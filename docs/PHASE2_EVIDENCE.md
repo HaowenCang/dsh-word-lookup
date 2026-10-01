@@ -174,9 +174,12 @@ drags counted in that window: 0
 
 | | Before | After |
 | --- | --- | --- |
-| Test files | 9 | 10 |
+| Test files | 8 | 9 |
 | Tests | 83 | **120** |
 | Failures | 0 | **0** |
+
+`+31` classifier tests and `+6` geometry tests account for the whole `83 → 120`
+delta.
 
 New coverage — classifier (`tests/client-gesture.spec.ts`, 31 tests):
 
@@ -241,8 +244,9 @@ auth        the isolated instance's own launch token
 phase1-verify: PASS — 77/77 checks
 ```
 
-Phase 1's 64 checks still pass unchanged. The 12 new Phase 2 checks, each run on
-the first boot (`B`) and again after a full restart (`R`):
+Phase 1's 64 checks still pass unchanged. The 13 new Phase 2 checks — 12 run on
+the first boot (`B`) and again after a full restart (`R`), plus `ISO05` — are:
+`64 + 13 = 77`.
 
 | Check | Claim | Measured |
 | --- | --- | --- |
@@ -325,3 +329,38 @@ no `dsh-word-lookup` bundle, dependency or junction.
 5. **No remote is configured and nothing was pushed**, as instructed.
 6. **The desktop DSH client is untested.** The shortcut defaults cover
    `desktop:*` profiles, but every measurement here is the Web client.
+
+## 16. Independent re-verification
+
+Phase 2 was re-verified from scratch in a later session, on 2026-10-01, without
+reusing any earlier session state. Nothing was rebuilt or rewritten: the same
+commit `da9f762` was measured again.
+
+```text
+$ npm run verify        PASS  typecheck + 120 tests (9 files) + build + 48/48 bundle checks
+$ npm run test:runtime  ISOLATION CHECK: PASS   (runner gate)
+                        ISOLATION CHECK: PASS   (harness gate)
+                        phase1-verify: PASS — 77/77 checks
+```
+
+The five critical claims were reproduced by this second run rather than carried
+over from the first:
+
+| Claim | First run | Re-verification |
+| --- | --- | --- |
+| real drag classified, zero requests | `kind=drag requests=0` | identical |
+| live range rectangle captured | `rect={x:156.6875,y:175,w:37.859375,h:19}` | byte-identical |
+| real double click classified, zero requests | `kind=double-click requests=0` | identical |
+| trailing `selectionchange` cannot become a drag | `kindAfterTrailing=double-click dragsDuringWindow=0` | identical |
+| 100 drags + 100 double clicks | `drags=100 doubleClicks=100 requests=0` | identical |
+| shortcut after the storm | `POST /api/dsh-word-lookup` exactly 1 | identical |
+
+Production was checked before and after the re-verification: port `19387` was
+held by pid `46308` throughout and was never restarted, port `50991` was free
+afterwards, and the `desktop` profile still carried no `dsh-word-lookup` bundle,
+dependency or junction.
+
+Two arithmetic errors in §8 and §12 of the first draft of this document were
+corrected during that pass: the test-file count is `8 → 9` (not `9 → 10`), and
+the Phase 2 additions are 13 checks (not 12 — `ISO05` is one of them), which is
+what makes `64 + 13 = 77`.
