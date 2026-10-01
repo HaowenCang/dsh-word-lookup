@@ -31,6 +31,7 @@
 import { spawn } from 'node:child_process'
 
 import { assertIsolatedDshEnvironment, buildIsolatedEnv, ISOLATION_BANNER } from './assert-isolated-env.mjs'
+import { redactTokens } from './redact.mjs'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -1216,15 +1217,6 @@ async function main() {
   report.finishedAt = new Date().toISOString()
 
   // --- report ---------------------------------------------------------------
-  // The launch token is a process credential: it mints the browser session
-  // cookie. Boot logs are kept for evidence, so the token is stripped first.
-  const redact = (text) => text.replace(/token=[A-Za-z0-9._~-]+/g, 'token=<redacted>')
-  for (const log of bootLogs) {
-    log.stdout = redact(log.stdout)
-    log.stderr = redact(log.stderr)
-  }
-  if (typeof report.facts.secondBootLog === 'string') report.facts.secondBootLog = redact(report.facts.secondBootLog)
-
   // Final isolation statement, recorded as a check so it lands in the report
   // rather than only on the console. Everything the run did addressed the
   // verified scratch environment; the processes it started were given a
@@ -1241,7 +1233,11 @@ async function main() {
   report.status = failed.length === 0 ? 'PASS' : 'FAIL'
 
   mkdirSync(resolve(OUT_PATH, '..'), { recursive: true })
-  writeFileSync(OUT_PATH, `${JSON.stringify(report, null, 2)}\n`, 'utf8')
+  // The launch token is a process credential: the URL it travels in mints the
+  // browser session cookie. `docs/evidence/` is committed, so the scrub runs
+  // over the whole report on the way out — including `environment.firstBootUrl`,
+  // which an earlier field-by-field scrub missed.
+  writeFileSync(OUT_PATH, `${JSON.stringify(redactTokens(report), null, 2)}\n`, 'utf8')
   console.log(`\nphase1-verify: ${report.status} — ${String(report.summary.passed)}/${String(report.summary.total)} checks`)
   console.log(`report: ${OUT_PATH}`)
   if (failed.length > 0) console.log(`failed: ${failed.map((result) => result.id).join(', ')}`)
@@ -1258,7 +1254,7 @@ main().catch((error) => {
   mkdirSync(resolve(OUT_PATH, '..'), { recursive: true })
   writeFileSync(
     OUT_PATH,
-    `${JSON.stringify({ status: 'ERROR', error: String(error?.stack ?? error), results, bootLogs }, null, 2)}\n`,
+    `${JSON.stringify(redactTokens({ status: 'ERROR', error: String(error?.stack ?? error), results, bootLogs }), null, 2)}\n`,
     'utf8',
   )
   process.exit(2)

@@ -364,3 +364,37 @@ Two arithmetic errors in §8 and §12 of the first draft of this document were
 corrected during that pass: the test-file count is `8 → 9` (not `9 → 10`), and
 the Phase 2 additions are 13 checks (not 12 — `ISO05` is one of them), which is
 what makes `64 + 13 = 77`.
+
+The run's token-free report is kept beside the first one at
+[`docs/evidence/phase2-reverification-20261001.json`](evidence/phase2-reverification-20261001.json).
+
+### 16.1 Credential-scrub gap found and fixed
+
+The mandatory "no credentials in the repository" check found that the harness
+scrubbed by field name: it redacted `bootLogs[].stdout`/`stderr` and
+`facts.secondBootLog`, but wrote `environment.firstBootUrl` and
+`environment.secondBootUrl` verbatim. The first re-verification report therefore
+contained **two live launch tokens** in `verify-out/`.
+
+Both belonged to the isolated instance and died with it — port `50991` was free
+by the time they were read, and `verify-out/` is gitignored — so nothing reached
+the repository. The gap was closed anyway, because `docs/evidence/*.json` **is**
+committed and the obvious next step is to copy a report there.
+
+The scrub now walks the whole report structurally, so a field added later is
+covered without anyone having to remember it:
+
+```text
+new       scripts/redact.mjs          redactTokenText / redactTokens
+          scripts/redact.d.mts        types, so typecheck covers the module
+          tests/redact.spec.ts        11 tests, incl. the exact leaked shape
+modified  scripts/phase1-verify.mjs   scrub at write time, on both write paths
+```
+
+It also covers the `status: 'ERROR'` path, which previously wrote `bootLogs`
+unscrubbed.
+
+Verified after the change rather than assumed: `npm run verify` → **PASS** — 10
+test files, **131** tests, 48/48 bundle checks; `npm run test:runtime` → **PASS —
+77/77**, and the report it wrote contains `0` unredacted tokens (`7 ×
+token=<redacted>`, with `environment.firstBootUrl` now scrubbed).
