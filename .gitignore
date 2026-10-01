@@ -1,0 +1,15 @@
+# Build output is committed on purpose: the DSH profile loader consumes
+# `lib/` directly through the package `exports` map, and Phase 1 evidence is
+# recorded against an exact build. Only dependencies and scratch state are
+# ignored.
+node_modules/
+*.tgz
+
+# Verification scratch space (isolated DSH homes, cookie jars, probe output).
+.tmp/
+verify-out/
+
+# Editor / OS noise.
+.DS_Store
+Thumbs.db
+*.log

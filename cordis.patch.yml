@@ -1,0 +1,10 @@
+# Loader row contributed by this package when it is listed in a profile's
+# `dsh.profile.bundles`.
+#
+# `id` is the Loader entry id and, by the DSH settings contract, also the
+# settings namespace the browser half addresses through
+# `ctx.configForms.get('dsh-word-lookup')`. `name` is the package specifier the
+# Loader resolves inside the profile.
+- insert:
+    - id: dsh-word-lookup
+      name: 'dsh-word-lookup'
