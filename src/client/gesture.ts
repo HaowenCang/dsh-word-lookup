@@ -20,10 +20,15 @@
  * by tests that need no browser, which is where the regressions that matter
  * would otherwise hide.
  *
- * **Phase 2 classifies only.** Nothing here issues a request, and the runtime
- * that consumes this state does not call the lookup transport from any pointer
- * or double-click path. `requestLookup` remains reachable from the manual
- * command alone.
+ * **Identity.** Since Phase 4 every gesture carries a monotonic `gestureId`,
+ * allocated when its press opens the sequence, and {@link classificationOf}
+ * projects the state onto the `{ id, kind, pointerType, at }` a trigger gate
+ * consumes. That is what makes "one semantic gesture, at most one automatic
+ * lookup" provable without consulting the clock, the text or the geometry.
+ *
+ * **This module still classifies only.** Nothing here issues a request or knows
+ * that a dictionary exists; the decision to look something up lives in
+ * `./trigger.js`, and the request itself in `./lookup.js`.
  *
  * @module dsh-word-lookup/client/gesture
  */
@@ -46,6 +51,55 @@ export const DRAG_THRESHOLD_PX = 5
 
 /** The semantic gestures the product distinguishes. */
 export type GestureKind = 'none' | 'drag' | 'double-click' | 'other'
+
+/**
+ * The pointer kinds the classifier distinguishes.
+ *
+ * `unknown` is a real category rather than a placeholder: it is what a
+ * `pointerdown` reports when the platform omits `pointerType` (synthetic events,
+ * and older engines). Phase 4 gates every automatic lookup on `mouse` and treats
+ * anything else as unverified, so this value is load-bearing for safety rather
+ * than cosmetic — see `evaluateAutomaticTrigger`.
+ */
+export type PointerKind = 'mouse' | 'pen' | 'touch' | 'unknown'
+
+/**
+ * Narrow a DOM `pointerType` string to a {@link PointerKind}.
+ *
+ * @param pointerType - the `PointerEvent.pointerType` value, if any.
+ * @returns the narrowed kind; `unknown` for anything not measured.
+ */
+export function pointerKind(pointerType: string | undefined): PointerKind {
+  if (pointerType === 'mouse' || pointerType === 'pen' || pointerType === 'touch') return pointerType
+  return 'unknown'
+}
+
+/**
+ * Identity and verdict of one completed classification.
+ *
+ * The identity is a **pointer-sequence identity**, allocated when a primary
+ * pointer press opens a gesture and carried by every classification that
+ * sequence produces. It is deliberately not a function of the text, the
+ * geometry or the time: two deliberate gestures on the same word are two
+ * gestures and must produce two lookups, and a reflow must not silently
+ * re-identify a gesture.
+ */
+export interface GestureClassification {
+  /**
+   * The pointer sequence's identity, allocated from a monotonic counter.
+   *
+   * A double click's `dblclick` carries the identity of the second press of the
+   * pair, which is the sequence it physically belongs to; the first press gets
+   * its own identity and never produces a lookup on its own.
+   */
+  readonly id: number
+  /** What the classification decided. */
+  readonly kind: GestureKind
+  /** The pointer kind that opened the sequence. */
+  readonly pointerType: PointerKind
+  /** When the classification completed, from the same clock as the event. */
+  readonly at: number
+}
 
 /**
  * Where the gesture phase currently is.
@@ -89,6 +143,15 @@ export interface GestureSnapshot {
   readonly completedAt: number | null
   /** The last completed gesture's geometry, or `null` before the first one. */
   readonly pointer: PointerSpan | null
+  /**
+   * Identity of the gesture the last classification belongs to; `0` before any
+   * gesture has been opened.
+   *
+   * Exposed because it is the single fact Phase 4's de-duplication is built on:
+   * a reader can see that two lookups came from two identities rather than from
+   * one identity consumed twice.
+   */
+  readonly gestureId: number
 }
 
 /** The classifier's full state, including what is in flight. */
@@ -99,6 +162,16 @@ export interface GestureState extends GestureSnapshot {
   readonly originY: number
   /** Peak travel of the in-flight pointer. Meaningless unless tracking. */
   readonly moved: number
+  /**
+   * Monotonic allocator for {@link GestureSnapshot.gestureId}.
+   *
+   * It only ever increases and is never reset, including by a cancel or a
+   * disposal: an identity that could be handed out twice would make the
+   * consumption ledger unsound.
+   */
+  readonly sequence: number
+  /** The pointer kind that opened the sequence {@link gestureId} names. */
+  readonly pointerType: PointerKind
 }
 
 /**
@@ -115,6 +188,9 @@ export const IDLE_GESTURE: GestureState = Object.freeze({
   originX: 0,
   originY: 0,
   moved: 0,
+  gestureId: 0,
+  sequence: 0,
+  pointerType: 'unknown',
 })
 
 /**
@@ -124,7 +200,24 @@ export const IDLE_GESTURE: GestureState = Object.freeze({
  * @returns the serializable gesture view.
  */
 export function gestureSnapshot(state: GestureState): GestureSnapshot {
-  return { kind: state.kind, completedAt: state.completedAt, pointer: state.pointer }
+  return { kind: state.kind, completedAt: state.completedAt, pointer: state.pointer, gestureId: state.gestureId }
+}
+
+/**
+ * Project the classifier state onto the classification a trigger gate consumes.
+ *
+ * `null` means "this state carries no classification at all", which is what the
+ * initial state and a cancelled-before-release state both report. A state that
+ * still carries an **earlier** classification reports it again — with the same
+ * identity, so a gate that de-duplicates by identity can only ever act on it
+ * once. That is deliberate: re-reading is safe, re-acting is not.
+ *
+ * @param state - the classifier state.
+ * @returns the classification, or `null` when there is none.
+ */
+export function classificationOf(state: GestureState): GestureClassification | null {
+  if (state.completedAt === null || state.kind === 'none') return null
+  return { id: state.gestureId, kind: state.kind, pointerType: state.pointerType, at: state.completedAt }
 }
 
 /**
@@ -157,6 +250,11 @@ function distanceBetween(ax: number, ay: number, bx: number, by: number): number
  * carries no text selection, and letting it open a gesture would let it close
  * one too.
  *
+ * Opening a gesture **allocates its identity**. That is the whole reason the
+ * allocation lives here rather than at classification time: the two pointer
+ * presses of a double click are two sequences with two identities, and the
+ * `dblclick` that follows the second one can be attributed to it exactly.
+ *
  * The previous classification is deliberately preserved: the snapshot always
  * describes the last *completed* gesture, so opening a new one does not blank
  * what the reader last did.
@@ -164,11 +262,27 @@ function distanceBetween(ax: number, ay: number, bx: number, by: number): number
  * @param state - the current state.
  * @param point - the press position.
  * @param button - the DOM `button` value; `0` is the primary button.
+ * @param pointerType - the pointer kind that produced the press.
  * @returns the next state.
  */
-export function beginPointer(state: GestureState, point: GesturePoint, button = 0): GestureState {
+export function beginPointer(
+  state: GestureState,
+  point: GesturePoint,
+  button = 0,
+  pointerType: PointerKind = 'unknown',
+): GestureState {
   if (button !== 0) return state
-  return { ...state, phase: 'tracking', originX: point.x, originY: point.y, moved: 0 }
+  const sequence = state.sequence + 1
+  return {
+    ...state,
+    phase: 'tracking',
+    originX: point.x,
+    originY: point.y,
+    moved: 0,
+    sequence,
+    gestureId: sequence,
+    pointerType,
+  }
 }
 
 /**
@@ -200,6 +314,9 @@ export function movePointer(state: GestureState, point: GesturePoint): GestureSt
  * rule. Once `dblclick` has classified the gesture, the release that produced it
  * cannot reinterpret it.
  *
+ * The identity is carried over unchanged: a release classifies the gesture the
+ * press opened, and it is never given an identity of its own.
+ *
  * @param state - the current state.
  * @param point - the release position.
  * @param hasEligibleSelection - whether a usable selection exists at release.
@@ -225,6 +342,9 @@ export function endPointer(state: GestureState, point: GesturePoint, hasEligible
     originX: 0,
     originY: 0,
     moved: 0,
+    gestureId: state.gestureId,
+    sequence: state.sequence,
+    pointerType: state.pointerType,
   }
 }
 
@@ -239,6 +359,15 @@ export function endPointer(state: GestureState, point: GesturePoint, hasEligible
  * Without an eligible selection at the moment of the double click there is
  * nothing to look up, so the gesture is recorded as `other` rather than claimed
  * as a usable double click.
+ *
+ * **Identity.** `dblclick` is reported by the platform after the second release,
+ * so it belongs to the sequence the second press opened: the state still carries
+ * that identity and it is reused rather than replaced. The first press of the
+ * pair keeps the identity it was given when it opened, and — since a short
+ * release is `other` — never produces a lookup of its own. When no press was
+ * observed at all (a synthetic `dblclick`, or an engine that delivers the event
+ * without pointer events) a fresh identity is allocated, so the gesture is still
+ * individually addressable and still de-duplicated exactly once.
  *
  * @param state - the current state.
  * @param point - the double click position.
@@ -266,6 +395,8 @@ export function registerDoubleClick(
           distance: inFlight,
         }
 
+  const sequence = state.gestureId === 0 ? state.sequence + 1 : state.sequence
+
   return {
     kind: hasEligibleSelection ? 'double-click' : 'other',
     completedAt: point.at,
@@ -274,6 +405,9 @@ export function registerDoubleClick(
     originX: 0,
     originY: 0,
     moved: 0,
+    gestureId: state.gestureId === 0 ? sequence : state.gestureId,
+    sequence,
+    pointerType: state.pointerType,
   }
 }
 
@@ -357,14 +491,16 @@ function countClassification(counters: GestureCounters, kind: GestureKind): Gest
  * @param observation - the current observation.
  * @param point - the press position.
  * @param button - the DOM `button` value.
+ * @param pointerType - the pointer kind that produced the press.
  * @returns the next observation.
  */
 export function observePointerDown(
   observation: GestureObservation,
   point: GesturePoint,
   button = 0,
+  pointerType: PointerKind = 'unknown',
 ): GestureObservation {
-  const state = beginPointer(observation.state, point, button)
+  const state = beginPointer(observation.state, point, button, pointerType)
   if (state === observation.state) return observation
   return { state, counters: { ...observation.counters, pointerdowns: observation.counters.pointerdowns + 1 } }
 }

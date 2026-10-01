@@ -21,14 +21,44 @@
 import z from '@deepseek-ai/schemastery';
 /** The plugin's configuration schema, exported under the name DSH looks for. */
 export declare const Config: z<Schemastery.ObjectS<NoInfer<{
-    /** Automatic lookup after a completed double click. Off by default. */
+    /**
+     * Automatic lookup after a completed double click. Off by default.
+     *
+     * The description is not decoration. Phase 3 shipped this switch with no
+     * behaviour behind it, so the settings row was a promise the plugin did not
+     * keep; Phase 4 makes it true, and the text says exactly which gesture it
+     * answers — a double click — so the row cannot be read as "look up whenever
+     * the selection changes".
+     */
     autoDoubleClick: z<boolean, boolean, "volatile-defined">;
-    /** Automatic lookup after a completed drag selection. Off by default. */
+    /**
+     * Automatic lookup after a completed drag selection. Off by default.
+     *
+     * "after dragging to select text" is the load-bearing phrase: this switch
+     * answers a finished pointer drag, not a `selectionchange` event. A keyboard
+     * selection, a programmatic one and the selection a double click produces are
+     * all deliberately outside it.
+     */
     autoSelection: z<boolean, boolean, "volatile-defined">;
 }>>, Schemastery.ObjectT<NoInfer<{
-    /** Automatic lookup after a completed double click. Off by default. */
+    /**
+     * Automatic lookup after a completed double click. Off by default.
+     *
+     * The description is not decoration. Phase 3 shipped this switch with no
+     * behaviour behind it, so the settings row was a promise the plugin did not
+     * keep; Phase 4 makes it true, and the text says exactly which gesture it
+     * answers — a double click — so the row cannot be read as "look up whenever
+     * the selection changes".
+     */
     autoDoubleClick: z<boolean, boolean, "volatile-defined">;
-    /** Automatic lookup after a completed drag selection. Off by default. */
+    /**
+     * Automatic lookup after a completed drag selection. Off by default.
+     *
+     * "after dragging to select text" is the load-bearing phrase: this switch
+     * answers a finished pointer drag, not a `selectionchange` event. A keyboard
+     * selection, a programmatic one and the selection a double click produces are
+     * all deliberately outside it.
+     */
     autoSelection: z<boolean, boolean, "volatile-defined">;
 }>>, "plain">;
 /**

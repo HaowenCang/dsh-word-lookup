@@ -17,27 +17,45 @@ before relying on anything below.
 | Package version | `0.1.0-dev.0`, private, not published |
 | Manual shortcut lookup | works, verified in a real browser |
 | Settings persistence | works, verified across a full restart |
-| Automatic lookup on double-click | **not implemented** |
-| Automatic lookup on drag-select | **not implemented** |
+| Automatic lookup on double-click | works when `autoDoubleClick` is on (default off), verified in a real browser |
+| Automatic lookup on drag-select | works when `autoSelection` is on (default off), verified in a real browser |
 | Dictionary storage | local SQLite (`node:sqlite`), package-owned fixture database |
 | Dictionary data (ECDICT / Tatoeba) | **not imported** — the store holds a hand-written fixture covering six lookup shapes |
 | Dictionary card UI | minimal; shows headword, phonetic, POS, Chinese meaning, forms and examples |
+| Pointer devices | mouse only — automatic lookup is refused for pen, touch and an unidentifiable pointer |
 
 The two automatic switches (`autoDoubleClick`, `autoSelection`) exist in the
-settings UI, default to **off**, and persist. They currently drive **nothing**:
-gesture classification exists, but no gesture triggers a lookup. Turning them on
-will not make automatic lookup happen. The manual `Primary+Shift+L` shortcut is
-the only path that reaches the dictionary.
+settings UI, default to **off**, and persist. Each one now drives exactly the
+gesture it names:
+
+```text
+autoSelection    a completed pointer drag selection   (not a selectionchange)
+autoDoubleClick  a double click the browser recognised
+```
+
+Neither switch affects the manual `Primary+Shift+L` shortcut, which is the only
+path that reaches the dictionary with both switches off.
+
+**`autoSelection` is not "the selection changed."** A keyboard selection, a
+programmatic one and the selection a double click produces are all deliberately
+outside it, and the plugin never issues a lookup from a `selectionchange` event.
+That is what keeps one double click to one lookup instead of two, and it is
+asserted two ways: a syntax-tree check that the `selectionchange` handler reaches
+no I/O, and a browser measurement that fifty programmatic selections issue zero
+requests with `autoSelection` on.
 
 ## How it works
 
 ```text
-browser (client half)                     host (Node half)
+browser (client half)                          host (Node half)
   selectionchange -> local snapshot only
   pointer/dblclick -> local gesture state only
-  shortcut run -----> POST api/dsh-word-lookup ----> SQLite dictionary lookup
-                                                     (deterministic fixture)
-                    <--------- structured result
+                       + monotonic gesture identity
+  gesture completes --> trigger gate --> maybe a lookup
+  shortcut run -------> POST api/dsh-word-lookup ----> SQLite dictionary lookup
+                                                       (deterministic fixture)
+                      <--------- structured result
+  latest request wins <--------- card state
   shell.overlay <---- renders the card
 ```
 
@@ -50,6 +68,32 @@ browser (client half)                     host (Node half)
   occupant, the command is registered with DSH's shortcut service, and the
   settings use DSH's own configuration form so the switches persist with the
   profile.
+
+### When a lookup happens
+
+Three paths, and only three:
+
+| path | trigger | can it be disabled |
+| --- | --- | --- |
+| `shortcut` | `Primary+Shift+L` on a qualifying selection | no — it is the first-class path |
+| `auto-selection` | a completed pointer **drag** that selected qualifying text | yes, `autoSelection` |
+| `auto-double-click` | the browser's own `dblclick` on qualifying text | yes, `autoDoubleClick` |
+
+Every automatic lookup passes through one gate (`src/client/trigger.ts`) which
+decides, in order: is this a real drag or double click; has this gesture identity
+already been used; is the switch that owns it on *right now*; is the pointer a
+kind this build measured; and was the selection captured when the gesture
+completed eligible. A refusal never consumes the gesture, so turning a switch on
+makes the very next gesture work and nothing else.
+
+Identity is a monotonic number allocated when a pointer press opens a gesture —
+never the text, never the rectangle, never a time window. Two deliberate
+double-clicks on the same word are therefore two lookups, and one gesture can
+never buy two.
+
+Requests are numbered too, so the newest lookup owns the card: a slow answer for
+A cannot roll the card back from B, and a superseded failure cannot bury a newer
+hit.
 
 ### The dictionary
 
@@ -117,7 +161,9 @@ src/
   shared/               types and text normalization shared by both halves
   client/
     index.tsx           browser runtime: overlay, command, settings, listeners
-    gesture.ts          pure gesture classifier (no DOM, no I/O)
+    gesture.ts          pure gesture classifier + identity (no DOM, no I/O)
+    trigger.ts          pure trigger gate: switches, eligibility, de-duplication
+    lookup.ts           request identity, supersession, the card's published state
     selection.ts        selection qualification and live-Range geometry
     card.tsx            the shell.overlay occupant
 fixtures/               generated fixture database (gitignored; see `npm run build:fixture`)
@@ -134,6 +180,7 @@ tests/                  unit tests (vitest)
 - [`docs/PHASE1_EVIDENCE.md`](docs/PHASE1_EVIDENCE.md) — Phase 1 runtime results
 - [`docs/PHASE2_EVIDENCE.md`](docs/PHASE2_EVIDENCE.md) — gesture classification results
 - [`docs/PHASE3_EVIDENCE.md`](docs/PHASE3_EVIDENCE.md) — SQLite dictionary results
+- [`docs/PHASE4_EVIDENCE.md`](docs/PHASE4_EVIDENCE.md) — trigger gate, de-duplication and request ordering
 
 ## License
 

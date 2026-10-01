@@ -306,6 +306,42 @@ async function installProbeNodes(page) {
     composer.textContent = 'derive inside the composer'
     document.body.appendChild(composer)
 
+    // Phase 4 drives real pointer gestures at real words. The paragraph above is
+    // the wrong target for that: a drag across it selects a phrase, and a double
+    // click lands wherever the sentence happens to put a word boundary. Each
+    // fixture word therefore gets its own line, in a column clear of the other
+    // probes, so a gesture can be aimed at exactly one known token and the
+    // expected query is known before the gesture is made.
+    const words = document.createElement('div')
+    words.setAttribute('data-phase1-probe', 'words')
+    // Without these two the probe is not a conversation node, and the plugin's
+    // own qualification rule would refuse every selection made inside it — the
+    // automatic paths would then measure "the drag was not eligible" while the
+    // report claimed to measure the switches. That is why every Phase 4 check
+    // asserts the *classification* alongside the request count.
+    words.setAttribute('data-chat-flow-kind', 'assistant-step')
+    words.setAttribute('data-chat-node-key', 'phase4:words:1')
+    words.style.cssText =
+      'position:fixed;right:24px;top:150px;z-index:2147482000;background:#1b1b20;color:#eaeaf0;padding:10px 14px;border-radius:6px;font:14px/1.6 system-ui;width:220px'
+    for (const word of [
+      'derive',
+      'derived',
+      'went',
+      'gone',
+      'teeth',
+      'conservation',
+      'unknowntoken',
+    ]) {
+      const line = document.createElement('div')
+      line.style.cssText = 'margin:0 0 4px'
+      const span = document.createElement('span')
+      span.setAttribute('data-phase1-word', word)
+      span.textContent = word
+      line.appendChild(span)
+      words.appendChild(line)
+    }
+    document.body.appendChild(words)
+
     // Recorded on the window bubble phase, registered after the plugin's own
     // listeners, so `defaultPrevented` shows whether the command consumed it.
     window.__PHASE1_KEY__ = null
@@ -351,6 +387,175 @@ async function selectWord(page, probe, word) {
 async function clearSelection(page) {
   await page.evaluate(() => {
     document.getSelection()?.removeAllRanges()
+  })
+}
+
+/**
+ * The bounding box of one word in the Phase 4 word probe.
+ *
+ * @param page - the authenticated page.
+ * @param word - the fixture word to measure.
+ * @returns the client-space box, or `null` when the probe is absent.
+ */
+async function wordBox(page, word) {
+  return await page.evaluate((target) => {
+    const span = document.querySelector(`[data-phase1-word="${target}"]`)
+    if (span === null) return null
+    const rect = span.getBoundingClientRect()
+    return { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
+  }, word)
+}
+
+/**
+ * Drag-select exactly one word with real trusted pointer input.
+ *
+ * The press starts one pixel inside the first glyph and the release ends one
+ * pixel inside the last, so the browser's own character-granular selection
+ * covers the whole word and nothing else. The press point is cleared of any
+ * previous selection first: pressing inside an existing selection starts a native
+ * drag-and-drop instead of extending one, and the resulting `pointercancel` would
+ * abandon the gesture rather than classify it.
+ *
+ * @param page - the authenticated page.
+ * @param word - the fixture word to select.
+ * @returns the box the gesture was aimed at, or `null` when the probe is absent.
+ */
+async function dragSelectWord(page, word) {
+  const box = await wordBox(page, word)
+  if (box === null) return null
+  await clearSelection(page)
+  const y = box.y + box.height / 2
+  await page.mouse.move(box.x + 1, y)
+  await page.mouse.down()
+  await page.mouse.move(box.x + Math.max(box.width - 1, 8), y, { steps: 6 })
+  await page.mouse.up()
+  await settle()
+  return box
+}
+
+/**
+ * Double-click exactly one word with real trusted pointer input.
+ *
+ * @param page - the authenticated page.
+ * @param word - the fixture word to double click.
+ * @returns the box the gesture was aimed at, or `null` when the probe is absent.
+ */
+async function doubleClickWord(page, word) {
+  const box = await wordBox(page, word)
+  if (box === null) return null
+  await clearSelection(page)
+  await page.mouse.dblclick(box.x + box.width / 2, box.y + box.height / 2)
+  await settle()
+  return box
+}
+
+/**
+ * Read the plugin's client-side view: the switches, the accounting and the gate.
+ *
+ * Every field is read in one round trip so the values describe one instant, and
+ * the origin accounting is read from the plugin rather than reconstructed from
+ * the wire — the two are compared, never conflated.
+ *
+ * @param page - the authenticated page.
+ * @returns the view.
+ */
+async function readPluginView(page) {
+  return await page.evaluate(() => {
+    const plugin = window.__DSH_WORD_LOOKUP__
+    return {
+      gates: plugin.gates(),
+      lookups: plugin.lookups(),
+      origins: plugin.lookupsByOrigin(),
+      trigger: plugin.trigger(),
+      capture: plugin.capture(),
+      selection: plugin.selection(),
+      requestId: plugin.requestId(),
+      loading: plugin.loading(),
+      lastOutcome: plugin.lastOutcome(),
+      card: plugin.card(),
+      gestures: plugin.gestures(),
+    }
+  })
+}
+
+/**
+ * Write one switch through the settings form, but only when it differs.
+ *
+ * Skipping a no-op write keeps a genuinely-unchanged value unchanged, which is
+ * what makes the live-transition checks in `main()` mean something rather than
+ * being satisfied by a write the harness made on its own.
+ *
+ * @param page - the authenticated page.
+ * @param field - `autoSelection` or `autoDoubleClick`.
+ * @param value - the value to establish.
+ * @returns the resulting gate value.
+ */
+async function ensureSwitch(page, field, value) {
+  const current = await page.evaluate((name) => window.__DSH_WORD_LOOKUP__.gates()[name], field)
+  if (current === value) return current
+  await page.evaluate(async ({ name, next }) => await window.__DSH_WORD_LOOKUP__.set(name, next), {
+    name: field,
+    next: value,
+  })
+  await settle()
+  return await page.evaluate((name) => window.__DSH_WORD_LOOKUP__.gates()[name], field)
+}
+
+/**
+ * Establish a complete switch state.
+ *
+ * @param page - the authenticated page.
+ * @param gates - the two switch values to establish.
+ * @returns the gate values actually in force afterwards.
+ */
+async function ensureSwitches(page, gates) {
+  await ensureSwitch(page, 'autoSelection', gates.autoSelection)
+  await ensureSwitch(page, 'autoDoubleClick', gates.autoDoubleClick)
+  return await page.evaluate(() => window.__DSH_WORD_LOOKUP__.gates())
+}
+
+/** The four switch states, named the way the test matrix names them. */
+const QUADRANTS = {
+  S00: { autoSelection: false, autoDoubleClick: false },
+  S10: { autoSelection: true, autoDoubleClick: false },
+  S01: { autoSelection: false, autoDoubleClick: true },
+  S11: { autoSelection: true, autoDoubleClick: true },
+}
+
+/** The two automatic origins, so a delta can name both. */
+const AUTOMATIC_ORIGINS = ['auto-selection', 'auto-double-click']
+
+/**
+ * Difference between two origin counts.
+ *
+ * @param before - the earlier view.
+ * @param after - the later view.
+ * @returns the per-origin delta, including the manual path.
+ */
+function originDelta(before, after) {
+  const delta = {}
+  for (const origin of ['shortcut', ...AUTOMATIC_ORIGINS]) delta[origin] = after.origins[origin] - before.origins[origin]
+  return delta
+}
+
+/**
+ * Whether every automatic origin in a delta is zero.
+ *
+ * @param delta - a delta produced by {@link originDelta}.
+ * @returns whether no automatic lookup was issued.
+ */
+function noAutomaticOrigin(delta) {
+  return AUTOMATIC_ORIGINS.every((origin) => delta[origin] === 0)
+}
+
+/** The query each observed request carried, read from its own body. */
+function requestQueries(requests) {
+  return requests.map((request) => {
+    try {
+      return JSON.parse(request.postData ?? '{}').query ?? null
+    } catch {
+      return null
+    }
   })
 }
 
@@ -625,6 +830,46 @@ async function runBrowserChecks(page, state, boot) {
     JSON.stringify(idleCard),
   )
 
+  // --- the settings mirror, read before anything can move it ----------------
+  // Phase 4 makes the two switches live: from the gesture section onward this
+  // harness writes them on purpose. The snapshot and the derived gates are
+  // therefore captured **first**, so `${prefix}20`/`${prefix}21` describe what
+  // this boot loaded rather than what the run left behind, and `bootGates` is the
+  // state the trigger matrix restores at the end.
+  await page.waitForFunction(() => window.__DSH_WORD_LOOKUP__.snapshot().status === 'ready', undefined, {
+    timeout: 30_000,
+  })
+  const snapshot = await page.evaluate(() => window.__DSH_WORD_LOOKUP__.snapshot())
+  const gates = await page.evaluate(() => window.__DSH_WORD_LOOKUP__.gates())
+  const bootGates = gates
+  facts.snapshotBeforeWrite = snapshot
+  facts.gatesBeforeWrite = gates
+  const settingsServed =
+    snapshot.status === 'ready' && snapshot.mode === 'host' && snapshot.writable === true && snapshot.revision !== undefined
+  // On the first boot the two switches must be at their composed defaults. On
+  // the restart they must instead carry what the earlier write persisted, which
+  // is asserted separately as S05/S06 — asserting "false" there would be
+  // asserting that the write was lost.
+  const settingsValues =
+    boot === 1
+      ? snapshot.value?.autoDoubleClick === false && snapshot.value?.autoSelection === false
+      : snapshot.value?.autoDoubleClick === true && snapshot.value?.autoSelection === true
+  record(
+    `${prefix}20`,
+    boot === 1
+      ? 'the settings namespace is served to the browser and both defaults are false'
+      : 'the settings namespace is served to the browser and carries the persisted values',
+    settingsServed && settingsValues,
+    JSON.stringify(snapshot),
+  )
+  record(
+    `${prefix}21`,
+    'the client gate values are derived from that snapshot',
+    gates.autoDoubleClick === (snapshot.value?.autoDoubleClick === true) &&
+      gates.autoSelection === (snapshot.value?.autoSelection === true),
+    JSON.stringify(gates),
+  )
+
   // --- shortcut catalog -----------------------------------------------------
   const catalog = await page.evaluate(() => window.__DSH_WORD_LOOKUP__.catalog())
   facts.catalog = catalog
@@ -832,11 +1077,25 @@ async function runBrowserChecks(page, state, boot) {
     JSON.stringify(direct.unknown),
   )
 
-  // --- automatic triggers are absent and produce zero requests --------------
+  // --- automatic triggers are measured from the OFF state -------------------
+  // Phase 4 makes the two switches live, so the boot's persisted value can no
+  // longer be assumed: on the second boot they are both `true`, and every check
+  // below is a claim about the OFF state. The state is therefore *established*
+  // and recorded here rather than inherited, and `bootGates` remembers what the
+  // boot actually loaded so the matrix can put it back.
+  const gatesForcedOff = await ensureSwitches(page, QUADRANTS.S00)
+  record(
+    `${prefix}A2`,
+    'the two switches are established OFF before the zero-request checks, whatever the boot loaded',
+    gatesForcedOff.autoSelection === false && gatesForcedOff.autoDoubleClick === false,
+    `boot=${JSON.stringify(bootGates)} now=${JSON.stringify(gatesForcedOff)}`,
+  )
+
   // Real trusted input, aimed at a real word inside a flow item: a double click
-  // (T02) and a drag selection (T01). Phase 1 has no trigger gate at all, so the
-  // expected count is zero for both; the selection they produce is still captured
-  // by the snapshot listener, which is what makes the zero meaningful.
+  // (T02) and a drag selection (T01). With both switches off the expected count
+  // is zero for both; the selection they produce is still captured by the
+  // snapshot listener, and the gate records *why* it refused, which is what makes
+  // the zero mean "refused" rather than "never asked".
   await clearSelection(page)
   const box = await page.locator('[data-phase1-probe="flow"] p[data-phase1-probe-line="drag"]').boundingBox()
   state.requests.length = 0
@@ -1053,11 +1312,15 @@ async function runBrowserChecks(page, state, boot) {
   // read off the wire, and the card is read from the DOM, so a plugin that
   // rendered an entry it had not actually been given would fail both ways.
   const phase3 = {}
-  // The settings echo is boot-dependent: boot 1 runs before the harness writes
-  // both switches, boot 2 runs after they persisted and a full restart reloaded
-  // them. Asserting `false` on boot 2 would be asserting the write was lost.
-  const expectedSwitches =
-    boot === 1 ? { autoDoubleClick: false, autoSelection: false } : { autoDoubleClick: true, autoSelection: true }
+  // The settings echo used to be compared against a boot constant: boot 1 ran
+  // before the harness wrote the switches, boot 2 after they persisted. Phase 4
+  // makes the two switches live, and `${prefix}A2` above establishes them OFF for
+  // the zero-request checks, so a boot constant no longer describes them — and a
+  // constant would be the weaker assertion anyway. The host's echo is compared
+  // against the **client's own live mirror**, read in the same breath, which is
+  // what the echo is actually a claim about: that both halves agree about the
+  // live configuration, on every boot and whatever it starts from.
+  const liveSwitches = async () => await page.evaluate(() => window.__DSH_WORD_LOOKUP__.gates())
 
   const deriveLookup = await lookupViaShortcut(page, state, 'derive')
   phase3.derive = deriveLookup
@@ -1148,8 +1411,11 @@ async function runBrowserChecks(page, state, boot) {
   )
 
   // --- the payload carries what the card needs ------------------------------
+  const switchesBeforePayload = await liveSwitches()
   const detailed = await postQuery(page, 'conservation')
+  const switchesAfterPayload = await liveSwitches()
   phase3.detailed = detailed
+  phase3.switches = { before: switchesBeforePayload, after: switchesAfterPayload }
   record(
     `${prefix}35`,
     'the payload carries headword, phonetic, POS, Chinese meaning, forms, examples and provenance',
@@ -1168,9 +1434,11 @@ async function runBrowserChecks(page, state, boot) {
       Array.isArray(detailed.body?.examples) &&
       detailed.body.examples.length > 0 &&
       detailed.body?.source === 'sqlite-fixture' &&
-      detailed.body?.settings?.autoDoubleClick === expectedSwitches.autoDoubleClick &&
-      detailed.body?.settings?.autoSelection === expectedSwitches.autoSelection,
-    JSON.stringify(detailed),
+      detailed.body?.settings?.autoDoubleClick === switchesBeforePayload.autoDoubleClick &&
+      detailed.body?.settings?.autoSelection === switchesBeforePayload.autoSelection &&
+      switchesAfterPayload.autoDoubleClick === switchesBeforePayload.autoDoubleClick &&
+      switchesAfterPayload.autoSelection === switchesBeforePayload.autoSelection,
+    JSON.stringify({ body: compactLookup(detailed.body), switches: phase3.switches }),
   )
 
   // --- SQL metacharacters are only words ------------------------------------
@@ -1242,36 +1510,681 @@ async function runBrowserChecks(page, state, boot) {
     `snapshotText=${JSON.stringify(fullWidth.snapshot.text)} body=${JSON.stringify(compactLookup(fullWidth.body))}`,
   )
 
+  // =========================================================================
+  // Phase 4 — the automatic trigger gate
+  // =========================================================================
+  // Everything below drives **real trusted input** (Playwright's mouse, at
+  // coordinates measured from a real DOM element) against the **live** switches,
+  // changed through the same form the settings UI calls. Two independent
+  // observations are taken for every measurement and compared rather than
+  // conflated:
+  //
+  // - the **wire**: request count, request body and response body, seen by
+  //   Playwright's network layer, which the plugin cannot influence;
+  // - the **plugin's own accounting**: which origin asked, what the gate
+  //   decided and why, and which gesture identity it decided about.
+  //
+  // A request count alone would be satisfied by a plugin whose origin accounting
+  // was wrong, and the accounting alone would be satisfied by a plugin that
+  // reported a lookup it never made. Both are asserted together.
+  const phase4 = {}
+
+  /** Wait until the observed request stream stops growing. */
+  async function waitForQuiescence(timeoutMs = 20_000) {
+    const deadline = Date.now() + timeoutMs
+    let last = -1
+    let stable = 0
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 250))
+      if (state.requests.length === last) {
+        stable += 1
+        if (stable >= 3) break
+      } else {
+        stable = 0
+        last = state.requests.length
+      }
+    }
+    return [...state.requests]
+  }
+
+  /**
+   * Measure one settings quadrant with one real drag and one real double click.
+   *
+   * @param gatesWanted - the switch state to establish first.
+   * @param word - the fixture word both gestures are aimed at.
+   * @returns the two measurements, each with its wire and plugin evidence.
+   */
+  async function measureQuadrant(gatesWanted, word) {
+    const active = await ensureSwitches(page, gatesWanted)
+
+    const dragBefore = await readPluginView(page)
+    state.requests.length = 0
+    state.responses.length = 0
+    const dragBox = await dragSelectWord(page, word)
+    const dragRequests = [...state.requests]
+    const dragResponses = dragRequests.length === 0 ? [] : await waitForResponses(state, dragRequests.length)
+    const dragAfter = await readPluginView(page)
+
+    const doubleBefore = await readPluginView(page)
+    state.requests.length = 0
+    state.responses.length = 0
+    const doubleBox = await doubleClickWord(page, word)
+    const doubleRequests = [...state.requests]
+    const doubleResponses = doubleRequests.length === 0 ? [] : await waitForResponses(state, doubleRequests.length)
+    const doubleAfter = await readPluginView(page)
+
+    return {
+      active,
+      drag: {
+        box: dragBox,
+        requests: dragRequests,
+        queries: requestQueries(dragRequests),
+        status: dragResponses[0]?.status ?? null,
+        responseQuery: dragResponses[0]?.body?.query ?? null,
+        headword: dragResponses[0]?.body?.headword ?? null,
+        delta: originDelta(dragBefore, dragAfter),
+        trigger: dragAfter.trigger,
+        capture: dragAfter.capture,
+        kind: dragAfter.gestures.last.kind,
+        gestureId: dragAfter.gestures.last.gestureId,
+        drags: dragAfter.gestures.counters.drags - dragBefore.gestures.counters.drags,
+      },
+      double: {
+        box: doubleBox,
+        requests: doubleRequests,
+        queries: requestQueries(doubleRequests),
+        status: doubleResponses[0]?.status ?? null,
+        responseQuery: doubleResponses[0]?.body?.query ?? null,
+        headword: doubleResponses[0]?.body?.headword ?? null,
+        delta: originDelta(doubleBefore, doubleAfter),
+        trigger: doubleAfter.trigger,
+        capture: doubleAfter.capture,
+        kind: doubleAfter.gestures.last.kind,
+        gestureId: doubleAfter.gestures.last.gestureId,
+        doubleClicks: doubleAfter.gestures.counters.doubleClickGestures - doubleBefore.gestures.counters.doubleClickGestures,
+      },
+    }
+  }
+
+  /** Compact one half of a quadrant measurement for the report. */
+  const compactHalf = (half) => ({
+    requests: half.requests.length,
+    queries: half.queries,
+    status: half.status,
+    responseQuery: half.responseQuery,
+    headword: half.headword,
+    delta: half.delta,
+    trigger: half.trigger === null ? null : { decision: half.trigger.decision, reason: half.trigger.reason, origin: half.trigger.origin, gestureId: half.trigger.gestureId },
+    capture: { eligible: half.capture.eligible, text: half.capture.text, rect: half.capture.rect },
+    kind: half.kind,
+    gestureId: half.gestureId,
+  })
+
+  // --- S00 ------------------------------------------------------------------
+  const s00 = await measureQuadrant(QUADRANTS.S00, 'derive')
+  phase4.s00 = { active: s00.active, drag: compactHalf(s00.drag), double: compactHalf(s00.double) }
+  record(
+    `${prefix}P01`,
+    'S00 — with both switches off a real drag selection issues no lookup, and the gate says why (T01/T22)',
+    s00.active.autoSelection === false &&
+      s00.active.autoDoubleClick === false &&
+      s00.drag.requests.length === 0 &&
+      s00.drag.drags === 1 &&
+      s00.drag.kind === 'drag' &&
+      s00.drag.capture.eligible === true &&
+      s00.drag.capture.text.trim() === 'derive' &&
+      s00.drag.capture.rect !== null &&
+      s00.drag.trigger?.decision === 'ignored' &&
+      s00.drag.trigger?.reason === 'switch-off' &&
+      noAutomaticOrigin(s00.drag.delta),
+    JSON.stringify(phase4.s00.drag),
+  )
+  record(
+    `${prefix}P02`,
+    'S00 — with both switches off a real double click issues no lookup, and the gate says why (T02)',
+    s00.double.requests.length === 0 &&
+      s00.double.doubleClicks === 1 &&
+      s00.double.kind === 'double-click' &&
+      s00.double.capture.eligible === true &&
+      s00.double.capture.text.trim() === 'derive' &&
+      s00.double.trigger?.decision === 'ignored' &&
+      s00.double.trigger?.reason === 'switch-off' &&
+      noAutomaticOrigin(s00.double.delta),
+    JSON.stringify(phase4.s00.double),
+  )
+  const s00Shortcut = await lookupViaShortcut(page, state, 'derive')
+  phase4.s00Shortcut = s00Shortcut
+  record(
+    `${prefix}P03`,
+    'S00 — the manual shortcut still issues exactly one lookup with both switches off (T03)',
+    s00Shortcut.requests === 1 &&
+      s00Shortcut.status === 200 &&
+      s00Shortcut.body?.headword === 'derive' &&
+      s00Shortcut.body?.source === 'sqlite-fixture',
+    JSON.stringify({ requests: s00Shortcut.requests, body: compactLookup(s00Shortcut.body) }),
+  )
+
+  // --- S10 ------------------------------------------------------------------
+  const s10 = await measureQuadrant(QUADRANTS.S10, 'derive')
+  phase4.s10 = { active: s10.active, drag: compactHalf(s10.drag), double: compactHalf(s10.double) }
+  record(
+    `${prefix}P04`,
+    'S10 — autoSelection on: a real drag selection issues exactly one lookup, from the auto-selection path (T05)',
+    s10.active.autoSelection === true &&
+      s10.active.autoDoubleClick === false &&
+      s10.drag.requests.length === 1 &&
+      s10.drag.drags === 1 &&
+      s10.drag.kind === 'drag' &&
+      s10.drag.capture.text.trim() === 'derive' &&
+      s10.drag.status === 200 &&
+      s10.drag.responseQuery === 'derive' &&
+      s10.drag.headword === 'derive' &&
+      s10.drag.trigger?.decision === 'lookup' &&
+      s10.drag.trigger?.origin === 'auto-selection' &&
+      s10.drag.delta['auto-selection'] === 1 &&
+      s10.drag.delta['auto-double-click'] === 0,
+    JSON.stringify(phase4.s10.drag),
+  )
+  record(
+    `${prefix}P05`,
+    'S10 — autoSelection on: a real double click still issues nothing, because it is not that switch’s gesture',
+    s10.double.requests.length === 0 &&
+      s10.double.doubleClicks === 1 &&
+      s10.double.kind === 'double-click' &&
+      s10.double.trigger?.reason === 'switch-off' &&
+      noAutomaticOrigin(s10.double.delta),
+    JSON.stringify(phase4.s10.double),
+  )
+  const s10Shortcut = await lookupViaShortcut(page, state, 'derive')
+  phase4.s10Shortcut = s10Shortcut
+  record(
+    `${prefix}P06`,
+    'S10 — the manual shortcut is not suppressed by the automatic path (T03)',
+    s10Shortcut.requests === 1 && s10Shortcut.outcome === 'found',
+    JSON.stringify({ requests: s10Shortcut.requests, outcome: s10Shortcut.outcome }),
+  )
+
+  // --- S01 ------------------------------------------------------------------
+  const s01 = await measureQuadrant(QUADRANTS.S01, 'derive')
+  phase4.s01 = { active: s01.active, drag: compactHalf(s01.drag), double: compactHalf(s01.double) }
+  record(
+    `${prefix}P07`,
+    'S01 — autoDoubleClick on: a real drag selection issues nothing, because it is not that switch’s gesture',
+    s01.active.autoDoubleClick === true &&
+      s01.active.autoSelection === false &&
+      s01.drag.requests.length === 0 &&
+      s01.drag.drags === 1 &&
+      s01.drag.trigger?.reason === 'switch-off' &&
+      noAutomaticOrigin(s01.drag.delta),
+    JSON.stringify(phase4.s01.drag),
+  )
+  record(
+    `${prefix}P08`,
+    'S01 — autoDoubleClick on: a real double click issues exactly one lookup, from the auto-double-click path (T04)',
+    s01.double.requests.length === 1 &&
+      s01.double.doubleClicks === 1 &&
+      s01.double.kind === 'double-click' &&
+      s01.double.capture.text.trim() === 'derive' &&
+      s01.double.status === 200 &&
+      s01.double.responseQuery === 'derive' &&
+      s01.double.headword === 'derive' &&
+      s01.double.trigger?.decision === 'lookup' &&
+      s01.double.trigger?.origin === 'auto-double-click' &&
+      s01.double.delta['auto-double-click'] === 1 &&
+      s01.double.delta['auto-selection'] === 0,
+    JSON.stringify(phase4.s01.double),
+  )
+  const s01Shortcut = await lookupViaShortcut(page, state, 'derive')
+  phase4.s01Shortcut = s01Shortcut
+  record(
+    `${prefix}P09`,
+    'S01 — the manual shortcut is not suppressed by the automatic path (T03)',
+    s01Shortcut.requests === 1 && s01Shortcut.outcome === 'found',
+    JSON.stringify({ requests: s01Shortcut.requests, outcome: s01Shortcut.outcome }),
+  )
+
+  // --- S11 ------------------------------------------------------------------
+  const s11 = await measureQuadrant(QUADRANTS.S11, 'derive')
+  phase4.s11 = { active: s11.active, drag: compactHalf(s11.drag), double: compactHalf(s11.double) }
+  record(
+    `${prefix}P10`,
+    'S11 — both switches on: one drag is exactly one lookup and one double click is exactly one lookup, on their own paths (T06)',
+    s11.active.autoSelection === true &&
+      s11.active.autoDoubleClick === true &&
+      s11.drag.requests.length === 1 &&
+      s11.drag.delta['auto-selection'] === 1 &&
+      s11.drag.delta['auto-double-click'] === 0 &&
+      s11.double.requests.length === 1 &&
+      s11.double.delta['auto-double-click'] === 1 &&
+      s11.double.delta['auto-selection'] === 0,
+    JSON.stringify({ drag: phase4.s11.drag, double: phase4.s11.double }),
+  )
+  record(
+    `${prefix}P11`,
+    'S11 — the trailing selectionchange of a double click cannot buy a second lookup through autoSelection',
+    s11.double.requests.length === 1 &&
+      s11.double.trigger?.origin === 'auto-double-click' &&
+      s11.double.delta['auto-selection'] === 0 &&
+      s11.double.kind === 'double-click',
+    JSON.stringify(phase4.s11.double),
+  )
+
+  // --- selectionchange is never a trigger -----------------------------------
+  // The brief's §36 assertion is structural (an AST check that the handler
+  // reaches no I/O). This is the behavioural half, and it is the case a naive
+  // `document.addEventListener('selectionchange', …)` implementation could not
+  // pass: fifty real selections, made with real Ranges, with autoSelection ON.
+  await ensureSwitches(page, QUADRANTS.S10)
+  const stormBefore = await readPluginView(page)
+  state.requests.length = 0
+  state.responses.length = 0
+  await page.evaluate(() => {
+    const host = document.querySelector('[data-phase1-probe="flow"]')
+    const node = host.firstChild
+    for (let index = 0; index < 50; index += 1) {
+      const range = document.createRange()
+      const start = index % 12
+      range.setStart(node.firstChild, start)
+      range.setEnd(node.firstChild, start + 6)
+      const selection = document.getSelection()
+      selection.removeAllRanges()
+      selection.addRange(range)
+    }
+  })
+  await settle()
+  const stormAfter = await readPluginView(page)
+  const selectionStorm = {
+    requests: [...state.requests],
+    delta: originDelta(stormBefore, stormAfter),
+    trigger: stormAfter.trigger,
+    // The two facts that make the zero meaningful rather than vacuous: the
+    // `selectionchange` listener really ran for these selections (the snapshot
+    // advanced and holds an eligible text), and no pointer gesture took place, so
+    // nothing but the selection events could have produced a request.
+    selection: { present: stormAfter.selection.present, eligible: stormAfter.selection.eligible, text: stormAfter.selection.text },
+    gestures: {
+      drags: stormAfter.gestures.counters.drags - stormBefore.gestures.counters.drags,
+      doubleClicks: stormAfter.gestures.counters.doubleClickGestures - stormBefore.gestures.counters.doubleClickGestures,
+    },
+  }
+  phase4.selectionStorm = selectionStorm
+  record(
+    `${prefix}P12`,
+    'S10 — fifty programmatic selection changes are observed, and issue zero lookups, so selectionchange is not a trigger (§36)',
+    selectionStorm.requests.length === 0 &&
+      selectionStorm.delta.shortcut === 0 &&
+      noAutomaticOrigin(selectionStorm.delta) &&
+      selectionStorm.selection.present === true &&
+      selectionStorm.selection.eligible === true &&
+      selectionStorm.selection.text.length > 0 &&
+      selectionStorm.gestures.drags === 0 &&
+      selectionStorm.gestures.doubleClicks === 0,
+    JSON.stringify(selectionStorm),
+  )
+
+  // --- live setting transitions ---------------------------------------------
+  // A switch that is only read at plugin load passes every quadrant above and
+  // fails here: this walks one switch up and back down without any reload, and
+  // requires the very next gesture to follow.
+  const liveSelection = []
+  for (const value of [false, true, false]) {
+    await ensureSwitch(page, 'autoSelection', value)
+    await ensureSwitch(page, 'autoDoubleClick', false)
+    state.requests.length = 0
+    state.responses.length = 0
+    const before = await readPluginView(page)
+    await dragSelectWord(page, 'derive')
+    const after = await readPluginView(page)
+    liveSelection.push({
+      value,
+      gates: after.gates,
+      requests: [...state.requests].length,
+      delta: originDelta(before, after),
+      reason: after.trigger?.reason ?? null,
+      origin: after.trigger?.origin ?? null,
+    })
+  }
+  phase4.liveSelection = liveSelection
+  record(
+    `${prefix}P13`,
+    'autoSelection follows false → true → false on consecutive drags, with no restart (live setting propagation)',
+    liveSelection[0].requests === 0 &&
+      liveSelection[0].delta['auto-selection'] === 0 &&
+      liveSelection[1].requests === 1 &&
+      liveSelection[1].delta['auto-selection'] === 1 &&
+      liveSelection[1].origin === 'auto-selection' &&
+      liveSelection[2].requests === 0 &&
+      liveSelection[2].delta['auto-selection'] === 0,
+    JSON.stringify(liveSelection),
+  )
+
+  const liveDouble = []
+  for (const value of [false, true, false]) {
+    await ensureSwitch(page, 'autoDoubleClick', value)
+    await ensureSwitch(page, 'autoSelection', false)
+    state.requests.length = 0
+    state.responses.length = 0
+    const before = await readPluginView(page)
+    await doubleClickWord(page, 'derive')
+    const after = await readPluginView(page)
+    liveDouble.push({
+      value,
+      gates: after.gates,
+      requests: [...state.requests].length,
+      delta: originDelta(before, after),
+      reason: after.trigger?.reason ?? null,
+      origin: after.trigger?.origin ?? null,
+    })
+  }
+  phase4.liveDouble = liveDouble
+  record(
+    `${prefix}P14`,
+    'autoDoubleClick follows false → true → false on consecutive double clicks, with no restart',
+    liveDouble[0].requests === 0 &&
+      liveDouble[0].delta['auto-double-click'] === 0 &&
+      liveDouble[1].requests === 1 &&
+      liveDouble[1].delta['auto-double-click'] === 1 &&
+      liveDouble[1].origin === 'auto-double-click' &&
+      liveDouble[2].requests === 0 &&
+      liveDouble[2].delta['auto-double-click'] === 0,
+    JSON.stringify(liveDouble),
+  )
+
+  // --- one gesture, one lookup — and two gestures, two lookups ---------------
+  // The de-duplication regression the brief calls out. If identity were derived
+  // from the text, from the rectangle or from a time window, the second gesture
+  // would be swallowed and the count would be one.
+  await ensureSwitches(page, QUADRANTS.S01)
+  state.requests.length = 0
+  state.responses.length = 0
+  const sameWordBefore = await readPluginView(page)
+  await doubleClickWord(page, 'derive')
+  const firstId = (await readPluginView(page)).gestures.last.gestureId
+  await doubleClickWord(page, 'derive')
+  const sameWordAfter = await readPluginView(page)
+  const repeatDouble = {
+    requests: requestQueries([...state.requests]),
+    delta: originDelta(sameWordBefore, sameWordAfter),
+    firstId,
+    secondId: sameWordAfter.gestures.last.gestureId,
+  }
+  phase4.repeatDouble = repeatDouble
+  record(
+    `${prefix}P15`,
+    'two independent double clicks on the same word are two gestures and two lookups, never one (T06 regression)',
+    repeatDouble.requests.length === 2 &&
+      repeatDouble.requests.every((query) => query === 'derive') &&
+      repeatDouble.delta['auto-double-click'] === 2 &&
+      repeatDouble.firstId !== repeatDouble.secondId,
+    JSON.stringify(repeatDouble),
+  )
+
+  await ensureSwitches(page, QUADRANTS.S10)
+  state.requests.length = 0
+  state.responses.length = 0
+  const repeatDragBefore = await readPluginView(page)
+  await dragSelectWord(page, 'derive')
+  const firstDragId = (await readPluginView(page)).gestures.last.gestureId
+  await dragSelectWord(page, 'derive')
+  const repeatDragAfter = await readPluginView(page)
+  const repeatDrag = {
+    requests: requestQueries([...state.requests]),
+    delta: originDelta(repeatDragBefore, repeatDragAfter),
+    firstId: firstDragId,
+    secondId: repeatDragAfter.gestures.last.gestureId,
+  }
+  phase4.repeatDrag = repeatDrag
+  record(
+    `${prefix}P16`,
+    'two independent drag selections of the same word are two gestures and two lookups, never one',
+    repeatDrag.requests.length === 2 &&
+      repeatDrag.requests.every((query) => query === 'derive') &&
+      repeatDrag.delta['auto-selection'] === 2 &&
+      repeatDrag.firstId !== repeatDrag.secondId,
+    JSON.stringify(repeatDrag),
+  )
+
+  // --- the card shows the answer to the gesture that was made ---------------
+  await ensureSwitches(page, QUADRANTS.S01)
+  state.requests.length = 0
+  state.responses.length = 0
+  await doubleClickWord(page, 'derived')
+  const derivedAuto = await waitForResponses(state, 1)
+  const derivedCard = await readCard(page)
+  const derivedView = await readPluginView(page)
+  phase4.derivedAuto = { response: compactLookup(derivedAuto[0]?.body ?? null), card: derivedCard }
+  record(
+    `${prefix}P17`,
+    'an automatic double click on "derived" resolves through the forms table and renders the lemma',
+    derivedAuto[0]?.body?.found === true &&
+      derivedAuto[0]?.body?.query === 'derived' &&
+      derivedAuto[0]?.body?.headword === 'derive' &&
+      derivedAuto[0]?.body?.matchedForm === 'derived' &&
+      derivedAuto[0]?.body?.source === 'sqlite-fixture' &&
+      derivedView.trigger?.origin === 'auto-double-click' &&
+      derivedCard.cardPresent === true &&
+      (derivedCard.headword ?? '').includes('derive'),
+    JSON.stringify(phase4.derivedAuto),
+  )
+
+  // Two automatic lookups issued back to back. The real dictionary answers in a
+  // few milliseconds, so this is not a race the host can be made to lose; what it
+  // proves is that a rapid pair leaves the card on the *second* gesture's answer
+  // and that the first one cannot come back over it. The genuinely out-of-order
+  // orders are driven deterministically in `tests/client-lookup.spec.ts` and
+  // through the real runtime in `tests/client-runtime-harness.spec.ts`.
+  state.requests.length = 0
+  state.responses.length = 0
+  const deriveBox = await wordBox(page, 'derive')
+  const wentBox = await wordBox(page, 'went')
+  await clearSelection(page)
+  if (deriveBox !== null) await page.mouse.dblclick(deriveBox.x + deriveBox.width / 2, deriveBox.y + deriveBox.height / 2)
+  await clearSelection(page)
+  if (wentBox !== null) await page.mouse.dblclick(wentBox.x + wentBox.width / 2, wentBox.y + wentBox.height / 2)
+  await settle()
+  const rapidRequests = requestQueries([...state.requests])
+  const rapidCard = await readCard(page)
+  const rapidView = await readPluginView(page)
+  phase4.rapidPair = { requests: rapidRequests, card: rapidCard, requestId: rapidView.requestId, loading: rapidView.loading }
+  record(
+    `${prefix}P18`,
+    'two automatic lookups in quick succession leave the card on the second query’s headword',
+    rapidRequests.length === 2 &&
+      rapidRequests[0] === 'derive' &&
+      rapidRequests[1] === 'went' &&
+      rapidCard.cardPresent === true &&
+      (rapidCard.headword ?? '').includes('go') &&
+      rapidView.loading === false,
+    JSON.stringify(phase4.rapidPair),
+  )
+
+  // --- a dictionary miss is not an error ------------------------------------
+  state.requests.length = 0
+  state.responses.length = 0
+  await doubleClickWord(page, 'unknowntoken')
+  const missResponses = await waitForResponses(state, 1)
+  const missCard = await readCard(page)
+  const missView = await readPluginView(page)
+  await doubleClickWord(page, 'derive')
+  const afterMissCard = await readCard(page)
+  phase4.unknownAuto = {
+    response: compactLookup(missResponses[0]?.body ?? null),
+    status: missResponses[0]?.status ?? null,
+    card: missCard,
+  }
+  record(
+    `${prefix}P19`,
+    'an automatic lookup of an unknown word is a normal miss, and the next gesture still works',
+    missResponses[0]?.status === 200 &&
+      missResponses[0]?.body?.found === false &&
+      missResponses[0]?.body?.query === 'unknowntoken' &&
+      missView.lastOutcome === 'not-found' &&
+      missCard.cardPresent === true &&
+      missCard.state === 'ready' &&
+      (missCard.body ?? '').includes('no entry for') &&
+      (afterMissCard.headword ?? '').includes('derive'),
+    JSON.stringify({ ...phase4.unknownAuto, after: afterMissCard }),
+  )
+
+  // --- the automatic path obeys the same composer exclusion as the shortcut --
+  await ensureSwitches(page, QUADRANTS.S11)
+  const composerBox = await page.locator('[data-phase1-probe="composer"]').boundingBox()
+  state.requests.length = 0
+  state.responses.length = 0
+  if (composerBox !== null) {
+    await clearSelection(page)
+    const y = composerBox.y + composerBox.height / 2
+    await page.mouse.move(composerBox.x + 4, y)
+    await page.mouse.down()
+    await page.mouse.move(composerBox.x + 60, y, { steps: 6 })
+    await page.mouse.up()
+    await settle()
+  }
+  const composerDrag = await readPluginView(page)
+  phase4.composerDrag = {
+    requests: [...state.requests].length,
+    kind: composerDrag.gestures.last.kind,
+    trigger: composerDrag.trigger,
+    box: composerBox,
+  }
+  record(
+    `${prefix}P20`,
+    'an automatic drag inside the composer issues nothing, because the classifier finds no eligible selection (T08)',
+    composerBox !== null &&
+      phase4.composerDrag.requests === 0 &&
+      composerDrag.gestures.last.kind === 'other' &&
+      composerDrag.trigger?.decision === 'ignored',
+    JSON.stringify(phase4.composerDrag),
+  )
+
+  state.requests.length = 0
+  state.responses.length = 0
+  if (composerBox !== null) {
+    await clearSelection(page)
+    await page.mouse.dblclick(composerBox.x + 40, composerBox.y + composerBox.height / 2)
+    await settle()
+  }
+  const composerDouble = await readPluginView(page)
+  phase4.composerDouble = {
+    requests: [...state.requests].length,
+    kind: composerDouble.gestures.last.kind,
+    trigger: composerDouble.trigger,
+  }
+  record(
+    `${prefix}P21`,
+    'an automatic double click inside the composer issues nothing (T08)',
+    composerBox !== null &&
+      phase4.composerDouble.requests === 0 &&
+      composerDouble.gestures.last.kind === 'other' &&
+      composerDouble.trigger?.decision === 'ignored',
+    JSON.stringify(phase4.composerDouble),
+  )
+
+  // --- stress ---------------------------------------------------------------
+  // The gesture storm is replayed in every quadrant. 100 + 100 is run for the two
+  // states the brief requires in a real browser (both off, both on) and a reduced
+  // 25 + 25 batch for the two single-switch states, whose only additional claim
+  // is *which* switch fired — a claim the batch size cannot weaken. The full
+  // 100 + 100 combinatorial matrix is covered exhaustively and cheaply in
+  // `tests/client-trigger.spec.ts` and `tests/client-runtime-harness.spec.ts`.
+  async function storm(dragCount, doubleClickCount) {
+    const before = await readPluginView(page)
+    state.requests.length = 0
+    state.responses.length = 0
+    for (let index = 0; index < dragCount; index += 1) {
+      await clearSelection(page)
+      await dragAcrossProbe()
+    }
+    for (let index = 0; index < doubleClickCount; index += 1) {
+      if (box !== null) await page.mouse.dblclick(box.x + 90, box.y + box.height / 2)
+    }
+    const requests = await waitForQuiescence()
+    const after = await readPluginView(page)
+    return {
+      requests: requests.length,
+      delta: originDelta(before, after),
+      drags: after.gestures.counters.drags - before.gestures.counters.drags,
+      doubleClicks: after.gestures.counters.doubleClickGestures - before.gestures.counters.doubleClickGestures,
+      cancels: after.gestures.counters.cancels - before.gestures.counters.cancels,
+    }
+  }
+
+  await ensureSwitches(page, QUADRANTS.S00)
+  const stress00 = await storm(100, 100)
+  phase4.stress00 = stress00
+  record(
+    `${prefix}P22`,
+    'S00 stress — 100 real drags and 100 real double clicks produce zero lookups (T01/T02/T22)',
+    stress00.drags === 100 &&
+      stress00.doubleClicks === 100 &&
+      stress00.requests === 0 &&
+      stress00.delta.shortcut === 0 &&
+      noAutomaticOrigin(stress00.delta),
+    JSON.stringify(stress00),
+  )
+
+  await ensureSwitches(page, QUADRANTS.S11)
+  const stress11 = await storm(100, 100)
+  phase4.stress11 = stress11
+  record(
+    `${prefix}P23`,
+    'S11 stress — 100 real drags and 100 real double clicks produce exactly 200 lookups, 100 on each path',
+    stress11.drags === 100 &&
+      stress11.doubleClicks === 100 &&
+      stress11.requests === 200 &&
+      stress11.delta['auto-selection'] === 100 &&
+      stress11.delta['auto-double-click'] === 100 &&
+      stress11.delta.shortcut === 0,
+    JSON.stringify(stress11),
+  )
+
+  await ensureSwitches(page, QUADRANTS.S10)
+  const stress10 = await storm(25, 25)
+  phase4.stress10 = stress10
+  record(
+    `${prefix}P24`,
+    'S10 stress — real drags and double clicks produce exactly one lookup per drag and none per double click',
+    stress10.drags === 25 &&
+      stress10.doubleClicks === 25 &&
+      stress10.requests === 25 &&
+      stress10.delta['auto-selection'] === 25 &&
+      stress10.delta['auto-double-click'] === 0,
+    JSON.stringify(stress10),
+  )
+
+  await ensureSwitches(page, QUADRANTS.S01)
+  const stress01 = await storm(25, 25)
+  phase4.stress01 = stress01
+  record(
+    `${prefix}P25`,
+    'S01 stress — real gestures produce exactly one lookup per double click and none per drag',
+    stress01.drags === 25 &&
+      stress01.doubleClicks === 25 &&
+      stress01.requests === 25 &&
+      stress01.delta['auto-double-click'] === 25 &&
+      stress01.delta['auto-selection'] === 0,
+    JSON.stringify(stress01),
+  )
+
+  // The matrix changed the switches on purpose. They are put back to what this
+  // boot loaded, so a later check cannot be satisfied by a write this harness
+  // made here rather than by the one it is measuring.
+  const restoredGates = await ensureSwitches(page, bootGates)
+  phase4.bootGates = bootGates
+  phase4.restoredGates = restoredGates
+  record(
+    `${prefix}P26`,
+    'the trigger matrix left the two switches exactly as this boot loaded them',
+    restoredGates.autoSelection === bootGates.autoSelection &&
+      restoredGates.autoDoubleClick === bootGates.autoDoubleClick,
+    `boot=${JSON.stringify(bootGates)} restored=${JSON.stringify(restoredGates)}`,
+  )
+  facts.phase4 = phase4
+
   // --- settings mirror ------------------------------------------------------
-  const snapshot = await page.evaluate(() => window.__DSH_WORD_LOOKUP__.snapshot())
-  const gates = await page.evaluate(() => window.__DSH_WORD_LOOKUP__.gates())
-  facts.snapshotBeforeWrite = snapshot
-  facts.gatesBeforeWrite = gates
-  const settingsServed =
-    snapshot.status === 'ready' && snapshot.mode === 'host' && snapshot.writable === true && snapshot.revision !== undefined
-  // On the first boot the two switches must be at their composed defaults. On
-  // the restart they must instead carry what the earlier write persisted, which
-  // is asserted separately as S05/S06 — asserting "false" there would be
-  // asserting that the write was lost.
-  const settingsValues =
-    boot === 1
-      ? snapshot.value?.autoDoubleClick === false && snapshot.value?.autoSelection === false
-      : snapshot.value?.autoDoubleClick === true && snapshot.value?.autoSelection === true
-  record(
-    `${prefix}20`,
-    boot === 1
-      ? 'the settings namespace is served to the browser and both defaults are false'
-      : 'the settings namespace is served to the browser and carries the persisted values',
-    settingsServed && settingsValues,
-    JSON.stringify(snapshot),
-  )
-  record(
-    `${prefix}21`,
-    'the client gate values are derived from that snapshot',
-    gates.autoDoubleClick === (snapshot.value?.autoDoubleClick === true) &&
-      gates.autoSelection === (snapshot.value?.autoSelection === true),
-    JSON.stringify(gates),
-  )
+  // Already measured at `${prefix}20`/`${prefix}21`, before any write could move
+  // the values. Nothing is re-read here: a second read after the matrix below
+  // would describe the run's own writes, not the boot's state.
 
   // --- DOM integrity --------------------------------------------------------
   const dom = await page.evaluate(() => ({
@@ -1451,6 +2364,48 @@ async function main() {
         reloaded.catalog.row !== null &&
         reloaded.catalog.row.conflicts.length === 0,
       JSON.stringify(reloaded),
+    )
+
+    // --- Phase 4: a reloaded runtime must not have stacked its listeners -----
+    // L01 proves the overlay and the command were registered once. Automatic
+    // lookups add five more listeners, and a reload that left a previous set
+    // behind would make one gesture issue two or three requests — the exact
+    // regression this measures. Both switches are `true` at this point, written
+    // by S01/S04 above, so the automatic paths are live.
+    await installProbeNodes(page)
+    await dismissDialogs(page)
+    await page.waitForTimeout(400)
+    state.requests.length = 0
+    state.responses.length = 0
+    await doubleClickWord(page, 'derive')
+    const reloadDoubleRequests = requestQueries([...state.requests])
+    const reloadDoubleView = await readPluginView(page)
+
+    state.requests.length = 0
+    state.responses.length = 0
+    await dragSelectWord(page, 'went')
+    const reloadDragRequests = requestQueries([...state.requests])
+    const reloadDragView = await readPluginView(page)
+
+    report.facts.afterReloadTriggers = {
+      double: { requests: reloadDoubleRequests, gates: reloadDoubleView.gates, trigger: reloadDoubleView.trigger },
+      drag: { requests: reloadDragRequests, gates: reloadDragView.gates, trigger: reloadDragView.trigger },
+    }
+    record(
+      'L06',
+      'after a full client reload one double click still issues exactly one lookup, so no listener was stacked',
+      reloadDoubleRequests.length === 1 &&
+        reloadDoubleRequests[0] === 'derive' &&
+        reloadDoubleView.trigger?.origin === 'auto-double-click',
+      JSON.stringify(report.facts.afterReloadTriggers.double),
+    )
+    record(
+      'L07',
+      'after a full client reload one drag selection still issues exactly one lookup',
+      reloadDragRequests.length === 1 &&
+        reloadDragRequests[0] === 'went' &&
+        reloadDragView.trigger?.origin === 'auto-selection',
+      JSON.stringify(report.facts.afterReloadTriggers.drag),
     )
 
     // --- console cleanliness ------------------------------------------------

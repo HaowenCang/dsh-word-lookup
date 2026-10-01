@@ -280,10 +280,76 @@ check(
   hostCode.includes('"sqlite-fixture"'),
   'the runtime must not still answer as the Phase 1 stub',
 )
+// Phase 4 §37: the two switches now drive real behaviour, so the settings rows
+// have to describe the gesture each one answers. The copy is asserted in the
+// emitted host bundle because that is where DSH reads the config schema from.
+for (const [field, description] of [
+  ['autoSelection', 'Automatically look up after dragging to select text'],
+  ['autoDoubleClick', 'Automatically look up a word after double-clicking it'],
+]) {
+  check(
+    `host bundle describes ${field} as the gesture it answers`,
+    host.includes(description),
+    `the settings row must not read as "look up on any selection change"`,
+  )
+}
 check(
   'the emitted host code claims no corpus and no stub as a source',
   !/"stub"|'stub'/.test(hostCode) && !/["']ECDICT["']/.test(hostCode) && !/["']Tatoeba["']/.test(hostCode),
   'provenance must describe the data that is actually there',
+)
+
+// --- Phase 4: the trigger gate lives in the browser, and only there ----------
+// Phase 4 connects the two switches to the gesture classifier. Two properties
+// have to hold in the emitted bytes rather than only in the sources: the gate
+// must actually be *in* the browser bundle, and the interaction concern it
+// carries must not have leaked into the host. A gate that shipped to the host
+// would mean the route had learned about pointer gestures, and a gate missing
+// from the client would mean the switches were inert again.
+for (const [label, needle] of [
+  ['the auto-selection origin', '"auto-selection"'],
+  ['the auto-double-click origin', '"auto-double-click"'],
+  ['the manual origin', '"shortcut"'],
+  ['the duplicate refusal reason', '"duplicate-gesture"'],
+  ['the switched-off refusal reason', '"switch-off"'],
+  ['the unverified-pointer refusal reason', '"unverified-pointer-kind"'],
+  ['the not-a-trigger refusal reason', '"not-a-trigger-gesture"'],
+]) {
+  check(`client bundle carries ${label}`, client.includes(needle), needle)
+}
+check(
+  'client bundle classifies pointer kinds, so an unverified one can be refused',
+  client.includes('pointerType') && client.includes('"mouse"'),
+  'the automatic paths are gated on the pointer kind the build measured',
+)
+check(
+  'client bundle allocates a gesture identity',
+  client.includes('gestureId') && client.includes('sequence'),
+  'de-duplication is by identity, never by text or by a time window',
+)
+// Phase 4 §18: no timer may decide whether a gesture happened. `setTimeout` in
+// the browser half would mean user-space gesture recognition rather than
+// consuming the classifier and the platform's own `dblclick`.
+const clientTimers = client.split('\n').filter((line) => /\b(setTimeout|setInterval|setImmediate)\s*\(/.test(line))
+check(
+  'client bundle uses no timer',
+  clientTimers.length === 0,
+  clientTimers.map((line) => line.trim().slice(0, 90)).join(' | ') || 'none',
+)
+// The interaction concern stays on the client: the host answers queries and
+// knows nothing about how one was asked for.
+for (const token of ['auto-selection', 'auto-double-click', 'gestureId', 'pointerType', 'duplicate-gesture']) {
+  check(`host bundle carries no gesture concern ("${token}")`, !host.includes(token))
+}
+check(
+  'host bundle still carries no pointer or selection event name',
+  !/["'](pointerdown|pointerup|pointermove|selectionchange|dblclick)["']/.test(host),
+  'a host that subscribed to a DOM event would be a second, unreviewed trigger path',
+)
+check(
+  'client bundle requests no origin field on the wire',
+  !client.includes('"origin"') && !/"origin"\s*:/.test(client),
+  'origin is client state; the HTTP contract is unchanged by Phase 4',
 )
 
 // --- package.json addresses real files --------------------------------------

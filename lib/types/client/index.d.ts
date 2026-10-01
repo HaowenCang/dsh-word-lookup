@@ -18,31 +18,41 @@
  * - a `selectionchange` listener that refreshes a local snapshot of the text and
  *   its live geometry, and nothing else;
  * - Phase 2: pointer and `dblclick` listeners that classify the last completed
- *   gesture into drag / double-click / other, and record it locally.
+ *   gesture into drag / double-click / other, each carrying a monotonic identity;
+ * - Phase 4: a trigger gate that turns a completed classification into a lookup
+ *   when — and only when — the switch that owns it is on, the pointer is one this
+ *   build measured, the selection captured at completion is eligible, and that
+ *   gesture identity has not already been consumed.
  *
- * It deliberately does **not** contribute: any automatic trigger, any dictionary
- * UI, any lookup history, or any model call.
+ * It deliberately does **not** contribute: any dictionary UI, any lookup history,
+ * any model call, or any timer that re-derives what the browser already knows.
  *
  * The I/O invariant is the one thing in this file that must stay obvious:
  *
  * ```text
- * selectionchange  -> local snapshot only
+ * selectionchange  -> local snapshot only          (no ticket, no gate, no I/O)
  * pointer events   -> local gesture state only
  * dblclick         -> local gesture state only
- * shortcut run     -> the only call site of runLookup
+ * gesture completion -> trigger gate -> maybe runLookup
+ * shortcut run     -> runLookup
  * ```
  *
- * Classification exists so that a later phase *can* gate the two automatic
- * switches on a real gesture. Phase 2 does not act on the classification: both
- * switches remain inert however they are set, and a drag or a double click
- * still produces zero requests.
+ * `selectionchange` is deliberately **not** a trigger. The product's
+ * `autoSelection` means a completed pointer drag, not "the selection changed":
+ * a double click produces a `selectionchange` too, a keyboard selection produces
+ * one, and a programmatic one produces one. Gating on the event would make
+ * `autoSelection` mean something the reader never asked for and would fire a
+ * second lookup for the trailing change of every double click.
  *
  * @module dsh-word-lookup/client
  */
 import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client';
 import type { ClientContext } from './contracts.js';
 import { type GestureCounters, type GestureSnapshot } from './gesture.js';
+import { type LookupCounts } from './lookup.js';
 import { type SelectionRect } from './selection.js';
+import { type CardState } from './store.js';
+import { type LookupOrigin, type TriggerGates } from './trigger.js';
 /**
  * Client services this half requires before activation.
  *
@@ -75,17 +85,13 @@ export declare const CARD_ORDER = 900;
 /**
  * The two switches as the browser sees them.
  *
- * `false` for either field means the corresponding automatic trigger is off. In
- * Phase 1 the mirror is read and republished but drives nothing: the automatic
- * paths do not exist yet, and the manual command is deliberately not gated by
- * them.
+ * `false` for either field means the corresponding automatic trigger is off. The
+ * mirror is refreshed from the settings form's subscription, and the gate reads
+ * the current value at each gesture rather than one captured at plugin load, so
+ * a change in the settings UI takes effect on the reader's next gesture with no
+ * reload. The manual command is deliberately not gated by either switch.
  */
-export interface LookupGates {
-    /** Mirror value of `Config.autoDoubleClick`. */
-    readonly autoDoubleClick: boolean;
-    /** Mirror value of `Config.autoSelection`. */
-    readonly autoSelection: boolean;
-}
+export type LookupGates = TriggerGates;
 /** The settings section this plugin's namespace carries. */
 interface HostSettings {
     readonly autoDoubleClick?: boolean;
@@ -113,14 +119,14 @@ export interface SelectionSnapshot {
     readonly gesture: GestureSnapshot;
 }
 /**
- * Phase 1 verification surface.
+ * The verification surface.
  *
- * Phase 1's acceptance criteria require observing client-side state that has no
- * product affordance yet — the live settings snapshot, the gate values, and how
- * many lookups a gesture sequence produced. This object is the instrument for
- * that, and it is the only global the plugin publishes. It is scheduled for
- * removal once the automatic triggers and the real card exist (Phase 5), at
- * which point every value here has a visible surface.
+ * Its acceptance criteria require observing client-side state that has no
+ * product affordance — the live settings snapshot, the switch values, how many
+ * lookups a gesture sequence produced and *which path asked for each*. This
+ * object is the instrument for that, and it is the only global the plugin
+ * publishes. It is scheduled for removal once the card carries every value here
+ * on screen (a later phase), at which point nothing here is invisible.
  */
 export interface WordLookupDiagnostics {
     /** Package id. */
@@ -199,6 +205,59 @@ export interface WordLookupDiagnostics {
     };
     /** How many lookups this plugin has issued since page load. */
     lookups(): number;
+    /**
+     * The same count, split by which path asked.
+     *
+     * This is the measurement that makes the four-state settings matrix checkable:
+     * a total alone cannot tell "the drag triggered" from "the double click did",
+     * and the two switches are only honest if each one moves its own counter.
+     */
+    lookupsByOrigin(): LookupCounts;
+    /** The origins a lookup can come from, for a report that iterates them. */
+    origins(): readonly LookupOrigin[];
+    /**
+     * The last automatic evaluation, accepted or suppressed.
+     *
+     * `reason` is what distinguishes "the gate refused this gesture" from "the gate
+     * never saw it". A request count of zero means the former and could never prove
+     * the latter, which is exactly the failure a missing trigger would produce.
+     */
+    trigger(): {
+        readonly decision: 'lookup' | 'ignored';
+        readonly reason: string;
+        readonly origin: LookupOrigin | null;
+        readonly gestureId: number;
+        readonly query: string;
+    } | null;
+    /**
+     * The selection captured with the last automatic evaluation.
+     *
+     * The decision reports a query only when it accepted one, so this is what
+     * separates "the gate refused the right gesture" from "the gate was handed the
+     * wrong text": both produce zero requests.
+     */
+    capture(): {
+        readonly eligible: boolean;
+        readonly text: string;
+        readonly rect: SelectionRect | null;
+    };
+    /**
+     * Identity of the request currently allowed to publish to the card.
+     *
+     * Requests are numbered monotonically and only the newest may publish, so this
+     * value alone decides whether a slow answer is shown or dropped.
+     */
+    requestId(): number;
+    /** Whether the card is waiting on the request that owns it. */
+    loading(): boolean;
+    /**
+     * The card's current state.
+     *
+     * The browser harness reads the rendered card out of the DOM instead; this is
+     * the same value one step earlier, which is what a test without a DOM needs to
+     * tell "the newest answer is on screen" from "an answer arrived".
+     */
+    card(): CardState;
     /** The last lookup outcome's discriminant, or `null`. */
     lastOutcome(): string | null;
     /** Write one switch through the same form the settings UI uses. */
