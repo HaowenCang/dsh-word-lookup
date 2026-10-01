@@ -43,9 +43,11 @@
   },
   "scripts": {
     "build": "tsdown && tsc -p tsconfig.build.json",
+    "build:fixture": "node scripts/build-fixture-db.mjs --force",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
     "verify": "node scripts/verify.mjs",
+    "scan:credentials": "node scripts/scan-credentials.mjs",
     "iso:check": "node scripts/assert-isolated-env.mjs",
     "test-profile:create": "node scripts/create-test-profile.mjs",
     "test-profile:cleanup": "node scripts/cleanup-test-profile.mjs",

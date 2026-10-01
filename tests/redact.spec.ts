@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Launch-token scrubbing for evidence files.
  *
  * The regression this file exists for is real: the harness redacted `bootLogs`
@@ -7,19 +7,28 @@
  * launch tokens. `docs/evidence/` is committed, so the failure mode is a
  * credential in the repository.
  *
- * The scrub is therefore asserted structurally — on a report shaped like the one
- * that leaked — rather than field by field.
+ * The scrub is therefore asserted structurally 鈥?on a report shaped like the one
+ * that leaked 鈥?rather than field by field.
  */
 
 import { describe, expect, it } from 'vitest'
 
 import { REDACTED_TOKEN, redactTokenText, redactTokens } from '../scripts/redact.mjs'
 
-/** A launch URL with a token, in the shape DSH actually prints. */
-const LAUNCH_URL = 'http://127.0.0.1:50991/?token=eHv00anBdUDKoJmHFM-TRNWmSVBYSikBhVoGQ5Lm9pQ'
+/**
+ * A launch URL with a token, in the shape DSH actually prints.
+ *
+ * The value is fabricated for this test and is deliberately not a random-looking
+ * string: it is 43 characters 鈥?the length of a real launch token 鈥?drawn from
+ * the same alphabet, so the scrub is exercised against a faithful shape, while a
+ * reader or a scanner can see at a glance that it was never minted by anything.
+ * Committing a value that merely *looks* like a credential is a false positive
+ * every future credential scan has to reason about.
+ */
+const LAUNCH_URL = 'http://127.0.0.1:50991/?token=NOTAREALCREDENTIALAAAAAAAAAAAAAAAAAAAAAAAAA'
 
-/** A second, different token. */
-const OTHER_URL = 'http://127.0.0.1:50991/?token=T2xAzqfWtrD8V4J_36y57t3VG8uwTKuQHHAf3-9u0Es'
+/** A second, different fabricated token. */
+const OTHER_URL = 'http://127.0.0.1:50991/?token=FIXTUREONLYVALUEBBBBBBBBBBBBBBBBBBBBBBBBBBB'
 
 describe('redactTokenText', () => {
   it('removes the token from a launch URL', () => {
@@ -33,8 +42,8 @@ describe('redactTokenText', () => {
 
   it('removes every token, not only the first', () => {
     const scrubbed = redactTokenText(`${LAUNCH_URL} then ${OTHER_URL}`)
-    expect(scrubbed).not.toContain('eHv00anBdUDKoJmHFM')
-    expect(scrubbed).not.toContain('T2xAzqfWtrD8V4J_')
+    expect(scrubbed).not.toContain('NOTAREALCREDENTIAL')
+    expect(scrubbed).not.toContain('FIXTUREONLYVALUE')
     expect(scrubbed.match(/token=<redacted>/g)).toHaveLength(2)
   })
 
@@ -46,7 +55,7 @@ describe('redactTokenText', () => {
   it('scrubs a token inside an error stack', () => {
     // The harness writes the failure path too, so a stack can carry the URL.
     const stack = `Error: navigation failed\n    at open (${LAUNCH_URL})`
-    expect(redactTokenText(stack)).not.toContain('eHv00anBdUDKoJmHFM')
+    expect(redactTokenText(stack)).not.toContain('NOTAREALCREDENTIAL')
   })
 })
 
@@ -65,8 +74,8 @@ describe('redactTokens', () => {
     }
     const scrubbed = redactTokens(report)
     const serialized = JSON.stringify(scrubbed)
-    expect(serialized).not.toContain('eHv00anBdUDKoJmHFM')
-    expect(serialized).not.toContain('T2xAzqfWtrD8V4J_')
+    expect(serialized).not.toContain('NOTAREALCREDENTIAL')
+    expect(serialized).not.toContain('FIXTUREONLYVALUE')
     expect(scrubbed.environment.firstBootUrl).toBe(`http://127.0.0.1:50991/?${REDACTED_TOKEN}`)
     // Everything that is not a secret must survive: the report is evidence.
     expect(scrubbed.environment.profile).toBe('word-lookup-test')
@@ -105,5 +114,25 @@ describe('redactTokens', () => {
   it('handles a report with no token at all', () => {
     const report = { status: 'PASS', summary: { total: 77, passed: 77, failed: [] } }
     expect(redactTokens(report)).toEqual(report)
+  })
+
+  it('scrubs the whole ERROR report the harness writes when it aborts', () => {
+    // `phase1-verify.mjs` has two write paths: the normal report and the
+    // `status: 'ERROR'` report written from the top-level catch. The second was
+    // the one an earlier field-list scrub missed, so its exact shape is asserted
+    // here: the token can reach it through the message, the stack, a recorded
+    // result and a boot log at once.
+    const report = {
+      status: 'ERROR',
+      error: `Error: dsh did not print a launch URL within 90s\n    at startDsh (${LAUNCH_URL})`,
+      results: [{ id: 'H01', name: 'boot', ok: false, detail: `no URL at ${OTHER_URL}` }],
+      bootLogs: [{ bootIndex: 1, stdout: `dsh web: ${LAUNCH_URL}\n`, stderr: `failed: ${LAUNCH_URL}` }],
+    }
+    const serialized = JSON.stringify(redactTokens(report))
+    expect(serialized).not.toMatch(/token=(?!<redacted>)/)
+    expect(serialized).not.toContain('NOTAREALCREDENTIAL')
+    expect(serialized).not.toContain('FIXTUREONLYVALUE')
+    // The report must still say what went wrong.
+    expect(serialized).toContain('did not print a launch URL')
   })
 })

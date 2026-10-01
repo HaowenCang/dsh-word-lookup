@@ -39,20 +39,46 @@ export declare const MAX_QUERY_CODE_POINTS = 96;
  */
 export declare const MAX_REQUEST_BYTES = 4096;
 /** Stable machine-readable reasons a lookup request is refused. */
-export type LookupFailureCode = 'method-not-allowed' | 'unsupported-content-type' | 'body-too-large' | 'malformed-body' | 'missing-query' | 'empty-query' | 'query-too-long';
-/** One sense of a headword. */
+export type LookupFailureCode = 'method-not-allowed' | 'unsupported-content-type' | 'body-too-large' | 'malformed-body' | 'missing-query' | 'empty-query' | 'query-too-long' | 'dictionary-unavailable';
+/**
+ * Provenance of a lookup payload.
+ *
+ * Phase 3 answers from a deterministic SQLite fixture built into this package,
+ * and says so. The value is a closed union that contains **no** name for a
+ * production corpus, a third-party dataset or an on-the-fly guess, so a payload
+ * cannot claim a source this build does not have. Widening it is a deliberate
+ * act that belongs to the phase that actually imports such data.
+ */
+export type LookupSource = 'sqlite-fixture';
+/**
+ * One sense of a headword.
+ *
+ * Every field is nullable because the storage layer treats them that way: the
+ * `entries` row may carry a translation and no English definition, or the
+ * reverse. A field with nothing behind it is `null`, never an empty string and
+ * never invented prose — the card renders what is there.
+ */
 export interface LookupMeaning {
-    /** Part of speech, as printed by the stub dictionary. */
-    readonly partOfSpeech: string;
-    /** Definition text. */
-    readonly definition: string;
+    /** Part of speech, e.g. `verb`; `null` when the row does not name one. */
+    readonly partOfSpeech: string | null;
+    /** English definition; `null` when the row has none. */
+    readonly definition: string | null;
+    /** Chinese translation; `null` when the row has none. */
+    readonly translation: string | null;
+}
+/** One inflected surface form of the returned headword. */
+export interface LookupForm {
+    /** The surface form, e.g. `went`. */
+    readonly form: string;
+    /** Grammatical label, e.g. `past`; `null` when unnamed. */
+    readonly kind: string | null;
 }
 /** One bilingual example sentence. */
 export interface LookupExample {
     /** English sentence. */
     readonly en: string;
-    /** Chinese rendering of {@link en}. */
-    readonly zh: string;
+    /** Chinese rendering; `null` when the fixture has none. */
+    readonly zh: string | null;
 }
 /**
  * Phase 1 diagnostic echo of the host's live volatile configuration.
@@ -73,12 +99,26 @@ export interface LookupFoundResponse {
     readonly found: true;
     /** Normalized query the host actually looked up. */
     readonly query: string;
+    /** Canonical headword the query resolved to. */
     readonly headword: string;
-    readonly phonetic: string;
+    /** IPA transcription; `null` when the entry has none. */
+    readonly phonetic: string | null;
+    /** Senses in a stable order; empty when the entry carries no text. */
     readonly meanings: readonly LookupMeaning[];
+    /** Inflected forms of {@link headword}, in a stable order. */
+    readonly forms: readonly LookupForm[];
+    /**
+     * The surface form the query matched, when it matched one.
+     *
+     * `null` when the query was already the headword. Together with
+     * {@link headword} this is the inflection → lemma relationship: a lookup of
+     * `went` answers `headword: "go"` with `matchedForm: "went"`.
+     */
+    readonly matchedForm: string | null;
+    /** Example sentences, most relevant first. */
     readonly examples: readonly LookupExample[];
-    /** Provenance of the payload; `stub` until the real dictionary lands. */
-    readonly source: 'stub';
+    /** Provenance of the payload. */
+    readonly source: LookupSource;
     readonly settings: LookupSettingsEcho;
 }
 /** Well-formed request for a word the dictionary does not contain. */
@@ -87,7 +127,7 @@ export interface LookupNotFoundResponse {
     readonly found: false;
     /** Normalized query the host actually looked up. */
     readonly query: string;
-    readonly source: 'stub';
+    readonly source: LookupSource;
     readonly settings: LookupSettingsEcho;
 }
 /**

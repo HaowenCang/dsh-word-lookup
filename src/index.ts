@@ -16,6 +16,18 @@
  * throws at plugin load, and `rpc.handle` has no first-party call site to model
  * against.
  *
+ * **Phase 3 lifecycle.** The route is answered by a real local SQLite
+ * dictionary, and this module owns it. One `ctx.effect` opens the database,
+ * registers the route, and returns a disposer that unregisters the route and
+ * closes the database — in that order, and `close()` is idempotent, so a load/
+ * unload cycle cannot accumulate handles. The open happens before the
+ * registration so that a dictionary that cannot be opened fails the load
+ * outright instead of leaving a route whose every request answers 500.
+ *
+ * The database path is not configuration. It is derived from this package's own
+ * location by `resolveFixtureDatabasePath`; see `src/host/fixture-db.ts` for why
+ * Phase 3 deliberately adds no `dictionaryPath` setting.
+ *
  * This module is imported by the Node host process and must never reach a
  * browser-only dependency. The browser half lives behind `exports "./client"` and
  * shares only the type-only contract in `src/shared/protocol.ts`.
@@ -29,6 +41,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-connection'
 
 import { Config, type HostConfig } from './host/config.js'
+import { openFixtureDictionary } from './host/fixture-db.js'
 import { createLookupHandler } from './host/lookup.js'
 import { LOOKUP_PATH } from './host/route.js'
 
@@ -44,25 +57,38 @@ export const inject: readonly string[] = ['connection']
 /**
  * Register the host contributions.
  *
- * One effect owns the whole host surface, so unloading the loader entry removes
- * the route exactly once. A second registration of the same path would throw
- * `connection: exact Fetch route "…" is already registered`, which is a
- * load-time signal rather than a silent duplicate.
+ * One effect owns the whole host surface, so unloading the loader entry closes
+ * the database and removes the route exactly once. A second registration of the
+ * same path would throw `connection: exact Fetch route "…" is already
+ * registered`, which is a load-time signal rather than a silent duplicate.
  *
  * @param ctx - the host plugin context.
  * @param config - the parsed {@link Config} output for this loader entry.
  */
 export function apply(ctx: Context, config: HostConfig): void {
-  const handleLookup = createLookupHandler(config)
+  ctx.effect(() => {
+    const dictionary = openFixtureDictionary()
 
-  ctx.effect(
-    () =>
-      ctx.connection.fetch.register({
+    let disposeRoute: (() => Promise<void>) | undefined
+    try {
+      disposeRoute = ctx.connection.fetch.register({
         path: LOOKUP_PATH,
         methods: ['POST'],
         requestBody: 'buffered',
-        fetch: handleLookup,
-      }),
-    'dsh-word-lookup: exact fetch route',
-  )
+        fetch: createLookupHandler(config, dictionary),
+      })
+    } catch (error) {
+      // The route never registered, so nothing else will release the handle.
+      dictionary.close()
+      throw error
+    }
+
+    return async () => {
+      try {
+        await disposeRoute?.()
+      } finally {
+        dictionary.close()
+      }
+    }
+  }, 'dsh-word-lookup: local sqlite dictionary and exact fetch route')
 }

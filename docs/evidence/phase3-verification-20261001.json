@@ -1,0 +1,3528 @@
+{
+  "startedAt": "2026-10-01T09:23:39.319Z",
+  "environment": {
+    "home": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-word-lookup-test\\home",
+    "profile": "word-lookup-test",
+    "port": 50991,
+    "profileDir": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-word-lookup-test\\home\\profiles\\word-lookup-test",
+    "patchPath": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-word-lookup-test\\home\\profiles\\word-lookup-test\\cordis.patch.yml",
+    "workdir": "E:\\Projects\\DSHarness\\dsh-word-lookup",
+    "dshVersion": "0.2.0-rc.2",
+    "firstBootUrl": "http://127.0.0.1:50991/?token=<redacted>",
+    "browserVersion": "153.0.8010.12",
+    "secondBootUrl": "http://127.0.0.1:50991/?token=<redacted>"
+  },
+  "results": [
+    {
+      "id": "H01",
+      "name": "the isolated DSH Web process started and printed an authenticated URL",
+      "ok": true,
+      "detail": "http://127.0.0.1:50991/?token=<redacted>"
+    },
+    {
+      "id": "B01",
+      "name": "the plugin appears in the boot manifest as a browser entry",
+      "ok": true,
+      "detail": "[{\"id\":\"dsh-word-lookup\",\"url\":\"plugins/??dsh-word-lookup/client.js&rev=a08e57edfd4d\",\"inject\":[\"@deepseek-ai/dsh-client-ui-layout\",\"@deepseek-ai/dsh-client-ui-renderer\",\"@deepseek-ai/dsh-client-shortcuts\",\"@deepseek-ai/dsh-client-ui-settings\",\"@deepseek-ai/dsh-client-locale\"]}]"
+    },
+    {
+      "id": "B02",
+      "name": "the plugin is served inside the concatenated application batch",
+      "ok": true,
+      "detail": "plugins/??@deepseek-ai/dsh-client-ui-open-in-app/client.js,@deepseek-ai/dsh-api-gateway/client.js,@deepseek-ai/dsh-api-job-controller/client.js,@deepseek-ai/dsh-api-terminal-controller/client.js,@deepseek-ai/dsh-api-workspace-files/client.js,@deepseek-ai/dsh-client-ui-settings-account/client.js,@deepseek-ai/dsh-client-hmr/client.js,@deepseek-ai/dsh-cordis-client-runner/client.js,@deepseek-ai/dsh-client-ui-theme/client.js,@deepseek-ai/dsh-client-locale/client.js,@deepseek-ai/dsh-client-shortcuts/client.js,@deepseek-ai/dsh-client-ui-shortcuts/client.js,@deepseek-ai/dsh-client-ui-layout/client.js,@deepseek-ai/dsh-client-ui-renderer/client.js,@deepseek-ai/dsh-client-ui-session/client.js,@deepseek-ai/dsh-client-resources/client.js,@deepseek-ai/dsh-client-ui-sidebar/client.js,@deepseek-ai/dsh-client-ui-sidebar-right/client.js,@deepseek-ai/dsh-client-ui-sidebar-documentpreview/client.js,@deepseek-ai/dsh-client-ui-sidebar-terminal/client.js,@deepseek-ai/dsh-client-ui-sidebar-files/client.js,@deepseek-ai/dsh-client-ui-settings/client.js,@deepseek-ai/dsh-client-ui-settings-general/client.js,@deepseek-ai/dsh-client-ui-settings-models/client.js,@deepseek-ai/dsh-client-ui-plugin-manager/client.js,@deepseek-ai/dsh-client-ui-settings-plugin-inventory/client.js,@deepseek-ai/dsh-client-ui-conversation/client.js,@deepseek-ai/dsh-client-ui-approval/client.js,@deepseek-ai/dsh-client-ui-chat/client.js,@deepseek-ai/dsh-client-ui-brand-official/client.js,@deepseek-ai/dsh-client-ui-attachment/client.js,@deepseek-ai/dsh-client-ui-tool/client.js,@deepseek-ai/dsh-client-ui-cordis/client.js,@deepseek-ai/dsh-client-ui-workspace/client.js,@deepseek-ai/dsh-client-ui-workflow-run/client.js,@deepseek-ai/dsh-client-ui-input-trigger/client.js,@deepseek-ai/dsh-client-ui-commands/client.js,@deepseek-ai/dsh-client-ui-skill/client.js,@deepseek-ai/dsh-client-ui-subagent/client.js,@deepseek-ai/dsh-client-ui-reference/client.js,@deepseek-ai/dsh-client-ui-jobs/client.js,@deepseek-ai/dsh-client-ui-goal/client.js,@deepseek-ai/dsh-client-ui-message-feedback/client.js,@deepseek-ai/dsh-client-ui-model-selection/client.js,@deepseek-ai/dsh-client-ui-permission-presets/client.js,@deepseek-ai/dsh-client-ui-agent-preset/client.js,@deepseek-ai/dsh-client-ui-settings-session-log/client.js,@deepseek-ai/dsh-client-ui-settings-plugins/client.js,@deepseek-ai/dsh-client-ui-settings-shell/client.js,@deepseek-ai/dsh-client-ui-settings-agent-loop/client.js,@deepseek-ai/dsh-client-ui-settings-subagent/client.js,@deepseek-ai/dsh-client-ui-settings-web-search/client.js,@deepseek-ai/dsh-client-ui-plan/client.js,@deepseek-ai/dsh-client-ui-user-questions/client.js,@deepseek-ai/dsh-client-ui-trajectory/client.js,dsh-word-lookup/client.js,@deepseek-ai/dsh-session-log-export/client.js,@deepseek-ai/dsh-client-file-upload/client.js&rev=5ca140eb3608"
+    },
+    {
+      "id": "B03",
+      "name": "the client half executed and published its runtime",
+      "ok": true,
+      "detail": "boot manifest entries: 66, slot hosts: 24"
+    },
+    {
+      "id": "B04",
+      "name": "the shell.overlay declaration was observed and the occupant registered exactly once",
+      "ok": true,
+      "detail": "{\"entryId\":\"dsh-word-lookup:card\",\"order\":900,\"declarationSeen\":true,\"registrationCount\":1}"
+    },
+    {
+      "id": "B05",
+      "name": "the occupant renders nothing while idle",
+      "ok": true,
+      "detail": "{\"slotPresent\":true,\"slotChildren\":0,\"cardPresent\":false,\"state\":null,\"headword\":null,\"body\":null}"
+    },
+    {
+      "id": "B06",
+      "name": "the manual command is registered with the sealed binding and no conflict",
+      "ok": true,
+      "detail": "{\"id\":\"wordLookup.lookupSelection\",\"label\":\"Look up selection\",\"keys\":[\"Ctrl\",\"+\",\"Shift\",\"+\",\"L\"],\"binding\":{\"code\":\"KeyL\",\"modifiers\":[\"control\",\"shift\"]},\"conflicts\":[],\"issue\":null}"
+    },
+    {
+      "id": "BA0",
+      "name": "a command declaring no modals is blocked and consumed while a dialog is open",
+      "ok": true,
+      "detail": "open=[\"Add an API key to get started\"] requests=0 counters={\"resolveCalls\":0,\"passReturns\":0,\"handledReturns\":0,\"runCalls\":0,\"lastOutcome\":null,\"lastContext\":null}"
+    },
+    {
+      "id": "BA1",
+      "name": "the first-run notice is dismissed so the command can be measured on its own",
+      "ok": true,
+      "detail": "{\"dismissed\":[\"Add an API key to get started via \\\"Configure later\\\"\"],\"remaining\":0}"
+    },
+    {
+      "id": "B07",
+      "name": "the shortcut resolves to pass and consumes nothing when no selection qualifies",
+      "ok": true,
+      "detail": "requests=0 key={\"code\":\"KeyL\",\"ctrl\":true,\"shift\":true,\"defaultPrevented\":false} counters={\"resolveCalls\":1,\"passReturns\":1,\"handledReturns\":0,\"runCalls\":0,\"lastOutcome\":\"pass\",\"lastContext\":{\"region\":\"page\",\"modal\":null,\"target\":\"body\"}}"
+    },
+    {
+      "id": "B08",
+      "name": "a selection outside a conversation flow item does not qualify",
+      "ok": true,
+      "detail": "snapshot={\"present\":true,\"eligible\":false,\"text\":\"\",\"at\":1790846626693,\"rect\":null,\"gesture\":{\"kind\":\"none\",\"completedAt\":null,\"pointer\":null}} requests=0"
+    },
+    {
+      "id": "B09",
+      "name": "a selection inside the composer does not qualify (T08)",
+      "ok": true,
+      "detail": "snapshot={\"present\":true,\"eligible\":false,\"text\":\"\",\"at\":1790846627299,\"rect\":null,\"gesture\":{\"kind\":\"none\",\"completedAt\":null,\"pointer\":null}} requests=0"
+    },
+    {
+      "id": "B10",
+      "name": "a qualifying selection plus the shortcut resolves to handled and issues exactly one request (T03)",
+      "ok": true,
+      "detail": "requests=[{\"method\":\"POST\",\"url\":\"http://127.0.0.1:50991/api/dsh-word-lookup\",\"postData\":\"{\\\"query\\\":\\\"derive\\\"}\"}] key={\"code\":\"KeyL\",\"ctrl\":true,\"shift\":true,\"defaultPrevented\":true} context={\"region\":\"editable\",\"modal\":null,\"target\":\"div\"} counters={\"resolveCalls\":4,\"passReturns\":3,\"handledReturns\":1,\"runCalls\":1,\"lastOutcome\":\"handled\",\"lastContext\":{\"region\":\"editable\",\"modal\":null,\"target\":\"div\"}}"
+    },
+    {
+      "id": "B11",
+      "name": "the lookup reached the host and came back as a hit",
+      "ok": true,
+      "detail": "outcome=found card={\"slotPresent\":true,\"slotChildren\":1,\"cardPresent\":true,\"state\":\"ready\",\"headword\":\"derive /dɪˈraɪv/\",\"body\":\"derive×derive /dɪˈraɪv/verb 导出；派生；源自 obtain something from a specified source; originate inderived · derives · derivingThe result must derive from the boundary conditions alone.该结果只能由边界条件导出。This identity derives from Gauss’s law.这一恒等式源自高斯定律。\"}"
+    },
+    {
+      "id": "B12",
+      "name": "the card is rendered inside the frame-wide overlay layer",
+      "ok": true,
+      "detail": "slotChildren=1"
+    },
+    {
+      "id": "B13",
+      "name": "no duplicate occupant is registered by the running runtime",
+      "ok": true,
+      "detail": "{\"overlayAfter\":{\"entryId\":\"dsh-word-lookup:card\",\"order\":900,\"declarationSeen\":true,\"registrationCount\":1},\"cardCount\":1}"
+    },
+    {
+      "id": "B14",
+      "name": "the exact Fetch route answers 200 from the authenticated page",
+      "ok": true,
+      "detail": "{\"found\":true,\"query\":\"derive\",\"headword\":\"derive\",\"phonetic\":\"/dɪˈraɪv/\",\"matchedForm\":null,\"meaningCount\":1,\"firstMeaning\":{\"partOfSpeech\":\"verb\",\"definition\":\"obtain something from a specified source; originate in\",\"translation\":\"导出；派生；源自\"},\"forms\":[\"derived\",\"derives\",\"deriving\"],\"exampleCount\":2,\"source\":\"sqlite-fixture\",\"settings\":{\"autoDoubleClick\":false,\"autoSelection\":false}}"
+    },
+    {
+      "id": "B15",
+      "name": "a malformed request is a controlled 400 (T13)",
+      "ok": true,
+      "detail": "{\"status\":400,\"body\":{\"ok\":false,\"error\":\"malformed-body\",\"message\":\"request body is not valid JSON\"}}"
+    },
+    {
+      "id": "B16",
+      "name": "an over-long query is a controlled 400 (T14)",
+      "ok": true,
+      "detail": "{\"status\":400,\"body\":{\"ok\":false,\"error\":\"query-too-long\",\"message\":\"query exceeds 96 code points\"}}"
+    },
+    {
+      "id": "B17",
+      "name": "an unsupported content type is a controlled 400",
+      "ok": true,
+      "detail": "{\"status\":400,\"body\":{\"ok\":false,\"error\":\"unsupported-content-type\",\"message\":\"expected application/json, received \\\"text/plain\\\"\"}}"
+    },
+    {
+      "id": "B18",
+      "name": "an unknown word is 200 with found:false, never an error (T12)",
+      "ok": true,
+      "detail": "{\"status\":200,\"body\":{\"ok\":true,\"found\":false,\"query\":\"zzz-not-a-word\",\"source\":\"sqlite-fixture\",\"settings\":{\"autoDoubleClick\":false,\"autoSelection\":false}}}"
+    },
+    {
+      "id": "B19",
+      "name": "with both switches off, double click and drag selection produce zero lookups (T01/T02/T22)",
+      "ok": true,
+      "detail": "requests=0 snapshot={\"present\":true,\"eligible\":true,\"text\":\"he serializer must derive the wire form from the boundary conditions.\",\"at\":1790846629399,\"rect\":{\"x\":45.328125,\"y\":175,\"width\":427.515625,\"height\":19},\"gesture\":{\"kind\":\"drag\",\"completedAt\":1790846629400,\"pointer\":{\"startX\":44,\"startY\":185.1953125,\"endX\":472,\"endY\":185.1953125,\"distance\":428}}}"
+    },
+    {
+      "id": "B23",
+      "name": "a real pointer drag over conversation text is classified as a drag and issues no request",
+      "ok": true,
+      "detail": "landedInFlow=true landedInInteractive=false selected=\" serializer must derive the wire\" drags+1 kind=drag requests=0"
+    },
+    {
+      "id": "B24",
+      "name": "the selection snapshot carries the live range rectangle",
+      "ok": true,
+      "detail": "text=\"derive\" rect={\"x\":156.6875,\"y\":175,\"width\":37.859375,\"height\":19}"
+    },
+    {
+      "id": "B25",
+      "name": "a real double click is classified as a double click and issues no request",
+      "ok": true,
+      "detail": "doubleClickGestures+1 kind=double-click requests=0"
+    },
+    {
+      "id": "B26",
+      "name": "the trailing selectionchange cannot turn a double click into a drag",
+      "ok": true,
+      "detail": "kindAfterTrailing=double-click dragsDuringWindow=0"
+    },
+    {
+      "id": "B27",
+      "name": "100 drags and 100 double clicks are all classified and produce zero requests",
+      "ok": true,
+      "detail": "drags=100 doubleClicks=100 cancels=0 requests=0"
+    },
+    {
+      "id": "B28",
+      "name": "after the gesture storm, the shortcut still issues exactly one lookup (T03)",
+      "ok": true,
+      "detail": "requests=[{\"method\":\"POST\",\"url\":\"http://127.0.0.1:50991/api/dsh-word-lookup\",\"postData\":\"{\\\"query\\\":\\\"derive\\\"}\"}]"
+    },
+    {
+      "id": "B29",
+      "name": "the shortcut’s single lookup is answered by the local SQLite fixture, not a stub",
+      "ok": true,
+      "detail": "status=200 body={\"found\":true,\"query\":\"derive\",\"headword\":\"derive\",\"phonetic\":\"/dɪˈraɪv/\",\"matchedForm\":null,\"meaningCount\":1,\"firstMeaning\":{\"partOfSpeech\":\"verb\",\"definition\":\"obtain something from a specified source; originate in\",\"translation\":\"导出；派生；源自\"},\"forms\":[\"derived\",\"derives\",\"deriving\"],\"exampleCount\":2,\"source\":\"sqlite-fixture\",\"settings\":{\"autoDoubleClick\":false,\"autoSelection\":false}} outcome=found cardHeadword=derive /dɪˈraɪv/"
+    },
+    {
+      "id": "B30",
+      "name": "an inflected selection resolves to its lemma through the forms table (T10)",
+      "ok": true,
+      "detail": "status=200 body={\"found\":true,\"query\":\"derived\",\"headword\":\"derive\",\"phonetic\":\"/dɪˈraɪv/\",\"matchedForm\":\"derived\",\"meaningCount\":1,\"firstMeaning\":{\"partOfSpeech\":\"verb\",\"definition\":\"obtain something from a specified source; originate in\",\"translation\":\"导出；派生；源自\"},\"forms\":[\"derived\",\"derives\",\"deriving\"],\"exampleCount\":2,\"source\":\"sqlite-fixture\",\"settings\":{\"autoDoubleClick\":false,\"autoSelection\":false}}"
+    },
+    {
+      "id": "B31",
+      "name": "irregular forms resolve to their lemma (T11)",
+      "ok": true,
+      "detail": "went={\"found\":true,\"query\":\"went\",\"headword\":\"go\",\"phonetic\":\"/ɡəʊ/\",\"matchedForm\":\"went\",\"meaningCount\":1,\"firstMeaning\":{\"partOfSpeech\":\"verb\",\"definition\":\"move or travel from one place to another\",\"translation\":\"去；走；进行\"},\"forms\":[\"goes\",\"going\",\"gone\",\"went\"],\"exampleCount\":1,\"source\":\"sqlite-fixture\",\"settings\":{\"autoDoubleClick\":false,\"autoSelection\":false}} gone={\"found\":true,\"query\":\"gone\",\"headword\":\"go\",\"phonetic\":\"/ɡəʊ/\",\"matchedForm\":\"gone\",\"meaningCount\":1,\"firstMeaning\":{\"partOfSpeech\":\"verb\",\"definition\":\"move or travel from one place to another\",\"translation\":\"去；走；进行\"},\"forms\":[\"goes\",\"going\",\"gone\",\"went\"],\"exampleCount\":1,\"source\":\"sqlite-fixture\",\"settings\":{\"autoDoubleClick\":false,\"autoSelection\":false}}"
+    },
+    {
+      "id": "B32",
+      "name": "an irregular plural resolves to its singular headword",
+      "ok": true,
+      "detail": "body={\"found\":true,\"query\":\"teeth\",\"headword\":\"tooth\",\"phonetic\":\"/tuːθ/\",\"matchedForm\":\"teeth\",\"meaningCount\":1,\"firstMeaning\":{\"partOfSpeech\":\"noun\",\"definition\":\"each of a set of hard structures set in the jaws\",\"translation\":\"牙齿；齿\"},\"forms\":[\"teeth\"],\"exampleCount\":2,\"source\":\"sqlite-fixture\",\"settings\":{\"autoDoubleClick\":false,\"autoSelection\":false}}"
+    },
+    {
+      "id": "B33",
+      "name": "a multi-word phrase is answered exactly, and is never split into its words",
+      "ok": true,
+      "detail": "body={\"found\":true,\"query\":\"wave function\",\"headword\":\"wave function\",\"phonetic\":\"/weɪv ˈfʌŋkʃn/\",\"matchedForm\":null,\"meaningCount\":1,\"firstMeaning\":{\"partOfSpeech\":\"noun phrase\",\"definition\":\"a mathematical description of the quantum state of a system\",\"translation\":\"波函数\"},\"forms\":[\"wave functions\"],\"exampleCount\":2,\"source\":\"sqlite-fixture\",\"settings\":{\"autoDoubleClick\":false,\"autoSelection\":false}}"
+    },
+    {
+      "id": "B34",
+      "name": "a well-formed selection the dictionary does not contain is 200 found:false (T12)",
+      "ok": true,
+      "detail": "status=200 body={\"ok\":true,\"found\":false,\"query\":\"unknowntoken\",\"source\":\"sqlite-fixture\",\"settings\":{\"autoDoubleClick\":false,\"autoSelection\":false}} outcome=not-found cardState=ready card=\"unknowntoken×no entry for \\\"unknowntoken\\\"\""
+    },
+    {
+      "id": "B35",
+      "name": "the payload carries headword, phonetic, POS, Chinese meaning, forms, examples and provenance",
+      "ok": true,
+      "detail": "{\"status\":200,\"body\":{\"ok\":true,\"found\":true,\"query\":\"conservation\",\"headword\":\"conservation\",\"phonetic\":\"/ˌkɒnsəˈveɪʃn/\",\"meanings\":[{\"partOfSpeech\":\"noun\",\"definition\":\"the principle that a quantity of a closed system stays constant\",\"translation\":\"守恒；保存；保护\"}],\"forms\":[],\"matchedForm\":null,\"examples\":[{\"en\":\"Charge conservation follows from the symmetry of the Lagrangian.\",\"zh\":\"电荷守恒来自拉格朗日量的对称性。\"},{\"en\":\"Energy conservation forbids that transition.\",\"zh\":\"能量守恒禁戒该跃迁。\"}],\"source\":\"sqlite-fixture\",\"settings\":{\"autoDoubleClick\":false,\"autoSelection\":false}}}"
+    },
+    {
+      "id": "B36",
+      "name": "SQL metacharacters in a query never fault the route and never change the schema",
+      "ok": true,
+      "detail": "{\"hostile\":[{\"query\":\"'; DROP TABLE entries; --\",\"status\":200,\"body\":{\"ok\":true,\"found\":false,\"query\":\"drop table entries\",\"source\":\"sqlite-fixture\",\"settings\":{\"autoDoubleClick\":false,\"autoSelection\":false}}},{\"query\":\"' OR '1'='1\",\"status\":200,\"body\":{\"ok\":true,\"found\":false,\"query\":\"or '1'='1\",\"source\":\"sqlite-fixture\",\"settings\":{\"autoDoubleClick\":false,\"autoSelection\":false}}},{\"query\":\"\\\"; DROP TABLE forms; --\",\"status\":200,\"body\":{\"ok\":true,\"found\":false,\"query\":\"drop table forms\",\"source\":\"sqlite-fixture\",\"settings\":{\"autoDoubleClick\":false,\"autoSelection\":false}}},{\"query\":\"' UNION SELECT word FROM entries --\",\"status\":200,\"body\":{\"ok\":true,\"found\":false,\"query\":\"union select word from entries\",\"source\":\"sqlite-fixture\",\"settings\":{\"autoDoubleClick\":false,\"autoSelection\":false}}},{\"query\":\"'); INSERT INTO entries (word) VALUES ('x'); --\",\"status\":200,\"body\":{\"ok\":true,\"found\":false,\"query\":\"insert into entries (word) values ('x\",\"source\":\"sqlite-fixture\",\"settings\":{\"autoDoubleClick\":false,\"autoSelection\":false}}}],\"after\":{\"found\":true,\"query\":\"derive\",\"headword\":\"derive\",\"phonetic\":\"/dɪˈraɪv/\",\"matchedForm\":null,\"meaningCount\":1,\"firstMeaning\":{\"partOfSpeech\":\"verb\",\"definition\":\"obtain something from a specified source; originate in\",\"translation\":\"导出；派生；源自\"},\"forms\":[\"derived\",\"derives\",\"deriving\"],\"exampleCount\":2,\"source\":\"sqlite-fixture\",\"settings\":{\"autoDoubleClick\":false,\"autoSelection\":false}}}"
+    },
+    {
+      "id": "B37",
+      "name": "examples are deterministic and never belong to another headword",
+      "ok": true,
+      "detail": "{\"derive\":[{\"en\":\"The result must derive from the boundary conditions alone.\",\"zh\":\"该结果只能由边界条件导出。\"},{\"en\":\"This identity derives from Gauss’s law.\",\"zh\":\"这一恒等式源自高斯定律。\"}],\"phrase\":[{\"en\":\"The wave function collapses on measurement.\",\"zh\":\"波函数在测量时坍缩。\"},{\"en\":\"A normalizable wave function belongs to the Hilbert space.\",\"zh\":\"可归一化的波函数属于希尔伯特空间。\"}],\"wave\":[{\"en\":\"The wave carries energy without carrying matter.\",\"zh\":\"波传递能量而不传递物质。\"}],\"function\":[{\"en\":\"A function maps every input to exactly one output.\",\"zh\":\"函数把每个输入映射到恰好一个输出。\"},{\"en\":\"The delta function is not a function in the classical sense.\",\"zh\":\"δ 函数在经典意义下并不是函数。\"}]}"
+    },
+    {
+      "id": "B38",
+      "name": "a full-width selection is NFKC-folded before it is looked up",
+      "ok": true,
+      "detail": "snapshotText=\"ｄｅｒｉｖｅ\" body={\"found\":true,\"query\":\"derive\",\"headword\":\"derive\",\"phonetic\":\"/dɪˈraɪv/\",\"matchedForm\":null,\"meaningCount\":1,\"firstMeaning\":{\"partOfSpeech\":\"verb\",\"definition\":\"obtain something from a specified source; originate in\",\"translation\":\"导出；派生；源自\"},\"forms\":[\"derived\",\"derives\",\"deriving\"],\"exampleCount\":2,\"source\":\"sqlite-fixture\",\"settings\":{\"autoDoubleClick\":false,\"autoSelection\":false}}"
+    },
+    {
+      "id": "B20",
+      "name": "the settings namespace is served to the browser and both defaults are false",
+      "ok": true,
+      "detail": "{\"status\":\"ready\",\"mode\":\"host\",\"writable\":true,\"revision\":0,\"value\":{\"autoDoubleClick\":false,\"autoSelection\":false}}"
+    },
+    {
+      "id": "B21",
+      "name": "the client gate values are derived from that snapshot",
+      "ok": true,
+      "detail": "{\"autoDoubleClick\":false,\"autoSelection\":false}"
+    },
+    {
+      "id": "B22",
+      "name": "the plugin added no node outside the overlay layer",
+      "ok": true,
+      "detail": "{\"flowItems\":1,\"messageBody\":0,\"pluginNodesOutsideOverlay\":0,\"probeNodes\":3}"
+    },
+    {
+      "id": "S01",
+      "name": "a settings write is accepted and the client snapshot changes without a restart",
+      "ok": true,
+      "detail": "{\"accepted\":true,\"value\":{\"autoDoubleClick\":false,\"autoSelection\":true},\"revision\":1}"
+    },
+    {
+      "id": "S02",
+      "name": "the host reads the new value on its next request (config.autoSelection.get())",
+      "ok": true,
+      "detail": "{\"autoDoubleClick\":false,\"autoSelection\":true}"
+    },
+    {
+      "id": "S03",
+      "name": "the accepted write is persisted to the profile patch on disk",
+      "ok": true,
+      "detail": "# Isolated test profile: bind the test port only. | - id: webserver |   config: |     host: !!js ctx.webStartup.host ?? '127.0.0.1' |     port: !!js ctx.webStartup.port ?? 50991 | - id: ui-settings-general |   name: \"@deepseek-ai/dsh-client-ui-settings-general\" |   config: |     welcomeNoticeVersion: 2026-09-28.1 | - id: dsh-word-lookup |   name: dsh-word-lookup |   config: |     autoDoubleClick: "
+    },
+    {
+      "id": "S04",
+      "name": "the two switches are independent: writing the second one leaves the first alone",
+      "ok": true,
+      "detail": "{\"autoDoubleClick\":true,\"autoSelection\":true}"
+    },
+    {
+      "id": "F05",
+      "name": "the route is still behind the connection fence without a browser session",
+      "ok": true,
+      "detail": "status=401"
+    },
+    {
+      "id": "L01",
+      "name": "a full client reload re-registers the overlay and the command exactly once",
+      "ok": true,
+      "detail": "{\"overlay\":{\"entryId\":\"dsh-word-lookup:card\",\"order\":900,\"declarationSeen\":true,\"registrationCount\":1},\"catalog\":{\"size\":18,\"row\":{\"id\":\"wordLookup.lookupSelection\",\"label\":\"Look up selection\",\"keys\":[\"Ctrl\",\"+\",\"Shift\",\"+\",\"L\"],\"binding\":{\"code\":\"KeyL\",\"modifiers\":[\"control\",\"shift\"]},\"conflicts\":[],\"issue\":null}}}"
+    },
+    {
+      "id": "L02",
+      "name": "the browser console reported no unexpected error and no unhandled exception",
+      "ok": true,
+      "detail": "unexpected=[] pageErrors=[] intentional400=0"
+    },
+    {
+      "id": "H02",
+      "name": "the first isolated process stopped cleanly",
+      "ok": true,
+      "detail": "pid=51756"
+    },
+    {
+      "id": "H03",
+      "name": "a second full DSH boot succeeded from the same profile",
+      "ok": true,
+      "detail": "http://127.0.0.1:50991/?token=<redacted>"
+    },
+    {
+      "id": "R01",
+      "name": "the plugin appears in the boot manifest as a browser entry",
+      "ok": true,
+      "detail": "[{\"id\":\"dsh-word-lookup\",\"url\":\"plugins/??dsh-word-lookup/client.js&rev=a08e57edfd4d\",\"inject\":[\"@deepseek-ai/dsh-client-ui-layout\",\"@deepseek-ai/dsh-client-ui-renderer\",\"@deepseek-ai/dsh-client-shortcuts\",\"@deepseek-ai/dsh-client-ui-settings\",\"@deepseek-ai/dsh-client-locale\"]}]"
+    },
+    {
+      "id": "R02",
+      "name": "the plugin is served inside the concatenated application batch",
+      "ok": true,
+      "detail": "plugins/??@deepseek-ai/dsh-client-ui-open-in-app/client.js,@deepseek-ai/dsh-api-gateway/client.js,@deepseek-ai/dsh-api-job-controller/client.js,@deepseek-ai/dsh-api-terminal-controller/client.js,@deepseek-ai/dsh-api-workspace-files/client.js,@deepseek-ai/dsh-client-ui-settings-account/client.js,@deepseek-ai/dsh-client-hmr/client.js,@deepseek-ai/dsh-cordis-client-runner/client.js,@deepseek-ai/dsh-client-ui-theme/client.js,@deepseek-ai/dsh-client-locale/client.js,@deepseek-ai/dsh-client-shortcuts/client.js,@deepseek-ai/dsh-client-ui-shortcuts/client.js,@deepseek-ai/dsh-client-ui-layout/client.js,@deepseek-ai/dsh-client-ui-renderer/client.js,@deepseek-ai/dsh-client-ui-session/client.js,@deepseek-ai/dsh-client-resources/client.js,@deepseek-ai/dsh-client-ui-sidebar/client.js,@deepseek-ai/dsh-client-ui-sidebar-right/client.js,@deepseek-ai/dsh-client-ui-sidebar-documentpreview/client.js,@deepseek-ai/dsh-client-ui-sidebar-terminal/client.js,@deepseek-ai/dsh-client-ui-sidebar-files/client.js,@deepseek-ai/dsh-client-ui-settings/client.js,@deepseek-ai/dsh-client-ui-settings-general/client.js,@deepseek-ai/dsh-client-ui-settings-models/client.js,@deepseek-ai/dsh-client-ui-plugin-manager/client.js,@deepseek-ai/dsh-client-ui-settings-plugin-inventory/client.js,@deepseek-ai/dsh-client-ui-conversation/client.js,@deepseek-ai/dsh-client-ui-approval/client.js,@deepseek-ai/dsh-client-ui-chat/client.js,@deepseek-ai/dsh-client-ui-brand-official/client.js,@deepseek-ai/dsh-client-ui-attachment/client.js,@deepseek-ai/dsh-client-ui-tool/client.js,@deepseek-ai/dsh-client-ui-cordis/client.js,@deepseek-ai/dsh-client-ui-workspace/client.js,@deepseek-ai/dsh-client-ui-workflow-run/client.js,@deepseek-ai/dsh-client-ui-input-trigger/client.js,@deepseek-ai/dsh-client-ui-commands/client.js,@deepseek-ai/dsh-client-ui-skill/client.js,@deepseek-ai/dsh-client-ui-subagent/client.js,@deepseek-ai/dsh-client-ui-reference/client.js,@deepseek-ai/dsh-client-ui-jobs/client.js,@deepseek-ai/dsh-client-ui-goal/client.js,@deepseek-ai/dsh-client-ui-message-feedback/client.js,@deepseek-ai/dsh-client-ui-model-selection/client.js,@deepseek-ai/dsh-client-ui-permission-presets/client.js,@deepseek-ai/dsh-client-ui-agent-preset/client.js,@deepseek-ai/dsh-client-ui-settings-session-log/client.js,@deepseek-ai/dsh-client-ui-settings-plugins/client.js,@deepseek-ai/dsh-client-ui-settings-shell/client.js,@deepseek-ai/dsh-client-ui-settings-agent-loop/client.js,@deepseek-ai/dsh-client-ui-settings-subagent/client.js,@deepseek-ai/dsh-client-ui-settings-web-search/client.js,@deepseek-ai/dsh-client-ui-plan/client.js,@deepseek-ai/dsh-client-ui-user-questions/client.js,@deepseek-ai/dsh-client-ui-trajectory/client.js,dsh-word-lookup/client.js,@deepseek-ai/dsh-session-log-export/client.js,@deepseek-ai/dsh-client-file-upload/client.js&rev=5ca140eb3608"
+    },
+    {
+      "id": "R03",
+      "name": "the client half executed and published its runtime",
+      "ok": true,
+      "detail": "boot manifest entries: 66, slot hosts: 24"
+    },
+    {
+      "id": "R04",
+      "name": "the shell.overlay declaration was observed and the occupant registered exactly once",
+      "ok": true,
+      "detail": "{\"entryId\":\"dsh-word-lookup:card\",\"order\":900,\"declarationSeen\":true,\"registrationCount\":1}"
+    },
+    {
+      "id": "R05",
+      "name": "the occupant renders nothing while idle",
+      "ok": true,
+      "detail": "{\"slotPresent\":true,\"slotChildren\":0,\"cardPresent\":false,\"state\":null,\"headword\":null,\"body\":null}"
+    },
+    {
+      "id": "R06",
+      "name": "the manual command is registered with the sealed binding and no conflict",
+      "ok": true,
+      "detail": "{\"id\":\"wordLookup.lookupSelection\",\"label\":\"Look up selection\",\"keys\":[\"Ctrl\",\"+\",\"Shift\",\"+\",\"L\"],\"binding\":{\"code\":\"KeyL\",\"modifiers\":[\"control\",\"shift\"]},\"conflicts\":[],\"issue\":null}"
+    },
+    {
+      "id": "RA0",
+      "name": "a command declaring no modals is blocked and consumed while a dialog is open",
+      "ok": true,
+      "detail": "open=[\"Add an API key to get started\"] requests=0 counters={\"resolveCalls\":0,\"passReturns\":0,\"handledReturns\":0,\"runCalls\":0,\"lastOutcome\":null,\"lastContext\":null}"
+    },
+    {
+      "id": "RA1",
+      "name": "the first-run notice is dismissed so the command can be measured on its own",
+      "ok": true,
+      "detail": "{\"dismissed\":[\"Add an API key to get started via \\\"Configure later\\\"\"],\"remaining\":0}"
+    },
+    {
+      "id": "R07",
+      "name": "the shortcut resolves to pass and consumes nothing when no selection qualifies",
+      "ok": true,
+      "detail": "requests=0 key={\"code\":\"KeyL\",\"ctrl\":true,\"shift\":true,\"defaultPrevented\":false} counters={\"resolveCalls\":1,\"passReturns\":1,\"handledReturns\":0,\"runCalls\":0,\"lastOutcome\":\"pass\",\"lastContext\":{\"region\":\"page\",\"modal\":null,\"target\":\"body\"}}"
+    },
+    {
+      "id": "R08",
+      "name": "a selection outside a conversation flow item does not qualify",
+      "ok": true,
+      "detail": "snapshot={\"present\":true,\"eligible\":false,\"text\":\"\",\"at\":1790846662979,\"rect\":null,\"gesture\":{\"kind\":\"none\",\"completedAt\":null,\"pointer\":null}} requests=0"
+    },
+    {
+      "id": "R09",
+      "name": "a selection inside the composer does not qualify (T08)",
+      "ok": true,
+      "detail": "snapshot={\"present\":true,\"eligible\":false,\"text\":\"\",\"at\":1790846663589,\"rect\":null,\"gesture\":{\"kind\":\"none\",\"completedAt\":null,\"pointer\":null}} requests=0"
+    },
+    {
+      "id": "R10",
+      "name": "a qualifying selection plus the shortcut resolves to handled and issues exactly one request (T03)",
+      "ok": true,
+      "detail": "requests=[{\"method\":\"POST\",\"url\":\"http://127.0.0.1:50991/api/dsh-word-lookup\",\"postData\":\"{\\\"query\\\":\\\"derive\\\"}\"}] key={\"code\":\"KeyL\",\"ctrl\":true,\"shift\":true,\"defaultPrevented\":true} context={\"region\":\"editable\",\"modal\":null,\"target\":\"div\"} counters={\"resolveCalls\":4,\"passReturns\":3,\"handledReturns\":1,\"runCalls\":1,\"lastOutcome\":\"handled\",\"lastContext\":{\"region\":\"editable\",\"modal\":null,\"target\":\"div\"}}"
+    },
+    {
+      "id": "R11",
+      "name": "the lookup reached the host and came back as a hit",
+      "ok": true,
+      "detail": "outcome=found card={\"slotPresent\":true,\"slotChildren\":1,\"cardPresent\":true,\"state\":\"ready\",\"headword\":\"derive /dɪˈraɪv/\",\"body\":\"derive×derive /dɪˈraɪv/verb 导出；派生；源自 obtain something from a specified source; originate inderived · derives · derivingThe result must derive from the boundary conditions alone.该结果只能由边界条件导出。This identity derives from Gauss’s law.这一恒等式源自高斯定律。\"}"
+    },
+    {
+      "id": "R12",
+      "name": "the card is rendered inside the frame-wide overlay layer",
+      "ok": true,
+      "detail": "slotChildren=1"
+    },
+    {
+      "id": "R13",
+      "name": "no duplicate occupant is registered by the running runtime",
+      "ok": true,
+      "detail": "{\"overlayAfter\":{\"entryId\":\"dsh-word-lookup:card\",\"order\":900,\"declarationSeen\":true,\"registrationCount\":1},\"cardCount\":1}"
+    },
+    {
+      "id": "R14",
+      "name": "the exact Fetch route answers 200 from the authenticated page",
+      "ok": true,
+      "detail": "{\"found\":true,\"query\":\"derive\",\"headword\":\"derive\",\"phonetic\":\"/dɪˈraɪv/\",\"matchedForm\":null,\"meaningCount\":1,\"firstMeaning\":{\"partOfSpeech\":\"verb\",\"definition\":\"obtain something from a specified source; originate in\",\"translation\":\"导出；派生；源自\"},\"forms\":[\"derived\",\"derives\",\"deriving\"],\"exampleCount\":2,\"source\":\"sqlite-fixture\",\"settings\":{\"autoDoubleClick\":true,\"autoSelection\":true}}"
+    },
+    {
+      "id": "R15",
+      "name": "a malformed request is a controlled 400 (T13)",
+      "ok": true,
+      "detail": "{\"status\":400,\"body\":{\"ok\":false,\"error\":\"malformed-body\",\"message\":\"request body is not valid JSON\"}}"
+    },
+    {
+      "id": "R16",
+      "name": "an over-long query is a controlled 400 (T14)",
+      "ok": true,
+      "detail": "{\"status\":400,\"body\":{\"ok\":false,\"error\":\"query-too-long\",\"message\":\"query exceeds 96 code points\"}}"
+    },
+    {
+      "id": "R17",
+      "name": "an unsupported content type is a controlled 400",
+      "ok": true,
+      "detail": "{\"status\":400,\"body\":{\"ok\":false,\"error\":\"unsupported-content-type\",\"message\":\"expected application/json, received \\\"text/plain\\\"\"}}"
+    },
+    {
+      "id": "R18",
+      "name": "an unknown word is 200 with found:false, never an error (T12)",
+      "ok": true,
+      "detail": "{\"status\":200,\"body\":{\"ok\":true,\"found\":false,\"query\":\"zzz-not-a-word\",\"source\":\"sqlite-fixture\",\"settings\":{\"autoDoubleClick\":true,\"autoSelection\":true}}}"
+    },
+    {
+      "id": "R19",
+      "name": "with both switches off, double click and drag selection produce zero lookups (T01/T02/T22)",
+      "ok": true,
+      "detail": "requests=0 snapshot={\"present\":true,\"eligible\":true,\"text\":\"he serializer must derive the wire form from the boundary conditions.\",\"at\":1790846665665,\"rect\":{\"x\":45.328125,\"y\":175,\"width\":427.515625,\"height\":19},\"gesture\":{\"kind\":\"drag\",\"completedAt\":1790846665666,\"pointer\":{\"startX\":44,\"startY\":185.1953125,\"endX\":472,\"endY\":185.1953125,\"distance\":428}}}"
+    },
+    {
+      "id": "R23",
+      "name": "a real pointer drag over conversation text is classified as a drag and issues no request",
+      "ok": true,
+      "detail": "landedInFlow=true landedInInteractive=false selected=\" serializer must derive the wire\" drags+1 kind=drag requests=0"
+    },
+    {
+      "id": "R24",
+      "name": "the selection snapshot carries the live range rectangle",
+      "ok": true,
+      "detail": "text=\"derive\" rect={\"x\":156.6875,\"y\":175,\"width\":37.859375,\"height\":19}"
+    },
+    {
+      "id": "R25",
+      "name": "a real double click is classified as a double click and issues no request",
+      "ok": true,
+      "detail": "doubleClickGestures+1 kind=double-click requests=0"
+    },
+    {
+      "id": "R26",
+      "name": "the trailing selectionchange cannot turn a double click into a drag",
+      "ok": true,
+      "detail": "kindAfterTrailing=double-click dragsDuringWindow=0"
+    },
+    {
+      "id": "R27",
+      "name": "100 drags and 100 double clicks are all classified and produce zero requests",
+      "ok": true,
+      "detail": "drags=100 doubleClicks=100 cancels=0 requests=0"
+    },
+    {
+      "id": "R28",
+      "name": "after the gesture storm, the shortcut still issues exactly one lookup (T03)",
+      "ok": true,
+      "detail": "requests=[{\"method\":\"POST\",\"url\":\"http://127.0.0.1:50991/api/dsh-word-lookup\",\"postData\":\"{\\\"query\\\":\\\"derive\\\"}\"}]"
+    },
+    {
+      "id": "R29",
+      "name": "the shortcut’s single lookup is answered by the local SQLite fixture, not a stub",
+      "ok": true,
+      "detail": "status=200 body={\"found\":true,\"query\":\"derive\",\"headword\":\"derive\",\"phonetic\":\"/dɪˈraɪv/\",\"matchedForm\":null,\"meaningCount\":1,\"firstMeaning\":{\"partOfSpeech\":\"verb\",\"definition\":\"obtain something from a specified source; originate in\",\"translation\":\"导出；派生；源自\"},\"forms\":[\"derived\",\"derives\",\"deriving\"],\"exampleCount\":2,\"source\":\"sqlite-fixture\",\"settings\":{\"autoDoubleClick\":true,\"autoSelection\":true}} outcome=found cardHeadword=derive /dɪˈraɪv/"
+    },
+    {
+      "id": "R30",
+      "name": "an inflected selection resolves to its lemma through the forms table (T10)",
+      "ok": true,
+      "detail": "status=200 body={\"found\":true,\"query\":\"derived\",\"headword\":\"derive\",\"phonetic\":\"/dɪˈraɪv/\",\"matchedForm\":\"derived\",\"meaningCount\":1,\"firstMeaning\":{\"partOfSpeech\":\"verb\",\"definition\":\"obtain something from a specified source; originate in\",\"translation\":\"导出；派生；源自\"},\"forms\":[\"derived\",\"derives\",\"deriving\"],\"exampleCount\":2,\"source\":\"sqlite-fixture\",\"settings\":{\"autoDoubleClick\":true,\"autoSelection\":true}}"
+    },
+    {
+      "id": "R31",
+      "name": "irregular forms resolve to their lemma (T11)",
+      "ok": true,
+      "detail": "went={\"found\":true,\"query\":\"went\",\"headword\":\"go\",\"phonetic\":\"/ɡəʊ/\",\"matchedForm\":\"went\",\"meaningCount\":1,\"firstMeaning\":{\"partOfSpeech\":\"verb\",\"definition\":\"move or travel from one place to another\",\"translation\":\"去；走；进行\"},\"forms\":[\"goes\",\"going\",\"gone\",\"went\"],\"exampleCount\":1,\"source\":\"sqlite-fixture\",\"settings\":{\"autoDoubleClick\":true,\"autoSelection\":true}} gone={\"found\":true,\"query\":\"gone\",\"headword\":\"go\",\"phonetic\":\"/ɡəʊ/\",\"matchedForm\":\"gone\",\"meaningCount\":1,\"firstMeaning\":{\"partOfSpeech\":\"verb\",\"definition\":\"move or travel from one place to another\",\"translation\":\"去；走；进行\"},\"forms\":[\"goes\",\"going\",\"gone\",\"went\"],\"exampleCount\":1,\"source\":\"sqlite-fixture\",\"settings\":{\"autoDoubleClick\":true,\"autoSelection\":true}}"
+    },
+    {
+      "id": "R32",
+      "name": "an irregular plural resolves to its singular headword",
+      "ok": true,
+      "detail": "body={\"found\":true,\"query\":\"teeth\",\"headword\":\"tooth\",\"phonetic\":\"/tuːθ/\",\"matchedForm\":\"teeth\",\"meaningCount\":1,\"firstMeaning\":{\"partOfSpeech\":\"noun\",\"definition\":\"each of a set of hard structures set in the jaws\",\"translation\":\"牙齿；齿\"},\"forms\":[\"teeth\"],\"exampleCount\":2,\"source\":\"sqlite-fixture\",\"settings\":{\"autoDoubleClick\":true,\"autoSelection\":true}}"
+    },
+    {
+      "id": "R33",
+      "name": "a multi-word phrase is answered exactly, and is never split into its words",
+      "ok": true,
+      "detail": "body={\"found\":true,\"query\":\"wave function\",\"headword\":\"wave function\",\"phonetic\":\"/weɪv ˈfʌŋkʃn/\",\"matchedForm\":null,\"meaningCount\":1,\"firstMeaning\":{\"partOfSpeech\":\"noun phrase\",\"definition\":\"a mathematical description of the quantum state of a system\",\"translation\":\"波函数\"},\"forms\":[\"wave functions\"],\"exampleCount\":2,\"source\":\"sqlite-fixture\",\"settings\":{\"autoDoubleClick\":true,\"autoSelection\":true}}"
+    },
+    {
+      "id": "R34",
+      "name": "a well-formed selection the dictionary does not contain is 200 found:false (T12)",
+      "ok": true,
+      "detail": "status=200 body={\"ok\":true,\"found\":false,\"query\":\"unknowntoken\",\"source\":\"sqlite-fixture\",\"settings\":{\"autoDoubleClick\":true,\"autoSelection\":true}} outcome=not-found cardState=ready card=\"unknowntoken×no entry for \\\"unknowntoken\\\"\""
+    },
+    {
+      "id": "R35",
+      "name": "the payload carries headword, phonetic, POS, Chinese meaning, forms, examples and provenance",
+      "ok": true,
+      "detail": "{\"status\":200,\"body\":{\"ok\":true,\"found\":true,\"query\":\"conservation\",\"headword\":\"conservation\",\"phonetic\":\"/ˌkɒnsəˈveɪʃn/\",\"meanings\":[{\"partOfSpeech\":\"noun\",\"definition\":\"the principle that a quantity of a closed system stays constant\",\"translation\":\"守恒；保存；保护\"}],\"forms\":[],\"matchedForm\":null,\"examples\":[{\"en\":\"Charge conservation follows from the symmetry of the Lagrangian.\",\"zh\":\"电荷守恒来自拉格朗日量的对称性。\"},{\"en\":\"Energy conservation forbids that transition.\",\"zh\":\"能量守恒禁戒该跃迁。\"}],\"source\":\"sqlite-fixture\",\"settings\":{\"autoDoubleClick\":true,\"autoSelection\":true}}}"
+    },
+    {
+      "id": "R36",
+      "name": "SQL metacharacters in a query never fault the route and never change the schema",
+      "ok": true,
+      "detail": "{\"hostile\":[{\"query\":\"'; DROP TABLE entries; --\",\"status\":200,\"body\":{\"ok\":true,\"found\":false,\"query\":\"drop table entries\",\"source\":\"sqlite-fixture\",\"settings\":{\"autoDoubleClick\":true,\"autoSelection\":true}}},{\"query\":\"' OR '1'='1\",\"status\":200,\"body\":{\"ok\":true,\"found\":false,\"query\":\"or '1'='1\",\"source\":\"sqlite-fixture\",\"settings\":{\"autoDoubleClick\":true,\"autoSelection\":true}}},{\"query\":\"\\\"; DROP TABLE forms; --\",\"status\":200,\"body\":{\"ok\":true,\"found\":false,\"query\":\"drop table forms\",\"source\":\"sqlite-fixture\",\"settings\":{\"autoDoubleClick\":true,\"autoSelection\":true}}},{\"query\":\"' UNION SELECT word FROM entries --\",\"status\":200,\"body\":{\"ok\":true,\"found\":false,\"query\":\"union select word from entries\",\"source\":\"sqlite-fixture\",\"settings\":{\"autoDoubleClick\":true,\"autoSelection\":true}}},{\"query\":\"'); INSERT INTO entries (word) VALUES ('x'); --\",\"status\":200,\"body\":{\"ok\":true,\"found\":false,\"query\":\"insert into entries (word) values ('x\",\"source\":\"sqlite-fixture\",\"settings\":{\"autoDoubleClick\":true,\"autoSelection\":true}}}],\"after\":{\"found\":true,\"query\":\"derive\",\"headword\":\"derive\",\"phonetic\":\"/dɪˈraɪv/\",\"matchedForm\":null,\"meaningCount\":1,\"firstMeaning\":{\"partOfSpeech\":\"verb\",\"definition\":\"obtain something from a specified source; originate in\",\"translation\":\"导出；派生；源自\"},\"forms\":[\"derived\",\"derives\",\"deriving\"],\"exampleCount\":2,\"source\":\"sqlite-fixture\",\"settings\":{\"autoDoubleClick\":true,\"autoSelection\":true}}}"
+    },
+    {
+      "id": "R37",
+      "name": "examples are deterministic and never belong to another headword",
+      "ok": true,
+      "detail": "{\"derive\":[{\"en\":\"The result must derive from the boundary conditions alone.\",\"zh\":\"该结果只能由边界条件导出。\"},{\"en\":\"This identity derives from Gauss’s law.\",\"zh\":\"这一恒等式源自高斯定律。\"}],\"phrase\":[{\"en\":\"The wave function collapses on measurement.\",\"zh\":\"波函数在测量时坍缩。\"},{\"en\":\"A normalizable wave function belongs to the Hilbert space.\",\"zh\":\"可归一化的波函数属于希尔伯特空间。\"}],\"wave\":[{\"en\":\"The wave carries energy without carrying matter.\",\"zh\":\"波传递能量而不传递物质。\"}],\"function\":[{\"en\":\"A function maps every input to exactly one output.\",\"zh\":\"函数把每个输入映射到恰好一个输出。\"},{\"en\":\"The delta function is not a function in the classical sense.\",\"zh\":\"δ 函数在经典意义下并不是函数。\"}]}"
+    },
+    {
+      "id": "R38",
+      "name": "a full-width selection is NFKC-folded before it is looked up",
+      "ok": true,
+      "detail": "snapshotText=\"ｄｅｒｉｖｅ\" body={\"found\":true,\"query\":\"derive\",\"headword\":\"derive\",\"phonetic\":\"/dɪˈraɪv/\",\"matchedForm\":null,\"meaningCount\":1,\"firstMeaning\":{\"partOfSpeech\":\"verb\",\"definition\":\"obtain something from a specified source; originate in\",\"translation\":\"导出；派生；源自\"},\"forms\":[\"derived\",\"derives\",\"deriving\"],\"exampleCount\":2,\"source\":\"sqlite-fixture\",\"settings\":{\"autoDoubleClick\":true,\"autoSelection\":true}}"
+    },
+    {
+      "id": "R20",
+      "name": "the settings namespace is served to the browser and carries the persisted values",
+      "ok": true,
+      "detail": "{\"status\":\"ready\",\"mode\":\"host\",\"writable\":true,\"revision\":0,\"value\":{\"autoDoubleClick\":true,\"autoSelection\":true}}"
+    },
+    {
+      "id": "R21",
+      "name": "the client gate values are derived from that snapshot",
+      "ok": true,
+      "detail": "{\"autoDoubleClick\":true,\"autoSelection\":true}"
+    },
+    {
+      "id": "R22",
+      "name": "the plugin added no node outside the overlay layer",
+      "ok": true,
+      "detail": "{\"flowItems\":1,\"messageBody\":0,\"pluginNodesOutsideOverlay\":0,\"probeNodes\":3}"
+    },
+    {
+      "id": "S05",
+      "name": "both switches survive a full restart",
+      "ok": true,
+      "detail": "{\"autoDoubleClick\":true,\"autoSelection\":true}"
+    },
+    {
+      "id": "S06",
+      "name": "the host reads the persisted values after the restart",
+      "ok": true,
+      "detail": "{\"autoDoubleClick\":true,\"autoSelection\":true}"
+    },
+    {
+      "id": "S07",
+      "name": "the switches can be returned to false, and the client follows",
+      "ok": true,
+      "detail": "{\"autoDoubleClick\":false,\"autoSelection\":false}"
+    },
+    {
+      "id": "L03",
+      "name": "the second boot reported no unexpected console error and no duplicate-registration failure",
+      "ok": true,
+      "detail": "unexpected=[] pageErrors=[] intentional400=3"
+    },
+    {
+      "id": "L05",
+      "name": "the recording environment stayed clean: the reload and restart produced no console error at all",
+      "ok": true,
+      "detail": "firstBoot unexpected=0 diagnosticsAfterRestart=true"
+    },
+    {
+      "id": "L04",
+      "name": "the host boot log carries no loader failure for this plugin",
+      "ok": true,
+      "detail": "no dsh-word-lookup line beyond the plugin table"
+    },
+    {
+      "id": "ISO05",
+      "name": "the run addressed the isolated environment and nothing production-owned",
+      "ok": true,
+      "detail": "home=C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-word-lookup-test\\home profile=word-lookup-test port=50991"
+    }
+  ],
+  "bootLogs": [
+    {
+      "bootIndex": 1,
+      "stdout": "dsh web: http://127.0.0.1:50991/?token=<redacted>\n",
+      "stderr": "(node:28344) ExperimentalWarning: SQLite is an experimental feature and might change at any time\n(Use `node --trace-warnings ...` to show where the warning was created)\n",
+      "startedAt": "2026-10-01T09:23:39.480Z",
+      "pid": 51756
+    },
+    {
+      "bootIndex": 2,
+      "stdout": "dsh web: http://127.0.0.1:50991/?token=<redacted>\n",
+      "stderr": "(node:47768) ExperimentalWarning: SQLite is an experimental feature and might change at any time\n(Use `node --trace-warnings ...` to show where the warning was created)\n",
+      "startedAt": "2026-10-01T09:24:15.851Z",
+      "pid": 56396
+    }
+  ],
+  "facts": {
+    "patchAfterWrite": "# Isolated test profile: bind the test port only.\n- id: webserver\n  config:\n    host: !!js ctx.webStartup.host ?? '127.0.0.1'\n    port: !!js ctx.webStartup.port ?? 50991\n- id: ui-settings-general\n  name: \"@deepseek-ai/dsh-client-ui-settings-general\"\n  config:\n    welcomeNoticeVersion: 2026-09-28.1\n- id: dsh-word-lookup\n  name: dsh-word-lookup\n  config:\n    autoDoubleClick: false\n    autoSelection: true\n",
+    "firstBoot": {
+      "boot": {
+        "entryCount": 66,
+        "own": [
+          {
+            "id": "dsh-word-lookup",
+            "url": "plugins/??dsh-word-lookup/client.js&rev=a08e57edfd4d",
+            "inject": [
+              "@deepseek-ai/dsh-client-ui-layout",
+              "@deepseek-ai/dsh-client-ui-renderer",
+              "@deepseek-ai/dsh-client-shortcuts",
+              "@deepseek-ai/dsh-client-ui-settings",
+              "@deepseek-ai/dsh-client-locale"
+            ]
+          }
+        ],
+        "batchUrls": [
+          "plugins/??@deepseek-ai/dsh-client-modules/client.js&rev=4f95304bf137",
+          "plugins/??@deepseek-ai/dsh-client-ui-open-in-app/client.js,@deepseek-ai/dsh-api-gateway/client.js,@deepseek-ai/dsh-api-job-controller/client.js,@deepseek-ai/dsh-api-terminal-controller/client.js,@deepseek-ai/dsh-api-workspace-files/client.js,@deepseek-ai/dsh-client-ui-settings-account/client.js,@deepseek-ai/dsh-client-hmr/client.js,@deepseek-ai/dsh-cordis-client-runner/client.js,@deepseek-ai/dsh-client-ui-theme/client.js,@deepseek-ai/dsh-client-locale/client.js,@deepseek-ai/dsh-client-shortcuts/client.js,@deepseek-ai/dsh-client-ui-shortcuts/client.js,@deepseek-ai/dsh-client-ui-layout/client.js,@deepseek-ai/dsh-client-ui-renderer/client.js,@deepseek-ai/dsh-client-ui-session/client.js,@deepseek-ai/dsh-client-resources/client.js,@deepseek-ai/dsh-client-ui-sidebar/client.js,@deepseek-ai/dsh-client-ui-sidebar-right/client.js,@deepseek-ai/dsh-client-ui-sidebar-documentpreview/client.js,@deepseek-ai/dsh-client-ui-sidebar-terminal/client.js,@deepseek-ai/dsh-client-ui-sidebar-files/client.js,@deepseek-ai/dsh-client-ui-settings/client.js,@deepseek-ai/dsh-client-ui-settings-general/client.js,@deepseek-ai/dsh-client-ui-settings-models/client.js,@deepseek-ai/dsh-client-ui-plugin-manager/client.js,@deepseek-ai/dsh-client-ui-settings-plugin-inventory/client.js,@deepseek-ai/dsh-client-ui-conversation/client.js,@deepseek-ai/dsh-client-ui-approval/client.js,@deepseek-ai/dsh-client-ui-chat/client.js,@deepseek-ai/dsh-client-ui-brand-official/client.js,@deepseek-ai/dsh-client-ui-attachment/client.js,@deepseek-ai/dsh-client-ui-tool/client.js,@deepseek-ai/dsh-client-ui-cordis/client.js,@deepseek-ai/dsh-client-ui-workspace/client.js,@deepseek-ai/dsh-client-ui-workflow-run/client.js,@deepseek-ai/dsh-client-ui-input-trigger/client.js,@deepseek-ai/dsh-client-ui-commands/client.js,@deepseek-ai/dsh-client-ui-skill/client.js,@deepseek-ai/dsh-client-ui-subagent/client.js,@deepseek-ai/dsh-client-ui-reference/client.js,@deepseek-ai/dsh-client-ui-jobs/client.js,@deepseek-ai/dsh-client-ui-goal/client.js,@deepseek-ai/dsh-client-ui-message-feedback/client.js,@deepseek-ai/dsh-client-ui-model-selection/client.js,@deepseek-ai/dsh-client-ui-permission-presets/client.js,@deepseek-ai/dsh-client-ui-agent-preset/client.js,@deepseek-ai/dsh-client-ui-settings-session-log/client.js,@deepseek-ai/dsh-client-ui-settings-plugins/client.js,@deepseek-ai/dsh-client-ui-settings-shell/client.js,@deepseek-ai/dsh-client-ui-settings-agent-loop/client.js,@deepseek-ai/dsh-client-ui-settings-subagent/client.js,@deepseek-ai/dsh-client-ui-settings-web-search/client.js,@deepseek-ai/dsh-client-ui-plan/client.js,@deepseek-ai/dsh-client-ui-user-questions/client.js,@deepseek-ai/dsh-client-ui-trajectory/client.js,dsh-word-lookup/client.js,@deepseek-ai/dsh-session-log-export/client.js,@deepseek-ai/dsh-client-file-upload/client.js&rev=5ca140eb3608",
+          "plugins/??@deepseek-ai/dsh-api-remotes/client.js,@deepseek-ai/dsh-client-ui-deliverables/client.js,@deepseek-ai/dsh-typert-registry/client.js,@deepseek-ai/dsh-client-connection/client.js,@deepseek-ai/dsh-api-workspace-controller/client.js,@deepseek-ai/dsh-api-session-controller/client.js,@deepseek-ai/dsh-client-ui-directory-picker-native/client.js&rev=cff9ad5fd71b"
+        ],
+        "hasPluginInBatch": true,
+        "diagnostics": true,
+        "slotHostCount": 24
+      },
+      "overlayBeforeLookup": {
+        "entryId": "dsh-word-lookup:card",
+        "order": 900,
+        "declarationSeen": true,
+        "registrationCount": 1
+      },
+      "catalog": {
+        "size": 18,
+        "row": {
+          "id": "wordLookup.lookupSelection",
+          "label": "Look up selection",
+          "keys": [
+            "Ctrl",
+            "+",
+            "Shift",
+            "+",
+            "L"
+          ],
+          "binding": {
+            "code": "KeyL",
+            "modifiers": [
+              "control",
+              "shift"
+            ]
+          },
+          "conflicts": [],
+          "issue": null
+        }
+      },
+      "modalBefore": {
+        "dialogs": [
+          "Add an API key to get started"
+        ],
+        "menus": 0
+      },
+      "modalBlock": {
+        "modalBefore": {
+          "dialogs": [
+            "Add an API key to get started"
+          ],
+          "menus": 0
+        },
+        "beforeCounters": {
+          "resolveCalls": 0,
+          "passReturns": 0,
+          "handledReturns": 0,
+          "runCalls": 0,
+          "lastOutcome": null,
+          "lastContext": null
+        },
+        "blockedCounters": {
+          "resolveCalls": 0,
+          "passReturns": 0,
+          "handledReturns": 0,
+          "runCalls": 0,
+          "lastOutcome": null,
+          "lastContext": null
+        },
+        "requests": 0
+      },
+      "dialogDismissal": {
+        "dismissed": [
+          "Add an API key to get started via \"Configure later\""
+        ],
+        "remaining": 0
+      },
+      "noSelection": {
+        "requests": 0,
+        "key": {
+          "code": "KeyL",
+          "ctrl": true,
+          "shift": true,
+          "defaultPrevented": false
+        },
+        "card": {
+          "slotPresent": true,
+          "slotChildren": 0,
+          "cardPresent": false,
+          "state": null,
+          "headword": null,
+          "body": null
+        },
+        "countersAfterPass": {
+          "resolveCalls": 1,
+          "passReturns": 1,
+          "handledReturns": 0,
+          "runCalls": 0,
+          "lastOutcome": "pass",
+          "lastContext": {
+            "region": "page",
+            "modal": null,
+            "target": "body"
+          }
+        }
+      },
+      "looseSelection": {
+        "snapshot": {
+          "present": true,
+          "eligible": false,
+          "text": "",
+          "at": 1790846626693,
+          "rect": null,
+          "gesture": {
+            "kind": "none",
+            "completedAt": null,
+            "pointer": null
+          }
+        },
+        "requests": 0,
+        "card": {
+          "slotPresent": true,
+          "slotChildren": 0,
+          "cardPresent": false,
+          "state": null,
+          "headword": null,
+          "body": null
+        }
+      },
+      "composerSelection": {
+        "snapshot": {
+          "present": true,
+          "eligible": false,
+          "text": "",
+          "at": 1790846627299,
+          "rect": null,
+          "gesture": {
+            "kind": "none",
+            "completedAt": null,
+            "pointer": null
+          }
+        },
+        "requests": 0
+      },
+      "manual": {
+        "snapshot": {
+          "present": true,
+          "eligible": true,
+          "text": "derive",
+          "at": 1790846627907,
+          "rect": {
+            "x": 156.6875,
+            "y": 175,
+            "width": 37.859375,
+            "height": 19
+          },
+          "gesture": {
+            "kind": "none",
+            "completedAt": null,
+            "pointer": null
+          }
+        },
+        "requests": [
+          {
+            "method": "POST",
+            "url": "http://127.0.0.1:50991/api/dsh-word-lookup",
+            "postData": "{\"query\":\"derive\"}"
+          }
+        ],
+        "key": {
+          "code": "KeyL",
+          "ctrl": true,
+          "shift": true,
+          "defaultPrevented": true
+        },
+        "card": {
+          "slotPresent": true,
+          "slotChildren": 1,
+          "cardPresent": true,
+          "state": "ready",
+          "headword": "derive /dɪˈraɪv/",
+          "body": "derive×derive /dɪˈraɪv/verb 导出；派生；源自 obtain something from a specified source; originate inderived · derives · derivingThe result must derive from the boundary conditions alone.该结果只能由边界条件导出。This identity derives from Gauss’s law.这一恒等式源自高斯定律。"
+        },
+        "countersBeforeHandled": {
+          "resolveCalls": 3,
+          "passReturns": 3,
+          "handledReturns": 0,
+          "runCalls": 0,
+          "lastOutcome": "pass",
+          "lastContext": {
+            "region": "editable",
+            "modal": null,
+            "target": "div"
+          }
+        },
+        "countersAfterHandled": {
+          "resolveCalls": 4,
+          "passReturns": 3,
+          "handledReturns": 1,
+          "runCalls": 1,
+          "lastOutcome": "handled",
+          "lastContext": {
+            "region": "editable",
+            "modal": null,
+            "target": "div"
+          }
+        },
+        "after": {
+          "lookups": 1,
+          "lastOutcome": "found"
+        }
+      },
+      "overlayAfterLookup": {
+        "overlayAfter": {
+          "entryId": "dsh-word-lookup:card",
+          "order": 900,
+          "declarationSeen": true,
+          "registrationCount": 1
+        },
+        "cardCount": 1
+      },
+      "route": {
+        "found": {
+          "status": 200,
+          "body": {
+            "ok": true,
+            "found": true,
+            "query": "derive",
+            "headword": "derive",
+            "phonetic": "/dɪˈraɪv/",
+            "meanings": [
+              {
+                "partOfSpeech": "verb",
+                "definition": "obtain something from a specified source; originate in",
+                "translation": "导出；派生；源自"
+              }
+            ],
+            "forms": [
+              {
+                "form": "derived",
+                "kind": "past"
+              },
+              {
+                "form": "derives",
+                "kind": "third-person singular"
+              },
+              {
+                "form": "deriving",
+                "kind": "present participle"
+              }
+            ],
+            "matchedForm": null,
+            "examples": [
+              {
+                "en": "The result must derive from the boundary conditions alone.",
+                "zh": "该结果只能由边界条件导出。"
+              },
+              {
+                "en": "This identity derives from Gauss’s law.",
+                "zh": "这一恒等式源自高斯定律。"
+              }
+            ],
+            "source": "sqlite-fixture",
+            "settings": {
+              "autoDoubleClick": false,
+              "autoSelection": false
+            }
+          }
+        },
+        "unknown": {
+          "status": 200,
+          "body": {
+            "ok": true,
+            "found": false,
+            "query": "zzz-not-a-word",
+            "source": "sqlite-fixture",
+            "settings": {
+              "autoDoubleClick": false,
+              "autoSelection": false
+            }
+          }
+        },
+        "malformed": {
+          "status": 400,
+          "body": {
+            "ok": false,
+            "error": "malformed-body",
+            "message": "request body is not valid JSON"
+          }
+        },
+        "tooLong": {
+          "status": 400,
+          "body": {
+            "ok": false,
+            "error": "query-too-long",
+            "message": "query exceeds 96 code points"
+          }
+        },
+        "wrongType": {
+          "status": 400,
+          "body": {
+            "ok": false,
+            "error": "unsupported-content-type",
+            "message": "expected application/json, received \"text/plain\""
+          }
+        }
+      },
+      "automaticTriggers": {
+        "requests": 0,
+        "box": {
+          "x": 38,
+          "y": 174,
+          "width": 440,
+          "height": 22.390625
+        },
+        "snapshotAfterGestures": {
+          "present": true,
+          "eligible": true,
+          "text": "he serializer must derive the wire form from the boundary conditions.",
+          "at": 1790846629399,
+          "rect": {
+            "x": 45.328125,
+            "y": 175,
+            "width": 427.515625,
+            "height": 19
+          },
+          "gesture": {
+            "kind": "drag",
+            "completedAt": 1790846629400,
+            "pointer": {
+              "startX": 44,
+              "startY": 185.1953125,
+              "endX": 472,
+              "endY": 185.1953125,
+              "distance": 428
+            }
+          }
+        }
+      },
+      "dragTrace": {
+        "label": "pointerup",
+        "rangeCount": 1,
+        "collapsed": false,
+        "text": " serializer must derive the wire",
+        "anchorTag": "P",
+        "inFlow": true,
+        "inInteractive": false
+      },
+      "drag": {
+        "before": {
+          "pointerdowns": 3,
+          "pointerups": 3,
+          "drags": 1,
+          "doubleClicks": 1,
+          "doubleClickGestures": 1,
+          "simpleGestures": 2,
+          "cancels": 0
+        },
+        "after": {
+          "pointerdowns": 4,
+          "pointerups": 4,
+          "drags": 2,
+          "doubleClicks": 1,
+          "doubleClickGestures": 1,
+          "simpleGestures": 2,
+          "cancels": 0
+        },
+        "last": {
+          "kind": "drag",
+          "completedAt": 1790846630150,
+          "pointer": {
+            "startX": 62,
+            "startY": 185.1953125,
+            "endX": 248,
+            "endY": 185.1953125,
+            "distance": 186
+          }
+        },
+        "view": {
+          "present": true,
+          "eligible": true,
+          "text": " serializer must derive the wire",
+          "at": 1790846630149,
+          "rect": {
+            "x": 60.578125,
+            "y": 175,
+            "width": 187.328125,
+            "height": 19
+          },
+          "gesture": {
+            "kind": "drag",
+            "completedAt": 1790846630150,
+            "pointer": {
+              "startX": 62,
+              "startY": 185.1953125,
+              "endX": 248,
+              "endY": 185.1953125,
+              "distance": 186
+            }
+          }
+        }
+      },
+      "rect": {
+        "view": {
+          "present": true,
+          "eligible": true,
+          "text": "derive",
+          "at": 1790846630767,
+          "rect": {
+            "x": 156.6875,
+            "y": 175,
+            "width": 37.859375,
+            "height": 19
+          },
+          "gesture": {
+            "kind": "drag",
+            "completedAt": 1790846630150,
+            "pointer": {
+              "startX": 62,
+              "startY": 185.1953125,
+              "endX": 248,
+              "endY": 185.1953125,
+              "distance": 186
+            }
+          }
+        }
+      },
+      "doubleClick": {
+        "immediatelyAfter": {
+          "kind": "double-click",
+          "completedAt": 1790846631373,
+          "pointer": {
+            "startX": 128,
+            "startY": 185.1953125,
+            "endX": 128,
+            "endY": 185.1953125,
+            "distance": 0
+          }
+        },
+        "afterTrailing": {
+          "kind": "double-click",
+          "completedAt": 1790846631373,
+          "pointer": {
+            "startX": 128,
+            "startY": 185.1953125,
+            "endX": 128,
+            "endY": 185.1953125,
+            "distance": 0
+          }
+        },
+        "delta": 1,
+        "view": {
+          "present": true,
+          "eligible": true,
+          "text": "must ",
+          "at": 1790846631382,
+          "rect": {
+            "x": 122.1875,
+            "y": 175,
+            "width": 34.515625,
+            "height": 19
+          },
+          "gesture": {
+            "kind": "double-click",
+            "completedAt": 1790846631373,
+            "pointer": {
+              "startX": 128,
+              "startY": 185.1953125,
+              "endX": 128,
+              "endY": 185.1953125,
+              "distance": 0
+            }
+          }
+        }
+      },
+      "gestureStorm": {
+        "drags": 100,
+        "doubleClicks": 100,
+        "cancels": 0,
+        "requests": 0,
+        "counters": {
+          "pointerdowns": 306,
+          "pointerups": 306,
+          "drags": 102,
+          "doubleClicks": 102,
+          "doubleClickGestures": 102,
+          "simpleGestures": 204,
+          "cancels": 0
+        }
+      },
+      "shortcutAfterGestures": {
+        "word": "derive",
+        "snapshot": {
+          "text": "derive",
+          "eligible": true
+        },
+        "requests": 1,
+        "status": 200,
+        "body": {
+          "ok": true,
+          "found": true,
+          "query": "derive",
+          "headword": "derive",
+          "phonetic": "/dɪˈraɪv/",
+          "meanings": [
+            {
+              "partOfSpeech": "verb",
+              "definition": "obtain something from a specified source; originate in",
+              "translation": "导出；派生；源自"
+            }
+          ],
+          "forms": [
+            {
+              "form": "derived",
+              "kind": "past"
+            },
+            {
+              "form": "derives",
+              "kind": "third-person singular"
+            },
+            {
+              "form": "deriving",
+              "kind": "present participle"
+            }
+          ],
+          "matchedForm": null,
+          "examples": [
+            {
+              "en": "The result must derive from the boundary conditions alone.",
+              "zh": "该结果只能由边界条件导出。"
+            },
+            {
+              "en": "This identity derives from Gauss’s law.",
+              "zh": "这一恒等式源自高斯定律。"
+            }
+          ],
+          "source": "sqlite-fixture",
+          "settings": {
+            "autoDoubleClick": false,
+            "autoSelection": false
+          }
+        },
+        "card": {
+          "slotPresent": true,
+          "slotChildren": 1,
+          "cardPresent": true,
+          "state": "ready",
+          "headword": "derive /dɪˈraɪv/",
+          "body": "derive×derive /dɪˈraɪv/verb 导出；派生；源自 obtain something from a specified source; originate inderived · derives · derivingThe result must derive from the boundary conditions alone.该结果只能由边界条件导出。This identity derives from Gauss’s law.这一恒等式源自高斯定律。"
+        },
+        "outcome": "found"
+      },
+      "phase3Examples": {
+        "examplesFirst": {
+          "status": 200,
+          "body": {
+            "ok": true,
+            "found": true,
+            "query": "derive",
+            "headword": "derive",
+            "phonetic": "/dɪˈraɪv/",
+            "meanings": [
+              {
+                "partOfSpeech": "verb",
+                "definition": "obtain something from a specified source; originate in",
+                "translation": "导出；派生；源自"
+              }
+            ],
+            "forms": [
+              {
+                "form": "derived",
+                "kind": "past"
+              },
+              {
+                "form": "derives",
+                "kind": "third-person singular"
+              },
+              {
+                "form": "deriving",
+                "kind": "present participle"
+              }
+            ],
+            "matchedForm": null,
+            "examples": [
+              {
+                "en": "The result must derive from the boundary conditions alone.",
+                "zh": "该结果只能由边界条件导出。"
+              },
+              {
+                "en": "This identity derives from Gauss’s law.",
+                "zh": "这一恒等式源自高斯定律。"
+              }
+            ],
+            "source": "sqlite-fixture",
+            "settings": {
+              "autoDoubleClick": false,
+              "autoSelection": false
+            }
+          }
+        },
+        "examplesSecond": {
+          "status": 200,
+          "body": {
+            "ok": true,
+            "found": true,
+            "query": "derive",
+            "headword": "derive",
+            "phonetic": "/dɪˈraɪv/",
+            "meanings": [
+              {
+                "partOfSpeech": "verb",
+                "definition": "obtain something from a specified source; originate in",
+                "translation": "导出；派生；源自"
+              }
+            ],
+            "forms": [
+              {
+                "form": "derived",
+                "kind": "past"
+              },
+              {
+                "form": "derives",
+                "kind": "third-person singular"
+              },
+              {
+                "form": "deriving",
+                "kind": "present participle"
+              }
+            ],
+            "matchedForm": null,
+            "examples": [
+              {
+                "en": "The result must derive from the boundary conditions alone.",
+                "zh": "该结果只能由边界条件导出。"
+              },
+              {
+                "en": "This identity derives from Gauss’s law.",
+                "zh": "这一恒等式源自高斯定律。"
+              }
+            ],
+            "source": "sqlite-fixture",
+            "settings": {
+              "autoDoubleClick": false,
+              "autoSelection": false
+            }
+          }
+        },
+        "waveExamples": {
+          "status": 200,
+          "body": {
+            "ok": true,
+            "found": true,
+            "query": "wave",
+            "headword": "wave",
+            "phonetic": "/weɪv/",
+            "meanings": [
+              {
+                "partOfSpeech": "noun",
+                "definition": "a disturbance that transfers energy through a medium",
+                "translation": "波；波浪"
+              }
+            ],
+            "forms": [
+              {
+                "form": "waves",
+                "kind": "plural"
+              }
+            ],
+            "matchedForm": null,
+            "examples": [
+              {
+                "en": "The wave carries energy without carrying matter.",
+                "zh": "波传递能量而不传递物质。"
+              }
+            ],
+            "source": "sqlite-fixture",
+            "settings": {
+              "autoDoubleClick": false,
+              "autoSelection": false
+            }
+          }
+        },
+        "phraseExamples": {
+          "status": 200,
+          "body": {
+            "ok": true,
+            "found": true,
+            "query": "wave function",
+            "headword": "wave function",
+            "phonetic": "/weɪv ˈfʌŋkʃn/",
+            "meanings": [
+              {
+                "partOfSpeech": "noun phrase",
+                "definition": "a mathematical description of the quantum state of a system",
+                "translation": "波函数"
+              }
+            ],
+            "forms": [
+              {
+                "form": "wave functions",
+                "kind": "plural"
+              }
+            ],
+            "matchedForm": null,
+            "examples": [
+              {
+                "en": "The wave function collapses on measurement.",
+                "zh": "波函数在测量时坍缩。"
+              },
+              {
+                "en": "A normalizable wave function belongs to the Hilbert space.",
+                "zh": "可归一化的波函数属于希尔伯特空间。"
+              }
+            ],
+            "source": "sqlite-fixture",
+            "settings": {
+              "autoDoubleClick": false,
+              "autoSelection": false
+            }
+          }
+        },
+        "functionExamples": {
+          "status": 200,
+          "body": {
+            "ok": true,
+            "found": true,
+            "query": "function",
+            "headword": "function",
+            "phonetic": "/ˈfʌŋkʃn/",
+            "meanings": [
+              {
+                "partOfSpeech": "noun",
+                "definition": "a relation that assigns exactly one output to each input",
+                "translation": "函数；功能"
+              }
+            ],
+            "forms": [
+              {
+                "form": "functions",
+                "kind": "plural"
+              }
+            ],
+            "matchedForm": null,
+            "examples": [
+              {
+                "en": "A function maps every input to exactly one output.",
+                "zh": "函数把每个输入映射到恰好一个输出。"
+              },
+              {
+                "en": "The delta function is not a function in the classical sense.",
+                "zh": "δ 函数在经典意义下并不是函数。"
+              }
+            ],
+            "source": "sqlite-fixture",
+            "settings": {
+              "autoDoubleClick": false,
+              "autoSelection": false
+            }
+          }
+        }
+      },
+      "phase3": {
+        "derive": {
+          "word": "derive",
+          "snapshot": {
+            "text": "derive",
+            "eligible": true
+          },
+          "requests": 1,
+          "status": 200,
+          "body": {
+            "ok": true,
+            "found": true,
+            "query": "derive",
+            "headword": "derive",
+            "phonetic": "/dɪˈraɪv/",
+            "meanings": [
+              {
+                "partOfSpeech": "verb",
+                "definition": "obtain something from a specified source; originate in",
+                "translation": "导出；派生；源自"
+              }
+            ],
+            "forms": [
+              {
+                "form": "derived",
+                "kind": "past"
+              },
+              {
+                "form": "derives",
+                "kind": "third-person singular"
+              },
+              {
+                "form": "deriving",
+                "kind": "present participle"
+              }
+            ],
+            "matchedForm": null,
+            "examples": [
+              {
+                "en": "The result must derive from the boundary conditions alone.",
+                "zh": "该结果只能由边界条件导出。"
+              },
+              {
+                "en": "This identity derives from Gauss’s law.",
+                "zh": "这一恒等式源自高斯定律。"
+              }
+            ],
+            "source": "sqlite-fixture",
+            "settings": {
+              "autoDoubleClick": false,
+              "autoSelection": false
+            }
+          },
+          "card": {
+            "slotPresent": true,
+            "slotChildren": 1,
+            "cardPresent": true,
+            "state": "ready",
+            "headword": "derive /dɪˈraɪv/",
+            "body": "derive×derive /dɪˈraɪv/verb 导出；派生；源自 obtain something from a specified source; originate inderived · derives · derivingThe result must derive from the boundary conditions alone.该结果只能由边界条件导出。This identity derives from Gauss’s law.这一恒等式源自高斯定律。"
+          },
+          "outcome": "found"
+        },
+        "derived": {
+          "word": "derived",
+          "snapshot": {
+            "text": "derived",
+            "eligible": true
+          },
+          "requests": 1,
+          "status": 200,
+          "body": {
+            "ok": true,
+            "found": true,
+            "query": "derived",
+            "headword": "derive",
+            "phonetic": "/dɪˈraɪv/",
+            "meanings": [
+              {
+                "partOfSpeech": "verb",
+                "definition": "obtain something from a specified source; originate in",
+                "translation": "导出；派生；源自"
+              }
+            ],
+            "forms": [
+              {
+                "form": "derived",
+                "kind": "past"
+              },
+              {
+                "form": "derives",
+                "kind": "third-person singular"
+              },
+              {
+                "form": "deriving",
+                "kind": "present participle"
+              }
+            ],
+            "matchedForm": "derived",
+            "examples": [
+              {
+                "en": "The result must derive from the boundary conditions alone.",
+                "zh": "该结果只能由边界条件导出。"
+              },
+              {
+                "en": "This identity derives from Gauss’s law.",
+                "zh": "这一恒等式源自高斯定律。"
+              }
+            ],
+            "source": "sqlite-fixture",
+            "settings": {
+              "autoDoubleClick": false,
+              "autoSelection": false
+            }
+          },
+          "card": {
+            "slotPresent": true,
+            "slotChildren": 1,
+            "cardPresent": true,
+            "state": "ready",
+            "headword": "derive /dɪˈraɪv/",
+            "body": "derived×derive /dɪˈraɪv/derived → deriveverb 导出；派生；源自 obtain something from a specified source; originate inderived · derives · derivingThe result must derive from the boundary conditions alone.该结果只能由边界条件导出。This identity derives from Gauss’s law.这一恒等式源自高斯定律。"
+          },
+          "outcome": "found"
+        },
+        "went": {
+          "word": "went",
+          "snapshot": {
+            "text": "went",
+            "eligible": true
+          },
+          "requests": 1,
+          "status": 200,
+          "body": {
+            "ok": true,
+            "found": true,
+            "query": "went",
+            "headword": "go",
+            "phonetic": "/ɡəʊ/",
+            "meanings": [
+              {
+                "partOfSpeech": "verb",
+                "definition": "move or travel from one place to another",
+                "translation": "去；走；进行"
+              }
+            ],
+            "forms": [
+              {
+                "form": "goes",
+                "kind": "third-person singular"
+              },
+              {
+                "form": "going",
+                "kind": "present participle"
+              },
+              {
+                "form": "gone",
+                "kind": "past participle"
+              },
+              {
+                "form": "went",
+                "kind": "past"
+              }
+            ],
+            "matchedForm": "went",
+            "examples": [
+              {
+                "en": "The measurement went the other way.",
+                "zh": "测量结果朝相反方向变化了。"
+              }
+            ],
+            "source": "sqlite-fixture",
+            "settings": {
+              "autoDoubleClick": false,
+              "autoSelection": false
+            }
+          },
+          "card": {
+            "slotPresent": true,
+            "slotChildren": 1,
+            "cardPresent": true,
+            "state": "ready",
+            "headword": "go /ɡəʊ/",
+            "body": "went×go /ɡəʊ/went → goverb 去；走；进行 move or travel from one place to anothergoes · going · gone · wentThe measurement went the other way.测量结果朝相反方向变化了。"
+          },
+          "outcome": "found"
+        },
+        "gone": {
+          "word": "gone",
+          "snapshot": {
+            "text": "gone",
+            "eligible": true
+          },
+          "requests": 1,
+          "status": 200,
+          "body": {
+            "ok": true,
+            "found": true,
+            "query": "gone",
+            "headword": "go",
+            "phonetic": "/ɡəʊ/",
+            "meanings": [
+              {
+                "partOfSpeech": "verb",
+                "definition": "move or travel from one place to another",
+                "translation": "去；走；进行"
+              }
+            ],
+            "forms": [
+              {
+                "form": "goes",
+                "kind": "third-person singular"
+              },
+              {
+                "form": "going",
+                "kind": "present participle"
+              },
+              {
+                "form": "gone",
+                "kind": "past participle"
+              },
+              {
+                "form": "went",
+                "kind": "past"
+              }
+            ],
+            "matchedForm": "gone",
+            "examples": [
+              {
+                "en": "The measurement went the other way.",
+                "zh": "测量结果朝相反方向变化了。"
+              }
+            ],
+            "source": "sqlite-fixture",
+            "settings": {
+              "autoDoubleClick": false,
+              "autoSelection": false
+            }
+          },
+          "card": {
+            "slotPresent": true,
+            "slotChildren": 1,
+            "cardPresent": true,
+            "state": "ready",
+            "headword": "go /ɡəʊ/",
+            "body": "gone×go /ɡəʊ/gone → goverb 去；走；进行 move or travel from one place to anothergoes · going · gone · wentThe measurement went the other way.测量结果朝相反方向变化了。"
+          },
+          "outcome": "found"
+        },
+        "teeth": {
+          "word": "teeth",
+          "snapshot": {
+            "text": "teeth",
+            "eligible": true
+          },
+          "requests": 1,
+          "status": 200,
+          "body": {
+            "ok": true,
+            "found": true,
+            "query": "teeth",
+            "headword": "tooth",
+            "phonetic": "/tuːθ/",
+            "meanings": [
+              {
+                "partOfSpeech": "noun",
+                "definition": "each of a set of hard structures set in the jaws",
+                "translation": "牙齿；齿"
+              }
+            ],
+            "forms": [
+              {
+                "form": "teeth",
+                "kind": "plural"
+              }
+            ],
+            "matchedForm": "teeth",
+            "examples": [
+              {
+                "en": "Each tooth has a crown and one or more roots.",
+                "zh": "每颗牙齿都有一个牙冠和一条或多条牙根。"
+              },
+              {
+                "en": "A chipped tooth can usually be repaired.",
+                "zh": "缺损的牙齿通常可以修复。"
+              }
+            ],
+            "source": "sqlite-fixture",
+            "settings": {
+              "autoDoubleClick": false,
+              "autoSelection": false
+            }
+          },
+          "card": {
+            "slotPresent": true,
+            "slotChildren": 1,
+            "cardPresent": true,
+            "state": "ready",
+            "headword": "tooth /tuːθ/",
+            "body": "teeth×tooth /tuːθ/teeth → toothnoun 牙齿；齿 each of a set of hard structures set in the jawsteethEach tooth has a crown and one or more roots.每颗牙齿都有一个牙冠和一条或多条牙根。A chipped tooth can usually be repaired.缺损的牙齿通常可以修复。"
+          },
+          "outcome": "found"
+        },
+        "phrase": {
+          "word": "wave function",
+          "snapshot": {
+            "text": "wave function",
+            "eligible": true
+          },
+          "requests": 1,
+          "status": 200,
+          "body": {
+            "ok": true,
+            "found": true,
+            "query": "wave function",
+            "headword": "wave function",
+            "phonetic": "/weɪv ˈfʌŋkʃn/",
+            "meanings": [
+              {
+                "partOfSpeech": "noun phrase",
+                "definition": "a mathematical description of the quantum state of a system",
+                "translation": "波函数"
+              }
+            ],
+            "forms": [
+              {
+                "form": "wave functions",
+                "kind": "plural"
+              }
+            ],
+            "matchedForm": null,
+            "examples": [
+              {
+                "en": "The wave function collapses on measurement.",
+                "zh": "波函数在测量时坍缩。"
+              },
+              {
+                "en": "A normalizable wave function belongs to the Hilbert space.",
+                "zh": "可归一化的波函数属于希尔伯特空间。"
+              }
+            ],
+            "source": "sqlite-fixture",
+            "settings": {
+              "autoDoubleClick": false,
+              "autoSelection": false
+            }
+          },
+          "card": {
+            "slotPresent": true,
+            "slotChildren": 1,
+            "cardPresent": true,
+            "state": "ready",
+            "headword": "wave function /weɪv ˈfʌŋkʃn/",
+            "body": "wave function×wave function /weɪv ˈfʌŋkʃn/noun phrase 波函数 a mathematical description of the quantum state of a systemwave functionsThe wave function collapses on measurement.波函数在测量时坍缩。A normalizable wave function belongs to the Hilbert space.可归一化的波函数属于希尔伯特空间。"
+          },
+          "outcome": "found"
+        },
+        "unknown": {
+          "word": "unknowntoken",
+          "snapshot": {
+            "text": "unknowntoken",
+            "eligible": true
+          },
+          "requests": 1,
+          "status": 200,
+          "body": {
+            "ok": true,
+            "found": false,
+            "query": "unknowntoken",
+            "source": "sqlite-fixture",
+            "settings": {
+              "autoDoubleClick": false,
+              "autoSelection": false
+            }
+          },
+          "card": {
+            "slotPresent": true,
+            "slotChildren": 1,
+            "cardPresent": true,
+            "state": "ready",
+            "headword": null,
+            "body": "unknowntoken×no entry for \"unknowntoken\""
+          },
+          "outcome": "not-found"
+        },
+        "detailed": {
+          "status": 200,
+          "body": {
+            "ok": true,
+            "found": true,
+            "query": "conservation",
+            "headword": "conservation",
+            "phonetic": "/ˌkɒnsəˈveɪʃn/",
+            "meanings": [
+              {
+                "partOfSpeech": "noun",
+                "definition": "the principle that a quantity of a closed system stays constant",
+                "translation": "守恒；保存；保护"
+              }
+            ],
+            "forms": [],
+            "matchedForm": null,
+            "examples": [
+              {
+                "en": "Charge conservation follows from the symmetry of the Lagrangian.",
+                "zh": "电荷守恒来自拉格朗日量的对称性。"
+              },
+              {
+                "en": "Energy conservation forbids that transition.",
+                "zh": "能量守恒禁戒该跃迁。"
+              }
+            ],
+            "source": "sqlite-fixture",
+            "settings": {
+              "autoDoubleClick": false,
+              "autoSelection": false
+            }
+          }
+        },
+        "hostile": {
+          "hostile": [
+            {
+              "query": "'; DROP TABLE entries; --",
+              "status": 200,
+              "body": {
+                "ok": true,
+                "found": false,
+                "query": "drop table entries",
+                "source": "sqlite-fixture",
+                "settings": {
+                  "autoDoubleClick": false,
+                  "autoSelection": false
+                }
+              }
+            },
+            {
+              "query": "' OR '1'='1",
+              "status": 200,
+              "body": {
+                "ok": true,
+                "found": false,
+                "query": "or '1'='1",
+                "source": "sqlite-fixture",
+                "settings": {
+                  "autoDoubleClick": false,
+                  "autoSelection": false
+                }
+              }
+            },
+            {
+              "query": "\"; DROP TABLE forms; --",
+              "status": 200,
+              "body": {
+                "ok": true,
+                "found": false,
+                "query": "drop table forms",
+                "source": "sqlite-fixture",
+                "settings": {
+                  "autoDoubleClick": false,
+                  "autoSelection": false
+                }
+              }
+            },
+            {
+              "query": "' UNION SELECT word FROM entries --",
+              "status": 200,
+              "body": {
+                "ok": true,
+                "found": false,
+                "query": "union select word from entries",
+                "source": "sqlite-fixture",
+                "settings": {
+                  "autoDoubleClick": false,
+                  "autoSelection": false
+                }
+              }
+            },
+            {
+              "query": "'); INSERT INTO entries (word) VALUES ('x'); --",
+              "status": 200,
+              "body": {
+                "ok": true,
+                "found": false,
+                "query": "insert into entries (word) values ('x",
+                "source": "sqlite-fixture",
+                "settings": {
+                  "autoDoubleClick": false,
+                  "autoSelection": false
+                }
+              }
+            }
+          ],
+          "after": {
+            "status": 200,
+            "body": {
+              "ok": true,
+              "found": true,
+              "query": "derive",
+              "headword": "derive",
+              "phonetic": "/dɪˈraɪv/",
+              "meanings": [
+                {
+                  "partOfSpeech": "verb",
+                  "definition": "obtain something from a specified source; originate in",
+                  "translation": "导出；派生；源自"
+                }
+              ],
+              "forms": [
+                {
+                  "form": "derived",
+                  "kind": "past"
+                },
+                {
+                  "form": "derives",
+                  "kind": "third-person singular"
+                },
+                {
+                  "form": "deriving",
+                  "kind": "present participle"
+                }
+              ],
+              "matchedForm": null,
+              "examples": [
+                {
+                  "en": "The result must derive from the boundary conditions alone.",
+                  "zh": "该结果只能由边界条件导出。"
+                },
+                {
+                  "en": "This identity derives from Gauss’s law.",
+                  "zh": "这一恒等式源自高斯定律。"
+                }
+              ],
+              "source": "sqlite-fixture",
+              "settings": {
+                "autoDoubleClick": false,
+                "autoSelection": false
+              }
+            }
+          }
+        },
+        "fullWidth": {
+          "word": "ｄｅｒｉｖｅ",
+          "snapshot": {
+            "text": "ｄｅｒｉｖｅ",
+            "eligible": true
+          },
+          "requests": 1,
+          "status": 200,
+          "body": {
+            "ok": true,
+            "found": true,
+            "query": "derive",
+            "headword": "derive",
+            "phonetic": "/dɪˈraɪv/",
+            "meanings": [
+              {
+                "partOfSpeech": "verb",
+                "definition": "obtain something from a specified source; originate in",
+                "translation": "导出；派生；源自"
+              }
+            ],
+            "forms": [
+              {
+                "form": "derived",
+                "kind": "past"
+              },
+              {
+                "form": "derives",
+                "kind": "third-person singular"
+              },
+              {
+                "form": "deriving",
+                "kind": "present participle"
+              }
+            ],
+            "matchedForm": null,
+            "examples": [
+              {
+                "en": "The result must derive from the boundary conditions alone.",
+                "zh": "该结果只能由边界条件导出。"
+              },
+              {
+                "en": "This identity derives from Gauss’s law.",
+                "zh": "这一恒等式源自高斯定律。"
+              }
+            ],
+            "source": "sqlite-fixture",
+            "settings": {
+              "autoDoubleClick": false,
+              "autoSelection": false
+            }
+          },
+          "card": {
+            "slotPresent": true,
+            "slotChildren": 1,
+            "cardPresent": true,
+            "state": "ready",
+            "headword": "derive /dɪˈraɪv/",
+            "body": "ｄｅｒｉｖｅ×derive /dɪˈraɪv/verb 导出；派生；源自 obtain something from a specified source; originate inderived · derives · derivingThe result must derive from the boundary conditions alone.该结果只能由边界条件导出。This identity derives from Gauss’s law.这一恒等式源自高斯定律。"
+          },
+          "outcome": "found"
+        }
+      },
+      "snapshotBeforeWrite": {
+        "status": "ready",
+        "mode": "host",
+        "writable": true,
+        "revision": 0,
+        "value": {
+          "autoDoubleClick": false,
+          "autoSelection": false
+        }
+      },
+      "gatesBeforeWrite": {
+        "autoDoubleClick": false,
+        "autoSelection": false
+      },
+      "dom": {
+        "flowItems": 1,
+        "messageBody": 0,
+        "pluginNodesOutsideOverlay": 0,
+        "probeNodes": 3
+      }
+    },
+    "firstWrite": {
+      "accepted": true,
+      "snapshot": {
+        "status": "ready",
+        "mode": "host",
+        "writable": true,
+        "revision": 1,
+        "value": {
+          "autoDoubleClick": false,
+          "autoSelection": true
+        }
+      },
+      "gates": {
+        "autoDoubleClick": false,
+        "autoSelection": true
+      },
+      "echo": {
+        "autoDoubleClick": false,
+        "autoSelection": true
+      }
+    },
+    "afterClientReload": {
+      "overlay": {
+        "entryId": "dsh-word-lookup:card",
+        "order": 900,
+        "declarationSeen": true,
+        "registrationCount": 1
+      },
+      "catalog": {
+        "size": 18,
+        "row": {
+          "id": "wordLookup.lookupSelection",
+          "label": "Look up selection",
+          "keys": [
+            "Ctrl",
+            "+",
+            "Shift",
+            "+",
+            "L"
+          ],
+          "binding": {
+            "code": "KeyL",
+            "modifiers": [
+              "control",
+              "shift"
+            ]
+          },
+          "conflicts": [],
+          "issue": null
+        }
+      }
+    },
+    "consoleErrors": {
+      "unexpected": [],
+      "expected": [],
+      "pageErrors": []
+    },
+    "failedRequests": [],
+    "secondBootLog": "dsh web: http://127.0.0.1:50991/?token=<redacted>\n",
+    "afterRestart": {
+      "snapshot": {
+        "status": "ready",
+        "mode": "host",
+        "writable": true,
+        "revision": 0,
+        "value": {
+          "autoDoubleClick": true,
+          "autoSelection": true
+        }
+      },
+      "echo": {
+        "autoDoubleClick": true,
+        "autoSelection": true
+      }
+    },
+    "restored": {
+      "accepted": true,
+      "snapshot": {
+        "status": "ready",
+        "mode": "host",
+        "writable": true,
+        "revision": 2,
+        "value": {
+          "autoDoubleClick": false,
+          "autoSelection": false
+        }
+      },
+      "gates": {
+        "autoDoubleClick": false,
+        "autoSelection": false
+      },
+      "echo": {
+        "autoDoubleClick": false,
+        "autoSelection": false
+      }
+    },
+    "secondBoot": {
+      "boot": {
+        "entryCount": 66,
+        "own": [
+          {
+            "id": "dsh-word-lookup",
+            "url": "plugins/??dsh-word-lookup/client.js&rev=a08e57edfd4d",
+            "inject": [
+              "@deepseek-ai/dsh-client-ui-layout",
+              "@deepseek-ai/dsh-client-ui-renderer",
+              "@deepseek-ai/dsh-client-shortcuts",
+              "@deepseek-ai/dsh-client-ui-settings",
+              "@deepseek-ai/dsh-client-locale"
+            ]
+          }
+        ],
+        "batchUrls": [
+          "plugins/??@deepseek-ai/dsh-client-modules/client.js&rev=4f95304bf137",
+          "plugins/??@deepseek-ai/dsh-client-ui-open-in-app/client.js,@deepseek-ai/dsh-api-gateway/client.js,@deepseek-ai/dsh-api-job-controller/client.js,@deepseek-ai/dsh-api-terminal-controller/client.js,@deepseek-ai/dsh-api-workspace-files/client.js,@deepseek-ai/dsh-client-ui-settings-account/client.js,@deepseek-ai/dsh-client-hmr/client.js,@deepseek-ai/dsh-cordis-client-runner/client.js,@deepseek-ai/dsh-client-ui-theme/client.js,@deepseek-ai/dsh-client-locale/client.js,@deepseek-ai/dsh-client-shortcuts/client.js,@deepseek-ai/dsh-client-ui-shortcuts/client.js,@deepseek-ai/dsh-client-ui-layout/client.js,@deepseek-ai/dsh-client-ui-renderer/client.js,@deepseek-ai/dsh-client-ui-session/client.js,@deepseek-ai/dsh-client-resources/client.js,@deepseek-ai/dsh-client-ui-sidebar/client.js,@deepseek-ai/dsh-client-ui-sidebar-right/client.js,@deepseek-ai/dsh-client-ui-sidebar-documentpreview/client.js,@deepseek-ai/dsh-client-ui-sidebar-terminal/client.js,@deepseek-ai/dsh-client-ui-sidebar-files/client.js,@deepseek-ai/dsh-client-ui-settings/client.js,@deepseek-ai/dsh-client-ui-settings-general/client.js,@deepseek-ai/dsh-client-ui-settings-models/client.js,@deepseek-ai/dsh-client-ui-plugin-manager/client.js,@deepseek-ai/dsh-client-ui-settings-plugin-inventory/client.js,@deepseek-ai/dsh-client-ui-conversation/client.js,@deepseek-ai/dsh-client-ui-approval/client.js,@deepseek-ai/dsh-client-ui-chat/client.js,@deepseek-ai/dsh-client-ui-brand-official/client.js,@deepseek-ai/dsh-client-ui-attachment/client.js,@deepseek-ai/dsh-client-ui-tool/client.js,@deepseek-ai/dsh-client-ui-cordis/client.js,@deepseek-ai/dsh-client-ui-workspace/client.js,@deepseek-ai/dsh-client-ui-workflow-run/client.js,@deepseek-ai/dsh-client-ui-input-trigger/client.js,@deepseek-ai/dsh-client-ui-commands/client.js,@deepseek-ai/dsh-client-ui-skill/client.js,@deepseek-ai/dsh-client-ui-subagent/client.js,@deepseek-ai/dsh-client-ui-reference/client.js,@deepseek-ai/dsh-client-ui-jobs/client.js,@deepseek-ai/dsh-client-ui-goal/client.js,@deepseek-ai/dsh-client-ui-message-feedback/client.js,@deepseek-ai/dsh-client-ui-model-selection/client.js,@deepseek-ai/dsh-client-ui-permission-presets/client.js,@deepseek-ai/dsh-client-ui-agent-preset/client.js,@deepseek-ai/dsh-client-ui-settings-session-log/client.js,@deepseek-ai/dsh-client-ui-settings-plugins/client.js,@deepseek-ai/dsh-client-ui-settings-shell/client.js,@deepseek-ai/dsh-client-ui-settings-agent-loop/client.js,@deepseek-ai/dsh-client-ui-settings-subagent/client.js,@deepseek-ai/dsh-client-ui-settings-web-search/client.js,@deepseek-ai/dsh-client-ui-plan/client.js,@deepseek-ai/dsh-client-ui-user-questions/client.js,@deepseek-ai/dsh-client-ui-trajectory/client.js,dsh-word-lookup/client.js,@deepseek-ai/dsh-session-log-export/client.js,@deepseek-ai/dsh-client-file-upload/client.js&rev=5ca140eb3608",
+          "plugins/??@deepseek-ai/dsh-api-remotes/client.js,@deepseek-ai/dsh-client-ui-deliverables/client.js,@deepseek-ai/dsh-typert-registry/client.js,@deepseek-ai/dsh-client-connection/client.js,@deepseek-ai/dsh-api-workspace-controller/client.js,@deepseek-ai/dsh-api-session-controller/client.js,@deepseek-ai/dsh-client-ui-directory-picker-native/client.js&rev=cff9ad5fd71b"
+        ],
+        "hasPluginInBatch": true,
+        "diagnostics": true,
+        "slotHostCount": 24
+      },
+      "overlayBeforeLookup": {
+        "entryId": "dsh-word-lookup:card",
+        "order": 900,
+        "declarationSeen": true,
+        "registrationCount": 1
+      },
+      "catalog": {
+        "size": 18,
+        "row": {
+          "id": "wordLookup.lookupSelection",
+          "label": "Look up selection",
+          "keys": [
+            "Ctrl",
+            "+",
+            "Shift",
+            "+",
+            "L"
+          ],
+          "binding": {
+            "code": "KeyL",
+            "modifiers": [
+              "control",
+              "shift"
+            ]
+          },
+          "conflicts": [],
+          "issue": null
+        }
+      },
+      "modalBefore": {
+        "dialogs": [
+          "Add an API key to get started"
+        ],
+        "menus": 0
+      },
+      "modalBlock": {
+        "modalBefore": {
+          "dialogs": [
+            "Add an API key to get started"
+          ],
+          "menus": 0
+        },
+        "beforeCounters": {
+          "resolveCalls": 0,
+          "passReturns": 0,
+          "handledReturns": 0,
+          "runCalls": 0,
+          "lastOutcome": null,
+          "lastContext": null
+        },
+        "blockedCounters": {
+          "resolveCalls": 0,
+          "passReturns": 0,
+          "handledReturns": 0,
+          "runCalls": 0,
+          "lastOutcome": null,
+          "lastContext": null
+        },
+        "requests": 0
+      },
+      "dialogDismissal": {
+        "dismissed": [
+          "Add an API key to get started via \"Configure later\""
+        ],
+        "remaining": 0
+      },
+      "noSelection": {
+        "requests": 0,
+        "key": {
+          "code": "KeyL",
+          "ctrl": true,
+          "shift": true,
+          "defaultPrevented": false
+        },
+        "card": {
+          "slotPresent": true,
+          "slotChildren": 0,
+          "cardPresent": false,
+          "state": null,
+          "headword": null,
+          "body": null
+        },
+        "countersAfterPass": {
+          "resolveCalls": 1,
+          "passReturns": 1,
+          "handledReturns": 0,
+          "runCalls": 0,
+          "lastOutcome": "pass",
+          "lastContext": {
+            "region": "page",
+            "modal": null,
+            "target": "body"
+          }
+        }
+      },
+      "looseSelection": {
+        "snapshot": {
+          "present": true,
+          "eligible": false,
+          "text": "",
+          "at": 1790846662979,
+          "rect": null,
+          "gesture": {
+            "kind": "none",
+            "completedAt": null,
+            "pointer": null
+          }
+        },
+        "requests": 0,
+        "card": {
+          "slotPresent": true,
+          "slotChildren": 0,
+          "cardPresent": false,
+          "state": null,
+          "headword": null,
+          "body": null
+        }
+      },
+      "composerSelection": {
+        "snapshot": {
+          "present": true,
+          "eligible": false,
+          "text": "",
+          "at": 1790846663589,
+          "rect": null,
+          "gesture": {
+            "kind": "none",
+            "completedAt": null,
+            "pointer": null
+          }
+        },
+        "requests": 0
+      },
+      "manual": {
+        "snapshot": {
+          "present": true,
+          "eligible": true,
+          "text": "derive",
+          "at": 1790846664195,
+          "rect": {
+            "x": 156.6875,
+            "y": 175,
+            "width": 37.859375,
+            "height": 19
+          },
+          "gesture": {
+            "kind": "none",
+            "completedAt": null,
+            "pointer": null
+          }
+        },
+        "requests": [
+          {
+            "method": "POST",
+            "url": "http://127.0.0.1:50991/api/dsh-word-lookup",
+            "postData": "{\"query\":\"derive\"}"
+          }
+        ],
+        "key": {
+          "code": "KeyL",
+          "ctrl": true,
+          "shift": true,
+          "defaultPrevented": true
+        },
+        "card": {
+          "slotPresent": true,
+          "slotChildren": 1,
+          "cardPresent": true,
+          "state": "ready",
+          "headword": "derive /dɪˈraɪv/",
+          "body": "derive×derive /dɪˈraɪv/verb 导出；派生；源自 obtain something from a specified source; originate inderived · derives · derivingThe result must derive from the boundary conditions alone.该结果只能由边界条件导出。This identity derives from Gauss’s law.这一恒等式源自高斯定律。"
+        },
+        "countersBeforeHandled": {
+          "resolveCalls": 3,
+          "passReturns": 3,
+          "handledReturns": 0,
+          "runCalls": 0,
+          "lastOutcome": "pass",
+          "lastContext": {
+            "region": "editable",
+            "modal": null,
+            "target": "div"
+          }
+        },
+        "countersAfterHandled": {
+          "resolveCalls": 4,
+          "passReturns": 3,
+          "handledReturns": 1,
+          "runCalls": 1,
+          "lastOutcome": "handled",
+          "lastContext": {
+            "region": "editable",
+            "modal": null,
+            "target": "div"
+          }
+        },
+        "after": {
+          "lookups": 1,
+          "lastOutcome": "found"
+        }
+      },
+      "overlayAfterLookup": {
+        "overlayAfter": {
+          "entryId": "dsh-word-lookup:card",
+          "order": 900,
+          "declarationSeen": true,
+          "registrationCount": 1
+        },
+        "cardCount": 1
+      },
+      "route": {
+        "found": {
+          "status": 200,
+          "body": {
+            "ok": true,
+            "found": true,
+            "query": "derive",
+            "headword": "derive",
+            "phonetic": "/dɪˈraɪv/",
+            "meanings": [
+              {
+                "partOfSpeech": "verb",
+                "definition": "obtain something from a specified source; originate in",
+                "translation": "导出；派生；源自"
+              }
+            ],
+            "forms": [
+              {
+                "form": "derived",
+                "kind": "past"
+              },
+              {
+                "form": "derives",
+                "kind": "third-person singular"
+              },
+              {
+                "form": "deriving",
+                "kind": "present participle"
+              }
+            ],
+            "matchedForm": null,
+            "examples": [
+              {
+                "en": "The result must derive from the boundary conditions alone.",
+                "zh": "该结果只能由边界条件导出。"
+              },
+              {
+                "en": "This identity derives from Gauss’s law.",
+                "zh": "这一恒等式源自高斯定律。"
+              }
+            ],
+            "source": "sqlite-fixture",
+            "settings": {
+              "autoDoubleClick": true,
+              "autoSelection": true
+            }
+          }
+        },
+        "unknown": {
+          "status": 200,
+          "body": {
+            "ok": true,
+            "found": false,
+            "query": "zzz-not-a-word",
+            "source": "sqlite-fixture",
+            "settings": {
+              "autoDoubleClick": true,
+              "autoSelection": true
+            }
+          }
+        },
+        "malformed": {
+          "status": 400,
+          "body": {
+            "ok": false,
+            "error": "malformed-body",
+            "message": "request body is not valid JSON"
+          }
+        },
+        "tooLong": {
+          "status": 400,
+          "body": {
+            "ok": false,
+            "error": "query-too-long",
+            "message": "query exceeds 96 code points"
+          }
+        },
+        "wrongType": {
+          "status": 400,
+          "body": {
+            "ok": false,
+            "error": "unsupported-content-type",
+            "message": "expected application/json, received \"text/plain\""
+          }
+        }
+      },
+      "automaticTriggers": {
+        "requests": 0,
+        "box": {
+          "x": 38,
+          "y": 174,
+          "width": 440,
+          "height": 22.390625
+        },
+        "snapshotAfterGestures": {
+          "present": true,
+          "eligible": true,
+          "text": "he serializer must derive the wire form from the boundary conditions.",
+          "at": 1790846665665,
+          "rect": {
+            "x": 45.328125,
+            "y": 175,
+            "width": 427.515625,
+            "height": 19
+          },
+          "gesture": {
+            "kind": "drag",
+            "completedAt": 1790846665666,
+            "pointer": {
+              "startX": 44,
+              "startY": 185.1953125,
+              "endX": 472,
+              "endY": 185.1953125,
+              "distance": 428
+            }
+          }
+        }
+      },
+      "dragTrace": {
+        "label": "pointerup",
+        "rangeCount": 1,
+        "collapsed": false,
+        "text": " serializer must derive the wire",
+        "anchorTag": "P",
+        "inFlow": true,
+        "inInteractive": false
+      },
+      "drag": {
+        "before": {
+          "pointerdowns": 3,
+          "pointerups": 3,
+          "drags": 1,
+          "doubleClicks": 1,
+          "doubleClickGestures": 1,
+          "simpleGestures": 2,
+          "cancels": 0
+        },
+        "after": {
+          "pointerdowns": 4,
+          "pointerups": 4,
+          "drags": 2,
+          "doubleClicks": 1,
+          "doubleClickGestures": 1,
+          "simpleGestures": 2,
+          "cancels": 0
+        },
+        "last": {
+          "kind": "drag",
+          "completedAt": 1790846666415,
+          "pointer": {
+            "startX": 62,
+            "startY": 185.1953125,
+            "endX": 248,
+            "endY": 185.1953125,
+            "distance": 186
+          }
+        },
+        "view": {
+          "present": true,
+          "eligible": true,
+          "text": " serializer must derive the wire",
+          "at": 1790846666414,
+          "rect": {
+            "x": 60.578125,
+            "y": 175,
+            "width": 187.328125,
+            "height": 19
+          },
+          "gesture": {
+            "kind": "drag",
+            "completedAt": 1790846666415,
+            "pointer": {
+              "startX": 62,
+              "startY": 185.1953125,
+              "endX": 248,
+              "endY": 185.1953125,
+              "distance": 186
+            }
+          }
+        }
+      },
+      "rect": {
+        "view": {
+          "present": true,
+          "eligible": true,
+          "text": "derive",
+          "at": 1790846667023,
+          "rect": {
+            "x": 156.6875,
+            "y": 175,
+            "width": 37.859375,
+            "height": 19
+          },
+          "gesture": {
+            "kind": "drag",
+            "completedAt": 1790846666415,
+            "pointer": {
+              "startX": 62,
+              "startY": 185.1953125,
+              "endX": 248,
+              "endY": 185.1953125,
+              "distance": 186
+            }
+          }
+        }
+      },
+      "doubleClick": {
+        "immediatelyAfter": {
+          "kind": "double-click",
+          "completedAt": 1790846667633,
+          "pointer": {
+            "startX": 128,
+            "startY": 185.1953125,
+            "endX": 128,
+            "endY": 185.1953125,
+            "distance": 0
+          }
+        },
+        "afterTrailing": {
+          "kind": "double-click",
+          "completedAt": 1790846667633,
+          "pointer": {
+            "startX": 128,
+            "startY": 185.1953125,
+            "endX": 128,
+            "endY": 185.1953125,
+            "distance": 0
+          }
+        },
+        "delta": 1,
+        "view": {
+          "present": true,
+          "eligible": true,
+          "text": "must ",
+          "at": 1790846667647,
+          "rect": {
+            "x": 122.1875,
+            "y": 175,
+            "width": 34.515625,
+            "height": 19
+          },
+          "gesture": {
+            "kind": "double-click",
+            "completedAt": 1790846667633,
+            "pointer": {
+              "startX": 128,
+              "startY": 185.1953125,
+              "endX": 128,
+              "endY": 185.1953125,
+              "distance": 0
+            }
+          }
+        }
+      },
+      "gestureStorm": {
+        "drags": 100,
+        "doubleClicks": 100,
+        "cancels": 0,
+        "requests": 0,
+        "counters": {
+          "pointerdowns": 306,
+          "pointerups": 306,
+          "drags": 102,
+          "doubleClicks": 102,
+          "doubleClickGestures": 102,
+          "simpleGestures": 204,
+          "cancels": 0
+        }
+      },
+      "shortcutAfterGestures": {
+        "word": "derive",
+        "snapshot": {
+          "text": "derive",
+          "eligible": true
+        },
+        "requests": 1,
+        "status": 200,
+        "body": {
+          "ok": true,
+          "found": true,
+          "query": "derive",
+          "headword": "derive",
+          "phonetic": "/dɪˈraɪv/",
+          "meanings": [
+            {
+              "partOfSpeech": "verb",
+              "definition": "obtain something from a specified source; originate in",
+              "translation": "导出；派生；源自"
+            }
+          ],
+          "forms": [
+            {
+              "form": "derived",
+              "kind": "past"
+            },
+            {
+              "form": "derives",
+              "kind": "third-person singular"
+            },
+            {
+              "form": "deriving",
+              "kind": "present participle"
+            }
+          ],
+          "matchedForm": null,
+          "examples": [
+            {
+              "en": "The result must derive from the boundary conditions alone.",
+              "zh": "该结果只能由边界条件导出。"
+            },
+            {
+              "en": "This identity derives from Gauss’s law.",
+              "zh": "这一恒等式源自高斯定律。"
+            }
+          ],
+          "source": "sqlite-fixture",
+          "settings": {
+            "autoDoubleClick": true,
+            "autoSelection": true
+          }
+        },
+        "card": {
+          "slotPresent": true,
+          "slotChildren": 1,
+          "cardPresent": true,
+          "state": "ready",
+          "headword": "derive /dɪˈraɪv/",
+          "body": "derive×derive /dɪˈraɪv/verb 导出；派生；源自 obtain something from a specified source; originate inderived · derives · derivingThe result must derive from the boundary conditions alone.该结果只能由边界条件导出。This identity derives from Gauss’s law.这一恒等式源自高斯定律。"
+        },
+        "outcome": "found"
+      },
+      "phase3Examples": {
+        "examplesFirst": {
+          "status": 200,
+          "body": {
+            "ok": true,
+            "found": true,
+            "query": "derive",
+            "headword": "derive",
+            "phonetic": "/dɪˈraɪv/",
+            "meanings": [
+              {
+                "partOfSpeech": "verb",
+                "definition": "obtain something from a specified source; originate in",
+                "translation": "导出；派生；源自"
+              }
+            ],
+            "forms": [
+              {
+                "form": "derived",
+                "kind": "past"
+              },
+              {
+                "form": "derives",
+                "kind": "third-person singular"
+              },
+              {
+                "form": "deriving",
+                "kind": "present participle"
+              }
+            ],
+            "matchedForm": null,
+            "examples": [
+              {
+                "en": "The result must derive from the boundary conditions alone.",
+                "zh": "该结果只能由边界条件导出。"
+              },
+              {
+                "en": "This identity derives from Gauss’s law.",
+                "zh": "这一恒等式源自高斯定律。"
+              }
+            ],
+            "source": "sqlite-fixture",
+            "settings": {
+              "autoDoubleClick": true,
+              "autoSelection": true
+            }
+          }
+        },
+        "examplesSecond": {
+          "status": 200,
+          "body": {
+            "ok": true,
+            "found": true,
+            "query": "derive",
+            "headword": "derive",
+            "phonetic": "/dɪˈraɪv/",
+            "meanings": [
+              {
+                "partOfSpeech": "verb",
+                "definition": "obtain something from a specified source; originate in",
+                "translation": "导出；派生；源自"
+              }
+            ],
+            "forms": [
+              {
+                "form": "derived",
+                "kind": "past"
+              },
+              {
+                "form": "derives",
+                "kind": "third-person singular"
+              },
+              {
+                "form": "deriving",
+                "kind": "present participle"
+              }
+            ],
+            "matchedForm": null,
+            "examples": [
+              {
+                "en": "The result must derive from the boundary conditions alone.",
+                "zh": "该结果只能由边界条件导出。"
+              },
+              {
+                "en": "This identity derives from Gauss’s law.",
+                "zh": "这一恒等式源自高斯定律。"
+              }
+            ],
+            "source": "sqlite-fixture",
+            "settings": {
+              "autoDoubleClick": true,
+              "autoSelection": true
+            }
+          }
+        },
+        "waveExamples": {
+          "status": 200,
+          "body": {
+            "ok": true,
+            "found": true,
+            "query": "wave",
+            "headword": "wave",
+            "phonetic": "/weɪv/",
+            "meanings": [
+              {
+                "partOfSpeech": "noun",
+                "definition": "a disturbance that transfers energy through a medium",
+                "translation": "波；波浪"
+              }
+            ],
+            "forms": [
+              {
+                "form": "waves",
+                "kind": "plural"
+              }
+            ],
+            "matchedForm": null,
+            "examples": [
+              {
+                "en": "The wave carries energy without carrying matter.",
+                "zh": "波传递能量而不传递物质。"
+              }
+            ],
+            "source": "sqlite-fixture",
+            "settings": {
+              "autoDoubleClick": true,
+              "autoSelection": true
+            }
+          }
+        },
+        "phraseExamples": {
+          "status": 200,
+          "body": {
+            "ok": true,
+            "found": true,
+            "query": "wave function",
+            "headword": "wave function",
+            "phonetic": "/weɪv ˈfʌŋkʃn/",
+            "meanings": [
+              {
+                "partOfSpeech": "noun phrase",
+                "definition": "a mathematical description of the quantum state of a system",
+                "translation": "波函数"
+              }
+            ],
+            "forms": [
+              {
+                "form": "wave functions",
+                "kind": "plural"
+              }
+            ],
+            "matchedForm": null,
+            "examples": [
+              {
+                "en": "The wave function collapses on measurement.",
+                "zh": "波函数在测量时坍缩。"
+              },
+              {
+                "en": "A normalizable wave function belongs to the Hilbert space.",
+                "zh": "可归一化的波函数属于希尔伯特空间。"
+              }
+            ],
+            "source": "sqlite-fixture",
+            "settings": {
+              "autoDoubleClick": true,
+              "autoSelection": true
+            }
+          }
+        },
+        "functionExamples": {
+          "status": 200,
+          "body": {
+            "ok": true,
+            "found": true,
+            "query": "function",
+            "headword": "function",
+            "phonetic": "/ˈfʌŋkʃn/",
+            "meanings": [
+              {
+                "partOfSpeech": "noun",
+                "definition": "a relation that assigns exactly one output to each input",
+                "translation": "函数；功能"
+              }
+            ],
+            "forms": [
+              {
+                "form": "functions",
+                "kind": "plural"
+              }
+            ],
+            "matchedForm": null,
+            "examples": [
+              {
+                "en": "A function maps every input to exactly one output.",
+                "zh": "函数把每个输入映射到恰好一个输出。"
+              },
+              {
+                "en": "The delta function is not a function in the classical sense.",
+                "zh": "δ 函数在经典意义下并不是函数。"
+              }
+            ],
+            "source": "sqlite-fixture",
+            "settings": {
+              "autoDoubleClick": true,
+              "autoSelection": true
+            }
+          }
+        }
+      },
+      "phase3": {
+        "derive": {
+          "word": "derive",
+          "snapshot": {
+            "text": "derive",
+            "eligible": true
+          },
+          "requests": 1,
+          "status": 200,
+          "body": {
+            "ok": true,
+            "found": true,
+            "query": "derive",
+            "headword": "derive",
+            "phonetic": "/dɪˈraɪv/",
+            "meanings": [
+              {
+                "partOfSpeech": "verb",
+                "definition": "obtain something from a specified source; originate in",
+                "translation": "导出；派生；源自"
+              }
+            ],
+            "forms": [
+              {
+                "form": "derived",
+                "kind": "past"
+              },
+              {
+                "form": "derives",
+                "kind": "third-person singular"
+              },
+              {
+                "form": "deriving",
+                "kind": "present participle"
+              }
+            ],
+            "matchedForm": null,
+            "examples": [
+              {
+                "en": "The result must derive from the boundary conditions alone.",
+                "zh": "该结果只能由边界条件导出。"
+              },
+              {
+                "en": "This identity derives from Gauss’s law.",
+                "zh": "这一恒等式源自高斯定律。"
+              }
+            ],
+            "source": "sqlite-fixture",
+            "settings": {
+              "autoDoubleClick": true,
+              "autoSelection": true
+            }
+          },
+          "card": {
+            "slotPresent": true,
+            "slotChildren": 1,
+            "cardPresent": true,
+            "state": "ready",
+            "headword": "derive /dɪˈraɪv/",
+            "body": "derive×derive /dɪˈraɪv/verb 导出；派生；源自 obtain something from a specified source; originate inderived · derives · derivingThe result must derive from the boundary conditions alone.该结果只能由边界条件导出。This identity derives from Gauss’s law.这一恒等式源自高斯定律。"
+          },
+          "outcome": "found"
+        },
+        "derived": {
+          "word": "derived",
+          "snapshot": {
+            "text": "derived",
+            "eligible": true
+          },
+          "requests": 1,
+          "status": 200,
+          "body": {
+            "ok": true,
+            "found": true,
+            "query": "derived",
+            "headword": "derive",
+            "phonetic": "/dɪˈraɪv/",
+            "meanings": [
+              {
+                "partOfSpeech": "verb",
+                "definition": "obtain something from a specified source; originate in",
+                "translation": "导出；派生；源自"
+              }
+            ],
+            "forms": [
+              {
+                "form": "derived",
+                "kind": "past"
+              },
+              {
+                "form": "derives",
+                "kind": "third-person singular"
+              },
+              {
+                "form": "deriving",
+                "kind": "present participle"
+              }
+            ],
+            "matchedForm": "derived",
+            "examples": [
+              {
+                "en": "The result must derive from the boundary conditions alone.",
+                "zh": "该结果只能由边界条件导出。"
+              },
+              {
+                "en": "This identity derives from Gauss’s law.",
+                "zh": "这一恒等式源自高斯定律。"
+              }
+            ],
+            "source": "sqlite-fixture",
+            "settings": {
+              "autoDoubleClick": true,
+              "autoSelection": true
+            }
+          },
+          "card": {
+            "slotPresent": true,
+            "slotChildren": 1,
+            "cardPresent": true,
+            "state": "ready",
+            "headword": "derive /dɪˈraɪv/",
+            "body": "derived×derive /dɪˈraɪv/derived → deriveverb 导出；派生；源自 obtain something from a specified source; originate inderived · derives · derivingThe result must derive from the boundary conditions alone.该结果只能由边界条件导出。This identity derives from Gauss’s law.这一恒等式源自高斯定律。"
+          },
+          "outcome": "found"
+        },
+        "went": {
+          "word": "went",
+          "snapshot": {
+            "text": "went",
+            "eligible": true
+          },
+          "requests": 1,
+          "status": 200,
+          "body": {
+            "ok": true,
+            "found": true,
+            "query": "went",
+            "headword": "go",
+            "phonetic": "/ɡəʊ/",
+            "meanings": [
+              {
+                "partOfSpeech": "verb",
+                "definition": "move or travel from one place to another",
+                "translation": "去；走；进行"
+              }
+            ],
+            "forms": [
+              {
+                "form": "goes",
+                "kind": "third-person singular"
+              },
+              {
+                "form": "going",
+                "kind": "present participle"
+              },
+              {
+                "form": "gone",
+                "kind": "past participle"
+              },
+              {
+                "form": "went",
+                "kind": "past"
+              }
+            ],
+            "matchedForm": "went",
+            "examples": [
+              {
+                "en": "The measurement went the other way.",
+                "zh": "测量结果朝相反方向变化了。"
+              }
+            ],
+            "source": "sqlite-fixture",
+            "settings": {
+              "autoDoubleClick": true,
+              "autoSelection": true
+            }
+          },
+          "card": {
+            "slotPresent": true,
+            "slotChildren": 1,
+            "cardPresent": true,
+            "state": "ready",
+            "headword": "go /ɡəʊ/",
+            "body": "went×go /ɡəʊ/went → goverb 去；走；进行 move or travel from one place to anothergoes · going · gone · wentThe measurement went the other way.测量结果朝相反方向变化了。"
+          },
+          "outcome": "found"
+        },
+        "gone": {
+          "word": "gone",
+          "snapshot": {
+            "text": "gone",
+            "eligible": true
+          },
+          "requests": 1,
+          "status": 200,
+          "body": {
+            "ok": true,
+            "found": true,
+            "query": "gone",
+            "headword": "go",
+            "phonetic": "/ɡəʊ/",
+            "meanings": [
+              {
+                "partOfSpeech": "verb",
+                "definition": "move or travel from one place to another",
+                "translation": "去；走；进行"
+              }
+            ],
+            "forms": [
+              {
+                "form": "goes",
+                "kind": "third-person singular"
+              },
+              {
+                "form": "going",
+                "kind": "present participle"
+              },
+              {
+                "form": "gone",
+                "kind": "past participle"
+              },
+              {
+                "form": "went",
+                "kind": "past"
+              }
+            ],
+            "matchedForm": "gone",
+            "examples": [
+              {
+                "en": "The measurement went the other way.",
+                "zh": "测量结果朝相反方向变化了。"
+              }
+            ],
+            "source": "sqlite-fixture",
+            "settings": {
+              "autoDoubleClick": true,
+              "autoSelection": true
+            }
+          },
+          "card": {
+            "slotPresent": true,
+            "slotChildren": 1,
+            "cardPresent": true,
+            "state": "ready",
+            "headword": "go /ɡəʊ/",
+            "body": "gone×go /ɡəʊ/gone → goverb 去；走；进行 move or travel from one place to anothergoes · going · gone · wentThe measurement went the other way.测量结果朝相反方向变化了。"
+          },
+          "outcome": "found"
+        },
+        "teeth": {
+          "word": "teeth",
+          "snapshot": {
+            "text": "teeth",
+            "eligible": true
+          },
+          "requests": 1,
+          "status": 200,
+          "body": {
+            "ok": true,
+            "found": true,
+            "query": "teeth",
+            "headword": "tooth",
+            "phonetic": "/tuːθ/",
+            "meanings": [
+              {
+                "partOfSpeech": "noun",
+                "definition": "each of a set of hard structures set in the jaws",
+                "translation": "牙齿；齿"
+              }
+            ],
+            "forms": [
+              {
+                "form": "teeth",
+                "kind": "plural"
+              }
+            ],
+            "matchedForm": "teeth",
+            "examples": [
+              {
+                "en": "Each tooth has a crown and one or more roots.",
+                "zh": "每颗牙齿都有一个牙冠和一条或多条牙根。"
+              },
+              {
+                "en": "A chipped tooth can usually be repaired.",
+                "zh": "缺损的牙齿通常可以修复。"
+              }
+            ],
+            "source": "sqlite-fixture",
+            "settings": {
+              "autoDoubleClick": true,
+              "autoSelection": true
+            }
+          },
+          "card": {
+            "slotPresent": true,
+            "slotChildren": 1,
+            "cardPresent": true,
+            "state": "ready",
+            "headword": "tooth /tuːθ/",
+            "body": "teeth×tooth /tuːθ/teeth → toothnoun 牙齿；齿 each of a set of hard structures set in the jawsteethEach tooth has a crown and one or more roots.每颗牙齿都有一个牙冠和一条或多条牙根。A chipped tooth can usually be repaired.缺损的牙齿通常可以修复。"
+          },
+          "outcome": "found"
+        },
+        "phrase": {
+          "word": "wave function",
+          "snapshot": {
+            "text": "wave function",
+            "eligible": true
+          },
+          "requests": 1,
+          "status": 200,
+          "body": {
+            "ok": true,
+            "found": true,
+            "query": "wave function",
+            "headword": "wave function",
+            "phonetic": "/weɪv ˈfʌŋkʃn/",
+            "meanings": [
+              {
+                "partOfSpeech": "noun phrase",
+                "definition": "a mathematical description of the quantum state of a system",
+                "translation": "波函数"
+              }
+            ],
+            "forms": [
+              {
+                "form": "wave functions",
+                "kind": "plural"
+              }
+            ],
+            "matchedForm": null,
+            "examples": [
+              {
+                "en": "The wave function collapses on measurement.",
+                "zh": "波函数在测量时坍缩。"
+              },
+              {
+                "en": "A normalizable wave function belongs to the Hilbert space.",
+                "zh": "可归一化的波函数属于希尔伯特空间。"
+              }
+            ],
+            "source": "sqlite-fixture",
+            "settings": {
+              "autoDoubleClick": true,
+              "autoSelection": true
+            }
+          },
+          "card": {
+            "slotPresent": true,
+            "slotChildren": 1,
+            "cardPresent": true,
+            "state": "ready",
+            "headword": "wave function /weɪv ˈfʌŋkʃn/",
+            "body": "wave function×wave function /weɪv ˈfʌŋkʃn/noun phrase 波函数 a mathematical description of the quantum state of a systemwave functionsThe wave function collapses on measurement.波函数在测量时坍缩。A normalizable wave function belongs to the Hilbert space.可归一化的波函数属于希尔伯特空间。"
+          },
+          "outcome": "found"
+        },
+        "unknown": {
+          "word": "unknowntoken",
+          "snapshot": {
+            "text": "unknowntoken",
+            "eligible": true
+          },
+          "requests": 1,
+          "status": 200,
+          "body": {
+            "ok": true,
+            "found": false,
+            "query": "unknowntoken",
+            "source": "sqlite-fixture",
+            "settings": {
+              "autoDoubleClick": true,
+              "autoSelection": true
+            }
+          },
+          "card": {
+            "slotPresent": true,
+            "slotChildren": 1,
+            "cardPresent": true,
+            "state": "ready",
+            "headword": null,
+            "body": "unknowntoken×no entry for \"unknowntoken\""
+          },
+          "outcome": "not-found"
+        },
+        "detailed": {
+          "status": 200,
+          "body": {
+            "ok": true,
+            "found": true,
+            "query": "conservation",
+            "headword": "conservation",
+            "phonetic": "/ˌkɒnsəˈveɪʃn/",
+            "meanings": [
+              {
+                "partOfSpeech": "noun",
+                "definition": "the principle that a quantity of a closed system stays constant",
+                "translation": "守恒；保存；保护"
+              }
+            ],
+            "forms": [],
+            "matchedForm": null,
+            "examples": [
+              {
+                "en": "Charge conservation follows from the symmetry of the Lagrangian.",
+                "zh": "电荷守恒来自拉格朗日量的对称性。"
+              },
+              {
+                "en": "Energy conservation forbids that transition.",
+                "zh": "能量守恒禁戒该跃迁。"
+              }
+            ],
+            "source": "sqlite-fixture",
+            "settings": {
+              "autoDoubleClick": true,
+              "autoSelection": true
+            }
+          }
+        },
+        "hostile": {
+          "hostile": [
+            {
+              "query": "'; DROP TABLE entries; --",
+              "status": 200,
+              "body": {
+                "ok": true,
+                "found": false,
+                "query": "drop table entries",
+                "source": "sqlite-fixture",
+                "settings": {
+                  "autoDoubleClick": true,
+                  "autoSelection": true
+                }
+              }
+            },
+            {
+              "query": "' OR '1'='1",
+              "status": 200,
+              "body": {
+                "ok": true,
+                "found": false,
+                "query": "or '1'='1",
+                "source": "sqlite-fixture",
+                "settings": {
+                  "autoDoubleClick": true,
+                  "autoSelection": true
+                }
+              }
+            },
+            {
+              "query": "\"; DROP TABLE forms; --",
+              "status": 200,
+              "body": {
+                "ok": true,
+                "found": false,
+                "query": "drop table forms",
+                "source": "sqlite-fixture",
+                "settings": {
+                  "autoDoubleClick": true,
+                  "autoSelection": true
+                }
+              }
+            },
+            {
+              "query": "' UNION SELECT word FROM entries --",
+              "status": 200,
+              "body": {
+                "ok": true,
+                "found": false,
+                "query": "union select word from entries",
+                "source": "sqlite-fixture",
+                "settings": {
+                  "autoDoubleClick": true,
+                  "autoSelection": true
+                }
+              }
+            },
+            {
+              "query": "'); INSERT INTO entries (word) VALUES ('x'); --",
+              "status": 200,
+              "body": {
+                "ok": true,
+                "found": false,
+                "query": "insert into entries (word) values ('x",
+                "source": "sqlite-fixture",
+                "settings": {
+                  "autoDoubleClick": true,
+                  "autoSelection": true
+                }
+              }
+            }
+          ],
+          "after": {
+            "status": 200,
+            "body": {
+              "ok": true,
+              "found": true,
+              "query": "derive",
+              "headword": "derive",
+              "phonetic": "/dɪˈraɪv/",
+              "meanings": [
+                {
+                  "partOfSpeech": "verb",
+                  "definition": "obtain something from a specified source; originate in",
+                  "translation": "导出；派生；源自"
+                }
+              ],
+              "forms": [
+                {
+                  "form": "derived",
+                  "kind": "past"
+                },
+                {
+                  "form": "derives",
+                  "kind": "third-person singular"
+                },
+                {
+                  "form": "deriving",
+                  "kind": "present participle"
+                }
+              ],
+              "matchedForm": null,
+              "examples": [
+                {
+                  "en": "The result must derive from the boundary conditions alone.",
+                  "zh": "该结果只能由边界条件导出。"
+                },
+                {
+                  "en": "This identity derives from Gauss’s law.",
+                  "zh": "这一恒等式源自高斯定律。"
+                }
+              ],
+              "source": "sqlite-fixture",
+              "settings": {
+                "autoDoubleClick": true,
+                "autoSelection": true
+              }
+            }
+          }
+        },
+        "fullWidth": {
+          "word": "ｄｅｒｉｖｅ",
+          "snapshot": {
+            "text": "ｄｅｒｉｖｅ",
+            "eligible": true
+          },
+          "requests": 1,
+          "status": 200,
+          "body": {
+            "ok": true,
+            "found": true,
+            "query": "derive",
+            "headword": "derive",
+            "phonetic": "/dɪˈraɪv/",
+            "meanings": [
+              {
+                "partOfSpeech": "verb",
+                "definition": "obtain something from a specified source; originate in",
+                "translation": "导出；派生；源自"
+              }
+            ],
+            "forms": [
+              {
+                "form": "derived",
+                "kind": "past"
+              },
+              {
+                "form": "derives",
+                "kind": "third-person singular"
+              },
+              {
+                "form": "deriving",
+                "kind": "present participle"
+              }
+            ],
+            "matchedForm": null,
+            "examples": [
+              {
+                "en": "The result must derive from the boundary conditions alone.",
+                "zh": "该结果只能由边界条件导出。"
+              },
+              {
+                "en": "This identity derives from Gauss’s law.",
+                "zh": "这一恒等式源自高斯定律。"
+              }
+            ],
+            "source": "sqlite-fixture",
+            "settings": {
+              "autoDoubleClick": true,
+              "autoSelection": true
+            }
+          },
+          "card": {
+            "slotPresent": true,
+            "slotChildren": 1,
+            "cardPresent": true,
+            "state": "ready",
+            "headword": "derive /dɪˈraɪv/",
+            "body": "ｄｅｒｉｖｅ×derive /dɪˈraɪv/verb 导出；派生；源自 obtain something from a specified source; originate inderived · derives · derivingThe result must derive from the boundary conditions alone.该结果只能由边界条件导出。This identity derives from Gauss’s law.这一恒等式源自高斯定律。"
+          },
+          "outcome": "found"
+        }
+      },
+      "snapshotBeforeWrite": {
+        "status": "ready",
+        "mode": "host",
+        "writable": true,
+        "revision": 0,
+        "value": {
+          "autoDoubleClick": true,
+          "autoSelection": true
+        }
+      },
+      "gatesBeforeWrite": {
+        "autoDoubleClick": true,
+        "autoSelection": true
+      },
+      "dom": {
+        "flowItems": 1,
+        "messageBody": 0,
+        "pluginNodesOutsideOverlay": 0,
+        "probeNodes": 3
+      }
+    },
+    "consoleErrorsSecondBoot": {
+      "unexpected": [],
+      "expected": [
+        "Failed to load resource: the server responded with a status of 400 (Bad Request)",
+        "Failed to load resource: the server responded with a status of 400 (Bad Request)",
+        "Failed to load resource: the server responded with a status of 400 (Bad Request)"
+      ],
+      "pageErrors": []
+    }
+  },
+  "finishedAt": "2026-10-01T09:24:51.665Z",
+  "summary": {
+    "total": 97,
+    "passed": 97,
+    "failed": []
+  },
+  "status": "PASS"
+}

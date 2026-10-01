@@ -4,9 +4,9 @@
  * A browser selection arrives with whatever punctuation the reader dragged over:
  * a trailing period from the end of a sentence, a leading quotation mark, or a
  * line break from a wrapped paragraph. Normalization is deliberately narrow — it
- * strips edge punctuation, folds case, and collapses internal whitespace, and it
- * does not attempt stemming. Inflection handling belongs to the dictionary
- * (Phase 3), not to the transport.
+ * folds compatibility characters, strips edge punctuation, folds case, and
+ * collapses internal whitespace, and it does not attempt stemming. Inflection
+ * handling belongs to the dictionary (Phase 3), not to the transport.
  *
  * The browser half calls the same functions only to decide whether a selection
  * is worth sending; the host calls them again as the authoritative normalization
@@ -51,19 +51,56 @@ export function countCodePoints(value: string): number {
 /**
  * Normalize one raw selection into a headword candidate.
  *
- * The steps are ordered: whitespace is collapsed first so that a selection
- * spanning a line break becomes a single space, then edge punctuation is
- * stripped so that a sentence-final period after a collapsed break is still
- * removed, and finally the result is lowercased. Lowercasing last keeps the
- * strip from depending on the case of the input.
+ * The steps and their order are the product specification's:
+ *
+ * ```text
+ * raw selection
+ *   -> NFKC                     fold compatibility characters
+ *   -> collapse whitespace      a line break becomes one space
+ *   -> strip edge punctuation   a sentence-final period is not part of the word
+ *   -> lowercase                the lookup is case-normalized
+ * ```
+ *
+ * `NFKC` runs first because it *creates* characters the later steps must then
+ * see: a full-width `．` folds to `.` and only then reads as edge punctuation, a
+ * no-break space folds to a space and only then collapses, and the ligature `ﬁ`
+ * folds to `fi` so a selection from a typeset document reaches the dictionary as
+ * the word it looks like. Folding after the strip would leave each of those
+ * unfixed.
+ *
+ * What NFKC deliberately does **not** do is fold `’` to `'`. Both survive, and
+ * because only *edge* punctuation is removed, an apostrophe or hyphen inside a
+ * word is part of the word: `don't` and `time-dependent` are looked up as
+ * themselves.
  *
  * @param raw - the text the reader selected.
  * @returns the normalized candidate; the empty string when nothing survives.
  */
 export function normalizeHeadword(raw: string): string {
-  const collapsed = raw.replace(WHITESPACE_RUN, ' ').trim()
+  const folded = raw.normalize('NFKC')
+  const collapsed = folded.replace(WHITESPACE_RUN, ' ').trim()
   const stripped = collapsed.replace(EDGE_PUNCTUATION, '').trim()
   return stripped.replace(WHITESPACE_RUN, ' ').toLowerCase()
+}
+
+/**
+ * Split a Chinese translation cell into individual glosses.
+ *
+ * A dictionary cell carries several glosses separated by a full-width
+ * semicolon — `导出；派生；源自` — which is the convention the source
+ * dictionaries use and the shape the product specification renders as
+ * "中文义项 1 / 2 / …". Splitting is presentational and lives here rather than in
+ * the storage layer so both halves can render the same list.
+ *
+ * @param translation - the raw cell, or `null`.
+ * @returns the glosses, in order; empty when the cell is `null` or blank.
+ */
+export function splitGlosses(translation: string | null): readonly string[] {
+  if (translation === null) return []
+  return translation
+    .split(/[；;]/)
+    .map((gloss) => gloss.trim())
+    .filter((gloss) => gloss.length > 0)
 }
 
 /**

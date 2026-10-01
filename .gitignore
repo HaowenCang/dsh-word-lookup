@@ -9,6 +9,16 @@ node_modules/
 .tmp/
 verify-out/
 
+# The Phase 3 fixture database is *generated*, not authored: every row in it is
+# a literal in `src/host/fixture.ts`, and `scripts/build-fixture-db.mjs`
+# reproduces it from those literals. The host also materialises it on first open,
+# so a fresh clone needs no committed binary. The `-journal`/`-wal`/`-shm` forms
+# are SQLite's own scratch files.
+fixtures/*.db
+fixtures/*.db-journal
+fixtures/*.db-wal
+fixtures/*.db-shm
+
 # Editor / OS noise.
 .DS_Store
 Thumbs.db

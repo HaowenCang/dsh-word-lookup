@@ -32,10 +32,19 @@ const SHELL = process.platform === 'win32'
 
 /** One step of the pipeline. */
 const STEPS = [
+  // The fixture database is a build input for the runtime, not for the bundle,
+  // so it is materialised first: `--force` gives every verify run the same file
+  // the runtime test will read, and the step itself fails if the fixture
+  // definition and the schema have drifted apart.
+  { name: 'fixture', command: NPM, args: ['run', '--silent', 'build:fixture'] },
   { name: 'typecheck', command: NPM, args: ['run', '--silent', 'typecheck'] },
   { name: 'test', command: NPM, args: ['run', '--silent', 'test'] },
   { name: 'build', command: NPM, args: ['run', '--silent', 'build'] },
   { name: 'bundle-static-checks', command: process.execPath, args: ['scripts/check-bundle.mjs'] },
+  // Last, because it inspects what the run just produced as well as what is
+  // committed: a report written by an earlier step is exactly where an
+  // unredacted launch token would land.
+  { name: 'credential-scan', command: process.execPath, args: ['scripts/scan-credentials.mjs'] },
 ]
 
 /** Results, in execution order. */

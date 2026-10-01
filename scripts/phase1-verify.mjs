@@ -183,12 +183,31 @@ async function stopDsh(child) {
 async function openAuthenticatedPage(browser, url) {
   const context = await browser.newContext({ viewport: { width: 1400, height: 900 } })
   const page = await context.newPage()
-  const state = { requests: [], consoleErrors: [], pageErrors: [], failedRequests: [] }
+  const state = { requests: [], responses: [], consoleErrors: [], pageErrors: [], failedRequests: [] }
 
   page.on('request', (req) => {
     if (req.url().includes('/api/dsh-word-lookup')) {
       state.requests.push({ method: req.method(), url: req.url(), postData: req.postData() })
     }
+  })
+  // Phase 3 asserts on what the dictionary *answered*, not only on how many
+  // requests were made. The body is captured from the wire rather than from the
+  // plugin's own state, so a card that rendered stale content could not make the
+  // measurement agree with itself.
+  page.on('response', (res) => {
+    if (!res.url().includes('/api/dsh-word-lookup')) return
+    const entry = { status: res.status(), body: null, settled: false }
+    state.responses.push(entry)
+    res.json().then(
+      (body) => {
+        entry.body = body
+        entry.settled = true
+      },
+      () => {
+        entry.body = null
+        entry.settled = true
+      },
+    )
   })
   page.on('console', (message) => {
     if (message.type() === 'error') state.consoleErrors.push(message.text())
@@ -208,6 +227,29 @@ async function openAuthenticatedPage(browser, url) {
 
 /** Wait for pending network activity to settle. */
 const settle = () => new Promise((r) => setTimeout(r, 600))
+
+/**
+ * Wait until the last `count` lookup responses have been read off the wire.
+ *
+ * The browser reports a response before its body has been parsed, so a check
+ * that read the body immediately would race the harness rather than the plugin.
+ * Returning whatever arrived after the deadline keeps a failure reportable: the
+ * caller compares against `null` and fails with the evidence in hand.
+ *
+ * @param state - the observation channels.
+ * @param count - how many of the most recent responses to wait for.
+ * @param timeoutMs - how long to wait before giving up.
+ * @returns the last `count` response records.
+ */
+async function waitForResponses(state, count, timeoutMs = 5000) {
+  const deadline = Date.now() + timeoutMs
+  for (;;) {
+    const tail = state.responses.slice(-count)
+    if (tail.length === count && tail.every((entry) => entry.settled)) return tail
+    if (Date.now() >= deadline) return tail
+    await new Promise((r) => setTimeout(r, 50))
+  }
+}
 
 /**
  * Install the synthetic DOM the shortcut checks select inside of.
@@ -236,8 +278,18 @@ async function installProbeNodes(page) {
     flow.setAttribute('data-chat-node-key', 'phase1:probe:1')
     flow.style.cssText = styleFor(150)
     const flowText = document.createElement('p')
+    flowText.setAttribute('data-phase1-probe-line', 'drag')
     flowText.textContent = 'The serializer must derive the wire form from the boundary conditions.'
     flow.appendChild(flowText)
+    // Phase 3 selects real fixture words through the real shortcut, so the
+    // surface forms have to exist in a node the plugin considers eligible. They
+    // are listed here rather than fetched from the database on purpose: the
+    // harness must not be able to make a lookup succeed by agreeing with the
+    // implementation about what the fixture contains.
+    const flowFixture = document.createElement('p')
+    flowFixture.textContent =
+      'Phase 3 fixtures: derive, derived, deriving, went, gone, teeth, wave function, conservation, unknowntoken, \uff44\uff45\uff52\uff49\uff56\uff45.'
+    flow.appendChild(flowFixture)
     document.body.appendChild(flow)
 
     const loose = document.createElement('div')
@@ -391,11 +443,100 @@ async function dismissDialogs(page) {
 /** Press the manual lookup shortcut and let the request settle. */
 async function pressLookup(page, state) {
   state.requests.length = 0
+  state.responses.length = 0
   await page.evaluate(() => {
     window.__PHASE1_KEY__ = null
   })
   await page.keyboard.press('Control+Shift+L')
   await settle()
+}
+
+/**
+ * Drive one real lookup: select inside a probe, press the shortcut, read both
+ * halves of the result.
+ *
+ * The response body is read off the wire rather than from the card, and the
+ * card is read as well, so the two can be compared. A plugin that rendered a
+ * hard-coded entry while answering with something else would fail here.
+ *
+ * @param page - the authenticated page.
+ * @param state - the observation channels.
+ * @param word - the surface form to select.
+ * @returns the measurement, including the raw response body.
+ */
+async function lookupViaShortcut(page, state, word) {
+  await selectWord(page, 'flow', word)
+  const snapshot = await page.evaluate(() => window.__DSH_WORD_LOOKUP__.selection())
+  await pressLookup(page, state)
+  const responses = await waitForResponses(state, 1)
+  return {
+    word,
+    snapshot: { text: snapshot.text, eligible: snapshot.eligible },
+    requests: state.requests.length,
+    status: responses[0]?.status ?? null,
+    body: responses[0]?.body ?? null,
+    card: await readCard(page),
+    outcome: await page.evaluate(() => window.__DSH_WORD_LOOKUP__.lastOutcome()),
+  }
+}
+
+/**
+ * POST one query straight at the route from the authenticated page.
+ *
+ * Used where the assertion is about the *payload* rather than about the
+ * trigger: the shortcut path is measured separately, so a route-level probe
+ * cannot be mistaken for evidence that the trigger works.
+ *
+ * @param page - the authenticated page.
+ * @param query - the raw query text.
+ * @returns the status and parsed body.
+ */
+async function postQuery(page, query) {
+  return await page.evaluate(async (text) => {
+    const response = await fetch('api/dsh-word-lookup', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ query: text }),
+    })
+    let parsed = null
+    try {
+      parsed = await response.json()
+    } catch {
+      parsed = null
+    }
+    return { status: response.status, body: parsed }
+  }, query)
+}
+
+/**
+ * Reduce a lookup payload to the fields the report needs.
+ *
+ * A full entry carries every example sentence, and the report is committed as
+ * evidence; repeating whole payloads for a dozen checks would bury the claim
+ * under its own data. The counts and the identifying fields are what a reader
+ * compares.
+ *
+ * @param body - the parsed response body, or `null`.
+ * @returns a compact projection.
+ */
+function compactLookup(body) {
+  if (body === null || typeof body !== 'object') return body
+  if (body.found !== true) {
+    return { found: body.found, query: body.query, source: body.source, error: body.error }
+  }
+  return {
+    found: true,
+    query: body.query,
+    headword: body.headword,
+    phonetic: body.phonetic,
+    matchedForm: body.matchedForm,
+    meaningCount: Array.isArray(body.meanings) ? body.meanings.length : -1,
+    firstMeaning: body.meanings?.[0] ?? null,
+    forms: Array.isArray(body.forms) ? body.forms.map((form) => form.form) : null,
+    exampleCount: Array.isArray(body.examples) ? body.examples.length : -1,
+    source: body.source,
+    settings: body.settings,
+  }
 }
 
 /** Read the card's presence and content from the overlay layer. */
@@ -659,8 +800,10 @@ async function runBrowserChecks(page, state, boot) {
   record(
     `${prefix}14`,
     'the exact Fetch route answers 200 from the authenticated page',
-    direct.found.status === 200 && direct.found.body?.found === true,
-    JSON.stringify(direct.found),
+    direct.found.status === 200 &&
+      direct.found.body?.found === true &&
+      direct.found.body?.source === 'sqlite-fixture',
+    JSON.stringify(compactLookup(direct.found.body)),
   )
   record(
     `${prefix}15`,
@@ -683,7 +826,9 @@ async function runBrowserChecks(page, state, boot) {
   record(
     `${prefix}18`,
     'an unknown word is 200 with found:false, never an error (T12)',
-    direct.unknown.status === 200 && direct.unknown.body?.found === false,
+    direct.unknown.status === 200 &&
+      direct.unknown.body?.found === false &&
+      direct.unknown.body?.source === 'sqlite-fixture',
     JSON.stringify(direct.unknown),
   )
 
@@ -693,7 +838,7 @@ async function runBrowserChecks(page, state, boot) {
   // expected count is zero for both; the selection they produce is still captured
   // by the snapshot listener, which is what makes the zero meaningful.
   await clearSelection(page)
-  const box = await page.locator('[data-phase1-probe="flow"] p').boundingBox()
+  const box = await page.locator('[data-phase1-probe="flow"] p[data-phase1-probe-line="drag"]').boundingBox()
   state.requests.length = 0
   if (box !== null) {
     const centreY = box.y + box.height / 2
@@ -891,18 +1036,210 @@ async function runBrowserChecks(page, state, boot) {
   // The point of the regression: 200 gestures must not leave the runtime in a
   // state where the one legitimate trigger has stopped working, and must not
   // have accumulated anything that makes it fire twice.
-  await selectWord(page, 'flow', 'derive')
-  await settle()
-  await pressLookup(page, state)
-  const stormShortcut = { requests: [...state.requests], key: await page.evaluate(() => window.__PHASE1_KEY__) }
+  const stormShortcut = await lookupViaShortcut(page, state, 'derive')
   facts.shortcutAfterGestures = stormShortcut
   record(
     `${prefix}28`,
     'after the gesture storm, the shortcut still issues exactly one lookup (T03)',
-    state.requests.length === 1 &&
+    stormShortcut.requests === 1 &&
       state.requests[0]?.method === 'POST' &&
       state.requests[0]?.url.includes('/api/dsh-word-lookup'),
-    `requests=${JSON.stringify(stormShortcut.requests)}`,
+    `requests=${JSON.stringify(state.requests)}`,
+  )
+
+  // --- Phase 3: the local SQLite dictionary answers the one real trigger -----
+  // Every measurement below goes through the product's only trigger: a real
+  // selection inside a conversation node, then `Primary+Shift+L`. The payload is
+  // read off the wire, and the card is read from the DOM, so a plugin that
+  // rendered an entry it had not actually been given would fail both ways.
+  const phase3 = {}
+  // The settings echo is boot-dependent: boot 1 runs before the harness writes
+  // both switches, boot 2 runs after they persisted and a full restart reloaded
+  // them. Asserting `false` on boot 2 would be asserting the write was lost.
+  const expectedSwitches =
+    boot === 1 ? { autoDoubleClick: false, autoSelection: false } : { autoDoubleClick: true, autoSelection: true }
+
+  const deriveLookup = await lookupViaShortcut(page, state, 'derive')
+  phase3.derive = deriveLookup
+  record(
+    `${prefix}29`,
+    'the shortcut\u2019s single lookup is answered by the local SQLite fixture, not a stub',
+    deriveLookup.requests === 1 &&
+      deriveLookup.status === 200 &&
+      deriveLookup.body?.found === true &&
+      deriveLookup.body?.headword === 'derive' &&
+      deriveLookup.body?.source === 'sqlite-fixture' &&
+      deriveLookup.body?.source !== 'stub' &&
+      deriveLookup.outcome === 'found' &&
+      (deriveLookup.card.headword ?? '').includes('derive'),
+    `status=${String(deriveLookup.status)} body=${JSON.stringify(compactLookup(deriveLookup.body))} outcome=${String(deriveLookup.outcome)} cardHeadword=${String(deriveLookup.card.headword)}`,
+  )
+
+  const derivedLookup = await lookupViaShortcut(page, state, 'derived')
+  phase3.derived = derivedLookup
+  record(
+    `${prefix}30`,
+    'an inflected selection resolves to its lemma through the forms table (T10)',
+    derivedLookup.requests === 1 &&
+      derivedLookup.body?.found === true &&
+      derivedLookup.body?.query === 'derived' &&
+      derivedLookup.body?.headword === 'derive' &&
+      derivedLookup.body?.matchedForm === 'derived' &&
+      Array.isArray(derivedLookup.body?.forms) &&
+      derivedLookup.body.forms.some((form) => form.form === 'deriving'),
+    `status=${String(derivedLookup.status)} body=${JSON.stringify(compactLookup(derivedLookup.body))}`,
+  )
+
+  const wentLookup = await lookupViaShortcut(page, state, 'went')
+  const goneLookup = await lookupViaShortcut(page, state, 'gone')
+  phase3.went = wentLookup
+  phase3.gone = goneLookup
+  record(
+    `${prefix}31`,
+    'irregular forms resolve to their lemma (T11)',
+    wentLookup.body?.headword === 'go' &&
+      wentLookup.body?.matchedForm === 'went' &&
+      goneLookup.body?.headword === 'go' &&
+      goneLookup.body?.matchedForm === 'gone' &&
+      wentLookup.requests === 1 &&
+      goneLookup.requests === 1,
+    `went=${JSON.stringify(compactLookup(wentLookup.body))} gone=${JSON.stringify(compactLookup(goneLookup.body))}`,
+  )
+
+  const teethLookup = await lookupViaShortcut(page, state, 'teeth')
+  phase3.teeth = teethLookup
+  record(
+    `${prefix}32`,
+    'an irregular plural resolves to its singular headword',
+    teethLookup.body?.headword === 'tooth' &&
+      teethLookup.body?.matchedForm === 'teeth' &&
+      teethLookup.requests === 1,
+    `body=${JSON.stringify(compactLookup(teethLookup.body))}`,
+  )
+
+  const phraseLookup = await lookupViaShortcut(page, state, 'wave function')
+  phase3.phrase = phraseLookup
+  record(
+    `${prefix}33`,
+    'a multi-word phrase is answered exactly, and is never split into its words',
+    phraseLookup.body?.found === true &&
+      phraseLookup.body?.query === 'wave function' &&
+      phraseLookup.body?.headword === 'wave function' &&
+      phraseLookup.body?.matchedForm === null &&
+      phraseLookup.requests === 1,
+    `body=${JSON.stringify(compactLookup(phraseLookup.body))}`,
+  )
+
+  const unknownLookup = await lookupViaShortcut(page, state, 'unknowntoken')
+  phase3.unknown = unknownLookup
+  record(
+    `${prefix}34`,
+    'a well-formed selection the dictionary does not contain is 200 found:false (T12)',
+    unknownLookup.status === 200 &&
+      unknownLookup.body?.found === false &&
+      unknownLookup.body?.query === 'unknowntoken' &&
+      unknownLookup.body?.source === 'sqlite-fixture' &&
+      unknownLookup.requests === 1 &&
+      unknownLookup.card.cardPresent === true &&
+      unknownLookup.card.state === 'ready' &&
+      (unknownLookup.card.body ?? '').includes('no entry for') &&
+      unknownLookup.outcome === 'not-found',
+    `status=${String(unknownLookup.status)} body=${JSON.stringify(unknownLookup.body)} outcome=${String(unknownLookup.outcome)} cardState=${String(unknownLookup.card.state)} card=${JSON.stringify(unknownLookup.card.body)}`,
+  )
+
+  // --- the payload carries what the card needs ------------------------------
+  const detailed = await postQuery(page, 'conservation')
+  phase3.detailed = detailed
+  record(
+    `${prefix}35`,
+    'the payload carries headword, phonetic, POS, Chinese meaning, forms, examples and provenance',
+    detailed.status === 200 &&
+      detailed.body?.found === true &&
+      detailed.body?.headword === 'conservation' &&
+      typeof detailed.body?.phonetic === 'string' &&
+      detailed.body.phonetic.length > 0 &&
+      detailed.body?.meanings?.[0]?.partOfSpeech === 'noun' &&
+      typeof detailed.body?.meanings?.[0]?.translation === 'string' &&
+      detailed.body.meanings[0].translation.includes('\u5b88\u6052') &&
+      typeof detailed.body?.meanings?.[0]?.definition === 'string' &&
+      Array.isArray(detailed.body?.forms) &&
+      detailed.body.forms.length === 0 &&
+      detailed.body?.matchedForm === null &&
+      Array.isArray(detailed.body?.examples) &&
+      detailed.body.examples.length > 0 &&
+      detailed.body?.source === 'sqlite-fixture' &&
+      detailed.body?.settings?.autoDoubleClick === expectedSwitches.autoDoubleClick &&
+      detailed.body?.settings?.autoSelection === expectedSwitches.autoSelection,
+    JSON.stringify(detailed),
+  )
+
+  // --- SQL metacharacters are only words ------------------------------------
+  const hostileQueries = [
+    "'; DROP TABLE entries; --",
+    "' OR '1'='1",
+    '"; DROP TABLE forms; --',
+    "' UNION SELECT word FROM entries --",
+    "'); INSERT INTO entries (word) VALUES ('x'); --",
+  ]
+  const hostile = []
+  for (const query of hostileQueries) hostile.push({ query, ...(await postQuery(page, query)) })
+  const dictionaryAfterHostile = await postQuery(page, 'derive')
+  phase3.hostile = { hostile, after: dictionaryAfterHostile }
+  record(
+    `${prefix}36`,
+    'SQL metacharacters in a query never fault the route and never change the schema',
+    hostile.every((result) => result.status < 500) &&
+      hostile.every((result) => result.body?.found === false || result.body?.error === 'empty-query') &&
+      dictionaryAfterHostile.status === 200 &&
+      dictionaryAfterHostile.body?.found === true &&
+      dictionaryAfterHostile.body?.headword === 'derive',
+    JSON.stringify({ hostile, after: compactLookup(dictionaryAfterHostile.body) }),
+  )
+
+  // --- examples are deterministic and belong to the right headword ----------
+  const examplesFirst = await postQuery(page, 'derive')
+  const examplesSecond = await postQuery(page, 'derive')
+  const waveExamples = await postQuery(page, 'wave')
+  const phraseExamples = await postQuery(page, 'wave function')
+  const functionExamples = await postQuery(page, 'function')
+  const phase3Examples = { examplesFirst, examplesSecond, waveExamples, phraseExamples, functionExamples }
+  facts.phase3Examples = phase3Examples
+  const phraseIds = new Set((phraseExamples.body?.examples ?? []).map((example) => example.en))
+  record(
+    `${prefix}37`,
+    'examples are deterministic and never belong to another headword',
+    examplesFirst.body?.examples?.length > 0 &&
+      JSON.stringify(examplesFirst.body.examples) === JSON.stringify(examplesSecond.body.examples) &&
+      phraseIds.size === (phraseExamples.body?.examples ?? []).length &&
+      !(waveExamples.body?.examples ?? []).some((example) => phraseIds.has(example.en)) &&
+      !(functionExamples.body?.examples ?? []).some((example) => phraseIds.has(example.en)),
+    JSON.stringify({
+      derive: examplesFirst.body?.examples,
+      phrase: phraseExamples.body?.examples,
+      wave: waveExamples.body?.examples,
+      function: functionExamples.body?.examples,
+    }),
+  )
+
+  facts.phase3 = phase3
+
+  // --- NFKC folding, through the real trigger -------------------------------
+  // The product specification puts a Unicode NFKC fold first in normalization.
+  // A full-width selection is the case that makes it observable: without the
+  // fold the query never reaches the dictionary as an English word, and without
+  // the fold running *before* the edge-punctuation strip the trailing full-width
+  // period is not removed either.
+  const fullWidth = await lookupViaShortcut(page, state, '\uff44\uff45\uff52\uff49\uff56\uff45')
+  phase3.fullWidth = fullWidth
+  record(
+    `${prefix}38`,
+    'a full-width selection is NFKC-folded before it is looked up',
+    fullWidth.requests === 1 &&
+      fullWidth.body?.found === true &&
+      fullWidth.body?.query === 'derive' &&
+      fullWidth.body?.headword === 'derive' &&
+      fullWidth.body?.source === 'sqlite-fixture',
+    `snapshotText=${JSON.stringify(fullWidth.snapshot.text)} body=${JSON.stringify(compactLookup(fullWidth.body))}`,
   )
 
   // --- settings mirror ------------------------------------------------------

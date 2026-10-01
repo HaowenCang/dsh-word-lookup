@@ -24,6 +24,7 @@ import { useSyncExternalStore } from 'react'
 import type { ReactElement, ReactNode } from 'react'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 
+import { splitGlosses } from '../shared/text.js'
 import type { LookupCardStore } from './store.js'
 
 /** Props the overlay seat supplies plus the store injected at registration. */
@@ -129,20 +130,52 @@ export function WordLookupCard(props: WordLookupCardProps): ReactElement | null 
       body = (
         <div data-dsh-word-lookup="entry">
           <div data-dsh-word-lookup="headword">
-            {found.headword} <span style={{ opacity: 0.7 }}>{found.phonetic}</span>
+            {found.headword}
+            {found.phonetic === null ? null : <span style={{ opacity: 0.7 }}> {found.phonetic}</span>}
           </div>
+          {found.matchedForm === null ? null : (
+            <div data-dsh-word-lookup="lemma" style={{ opacity: 0.7 }}>
+              {found.matchedForm}
+              {' \u2192 '}
+              {found.headword}
+            </div>
+          )}
           <ol style={{ margin: '4px 0 0', paddingLeft: '18px' }}>
             {found.meanings.map((meaning, index) => (
               <li key={String(index)}>
-                <em style={{ opacity: 0.75 }}>{meaning.partOfSpeech}</em> {meaning.definition}
+                {meaning.partOfSpeech === null ? null : (
+                  <em style={{ opacity: 0.75 }}>{meaning.partOfSpeech} </em>
+                )}
+                {/* The specification's card lists 中文义项 1, 中文义项 2, …: one
+                    cell holds several glosses, so they are rendered as a list
+                    rather than as one run-on string. */}
+                {splitGlosses(meaning.translation).map((gloss, glossIndex) => (
+                  <span key={String(glossIndex)} data-dsh-word-lookup="gloss">
+                    {glossIndex === 0 ? '' : '\uff1b'}
+                    {gloss}
+                  </span>
+                ))}
+                {meaning.translation !== null && meaning.definition !== null ? ' ' : null}
+                {meaning.definition === null ? null : (
+                  <span style={{ opacity: 0.85 }}>{meaning.definition}</span>
+                )}
               </li>
             ))}
           </ol>
+          {found.forms.length === 0 ? null : (
+            <div data-dsh-word-lookup="forms" style={{ marginTop: '4px', opacity: 0.7 }}>
+              {found.forms.map((form) => form.form).join(' \u00b7 ')}
+            </div>
+          )}
           {found.examples.slice(0, 2).map((example, index) => (
             <div key={String(index)} data-dsh-word-lookup="example" style={{ marginTop: '4px', opacity: 0.85 }}>
               {example.en}
-              <br />
-              {example.zh}
+              {example.zh === null ? null : (
+                <>
+                  <br />
+                  {example.zh}
+                </>
+              )}
             </div>
           ))}
         </div>

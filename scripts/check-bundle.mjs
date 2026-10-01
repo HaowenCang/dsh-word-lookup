@@ -39,6 +39,22 @@ function check(name, ok, detail = '') {
 }
 
 /**
+ * Remove block and line comments from an emitted bundle.
+ *
+ * Used only where a *comment* is allowed to discuss something the *code* must
+ * not claim — the host half's JSDoc names ECDICT and Tatoeba precisely to say it
+ * does not use them. Every "must not contain" check that is about reachable code
+ * runs against the raw text instead, because stripping could hide a violation
+ * rather than reveal one.
+ *
+ * @param {string} text - the bundle text.
+ * @returns the text with comments removed.
+ */
+function stripComments(text) {
+  return text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '')
+}
+
+/**
  * Read a repository-relative file as UTF-8.
  *
  * @param {string} relative - path below the repository root.
@@ -182,6 +198,92 @@ check(
 check(
   'host bundle imports no model provider package',
   !/from\s+"@deepseek-ai\/dsh-llm/.test(host) && !/dsh-llm-deepseek/.test(host),
+)
+
+// --- Phase 3: the dictionary lives on the host side and only there -----------
+// Phase 3 replaces the stub with a real SQLite store. The invariant that makes
+// that safe is a one-way door: the database is reachable from the host half and
+// unreachable from the browser half. These checks read the emitted bytes, so a
+// bundler configuration that quietly hoisted a `node:` import into the client
+// would fail here rather than at runtime in a reader's browser.
+const CLIENT_FORBIDDEN = [
+  'node:sqlite',
+  'DatabaseSync',
+  'StatementSync',
+  'better-sqlite3',
+  'sqlite3',
+  'CREATE TABLE',
+  'INSERT INTO',
+  'DELETE FROM',
+  'PRAGMA',
+  'dictionary.fixture',
+  'fixtures/',
+  'dictionaryPath',
+]
+for (const token of CLIENT_FORBIDDEN) {
+  check(`client bundle contains no "${token}"`, !client.includes(token))
+}
+// Statement *shapes* rather than bare keywords: the client half legitimately
+// contains the word `select` inside the composer-exclusion CSS selector, so a
+// keyword search would report a false positive and, worse, teach the next reader
+// to ignore this check.
+const SQL_STATEMENT_SHAPES = [
+  /SELECT\s+[\w*][\w*,\s().]*\s+FROM\s+\w/i,
+  /INSERT\s+INTO\s+\w/i,
+  /DELETE\s+FROM\s+\w/i,
+  /UPDATE\s+\w+\s+SET\s+\w/i,
+  /CREATE\s+(TABLE|INDEX)\s/i,
+  /PRAGMA\s+\w/i,
+  /BEGIN\s+(IMMEDIATE|DEFERRED|EXCLUSIVE|TRANSACTION)/i,
+  /ORDER\s+BY\s+\w+\s+(ASC|DESC)/i,
+]
+const sqlHit = SQL_STATEMENT_SHAPES.find((shape) => shape.test(client))
+check(
+  'client bundle contains no SQL statement',
+  sqlHit === undefined,
+  sqlHit === undefined
+    ? 'no statement shape found'
+    : `matched ${String(sqlHit)}: a dictionary query in the browser half would mean the dictionary shipped to the page`,
+)
+check(
+  'client bundle requires no Node built-in module',
+  !externalRequires.some((specifier) => specifier.startsWith('node:')),
+  externalRequires.join(', ') || '(none)',
+)
+check(
+  'client bundle names no filesystem or path API',
+  !/\b(readFileSync|writeFileSync|existsSync|mkdirSync|fileURLToPath)\b/.test(client),
+)
+
+const hostCode = stripComments(host)
+check(
+  'host bundle loads node:sqlite as a built-in',
+  host.includes('"node:sqlite"') && host.includes('DatabaseSync'),
+  'the dictionary must be a real local SQLite store on the host side',
+)
+check(
+  'host bundle ships the fixture schema',
+  hostCode.includes('CREATE TABLE IF NOT EXISTS entries') && hostCode.includes('CREATE TABLE IF NOT EXISTS forms'),
+)
+check(
+  'host bundle binds its queries through prepared statements',
+  hostCode.includes('.prepare(') && hostCode.includes('BEGIN IMMEDIATE'),
+  'the seed is one transaction',
+)
+check(
+  'host bundle resolves the fixture from its own module URL',
+  hostCode.includes('import.meta.url') && hostCode.includes('package.json'),
+  'the database path is derived, never configured and never hard-coded to a machine',
+)
+check(
+  'host bundle reports the fixture as its only provenance',
+  hostCode.includes('"sqlite-fixture"'),
+  'the runtime must not still answer as the Phase 1 stub',
+)
+check(
+  'the emitted host code claims no corpus and no stub as a source',
+  !/"stub"|'stub'/.test(hostCode) && !/["']ECDICT["']/.test(hostCode) && !/["']Tatoeba["']/.test(hostCode),
+  'provenance must describe the data that is actually there',
 )
 
 // --- package.json addresses real files --------------------------------------
