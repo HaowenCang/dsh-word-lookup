@@ -676,6 +676,40 @@ pronunciation audio, fuzzy matching, a network dictionary, an AI fallback, a
 desktop support claim, a touch double-tap claim, a card redesign, a
 `selectionchange` performance optimisation, or a replacement for `node:sqlite`.
 
+## 23. Git
+
+| | value |
+| --- | --- |
+| `START_SHA` | `b0d0186a9b5b951909899fcfad39f8f17acf2854` |
+| Phase 4 implementation commit | `9db08b5` — `feat: add automatic lookup trigger gates` |
+| Evidence document | committed immediately after it as `docs: record phase 4 evidence` |
+| `HEAD` | `git log -1 --format=%H` at the tip of `master` prints the resulting commit; a document cannot name its own SHA |
+| Worktree after commit | clean — `git status --porcelain` reports 0 entries |
+| `git diff --check` | no whitespace errors |
+
+The implementation is one commit, not several. The gate, the request controller,
+the classifier's identity fields, the settings copy, the 107 new tests, the 19 new
+bundle assertions, the runtime harness extension and the README are one coherent
+change: splitting them would produce intermediate commits that neither build nor
+pass, because the gate cannot be exercised without the runtime wiring that calls
+it. The phase deliberately did **not** rename `scripts/phase1-verify.mjs` (§20.3),
+which would have been the only genuinely separable change.
+
+Git discipline observed:
+
+```text
+no force push                        no remote was created
+no push to an unknown remote         (no remote is configured at all)
+Phase 1 / 2 / 3 commits              not amended, not rebased, not rewritten
+history                              not rewritten
+git reset --hard                     not run
+git clean -fd                        not run
+git checkout . / git restore .       not run
+```
+
+The only deletions performed were of files this phase generated itself and could
+prove worthless: none. Phase 4 deleted no file.
+
 ```text
 Production DSH environment modified during this work: NO
 ```
