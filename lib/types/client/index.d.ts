@@ -7,7 +7,7 @@
  * top-level `import`/`export` behind — `react` and `react/jsx-runtime` are
  * supplied by the envelope's `require`.
  *
- * Phase 1 contributes:
+ * Contributions:
  *
  * - one `shell.overlay` occupant that renders nothing until a lookup produces
  *   something (`shell.overlay` is mounted for the whole application lifetime);
@@ -15,15 +15,34 @@
  *   `Primary+Shift+L` on the five applicable profiles, with the sealed
  *   pass/handled behaviour;
  * - a read of the two host switches through the shared settings mirror;
- * - a `selectionchange` listener that updates a local snapshot and nothing else.
+ * - a `selectionchange` listener that refreshes a local snapshot of the text and
+ *   its live geometry, and nothing else;
+ * - Phase 2: pointer and `dblclick` listeners that classify the last completed
+ *   gesture into drag / double-click / other, and record it locally.
  *
- * It deliberately does **not** contribute: any automatic trigger, any gesture
- * classifier, any dictionary UI, any lookup history, or any model call.
+ * It deliberately does **not** contribute: any automatic trigger, any dictionary
+ * UI, any lookup history, or any model call.
+ *
+ * The I/O invariant is the one thing in this file that must stay obvious:
+ *
+ * ```text
+ * selectionchange  -> local snapshot only
+ * pointer events   -> local gesture state only
+ * dblclick         -> local gesture state only
+ * shortcut run     -> the only call site of runLookup
+ * ```
+ *
+ * Classification exists so that a later phase *can* gate the two automatic
+ * switches on a real gesture. Phase 2 does not act on the classification: both
+ * switches remain inert however they are set, and a drag or a double click
+ * still produces zero requests.
  *
  * @module dsh-word-lookup/client
  */
 import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client';
 import type { ClientContext } from './contracts.js';
+import { type GestureCounters, type GestureSnapshot } from './gesture.js';
+import { type SelectionRect } from './selection.js';
 /**
  * Client services this half requires before activation.
  *
@@ -72,13 +91,26 @@ interface HostSettings {
     readonly autoDoubleClick?: boolean;
     readonly autoSelection?: boolean;
 }
-/** Local snapshot of the last observed selection. Never triggers a request. */
-interface SelectionSnapshot {
+/**
+ * Local snapshot of the last observed selection. Never triggers a request.
+ *
+ * The selection facts and the gesture facts are two independent pieces of state
+ * — one advances on `selectionchange`, the other on pointer events — and are
+ * merged only when read, so neither write path has to reconstruct the other.
+ */
+export interface SelectionSnapshot {
+    /** Whether the document reports a non-collapsed selection at all. */
     readonly present: boolean;
+    /** Whether that selection passed every qualification rule. */
     readonly eligible: boolean;
+    /** The eligible text, truncated for transport-free diagnostics. */
     readonly text: string;
-    /** Which surface the selection was last seen in, for diagnostics. */
+    /** When the selection facts were last refreshed. */
     readonly at: number;
+    /** Geometry of the live range at capture time; `null` when there is none. */
+    readonly rect: SelectionRect | null;
+    /** The last completed gesture. */
+    readonly gesture: GestureSnapshot;
 }
 /**
  * Phase 1 verification surface.
@@ -105,8 +137,19 @@ export interface WordLookupDiagnostics {
     };
     /** The gates derived from {@link WordLookupDiagnostics.snapshot}. */
     gates(): LookupGates;
-    /** The last observed selection snapshot. */
+    /** The last observed selection snapshot, including the last gesture. */
     selection(): SelectionSnapshot;
+    /**
+     * What the gesture listeners observed and how they classified it.
+     *
+     * `counters` proves the listeners are alive; `last` proves the classifier
+     * reached a verdict. Both are needed to make "a drag produced no request"
+     * mean something.
+     */
+    gestures(): {
+        readonly counters: GestureCounters;
+        readonly last: GestureSnapshot;
+    };
     /**
      * The overlay contribution's progress.
      *

@@ -136,6 +136,26 @@ check(
   !/fetch\(\s*["'`]\/api\//.test(client),
 )
 check('client bundle contains no hard-coded route literal in fetch', !client.includes('fetch("/api'))
+
+// --- the gesture path performs no I/O ---------------------------------------
+// Phase 2 adds pointer and `dblclick` listeners whose whole job is to classify.
+// The invariant that makes the two automatic switches meaningful is that only
+// the manual command can reach the network, so the client half must contain
+// exactly one call site — and it must be the transport's.
+const fetchCallLines = client.split('\n').filter((line) => /\bfetch\s*\(/.test(line))
+check(
+  'the client half reaches the network from exactly one call site',
+  fetchCallLines.length === 1,
+  fetchCallLines.map((line) => line.trim().slice(0, 90)).join(' | ') || '(no fetch call found)',
+)
+check(
+  'the only network call site is the lookup transport',
+  fetchCallLines.length === 1 && fetchCallLines[0].includes('LOOKUP_DOCUMENT_PATH'),
+  'a second call site would mean some other path can issue a request',
+)
+for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'dblclick', 'selectionchange']) {
+  check(`client bundle subscribes to ${type}`, client.includes(`"${type}"`))
+}
 check(
   'client bundle declares the three required services',
   /\["slots",\s*"shortcuts",\s*"configForms"\]|"slots",\s*"shortcuts",\s*"configForms"/.test(client),
@@ -178,6 +198,17 @@ check(
   'the published file list covers the build output',
   files.includes('lib') && files.includes('cordis.patch.yml'),
   files.join(', '),
+)
+// `files` is a promise to whoever installs this package. Listing a path that
+// does not exist silently ships a package without it, so every entry is checked
+// rather than only the two the build is known to produce.
+const missingPublished = files.filter((relative) => !existsSync(join(ROOT, relative)))
+check(
+  'every published file entry exists on disk',
+  missingPublished.length === 0,
+  missingPublished.length === 0
+    ? files.join(', ')
+    : `missing: ${missingPublished.join(', ')}`,
 )
 check('dsh.bundle.patch exists', existsSync(join(ROOT, pkg.dsh.bundle.patch)), pkg.dsh.bundle.patch)
 check('dsh.client.platform is web', pkg.dsh.client.platform === 'web')

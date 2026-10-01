@@ -7,7 +7,7 @@
  * top-level `import`/`export` behind — `react` and `react/jsx-runtime` are
  * supplied by the envelope's `require`.
  *
- * Phase 1 contributes:
+ * Contributions:
  *
  * - one `shell.overlay` occupant that renders nothing until a lookup produces
  *   something (`shell.overlay` is mounted for the whole application lifetime);
@@ -15,10 +15,27 @@
  *   `Primary+Shift+L` on the five applicable profiles, with the sealed
  *   pass/handled behaviour;
  * - a read of the two host switches through the shared settings mirror;
- * - a `selectionchange` listener that updates a local snapshot and nothing else.
+ * - a `selectionchange` listener that refreshes a local snapshot of the text and
+ *   its live geometry, and nothing else;
+ * - Phase 2: pointer and `dblclick` listeners that classify the last completed
+ *   gesture into drag / double-click / other, and record it locally.
  *
- * It deliberately does **not** contribute: any automatic trigger, any gesture
- * classifier, any dictionary UI, any lookup history, or any model call.
+ * It deliberately does **not** contribute: any automatic trigger, any dictionary
+ * UI, any lookup history, or any model call.
+ *
+ * The I/O invariant is the one thing in this file that must stay obvious:
+ *
+ * ```text
+ * selectionchange  -> local snapshot only
+ * pointer events   -> local gesture state only
+ * dblclick         -> local gesture state only
+ * shortcut run     -> the only call site of runLookup
+ * ```
+ *
+ * Classification exists so that a later phase *can* gate the two automatic
+ * switches on a real gesture. Phase 2 does not act on the classification: both
+ * switches remain inert however they are set, and a drag or a double click
+ * still produces zero requests.
  *
  * @module dsh-word-lookup/client
  */
@@ -27,8 +44,20 @@ import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client
 
 import { WordLookupCard } from './card.js'
 import type { ClientContext } from './contracts.js'
+import {
+  gestureSnapshot,
+  IDLE_OBSERVATION,
+  observeCancel,
+  observeDoubleClick,
+  observePointerDown,
+  observePointerMove,
+  observePointerUp,
+  type GestureCounters,
+  type GestureObservation,
+  type GestureSnapshot,
+} from './gesture.js'
 import { Disposer } from './lifecycle.js'
-import { readEligibleSelection } from './selection.js'
+import { readEligibleSelection, type SelectionRect } from './selection.js'
 import { LookupCardStore } from './store.js'
 import { requestLookup, type LookupResult, type LookupTransportFailure } from './transport.js'
 
@@ -100,13 +129,26 @@ interface HostSettings {
   readonly autoSelection?: boolean
 }
 
-/** Local snapshot of the last observed selection. Never triggers a request. */
-interface SelectionSnapshot {
+/**
+ * Local snapshot of the last observed selection. Never triggers a request.
+ *
+ * The selection facts and the gesture facts are two independent pieces of state
+ * — one advances on `selectionchange`, the other on pointer events — and are
+ * merged only when read, so neither write path has to reconstruct the other.
+ */
+export interface SelectionSnapshot {
+  /** Whether the document reports a non-collapsed selection at all. */
   readonly present: boolean
+  /** Whether that selection passed every qualification rule. */
   readonly eligible: boolean
+  /** The eligible text, truncated for transport-free diagnostics. */
   readonly text: string
-  /** Which surface the selection was last seen in, for diagnostics. */
+  /** When the selection facts were last refreshed. */
   readonly at: number
+  /** Geometry of the live range at capture time; `null` when there is none. */
+  readonly rect: SelectionRect | null
+  /** The last completed gesture. */
+  readonly gesture: GestureSnapshot
 }
 
 /**
@@ -134,8 +176,19 @@ export interface WordLookupDiagnostics {
   }
   /** The gates derived from {@link WordLookupDiagnostics.snapshot}. */
   gates(): LookupGates
-  /** The last observed selection snapshot. */
+  /** The last observed selection snapshot, including the last gesture. */
   selection(): SelectionSnapshot
+  /**
+   * What the gesture listeners observed and how they classified it.
+   *
+   * `counters` proves the listeners are alive; `last` proves the classifier
+   * reached a verdict. Both are needed to make "a drag produced no request"
+   * mean something.
+   */
+  gestures(): {
+    readonly counters: GestureCounters
+    readonly last: GestureSnapshot
+  }
   /**
    * The overlay contribution's progress.
    *
@@ -206,7 +259,15 @@ function createRuntime(ctx: ClientContext): () => void {
 
   try {
     let gates: LookupGates = { autoDoubleClick: false, autoSelection: false }
-    let selectionSnapshot: SelectionSnapshot = { present: false, eligible: false, text: '', at: 0 }
+    /** Selection facts only; the gesture is merged in when the snapshot is read. */
+    let selectionFacts: Omit<SelectionSnapshot, 'gesture'> = {
+      present: false,
+      eligible: false,
+      text: '',
+      at: 0,
+      rect: null,
+    }
+    let gesture: GestureObservation = IDLE_OBSERVATION
     let lookupCount = 0
     let lastOutcome: string | null = null
     let inflight: AbortController | null = null
@@ -348,20 +409,74 @@ function createRuntime(ctx: ClientContext): () => void {
 
     // --- selection snapshot only ------------------------------------------
     // No lookup is issued from this listener. With both switches off the plugin
-    // must produce exactly zero requests for any selection gesture, and Phase 1
-    // has no trigger gate at all, so the listener stores and returns.
+    // must produce exactly zero requests for any selection gesture, and Phase 2
+    // still has no trigger gate at all, so the listener captures and returns.
+    // The geometry is re-read from the live range here, at capture time, because
+    // a scroll or a streaming re-render invalidates anything remembered.
     const onSelectionChange = (): void => {
       const selection = readEligibleSelection(document)
-      selectionSnapshot = {
+      selectionFacts = {
         present: document.getSelection()?.isCollapsed === false,
         eligible: selection !== null,
         text: selection === null ? '' : selection.text.slice(0, 96),
         at: Date.now(),
+        rect: selection === null ? null : selection.rect,
       }
     }
     document.addEventListener('selectionchange', onSelectionChange)
     disposer.add(() => {
       document.removeEventListener('selectionchange', onSelectionChange)
+    })
+
+    // --- gesture classification only --------------------------------------
+    // These listeners classify; they do not act. `classify()` reads the live
+    // selection so the verdict reflects what was selected at the moment the
+    // gesture ended — Phase 0 §7.4 measured that a drag's selection can be
+    // collapsed again within ~250 ms of `pointerup`, so a late read is not
+    // equivalent to this one.
+    //
+    // No branch below calls `runLookup`, `requestLookup` or `fetch`. That is the
+    // Phase 2 I/O invariant, and it is asserted by test rather than by comment.
+    const classify = (): boolean => readEligibleSelection(document) !== null
+
+    const onPointerDown = (event: PointerEvent): void => {
+      gesture = observePointerDown(gesture, { x: event.clientX, y: event.clientY, at: Date.now() }, event.button)
+    }
+
+    const onPointerMove = (event: PointerEvent): void => {
+      gesture = observePointerMove(gesture, { x: event.clientX, y: event.clientY, at: Date.now() })
+    }
+
+    const onPointerUp = (event: PointerEvent): void => {
+      gesture = observePointerUp(gesture, { x: event.clientX, y: event.clientY, at: Date.now() }, classify())
+    }
+
+    const onDoubleClick = (event: MouseEvent): void => {
+      gesture = observeDoubleClick(gesture, { x: event.clientX, y: event.clientY, at: Date.now() }, classify())
+    }
+
+    const onCancelGesture = (): void => {
+      gesture = observeCancel(gesture)
+    }
+
+    // Capture phase, matching how Phase 0 recorded the real orderings: a
+    // listener on the bubble phase would miss a gesture the transcript consumed.
+    const GESTURE_OPTIONS = { capture: true } as const
+    document.addEventListener('pointerdown', onPointerDown, GESTURE_OPTIONS)
+    document.addEventListener('pointermove', onPointerMove, GESTURE_OPTIONS)
+    document.addEventListener('pointerup', onPointerUp, GESTURE_OPTIONS)
+    document.addEventListener('pointercancel', onCancelGesture, GESTURE_OPTIONS)
+    document.addEventListener('dblclick', onDoubleClick, GESTURE_OPTIONS)
+    // A window that loses focus mid-drag never delivers the release.
+    window.addEventListener('blur', onCancelGesture)
+    disposer.add(() => {
+      document.removeEventListener('pointerdown', onPointerDown, GESTURE_OPTIONS)
+      document.removeEventListener('pointermove', onPointerMove, GESTURE_OPTIONS)
+      document.removeEventListener('pointerup', onPointerUp, GESTURE_OPTIONS)
+      document.removeEventListener('pointercancel', onCancelGesture, GESTURE_OPTIONS)
+      document.removeEventListener('dblclick', onDoubleClick, GESTURE_OPTIONS)
+      window.removeEventListener('blur', onCancelGesture)
+      gesture = observeCancel(gesture)
     })
 
     // --- Phase 1 verification surface -------------------------------------
@@ -379,7 +494,8 @@ function createRuntime(ctx: ClientContext): () => void {
         }
       },
       gates: () => gates,
-      selection: () => selectionSnapshot,
+      selection: () => ({ ...selectionFacts, gesture: gestureSnapshot(gesture.state) }),
+      gestures: () => ({ counters: gesture.counters, last: gestureSnapshot(gesture.state) }),
       overlay: () => ({
         entryId: CARD_ENTRY_ID,
         order: CARD_ORDER,

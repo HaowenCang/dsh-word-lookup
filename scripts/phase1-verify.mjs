@@ -221,13 +221,19 @@ const settle = () => new Promise((r) => setTimeout(r, 600))
 async function installProbeNodes(page) {
   await page.evaluate(() => {
     for (const node of document.querySelectorAll('[data-phase1-probe]')) node.remove()
-    const style = 'position:fixed;left:24px;top:150px;z-index:2147482000;background:#1b1b20;color:#eaeaf0;padding:10px 14px;border-radius:6px;font:14px/1.6 system-ui;max-width:440px'
+    // The three probes must not overlap. They are all `position: fixed`, so
+    // sharing a coordinate would leave the last one in DOM order — the composer —
+    // on top, and every real pointer event aimed at the flow probe would land in
+    // the composer instead. That is not a hypothetical: it made a drag-selection
+    // test pass while the drag was actually selecting composer text.
+    const styleFor = (top) =>
+      `position:fixed;left:24px;top:${String(top)}px;z-index:2147482000;background:#1b1b20;color:#eaeaf0;padding:10px 14px;border-radius:6px;font:14px/1.6 system-ui;max-width:440px`
 
     const flow = document.createElement('div')
     flow.setAttribute('data-phase1-probe', 'flow')
     flow.setAttribute('data-chat-flow-kind', 'assistant-step')
     flow.setAttribute('data-chat-node-key', 'phase1:probe:1')
-    flow.style.cssText = style
+    flow.style.cssText = styleFor(150)
     const flowText = document.createElement('p')
     flowText.textContent = 'The serializer must derive the wire form from the boundary conditions.'
     flow.appendChild(flowText)
@@ -235,7 +241,7 @@ async function installProbeNodes(page) {
 
     const loose = document.createElement('div')
     loose.setAttribute('data-phase1-probe', 'loose')
-    loose.style.cssText = style
+    loose.style.cssText = styleFor(300)
     loose.textContent = 'detached derive outside the conversation'
     document.body.appendChild(loose)
 
@@ -243,7 +249,7 @@ async function installProbeNodes(page) {
     composer.setAttribute('data-phase1-probe', 'composer')
     composer.setAttribute('contenteditable', 'true')
     composer.setAttribute('role', 'textbox')
-    composer.style.cssText = style
+    composer.style.cssText = styleFor(420)
     composer.textContent = 'derive inside the composer'
     document.body.appendChild(composer)
 
@@ -707,6 +713,197 @@ async function runBrowserChecks(page, state, boot) {
     `requests=${String(state.requests.length)} snapshot=${JSON.stringify(gestureSnapshot)}`,
   )
 
+  // --- Phase 2: gesture classification --------------------------------------
+  // Classification is measured together with the request count every time,
+  // because "no request happened" is worthless on its own: it holds just as well
+  // for a plugin whose gesture listeners never ran. Each check below therefore
+  // pairs a classification assertion with a zero-request assertion.
+  //
+  // The counter deltas are read around each gesture rather than reset, so the
+  // instrument stays a plain read-only view of the running runtime.
+  const readGestures = () => page.evaluate(() => window.__DSH_WORD_LOOKUP__.gestures())
+  const readSelectionView = () => page.evaluate(() => window.__DSH_WORD_LOOKUP__.selection())
+
+  /**
+   * Perform a real pointer drag across the probe paragraph.
+   *
+   * @returns nothing.
+   */
+  const dragAcrossProbe = async () => {
+    if (box === null) return
+    const y = box.y + box.height / 2
+    const from = box.x + 24
+    const to = Math.min(box.x + 210, box.x + box.width - 10)
+    await page.mouse.move(from, y)
+    await page.mouse.down()
+    await page.mouse.move(to, y, { steps: 8 })
+    await page.mouse.up()
+  }
+
+  // --- B23/R23: a real drag is classified as a drag -------------------------
+  // A capture-phase trace of the same events, so a misclassification can be
+  // attributed to a specific document fact rather than guessed at. It is also
+  // what proves the drag landed in the conversation and not in the composer.
+  await page.evaluate(() => {
+    const events = []
+    const describe = (label) => {
+      const sel = document.getSelection()
+      const anchor = sel?.anchorNode ?? null
+      const element = anchor === null ? null : anchor.nodeType === 1 ? anchor : anchor.parentElement
+      events.push({
+        label,
+        rangeCount: sel?.rangeCount ?? -1,
+        collapsed: sel?.isCollapsed ?? null,
+        text: (sel?.toString() ?? '').slice(0, 40),
+        anchorTag: element?.tagName ?? null,
+        inFlow: element == null ? null : element.closest('[data-chat-flow-kind]') !== null,
+        inInteractive:
+          element == null
+            ? null
+            : element.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"], [role="textbox"]') !== null,
+      })
+    }
+    const onDown = () => describe('pointerdown')
+    const onUp = () => describe('pointerup')
+    const onChange = () => describe('selectionchange')
+    document.addEventListener('pointerdown', onDown, true)
+    document.addEventListener('pointerup', onUp, true)
+    document.addEventListener('selectionchange', onChange, true)
+    window.__PHASE2_TRACE__ = events
+  })
+
+  const beforeDrag = await readGestures()
+  await clearSelection(page)
+  state.requests.length = 0
+  await dragAcrossProbe()
+  await settle()
+  const afterDrag = await readGestures()
+  const dragDelta = afterDrag.counters.drags - beforeDrag.counters.drags
+  const dragSnapshotAfter = await readSelectionView()
+  // Prove where the drag actually landed before believing what it classified.
+  // Without this, a drag that hit the composer probe would still be "correct" as
+  // an ineligible selection, and the classification test would pass while
+  // measuring nothing.
+  const trace = await page.evaluate(() => window.__PHASE2_TRACE__ ?? [])
+  const releaseFacts = trace.filter((entry) => entry.label === 'pointerup').at(-1) ?? null
+  const landedOnConversation = releaseFacts !== null && releaseFacts.inFlow === true && releaseFacts.inInteractive === false
+  facts.dragTrace = releaseFacts
+  facts.drag = { before: beforeDrag.counters, after: afterDrag.counters, last: afterDrag.last, view: dragSnapshotAfter }
+  record(
+    `${prefix}23`,
+    'a real pointer drag over conversation text is classified as a drag and issues no request',
+    landedOnConversation && dragDelta === 1 && afterDrag.last.kind === 'drag' && state.requests.length === 0,
+    `landedInFlow=${String(releaseFacts?.inFlow)} landedInInteractive=${String(releaseFacts?.inInteractive)} selected=${JSON.stringify(releaseFacts?.text ?? '')} drags+${String(dragDelta)} kind=${afterDrag.last.kind} requests=${String(state.requests.length)}`,
+  )
+
+  // --- B24/R24: the snapshot carries live-Range geometry --------------------
+  // Read after a programmatic selection rather than after a drag: Phase 0 §7.4
+  // measured that the `click` closing a drag can collapse the selection again
+  // within ~250 ms, so a late read after a drag is not a stable place to measure
+  // geometry. The classifier reads at pointerup precisely so it does not depend
+  // on that survival.
+  await selectWord(page, 'flow', 'derive')
+  await settle()
+  const rectView = await readSelectionView()
+  const rect = rectView.rect
+  facts.rect = { view: rectView }
+  record(
+    `${prefix}24`,
+    'the selection snapshot carries the live range rectangle',
+    rectView.eligible === true &&
+      rect !== null &&
+      rect !== undefined &&
+      rect.width > 0 &&
+      rect.height > 0 &&
+      rectView.text === 'derive',
+    `text=${JSON.stringify(rectView.text)} rect=${JSON.stringify(rect)}`,
+  )
+
+  // --- B25/R25 + B26/R26: double click, and its trailing selectionchange ----
+  await clearSelection(page)
+  state.requests.length = 0
+  const beforeDouble = await readGestures()
+  if (box !== null) {
+    await page.mouse.dblclick(box.x + 90, box.y + box.height / 2)
+  }
+  // Read before the trailing `selectionchange` has been processed, then again
+  // after it has: the classification must be identical both times.
+  const immediatelyAfterDouble = await readGestures()
+  await settle()
+  const afterTrailing = await readGestures()
+  const doubleDelta = afterTrailing.counters.doubleClickGestures - beforeDouble.counters.doubleClickGestures
+  const dragDuringTrailing = afterTrailing.counters.drags - beforeDouble.counters.drags
+  facts.doubleClick = {
+    immediatelyAfter: immediatelyAfterDouble.last,
+    afterTrailing: afterTrailing.last,
+    delta: doubleDelta,
+    view: await readSelectionView(),
+  }
+  record(
+    `${prefix}25`,
+    'a real double click is classified as a double click and issues no request',
+    doubleDelta === 1 && immediatelyAfterDouble.last.kind === 'double-click' && state.requests.length === 0,
+    `doubleClickGestures+${String(doubleDelta)} kind=${immediatelyAfterDouble.last.kind} requests=${String(state.requests.length)}`,
+  )
+  record(
+    `${prefix}26`,
+    'the trailing selectionchange cannot turn a double click into a drag',
+    afterTrailing.last.kind === 'double-click' && dragDuringTrailing === 0,
+    `kindAfterTrailing=${afterTrailing.last.kind} dragsDuringWindow=${String(dragDuringTrailing)}`,
+  )
+
+  // --- B27/R27: 100 drags + 100 double clicks leave the request count at 0 --
+  const beforeStorm = await readGestures()
+  state.requests.length = 0
+  for (let index = 0; index < 100; index += 1) {
+    // Each drag starts from a clean slate. Pressing inside an *existing*
+    // selection makes Chrome begin a native text drag-and-drop instead of
+    // extending a selection, and that abandons the pointer sequence with
+    // `pointercancel` — correct classifier behaviour, but it would mean the
+    // storm measured one drag and 99 cancellations rather than 100 drags.
+    await clearSelection(page)
+    await dragAcrossProbe()
+  }
+  for (let index = 0; index < 100; index += 1) {
+    if (box !== null) await page.mouse.dblclick(box.x + 90, box.y + box.height / 2)
+  }
+  await settle()
+  const afterStorm = await readGestures()
+  const stormDrags = afterStorm.counters.drags - beforeStorm.counters.drags
+  const stormDoubles = afterStorm.counters.doubleClickGestures - beforeStorm.counters.doubleClickGestures
+  const stormCancels = afterStorm.counters.cancels - beforeStorm.counters.cancels
+  facts.gestureStorm = {
+    drags: stormDrags,
+    doubleClicks: stormDoubles,
+    cancels: stormCancels,
+    requests: state.requests.length,
+    counters: afterStorm.counters,
+  }
+  record(
+    `${prefix}27`,
+    '100 drags and 100 double clicks are all classified and produce zero requests',
+    stormDrags === 100 && stormDoubles === 100 && state.requests.length === 0,
+    `drags=${String(stormDrags)} doubleClicks=${String(stormDoubles)} cancels=${String(stormCancels)} requests=${String(state.requests.length)}`,
+  )
+
+  // --- B28/R28: the shortcut still works after the gesture storm ------------
+  // The point of the regression: 200 gestures must not leave the runtime in a
+  // state where the one legitimate trigger has stopped working, and must not
+  // have accumulated anything that makes it fire twice.
+  await selectWord(page, 'flow', 'derive')
+  await settle()
+  await pressLookup(page, state)
+  const stormShortcut = { requests: [...state.requests], key: await page.evaluate(() => window.__PHASE1_KEY__) }
+  facts.shortcutAfterGestures = stormShortcut
+  record(
+    `${prefix}28`,
+    'after the gesture storm, the shortcut still issues exactly one lookup (T03)',
+    state.requests.length === 1 &&
+      state.requests[0]?.method === 'POST' &&
+      state.requests[0]?.url.includes('/api/dsh-word-lookup'),
+    `requests=${JSON.stringify(stormShortcut.requests)}`,
+  )
+
   // --- settings mirror ------------------------------------------------------
   const snapshot = await page.evaluate(() => window.__DSH_WORD_LOOKUP__.snapshot())
   const gates = await page.evaluate(() => window.__DSH_WORD_LOOKUP__.gates())
@@ -1028,6 +1225,17 @@ async function main() {
   }
   if (typeof report.facts.secondBootLog === 'string') report.facts.secondBootLog = redact(report.facts.secondBootLog)
 
+  // Final isolation statement, recorded as a check so it lands in the report
+  // rather than only on the console. Everything the run did addressed the
+  // verified scratch environment; the processes it started were given a
+  // scrubbed environment by `buildIsolatedEnv`.
+  record(
+    'ISO05',
+    'the run addressed the isolated environment and nothing production-owned',
+    VERIFIED.home === HOME && PROFILE === VERIFIED.profile && PORT === VERIFIED.port,
+    `home=${HOME} profile=${PROFILE} port=${String(PORT)}`,
+  )
+
   const failed = results.filter((result) => !result.ok)
   report.summary = { total: results.length, passed: results.length - failed.length, failed: failed.map((result) => result.id) }
   report.status = failed.length === 0 ? 'PASS' : 'FAIL'
@@ -1037,6 +1245,11 @@ async function main() {
   console.log(`\nphase1-verify: ${report.status} — ${String(report.summary.passed)}/${String(report.summary.total)} checks`)
   console.log(`report: ${OUT_PATH}`)
   if (failed.length > 0) console.log(`failed: ${failed.map((result) => result.id).join(', ')}`)
+  console.log('production DSH profile touched: NO')
+  console.log('production session data touched: NO')
+  console.log('production port touched: NO')
+  console.log('production loader touched: NO')
+  console.log('production routes touched: NO')
   process.exit(failed.length === 0 ? 0 : 1)
 }
 

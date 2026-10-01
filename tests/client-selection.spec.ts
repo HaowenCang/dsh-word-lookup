@@ -14,6 +14,8 @@ import {
   CONVERSATION_FLOW_SELECTOR,
   INTERACTIVE_SURFACE_SELECTOR,
   isEligibleEndpoint,
+  readRangeRect,
+  type RangeLike,
   type SelectionEndpointFacts,
 } from '../src/client/selection.js'
 
@@ -84,5 +86,61 @@ describe('selectors', () => {
     // The shipped class names are content-hashed and change between builds.
     expect(INTERACTIVE_SURFACE_SELECTOR).not.toMatch(/\._[a-z0-9]+_/)
     expect(CONVERSATION_FLOW_SELECTOR).not.toMatch(/\._[a-z0-9]+_/)
+  })
+})
+
+/**
+ * Build a range-like value for the geometry tests.
+ *
+ * @param collapsed - whether the range reports itself collapsed.
+ * @param rect - the rectangle the range reports.
+ * @returns the range-like value.
+ */
+function rangeLike(collapsed: boolean, rect: { x: number; y: number; width: number; height: number }): RangeLike {
+  return { collapsed, getBoundingClientRect: () => rect }
+}
+
+describe('readRangeRect', () => {
+  it('returns the live rectangle for a one-line selection', () => {
+    const rect = readRangeRect(rangeLike(false, { x: 604.6, y: 104, width: 41.5, height: 17 }))
+    expect(rect).toEqual({ x: 604.6, y: 104, width: 41.5, height: 17 })
+  })
+
+  it('returns the bounding box of a multi-line selection', () => {
+    // Phase 0 §7.4 measured a four-rect, 1239 px-wide paragraph selection;
+    // getBoundingClientRect has already folded those into one box.
+    const rect = readRangeRect(rangeLike(false, { x: 280, y: 76, width: 1239, height: 68 }))
+    expect(rect).toEqual({ x: 280, y: 76, width: 1239, height: 68 })
+  })
+
+  it('returns null for a collapsed range rather than a zero-area rect', () => {
+    expect(readRangeRect(rangeLike(true, { x: 10, y: 20, width: 0, height: 17 }))).toBeNull()
+  })
+
+  it('returns null when the range has no area at all', () => {
+    expect(readRangeRect(rangeLike(false, { x: 0, y: 0, width: 0, height: 0 }))).toBeNull()
+  })
+
+  it('re-reads the range rather than remembering a previous rectangle', () => {
+    // Phase 0 §7.4: scrolling the transcript by 200 px moved rect.y by exactly
+    // 200 for the same selection. A cached rect plus a delta would be wrong
+    // after a streaming re-render, so the value must come from the range.
+    let y = 279
+    const scrolling: RangeLike = {
+      collapsed: false,
+      getBoundingClientRect: () => ({ x: 600, y, width: 41, height: 17 }),
+    }
+    expect(readRangeRect(scrolling)?.y).toBe(279)
+    y = 479
+    expect(readRangeRect(scrolling)?.y).toBe(479)
+  })
+
+  it('preserves a zero-width but non-empty rect, which is a real caret box', () => {
+    expect(readRangeRect(rangeLike(false, { x: 5, y: 5, width: 0, height: 17 }))).toEqual({
+      x: 5,
+      y: 5,
+      width: 0,
+      height: 17,
+    })
   })
 })
