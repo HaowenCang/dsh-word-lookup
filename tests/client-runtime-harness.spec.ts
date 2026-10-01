@@ -624,31 +624,64 @@ describe('live settings transitions need no reload', () => {
 
   it('reads the switch at the gesture, never at boot', async () => {
     const harness = createHarness()
+    // Boot with the values the profile composes, then change one *without* any
+    // reload: the next gesture must follow the new value, which it can only do if
+    // the gate reads the form rather than a boolean captured at plugin load.
     harness.form.value = { autoSelection: false, autoDoubleClick: false }
     harness.boot()
-    // Flip the value without going through a write the runtime observed, then
-    // confirm the runtime is reading the form rather than a captured boolean.
+    await drag(harness, { text: 'derive' })
+    expect(view(harness).lookups()).toBe(0)
+
     await setSwitch(harness, 'autoSelection', true)
     expect(view(harness).gates()).toEqual({ autoDoubleClick: false, autoSelection: true })
+    await drag(harness, { text: 'derive' })
+    expect(view(harness).lookups()).toBe(1)
     expect(harness.form.writes).toEqual([{ field: 'autoSelection', value: true }])
   })
 })
 
 describe('de-duplication', () => {
-  it('absorbs a duplicate classification event for the same gesture', async () => {
+  it('absorbs a duplicate offer of an identity that was already consumed', async () => {
+    // The real duplicate path, and the one the brief's de-duplication rule is
+    // about: a release classifies as `drag` and is consumed, and the `dblclick`
+    // that follows promotes that very sequence, so it carries the same identity.
+    // The platform reported one gesture; it must buy one lookup.
     const harness = createHarness()
     harness.boot()
     await useState(harness, STATES.S11)
 
-    await doubleClick(harness, { text: 'derive' })
-    expect(view(harness).lookups()).toBe(1)
-
-    // Deliver the platform signal a second time for the same gesture, exactly as
-    // the brief's duplicate-injection case does at the gate.
-    harness.doc.emit('dblclick', { clientX: 200, clientY: 200 })
+    harness.doc.selection.clear()
+    harness.doc.emit('pointerdown', pointer(100, 100))
+    harness.select(harness.flow, 'derive')
+    harness.doc.emit('pointermove', pointer(160, 100))
+    harness.doc.emit('pointerup', pointer(160, 100))
     await settle()
     expect(view(harness).lookups()).toBe(1)
-    expect(view(harness).trigger()).toMatchObject({ decision: 'ignored', reason: 'duplicate-gesture' })
+    const dragId = view(harness).trigger()?.gestureId
+
+    // The platform's own recognition of the same press-release pair.
+    harness.doc.emit('dblclick', { clientX: 130, clientY: 100 })
+    await settle()
+    expect(view(harness).lookups()).toBe(1)
+    expect(view(harness).trigger()).toMatchObject({ decision: 'ignored', reason: 'duplicate-gesture', gestureId: dragId })
+  })
+
+  it('treats a second platform double click as a second gesture, not as a duplicate event', async () => {
+    // Two `dblclick` events are two gestures: the plugin has no timer and no
+    // other way to tell a synthesised repeat from a reader double-clicking twice,
+    // and collapsing them would swallow the second lookup the brief requires.
+    const harness = createHarness()
+    harness.boot()
+    await useState(harness, STATES.S01)
+
+    await doubleClick(harness, { text: 'derive' })
+    const first = view(harness).gestures().last.gestureId
+    harness.doc.emit('dblclick', { clientX: 200, clientY: 200 })
+    await settle()
+    const second = view(harness).gestures().last.gestureId
+
+    expect(first).not.toBe(second)
+    expect(view(harness).lookups()).toBe(2)
   })
 
   it('absorbs a stray release after a double click rather than turning it into a drag', async () => {
@@ -662,6 +695,66 @@ describe('de-duplication', () => {
     await settle()
     expect(view(harness).lookups()).toBe(after)
     expect(view(harness).gestures().counters.drags).toBe(0)
+  })
+
+  it('never offers a verdict for a press that has not been released', async () => {
+    // The defect this guards: a press allocates an identity while the state still
+    // carries the previous verdict, so a stray release could offer that verdict
+    // under the new identity — a lookup for a gesture that never happened, and
+    // one that burns an identity the real release afterwards needs.
+    const harness = createHarness()
+    harness.boot()
+    await useState(harness, STATES.S10)
+
+    await drag(harness, { text: 'derive' })
+    expect(view(harness).lookups()).toBe(1)
+
+    // An abandoned press, then a release that closes nothing.
+    harness.doc.emit('pointerdown', pointer(300, 300))
+    harness.doc.emit('pointercancel', {})
+    harness.doc.emit('pointerup', pointer(300, 300))
+    await settle()
+    expect(view(harness).lookups()).toBe(1)
+
+    // A right-button release never opened a gesture either.
+    harness.doc.emit('pointerup', { clientX: 400, clientY: 400, button: 2, pointerType: 'mouse' })
+    await settle()
+    expect(view(harness).lookups()).toBe(1)
+
+    // ...and the next real drag still works, with a fresh identity.
+    await drag(harness, { text: 'went' })
+    expect(view(harness).lookups()).toBe(2)
+    expect(harness.requests).toEqual(['derive', 'went'])
+  })
+
+  it('does not let a refused gesture re-fire later under a new identity', async () => {
+    // The sharpest form of the same defect, and the one a switch change exposes:
+    // a drag the switched-off gate refused is *not* consumed, so if a later stray
+    // release re-offered that verdict under a fresh identity, turning the switch
+    // on would buy a lookup for text the reader never dragged over for it.
+    const harness = createHarness()
+    harness.boot()
+    await useState(harness, STATES.S00)
+
+    await drag(harness, { text: 'derive' })
+    expect(view(harness).lookups()).toBe(0)
+    expect(view(harness).trigger()).toMatchObject({ decision: 'ignored', reason: 'switch-off' })
+
+    harness.doc.emit('pointerdown', pointer(300, 300))
+    harness.doc.emit('pointercancel', {})
+    await setSwitch(harness, 'autoSelection', true)
+
+    // A release that closes nothing, carrying an entirely unrelated selection.
+    harness.select(harness.flow, 'unrelated')
+    harness.doc.emit('pointerup', pointer(300, 300))
+    await settle()
+    expect(view(harness).lookups()).toBe(0)
+    expect(harness.requests).toEqual([])
+
+    // The gesture that really completes afterwards is the first to be consumed.
+    await drag(harness, { text: 'derive' })
+    expect(view(harness).lookups()).toBe(1)
+    expect(harness.requests).toEqual(['derive'])
   })
 
   it('lets two independent double clicks on the same word produce two lookups', async () => {
@@ -712,11 +805,11 @@ describe('de-duplication', () => {
     harness.boot()
     await useState(harness, STATES.S10)
 
-    await drag(harness, { text: 'a' })
-    await drag(harness, { text: 'b' })
-    await drag(harness, { text: 'c' })
-    const ids = [1, 2, 3].map((id) => id)
-    expect(view(harness).gestures().last.gestureId).toBe(3)
+    const ids: number[] = []
+    for (const word of ['a', 'b', 'c']) {
+      await drag(harness, { text: word })
+      ids.push(view(harness).gestures().last.gestureId)
+    }
     expect(ids).toEqual([1, 2, 3])
 
     // A cancelled gesture does not free its identity for reuse.

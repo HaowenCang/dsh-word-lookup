@@ -115,32 +115,80 @@ transcript reflowed or the page scrolled.
 interface GestureState {
   sequence: number      // monotonic allocator, never reset, never reused
   gestureId: number     // identity of the open (or just-closed) sequence
+  classifiedId: number  // identity the carried verdict was PRODUCED for; 0 = none
+  promotable: boolean   // a `dblclick` arriving now continues the release just folded
   pointerType: PointerKind
   // ...
 }
 
-beginPointer()          // allocates: sequence += 1; gestureId = sequence
-endPointer()            // carries the identity of the press that opened it
-registerDoubleClick()   // reuses the open sequence's identity
+beginPointer()          // allocates: sequence += 1; gestureId = sequence;
+                        // classifiedId = 0, promotable = false
+endPointer()            // carries the press's identity, and records it as
+                        // classifiedId; promotable = true
+registerDoubleClick()   // reuses the sequence it promotes, else allocates a fresh one
 ```
 
-Why the allocation sits at the press rather than at classification: a double
-click is **two** pointer sequences, and the platform reports `dblclick` after the
-second release. Reusing the second sequence's identity is what makes "one
-semantic gesture, at most one automatic lookup" provable — and it is exactly why
-the first press of the pair can never buy a lookup of its own (it classifies as
-`other`, which is not a trigger gesture and consumes nothing).
+Three of those fields exist because each one closes a defect an adversarial
+review found by executing the real modules, and each is asserted by a test that
+fails without it:
+
+- **`classifiedId`, not `gestureId`.** `beginPointer` allocates a new identity
+  while `kind`/`completedAt` still describe the *previous* gesture. Reading the
+  identity off the state would therefore pair a fresh identity with an old
+  verdict, and a stray release — a window that lost focus mid-drag, a
+  right-button release, a synthetic event — would offer that verdict as a new
+  gesture. Concretely: a drag the switched-off gate refused is *not* consumed, so
+  turning the switch on and then delivering a release that closes nothing would
+  have bought a lookup for text the reader never dragged over for it, and burned
+  the identity the real release afterwards needed. `classificationOf` now returns
+  `null` whenever `classifiedId` is `0`, and the runtime additionally offers a
+  classification only when the fold actually changed the state.
+- **`promotable`.** Without it, `dblclick` reused whatever identity the state
+  carried, so two `dblclick` events delivered with no pointer events at all (an
+  engine, an extension or an automation agent that synthesises them) shared one
+  identity and the second was swallowed as a duplicate — two gestures, one
+  lookup. It is now reused only when the `dblclick` genuinely continues a
+  sequence: an open press, or the release that was just folded.
+- **`cancelGesture` clears the offer.** An abandoned gesture has no verdict to
+  hand a gate, so nothing after it can re-offer the previous one.
+
+### A double click that also travels
+
+`dblclick` is the platform's recognition and the plugin consumes it, but the
+classifier's drag threshold (5 CSS px) and the platform's double-click area are
+**different rules**. A second press that drifts past 5 px while selecting a word
+can be both a drag and the second half of a double click.
+
+The rule this build implements is: **a press-release pair that travels far enough
+over an eligible selection is a drag**, and the `dblclick` that follows promotes
+that same identity and is refused as a duplicate. One platform gesture, one
+lookup, on the drag's path.
+
+That is a deliberate choice, not an accident, and it is measured rather than
+asserted (`B/R P27`, `B/R P28`): with `autoSelection` alone the drifting double
+click is at most one lookup, and with both switches on it is exactly one — never
+one per switch. What it means for the contract is stated plainly in §20.5: a
+double click *that is also a drag* is attributed to `auto-selection`. A
+zero-movement double click — what a reader produces and what both the browser
+harness and the real-browser matrix issue — is attributed to `auto-double-click`.
+
+Rebuilding the classifier to consult the platform's click count would remove the
+ambiguity, and was rejected: the brief forbids rewriting the verified Phase 2
+classifier to serve the automatic paths, and `MouseEvent.detail` on pointer events
+is a platform behaviour this project has not measured.
 
 The event order this is built on is the one Phase 0 §7.3 measured in real
 Chromium, and Phase 4 did not re-derive it:
 
 ```text
 pointerdown#1  pointerup#1  pointerdown#2  pointerup#2  dblclick  selectionchange(trailing)
-     id N-1        other         id N          other    double-click   <no classification>
+     id N-1        other         id N        other/drag  double-click   <no classification>
 ```
 
-The trailing `selectionchange` is structurally unable to produce a
-classification: no reducer in `gesture.ts` is reachable from a selection event,
+`pointerup#2` is `other` when the second press did not travel, which is what the
+real-browser matrix and the harness both produce, and `drag` when it did — see
+above. Either way the trailing `selectionchange` is structurally unable to produce
+a classification: no reducer in `gesture.ts` is reachable from a selection event,
 which the Phase 2 suite already asserts and which Phase 4 did not weaken.
 
 Identity is a per-page-load monotonic counter. That is sufficient because the
@@ -173,9 +221,20 @@ consumed by its own `dblclick`.
 | the same text under a new identity | lookup |
 
 Measured in real Chromium (`B/R P15`, `B/R P16`): two double clicks on `derive`
+issued **back to back** — one `gestures().last.gestureId` read between them —
 produced identities `329` and `331` with **2** requests; two drags produced `332`
-and `333` with **2** requests. A text-and-time de-duplicator would report 1 in
-both cases.
+and `333` with **2** requests. The gap between the two gestures is measured and
+asserted to be **under 300 ms**, so this rules out a text-and-time de-duplicator
+as well as a text-only one; a harness that waited between the two gestures would
+not have.
+
+One consequence is stated rather than hidden: the plugin cannot tell a
+synthesised repeat of a `dblclick` from a reader double-clicking twice, because
+it has no timer and the platform emits one `dblclick` per gesture. Two `dblclick`
+events are therefore two gestures with two identities. Duplicate absorption is
+proven on the identity path that really exists — a release that classified as
+`drag` and a `dblclick` promoting that same sequence — in
+`tests/client-runtime-harness.spec.ts` and by `B/R P27`/`P28` in the browser.
 
 ### The manual shortcut is a different domain
 
@@ -317,7 +376,10 @@ real runtime wiring in `tests/client-runtime-harness.spec.ts`.
 
 Every row also asserts the **gesture counters advanced by exactly the number of
 gestures performed**, so a request count of zero cannot be explained by a
-classification that never happened. Each row ran on **both** boots.
+classification that never happened. `cancels` is recorded alongside them, not
+asserted: a drag that began inside an existing selection would legitimately
+produce one, and pinning it to zero would be asserting a property of the harness
+rather than of the plugin. Each row ran on **both** boots.
 
 The brief asks for 100 + 100 "in all four quadrants if the cost is reasonable"
 and permits the full combinatorial matrix to live in the unit/integration
@@ -414,10 +476,16 @@ classification.
 
 | layer | evidence |
 | --- | --- |
-| unit | `tests/client-runtime-harness.spec.ts` asserts one listener per event type after `apply`, **zero** after dispose, the command registration removed, and exactly one lookup per gesture after an unload/reload cycle |
-| unit | a fixed transport that resolves *after* disposal publishes nothing, so a lookup outliving an unload cannot republish into the next lifecycle's store |
+| unit (the real proof) | `tests/client-runtime-harness.spec.ts` asserts one listener per event type after `apply`, **zero** after dispose, the command registration removed, and exactly one lookup per gesture after an unload/reload cycle |
+| unit | a transport that resolves *after* disposal publishes nothing, so a lookup outliving an unload cannot republish into the next lifecycle's store |
 | runtime | `B/R L01` asserts the overlay and command are registered exactly once after a full client reload |
-| runtime | `L06`/`L07` assert that after a full client reload one double click and one drag selection each still issue **exactly one** request, with the expected origin — one gesture cannot become two or three requests |
+| runtime | `L06`/`L07` assert that after a full client reload the automatic path still issues **exactly one** request per gesture, with the expected origin |
+
+`L06`/`L07` are **not** offered as evidence about listener disposal, and the check
+titles say so: `page.reload()` destroys the document, so no listener could survive
+it and the checks would pass with `removeEventListener` deleted. They prove the
+automatic path is wired and still one-to-one in a freshly loaded page; disposal
+itself is proven by the unit harness, which is the only place it can be.
 
 ## 16. Error handling
 
@@ -439,7 +507,7 @@ classification.
 | --- | --- |
 | fixture | built and validated |
 | typecheck | clean |
-| test | **16 files, 331 tests, 0 failures** |
+| test | **17 files, 351 tests, 0 failures** |
 | build | exit 0 |
 | bundle-static-checks | **88/88** |
 | credential-scan | PASS |
@@ -450,13 +518,16 @@ New by Phase 4:
 | --- | ---: | --- |
 | `tests/client-trigger.spec.ts` | 33 | the four-state matrix as a truth table, identity de-duplication, duplicate-identity injection, same-text/new-identity, refusals not consuming, pointer kinds, ledger bounding, 100 + 100 over the gate |
 | `tests/client-lookup.spec.ts` | 19 | C1–C4, stale success/error/rejection, current failure, loading ownership, error recovery, dispose, per-origin accounting |
-| `tests/client-runtime-harness.spec.ts` | 43 | the real `apply()` against a fake DOM and a fake DSH context: matrix, live transitions, de-duplication, composer exclusion, pointer kinds, lifecycle, deferred-transport ordering, error recovery, 100 + 100 in all four states |
+| `tests/client-runtime-harness.spec.ts` | 46 | the real `apply()` against a fake DOM and a fake DSH context: matrix, live transitions, de-duplication on the real duplicate path, a verdict never offered for an unreleased press, a refused gesture not re-firing under a new identity, composer exclusion, pointer kinds, lifecycle, deferred-transport ordering, error recovery, 100 + 100 in all four states |
+| `tests/client-gesture-identity.spec.ts` | 17 | which sequence a verdict belongs to, no offer for an unreleased or abandoned press, promotion of a double click, two press-less double clicks staying two gestures, identities never reused |
 | `tests/client-io-boundary.spec.ts` | 12 | AST reachability: `selectionchange` reaches no I/O; one `fetch` call site and it is the transport; no timers; the pure modules reference no DOM/network global |
 
-Totals moved from **12 files / 224 tests** (Phase 3) to **16 files / 331 tests**,
+Totals moved from **12 files / 224 tests** (Phase 3) to **17 files / 351 tests**,
 with **no pre-existing assertion weakened**. The 224 pre-existing tests still
-pass unchanged; `tests/client-gesture.spec.ts` gained no assertions and lost
-none — the identity fields are additive.
+pass unchanged. `tests/client-gesture.spec.ts` (Phase 2's suite) gained no
+assertions and lost none — the identity fields are additive, and the new
+identity semantics live in their own file so that the Phase 2 contract stays
+readable as the contract it was.
 
 `scripts/check-bundle.mjs` grew from **69** to **88** checks. New assertions:
 
@@ -487,7 +558,7 @@ $ npm run test:runtime
 ISOLATION CHECK: PASS          (runner gate)
 ISOLATION CHECK: PASS          (harness gate)
 ...
-phase1-verify: PASS — 153/153 checks
+phase1-verify: PASS — 159/159 checks
 ```
 
 | | value |
@@ -499,10 +570,10 @@ phase1-verify: PASS — 153/153 checks
 | browser | Chromium `153.0.8010.12`, headless |
 | authentication | the isolated instance's own launch token |
 | boots | 2 (full restart in between, to prove settings persistence) |
-| result | **153/153**, `summary.failed = []` |
+| result | **159/159**, `summary.failed = []` |
 
-153 = Phase 1's 64 + Phase 2's 13 + Phase 3's 20 + **Phase 4's 56**
-(`B/R A2`, `B/R P01`–`B/R P26` = 27 per boot x 2 boots = 54, plus `L06` and
+159 = Phase 1's 64 + Phase 2's 13 + Phase 3's 20 + **Phase 4's 62**
+(`B/R A2`, `B/R P01`–`B/R P29` = 30 per boot x 2 boots = 60, plus `L06` and
 `L07`). Every pre-existing check still passes.
 
 The Phase 4 checks run on **both** boots, so a trigger gate that only worked on a
@@ -563,6 +634,9 @@ unrelated DSH instance was touched.
 | `B/R P19` | automatic unknown word -> normal miss, next gesture works |
 | `B/R P20`/`P21` | automatic drag and double click inside the composer -> 0 |
 | `B/R P22`–`P25` | the browser stress matrix (§10) |
+| `B/R P27` | a double click whose second release drifts past the drag threshold is still at most one lookup |
+| `B/R P28` | the same drifting double click with both switches on is exactly one lookup, never one per switch |
+| `B/R P29` | a synthetic `pointerType: 'touch'` gesture with both switches on produces no automatic lookup |
 | `B/R P26` | the matrix restored the switches to what the boot loaded |
 | `L06`/`L07` | after a full client reload, one gesture is still exactly one request |
 
@@ -610,6 +684,32 @@ unrelated DSH instance was touched.
    probe installed its word column without `data-chat-flow-kind`, so every
    gesture in it was correctly refused as ineligible, and the failure was only
    diagnosable once the capture was visible.
+7. **A double click that is also a drag is attributed to `auto-selection`.**
+   §4 states the rule and `B/R P27`/`P28` measure it. A zero-movement double
+   click — every one issued by the browser harness and by the real-browser
+   matrix, and the only kind the settings matrix in §6 is about — is attributed
+   to `auto-double-click`. The ambiguity is a property of the platform: the
+   classifier's 5 CSS px drag threshold and the platform's double-click area are
+   different rules, and the brief forbids rebuilding the verified Phase 2
+   classifier to consult a click count this project has not measured.
+8. **Two `dblclick` events are two gestures.** The plugin has no timer and the
+   platform emits one `dblclick` per gesture, so it cannot distinguish a
+   synthesised repeat from a reader double-clicking twice. Duplicate absorption is
+   therefore proven on the identity path that really exists — a `drag` release and
+   the `dblclick` promoting it — not by injecting a second `dblclick`.
+9. **Eight of Phase 4's checks were rebuilt after an adversarial review that
+   executed the real modules.** Three defects were found and fixed in the
+   classifier's identity/verdict pairing and are recorded in §4; five checks were
+   found weak, vacuous or tautological and were replaced:
+   `B/R P12` now asserts the selection snapshot advanced and the gesture counters
+   did not move; `B/R P15`/`P16` now issue their two gestures **under 300 ms
+   apart** with the gap measured and asserted; `B/R P11` now asserts the eligible
+   selection the double click left behind; `P27`–`P29` were added; `L06`/`L07`
+   were retitled to claim only what a page reload can prove; and a tautological
+   array comparison in the harness was replaced with the identities it was
+   supposed to record. The reviewer's own verdict on the rest — the gate, the
+   ledger, the request controller and the I/O boundary — was that they are sound
+   as written.
 
 ## 21. Residual risks
 
@@ -626,23 +726,38 @@ unrelated DSH instance was touched.
 4. **The length ceiling is still measured on the raw selection**, not on the
    folded text (NFKC can expand). Phase 1 behaviour, unchanged.
 5. **Touch and pen are unverified and therefore refused.** Phase 4 claims mouse
-   only. A touch double-tap will not look anything up until a phase measures it.
-6. **The browser "rapid pair" measurement is not a race.** The real dictionary
+   only. The refusal is proven in the shipped bundle by `B/R P29`, which drives a
+   **synthetic** `PointerEvent` with `pointerType: 'touch'` — honestly weaker than
+   a real touch screen, because the event is constructed rather than produced by a
+   device, so it shows the gate is wired and not that a real touch device behaves
+   identically. A touch double-tap will not look anything up until a phase
+   measures it on hardware.
+6. **A double click whose second press drifts past 5 px is attributed to
+   `auto-selection`** (§4, §20.7). It is still exactly one lookup — never two —
+   but the settings matrix's "double click -> `auto-double-click`" holds for a
+   double click that is not also a drag, which is what both harnesses and a
+   reader's own double click produce.
+7. **The browser "rapid pair" measurement is not a race.** The real dictionary
    answers in milliseconds, so `B/R P18` proves the normal rapid path. The
    out-of-order orderings are proven with a deferred transport instead, in
    `tests/client-lookup.spec.ts` and through the real runtime wiring in
    `tests/client-runtime-harness.spec.ts`. A future phase that adds a slow
    dictionary or a network dependency should re-measure the race in a browser.
-7. **The gesture identity is per page load.** It is a monotonic counter, not a
+8. **The gesture identity is per page load.** It is a monotonic counter, not a
    UUID, and it is not persisted. That is sound because the consumption ledger is
    per page load too, but a future phase that persists gesture state across
    reloads must revisit it.
-8. **`getBoundingClientRect()` still runs on every `selectionchange`**, carried
+9. **`getBoundingClientRect()` still runs on every `selectionchange`**, carried
    over from Phase 2. Correct and measured working; still a Phase 7 performance
    question.
-9. **The desktop client remains untested.** Every measurement here is the Web
-   client.
-10. **No remote is configured and nothing was pushed.** No force push, no history
+10. **The desktop client remains untested.** Every measurement here is the Web
+    client.
+11. **The stress storms aim at the sentence probe, not the word column.** Each
+    storm's drags and double clicks land on the Phase 2 paragraph, so the queries
+    are whatever words the sentence puts under the cursor. That is irrelevant to
+    the claim the storms make — a request count paired with a gesture count — but
+    the evidence must not be read as naming fixture words.
+12. **No remote is configured and nothing was pushed.** No force push, no history
     rewrite, and the sealed Phase 1 / Phase 2 / Phase 3 commits were not amended.
 
 ## 22. Phase 5 readiness
@@ -681,19 +796,23 @@ desktop support claim, a touch double-tap claim, a card redesign, a
 | | value |
 | --- | --- |
 | `START_SHA` | `b0d0186a9b5b951909899fcfad39f8f17acf2854` |
-| Phase 4 implementation commit | `9db08b5` — `feat: add automatic lookup trigger gates` |
-| Evidence document | committed immediately after it as `docs: record phase 4 evidence` |
-| `HEAD` | `git log -1 --format=%H` at the tip of `master` prints the resulting commit; a document cannot name its own SHA |
+| Phase 4 implementation | `9db08b5` — `feat: add automatic lookup trigger gates` |
+| Review remediation | `fix: bind each gesture verdict to the identity that produced it` — the classifier fixes in §4 and the rebuilt checks in §20.9 |
+| Evidence document | `docs: record phase 4 evidence`, then `docs: name the phase 4 commits in the evidence`, then the remediation's own evidence update |
+| `HEAD` | `git log -1 --format=%H` at the tip of `master` prints the final commit; a document cannot name its own SHA |
 | Worktree after commit | clean — `git status --porcelain` reports 0 entries |
 | `git diff --check` | no whitespace errors |
+| Build reproducibility | `lib/client.js` rebuilt byte-identically (`sha256 834A1F61…4134`) to the artifact the 159/159 run served |
 
 The implementation is one commit, not several. The gate, the request controller,
-the classifier's identity fields, the settings copy, the 107 new tests, the 19 new
+the classifier's identity fields, the settings copy, the 127 new tests, the 19 new
 bundle assertions, the runtime harness extension and the README are one coherent
 change: splitting them would produce intermediate commits that neither build nor
 pass, because the gate cannot be exercised without the runtime wiring that calls
 it. The phase deliberately did **not** rename `scripts/phase1-verify.mjs` (§20.3),
-which would have been the only genuinely separable change.
+which would have been the only genuinely separable change. The review remediation
+is a second commit because it is a correction to a sealed artifact, and it says
+so.
 
 Git discipline observed:
 

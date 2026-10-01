@@ -159,6 +159,30 @@ export interface GestureState extends GestureSnapshot {
     readonly sequence: number;
     /** The pointer kind that opened the sequence {@link gestureId} names. */
     readonly pointerType: PointerKind;
+    /**
+     * The identity the carried verdict was **produced for**; `0` when the state
+     * carries no offerable classification.
+     *
+     * Distinct from {@link GestureSnapshot.gestureId} on purpose. `gestureId` is
+     * the identity of the sequence that is open (or was last opened); the verdict
+     * in `kind`/`completedAt` belongs to whichever sequence produced it. Pairing
+     * the two by reading `gestureId` would let a press that has not been released
+     * yet be offered with the *previous* gesture's verdict under a brand-new
+     * identity — a lookup for a gesture that never completed, and one that burns an
+     * identity the real release afterwards needs.
+     */
+    readonly classifiedId: number;
+    /**
+     * Whether a `dblclick` arriving now would be the promotion of the release just
+     * folded.
+     *
+     * Set by the release that closes a gesture and cleared by everything else, so a
+     * `dblclick` reuses an identity only when it genuinely continues a pointer
+     * sequence. Without it, two `dblclick` events delivered with no pointer events
+     * at all (an engine, an extension or an automation agent that synthesises them)
+     * would share one identity and collapse into a single lookup.
+     */
+    readonly promotable: boolean;
 }
 /**
  * The state before any gesture.
@@ -177,14 +201,14 @@ export declare function gestureSnapshot(state: GestureState): GestureSnapshot;
 /**
  * Project the classifier state onto the classification a trigger gate consumes.
  *
- * `null` means "this state carries no classification at all", which is what the
- * initial state and a cancelled-before-release state both report. A state that
- * still carries an **earlier** classification reports it again — with the same
- * identity, so a gate that de-duplicates by identity can only ever act on it
- * once. That is deliberate: re-reading is safe, re-acting is not.
+ * `null` means "there is nothing to offer": nothing has been classified yet, or
+ * a press is in flight and has not produced a verdict of its own, or the gesture
+ * was abandoned. A state that still carries an **earlier** verdict offers it
+ * again under that verdict's own identity, so a gate that de-duplicates by
+ * identity can only ever act on it once — re-reading is safe, re-acting is not.
  *
  * @param state - the classifier state.
- * @returns the classification, or `null` when there is none.
+ * @returns the classification, or `null` when there is none to offer.
  */
 export declare function classificationOf(state: GestureState): GestureClassification | null;
 /**
@@ -241,7 +265,9 @@ export declare function movePointer(state: GestureState, point: GesturePoint): G
  * cannot reinterpret it.
  *
  * The identity is carried over unchanged: a release classifies the gesture the
- * press opened, and it is never given an identity of its own.
+ * press opened, and it is never given an identity of its own. It is also
+ * recorded as the identity this verdict was produced for, so nothing downstream
+ * can pair the verdict with a later press's identity.
  *
  * @param state - the current state.
  * @param point - the release position.
@@ -262,13 +288,16 @@ export declare function endPointer(state: GestureState, point: GesturePoint, has
  * as a usable double click.
  *
  * **Identity.** `dblclick` is reported by the platform after the second release,
- * so it belongs to the sequence the second press opened: the state still carries
- * that identity and it is reused rather than replaced. The first press of the
- * pair keeps the identity it was given when it opened, and — since a short
- * release is `other` — never produces a lookup of its own. When no press was
- * observed at all (a synthetic `dblclick`, or an engine that delivers the event
- * without pointer events) a fresh identity is allocated, so the gesture is still
- * individually addressable and still de-duplicated exactly once.
+ * so when it promotes a sequence the state is still carrying — an open press, or
+ * the release that has just been folded — that sequence's identity is reused
+ * rather than replaced. The first press of the pair keeps the identity it was
+ * given when it opened, and — since a short release is `other` — never produces a
+ * lookup of its own.
+ *
+ * When it promotes nothing (an engine, an extension or an automation agent that
+ * delivers `dblclick` without pointer events) a **fresh** identity is allocated,
+ * so two such double clicks stay two gestures and each can produce its own
+ * lookup rather than the second being swallowed as a duplicate of the first.
  *
  * @param state - the current state.
  * @param point - the double click position.
@@ -283,6 +312,10 @@ export declare function registerDoubleClick(state: GestureState, point: GestureP
  * no half-built state behind — no origin, no travel, no open phase — while the
  * last completed classification stays readable, because "what did the reader
  * last do" is still true after an unrelated cancellation.
+ *
+ * What it also drops is the *offer*: an abandoned gesture has no verdict to hand
+ * to a trigger gate, so a stray release arriving afterwards cannot re-offer the
+ * previous gesture's classification.
  *
  * @param state - the current state.
  * @returns the next state.

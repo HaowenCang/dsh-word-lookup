@@ -551,12 +551,21 @@ function createRuntime(ctx: ClientContext): () => void {
 
     const onPointerUp = (event: PointerEvent): void => {
       const selection = captureSelection()
+      const previous = gesture.state
       gesture = observePointerUp(gesture, { x: event.clientX, y: event.clientY, at: Date.now() }, selection.eligible)
-      considerAutomatic(selection)
+      // Only a release that actually closed a gesture offers a classification.
+      // A stray release — no press was tracked, or a `dblclick` already sealed the
+      // gesture — leaves the state untouched, and re-offering the previous verdict
+      // from here would be a lookup for a gesture that never happened. The
+      // reducers return the same state object when they change nothing, which is
+      // the contract this relies on.
+      if (gesture.state !== previous) considerAutomatic(selection)
     }
 
     const onDoubleClick = (event: MouseEvent): void => {
       const selection = captureSelection()
+      // `dblclick` *is* the platform's completed gesture, so this fold always
+      // produces a classification and is always offered.
       gesture = observeDoubleClick(gesture, { x: event.clientX, y: event.clientY, at: Date.now() }, selection.eligible)
       considerAutomatic(selection)
     }

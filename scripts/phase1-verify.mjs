@@ -418,18 +418,22 @@ async function wordBox(page, word) {
  *
  * @param page - the authenticated page.
  * @param word - the fixture word to select.
+ * @param options - `settleAfter: false` returns as soon as the gesture is made, so
+ * a caller can issue a second gesture close enough behind it to defeat any
+ * time-window de-duplicator; `steps` lowers the number of intermediate pointer
+ * moves when that gap has to be as small as possible.
  * @returns the box the gesture was aimed at, or `null` when the probe is absent.
  */
-async function dragSelectWord(page, word) {
+async function dragSelectWord(page, word, options = {}) {
   const box = await wordBox(page, word)
   if (box === null) return null
   await clearSelection(page)
   const y = box.y + box.height / 2
   await page.mouse.move(box.x + 1, y)
   await page.mouse.down()
-  await page.mouse.move(box.x + Math.max(box.width - 1, 8), y, { steps: 6 })
+  await page.mouse.move(box.x + Math.max(box.width - 1, 8), y, { steps: options.steps ?? 6 })
   await page.mouse.up()
-  await settle()
+  if (options.settleAfter !== false) await settle()
   return box
 }
 
@@ -438,14 +442,15 @@ async function dragSelectWord(page, word) {
  *
  * @param page - the authenticated page.
  * @param word - the fixture word to double click.
+ * @param options - `settleAfter: false` returns as soon as the gesture is made.
  * @returns the box the gesture was aimed at, or `null` when the probe is absent.
  */
-async function doubleClickWord(page, word) {
+async function doubleClickWord(page, word, options = {}) {
   const box = await wordBox(page, word)
   if (box === null) return null
   await clearSelection(page)
   await page.mouse.dblclick(box.x + box.width / 2, box.y + box.height / 2)
-  await settle()
+  if (options.settleAfter !== false) await settle()
   return box
 }
 
@@ -1599,6 +1604,11 @@ async function runBrowserChecks(page, state, boot) {
         delta: originDelta(doubleBefore, doubleAfter),
         trigger: doubleAfter.trigger,
         capture: doubleAfter.capture,
+        selection: {
+          present: doubleAfter.selection.present,
+          eligible: doubleAfter.selection.eligible,
+          text: doubleAfter.selection.text,
+        },
         kind: doubleAfter.gestures.last.kind,
         gestureId: doubleAfter.gestures.last.gestureId,
         doubleClicks: doubleAfter.gestures.counters.doubleClickGestures - doubleBefore.gestures.counters.doubleClickGestures,
@@ -1616,6 +1626,7 @@ async function runBrowserChecks(page, state, boot) {
     delta: half.delta,
     trigger: half.trigger === null ? null : { decision: half.trigger.decision, reason: half.trigger.reason, origin: half.trigger.origin, gestureId: half.trigger.gestureId },
     capture: { eligible: half.capture.eligible, text: half.capture.text, rect: half.capture.rect },
+    selection: half.selection ?? null,
     kind: half.kind,
     gestureId: half.gestureId,
   })
@@ -1761,11 +1772,17 @@ async function runBrowserChecks(page, state, boot) {
   )
   record(
     `${prefix}P11`,
-    'S11 — the trailing selectionchange of a double click cannot buy a second lookup through autoSelection',
+    'S11 — a double click leaves an eligible selection behind, and still buys exactly one lookup, through its own path',
     s11.double.requests.length === 1 &&
       s11.double.trigger?.origin === 'auto-double-click' &&
       s11.double.delta['auto-selection'] === 0 &&
-      s11.double.kind === 'double-click',
+      s11.double.kind === 'double-click' &&
+      // The selection the double click produced really exists and really is
+      // eligible, so a `selectionchange`-triggered implementation had everything
+      // it needed to fire a second lookup here and did not.
+      s11.double.selection?.present === true &&
+      s11.double.selection?.eligible === true &&
+      (s11.double.selection?.text ?? '').length > 0,
     JSON.stringify(phase4.s11.double),
   )
 
@@ -1796,11 +1813,13 @@ async function runBrowserChecks(page, state, boot) {
   const selectionStorm = {
     requests: [...state.requests],
     delta: originDelta(stormBefore, stormAfter),
-    trigger: stormAfter.trigger,
     // The two facts that make the zero meaningful rather than vacuous: the
     // `selectionchange` listener really ran for these selections (the snapshot
     // advanced and holds an eligible text), and no pointer gesture took place, so
-    // nothing but the selection events could have produced a request.
+    // nothing but the selection events could have produced a request. The last
+    // *gate* decision is deliberately not recorded here — `selectionchange` never
+    // evaluates the gate, so any value kept there would describe the previous
+    // gesture and would read as if it described the storm.
     selection: { present: stormAfter.selection.present, eligible: stormAfter.selection.eligible, text: stormAfter.selection.text },
     gestures: {
       drags: stormAfter.gestures.counters.drags - stormBefore.gestures.counters.drags,
@@ -1891,31 +1910,46 @@ async function runBrowserChecks(page, state, boot) {
   )
 
   // --- one gesture, one lookup — and two gestures, two lookups ---------------
-  // The de-duplication regression the brief calls out. If identity were derived
-  // from the text, from the rectangle or from a time window, the second gesture
-  // would be swallowed and the count would be one.
+  // The de-duplication regression the brief calls out. The two gestures are issued
+  // **back to back**, with only a single `gestures().last.gestureId` read between
+  // them, and the gap is measured and asserted to be under 300 ms: a
+  // "same text within a time window" implementation therefore fails this check,
+  // which it would not if the harness waited between the two gestures.
+  const sameWordGap = async (first, second) => {
+    const startedAt = Date.now()
+    await first()
+    const firstId = await page.evaluate(() => window.__DSH_WORD_LOOKUP__.gestures().last.gestureId)
+    await second()
+    const gapMs = Date.now() - startedAt
+    const requests = await waitForQuiescence()
+    return { firstId, secondId: (await readPluginView(page)).gestures.last.gestureId, gapMs, requests }
+  }
+
   await ensureSwitches(page, QUADRANTS.S01)
   state.requests.length = 0
   state.responses.length = 0
-  const sameWordBefore = await readPluginView(page)
-  await doubleClickWord(page, 'derive')
-  const firstId = (await readPluginView(page)).gestures.last.gestureId
-  await doubleClickWord(page, 'derive')
-  const sameWordAfter = await readPluginView(page)
+  const repeatDoubleBefore = await readPluginView(page)
+  const repeatDoubleRaw = await sameWordGap(
+    () => doubleClickWord(page, 'derive', { settleAfter: false }),
+    () => doubleClickWord(page, 'derive', { settleAfter: false }),
+  )
+  const repeatDoubleAfter = await readPluginView(page)
   const repeatDouble = {
-    requests: requestQueries([...state.requests]),
-    delta: originDelta(sameWordBefore, sameWordAfter),
-    firstId,
-    secondId: sameWordAfter.gestures.last.gestureId,
+    requests: requestQueries(repeatDoubleRaw.requests),
+    delta: originDelta(repeatDoubleBefore, repeatDoubleAfter),
+    firstId: repeatDoubleRaw.firstId,
+    secondId: repeatDoubleRaw.secondId,
+    gapMs: repeatDoubleRaw.gapMs,
   }
   phase4.repeatDouble = repeatDouble
   record(
     `${prefix}P15`,
-    'two independent double clicks on the same word are two gestures and two lookups, never one (T06 regression)',
+    'two double clicks on the same word inside 300 ms are two gestures and two lookups, never one',
     repeatDouble.requests.length === 2 &&
       repeatDouble.requests.every((query) => query === 'derive') &&
       repeatDouble.delta['auto-double-click'] === 2 &&
-      repeatDouble.firstId !== repeatDouble.secondId,
+      repeatDouble.firstId !== repeatDouble.secondId &&
+      repeatDouble.gapMs < 300,
     JSON.stringify(repeatDouble),
   )
 
@@ -1923,24 +1957,27 @@ async function runBrowserChecks(page, state, boot) {
   state.requests.length = 0
   state.responses.length = 0
   const repeatDragBefore = await readPluginView(page)
-  await dragSelectWord(page, 'derive')
-  const firstDragId = (await readPluginView(page)).gestures.last.gestureId
-  await dragSelectWord(page, 'derive')
+  const repeatDragRaw = await sameWordGap(
+    () => dragSelectWord(page, 'derive', { settleAfter: false, steps: 2 }),
+    () => dragSelectWord(page, 'derive', { settleAfter: false, steps: 2 }),
+  )
   const repeatDragAfter = await readPluginView(page)
   const repeatDrag = {
-    requests: requestQueries([...state.requests]),
+    requests: requestQueries(repeatDragRaw.requests),
     delta: originDelta(repeatDragBefore, repeatDragAfter),
-    firstId: firstDragId,
-    secondId: repeatDragAfter.gestures.last.gestureId,
+    firstId: repeatDragRaw.firstId,
+    secondId: repeatDragRaw.secondId,
+    gapMs: repeatDragRaw.gapMs,
   }
   phase4.repeatDrag = repeatDrag
   record(
     `${prefix}P16`,
-    'two independent drag selections of the same word are two gestures and two lookups, never one',
+    'two drag selections of the same word inside 300 ms are two gestures and two lookups, never one',
     repeatDrag.requests.length === 2 &&
       repeatDrag.requests.every((query) => query === 'derive') &&
       repeatDrag.delta['auto-selection'] === 2 &&
-      repeatDrag.firstId !== repeatDrag.secondId,
+      repeatDrag.firstId !== repeatDrag.secondId &&
+      repeatDrag.gapMs < 300,
     JSON.stringify(repeatDrag),
   )
 
@@ -2166,6 +2203,145 @@ async function runBrowserChecks(page, state, boot) {
     JSON.stringify(stress01),
   )
 
+  // --- a double click that also travels, and a pointer kind nobody measured ---
+  // Two platform facts this phase must not *assume*. `dblclick` is the browser's
+  // own recognition and the plugin consumes it, but the classifier's drag
+  // threshold (5 CSS px) and the platform's double-click area are different rules:
+  // a second press that drifts past 5 px while selecting a word can be BOTH a drag
+  // and the second half of a double click. The plugin's rule is that a press-release
+  // pair which travels far enough over an eligible selection is a drag, and the
+  // `dblclick` that follows promotes that same identity and is therefore refused as
+  // a duplicate — one platform gesture, one lookup, on the drag's path. This
+  // measures that, rather than asserting which one wins.
+  const driftDouble = async (word) => {
+    const box = await wordBox(page, word)
+    if (box === null) return null
+    const cx = box.x + box.width / 2
+    const cy = box.y + box.height / 2
+    await clearSelection(page)
+    await page.mouse.move(cx, cy)
+    await page.mouse.down()
+    await page.mouse.up()
+    await clearSelection(page)
+    await page.mouse.move(cx, cy)
+    await page.mouse.down()
+    await page.mouse.move(cx + 8, cy, { steps: 3 })
+    await page.mouse.up()
+    await settle()
+    return box
+  }
+
+  await ensureSwitches(page, QUADRANTS.S10)
+  state.requests.length = 0
+  state.responses.length = 0
+  const driftBefore = await readPluginView(page)
+  await driftDouble('derive')
+  const driftRequests = await waitForQuiescence()
+  const driftAfter = await readPluginView(page)
+  const drift = {
+    gapRequests: driftRequests.length,
+    delta: originDelta(driftBefore, driftAfter),
+    kind: driftAfter.gestures.last.kind,
+    doubleClicks: driftAfter.gestures.counters.doubleClickGestures - driftBefore.gestures.counters.doubleClickGestures,
+    drags: driftAfter.gestures.counters.drags - driftBefore.gestures.counters.drags,
+    trigger: driftAfter.trigger,
+  }
+  phase4.driftDouble = drift
+  record(
+    `${prefix}P27`,
+    'S10 — a double click whose second release drifts past the drag threshold is still at most one lookup',
+    drift.gapRequests <= 1 &&
+      drift.drags + drift.doubleClicks >= 1 &&
+      Object.values(drift.delta).reduce((total, value) => total + value, 0) <= 1,
+    JSON.stringify(drift),
+  )
+
+  await ensureSwitches(page, QUADRANTS.S11)
+  state.requests.length = 0
+  state.responses.length = 0
+  const driftBothBefore = await readPluginView(page)
+  await driftDouble('derive')
+  const driftBothRequests = await waitForQuiescence()
+  const driftBothAfter = await readPluginView(page)
+  const driftBoth = {
+    requests: driftBothRequests.length,
+    delta: originDelta(driftBothBefore, driftBothAfter),
+    kind: driftBothAfter.gestures.last.kind,
+    reason: driftBothAfter.trigger?.reason ?? null,
+    gestureId: driftBothAfter.trigger?.gestureId ?? null,
+  }
+  phase4.driftBoth = driftBoth
+  record(
+    `${prefix}P28`,
+    'S11 — the same drifting double click produces exactly one lookup, never one per switch',
+    driftBoth.requests === 1 &&
+      driftBoth.delta['auto-selection'] + driftBoth.delta['auto-double-click'] === 1 &&
+      driftBoth.delta.shortcut === 0,
+    JSON.stringify(driftBoth),
+  )
+
+  // --- an unverified pointer kind produces no automatic I/O ------------------
+  // The pointer kind is the one gate input no real input device in this harness
+  // can produce, so it is driven with a **synthetic** `PointerEvent` carrying
+  // `pointerType: 'touch'`. That is honestly weaker than a real touch screen, and
+  // is reported as such: it proves the refusal is wired into the shipped bundle,
+  // not that a real touch device behaves the same way. No touch support is
+  // claimed.
+  await ensureSwitches(page, QUADRANTS.S11)
+  const touchBox = await wordBox(page, 'derive')
+  state.requests.length = 0
+  state.responses.length = 0
+  const touchBefore = await readPluginView(page)
+  if (touchBox !== null) {
+    await page.evaluate(
+      ({ x, y }) => {
+        const host = document.querySelector('[data-phase1-word="derive"]')
+        const range = document.createRange()
+        range.selectNodeContents(host)
+        const selection = document.getSelection()
+        selection.removeAllRanges()
+        selection.addRange(range)
+        const base = {
+          bubbles: true,
+          cancelable: true,
+          composed: true,
+          pointerId: 4242,
+          pointerType: 'touch',
+          isPrimary: true,
+          button: 0,
+          buttons: 1,
+          clientX: x,
+          clientY: y,
+        }
+        document.dispatchEvent(new PointerEvent('pointerdown', base))
+        document.dispatchEvent(new PointerEvent('pointermove', { ...base, clientX: x + 30 }))
+        document.dispatchEvent(new PointerEvent('pointerup', { ...base, buttons: 0, clientX: x + 30 }))
+      },
+      { x: touchBox.x + 2, y: touchBox.y + touchBox.height / 2 },
+    )
+  }
+  await settle()
+  const touchAfter = await readPluginView(page)
+  const touchGesture = {
+    requests: [...state.requests].length,
+    delta: originDelta(touchBefore, touchAfter),
+    kind: touchAfter.gestures.last.kind,
+    pointerTypeGate: touchAfter.trigger,
+    box: touchBox,
+  }
+  phase4.touchGesture = touchGesture
+  record(
+    `${prefix}P29`,
+    'an unverified pointer kind produces no automatic lookup even with both switches on (mouse only)',
+    touchBox !== null &&
+      touchGesture.requests === 0 &&
+      touchGesture.kind === 'drag' &&
+      touchGesture.pointerTypeGate?.decision === 'ignored' &&
+      touchGesture.pointerTypeGate?.reason === 'unverified-pointer-kind' &&
+      noAutomaticOrigin(touchGesture.delta),
+    JSON.stringify(touchGesture),
+  )
+
   // The matrix changed the switches on purpose. They are put back to what this
   // boot loaded, so a later check cannot be satisfied by a write this harness
   // made here rather than by the one it is measuring.
@@ -2179,6 +2355,8 @@ async function runBrowserChecks(page, state, boot) {
       restoredGates.autoDoubleClick === bootGates.autoDoubleClick,
     `boot=${JSON.stringify(bootGates)} restored=${JSON.stringify(restoredGates)}`,
   )
+  phase4.bootGates = bootGates
+  phase4.restoredGates = restoredGates
   facts.phase4 = phase4
 
   // --- settings mirror ------------------------------------------------------
@@ -2366,12 +2544,17 @@ async function main() {
       JSON.stringify(reloaded),
     )
 
-    // --- Phase 4: a reloaded runtime must not have stacked its listeners -----
-    // L01 proves the overlay and the command were registered once. Automatic
-    // lookups add five more listeners, and a reload that left a previous set
-    // behind would make one gesture issue two or three requests — the exact
-    // regression this measures. Both switches are `true` at this point, written
-    // by S01/S04 above, so the automatic paths are live.
+    // --- Phase 4: the automatic path after a client reload -------------------
+    // L01 proves the overlay and the command were registered once. These two
+    // prove the automatic path is still wired, and still exactly one lookup per
+    // gesture, in a freshly loaded page with both switches on.
+    //
+    // They are deliberately **not** offered as evidence about listener disposal:
+    // `page.reload()` destroys the document, so no listener could survive it and
+    // the checks would pass with `removeEventListener` deleted. Disposal is
+    // proven in `tests/client-runtime-harness.spec.ts`, which applies the real
+    // runtime, asserts one listener per event type, disposes it, asserts zero,
+    // and re-applies it to assert one lookup per gesture.
     await installProbeNodes(page)
     await dismissDialogs(page)
     await page.waitForTimeout(400)
@@ -2393,7 +2576,7 @@ async function main() {
     }
     record(
       'L06',
-      'after a full client reload one double click still issues exactly one lookup, so no listener was stacked',
+      'after a full client reload the automatic path still issues exactly one lookup for one double click',
       reloadDoubleRequests.length === 1 &&
         reloadDoubleRequests[0] === 'derive' &&
         reloadDoubleView.trigger?.origin === 'auto-double-click',
@@ -2401,7 +2584,7 @@ async function main() {
     )
     record(
       'L07',
-      'after a full client reload one drag selection still issues exactly one lookup',
+      'after a full client reload the automatic path still issues exactly one lookup for one drag selection',
       reloadDragRequests.length === 1 &&
         reloadDragRequests[0] === 'went' &&
         reloadDragView.trigger?.origin === 'auto-selection',

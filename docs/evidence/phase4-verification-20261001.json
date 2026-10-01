@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-10-01T12:03:08.094Z",
+  "startedAt": "2026-10-01T12:18:47.313Z",
   "environment": {
     "home": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-word-lookup-test\\home",
     "profile": "word-lookup-test",
@@ -23,13 +23,13 @@
       "id": "B01",
       "name": "the plugin appears in the boot manifest as a browser entry",
       "ok": true,
-      "detail": "[{\"id\":\"dsh-word-lookup\",\"url\":\"plugins/??dsh-word-lookup/client.js&rev=0e714c009732\",\"inject\":[\"@deepseek-ai/dsh-client-ui-layout\",\"@deepseek-ai/dsh-client-ui-renderer\",\"@deepseek-ai/dsh-client-shortcuts\",\"@deepseek-ai/dsh-client-ui-settings\",\"@deepseek-ai/dsh-client-locale\"]}]"
+      "detail": "[{\"id\":\"dsh-word-lookup\",\"url\":\"plugins/??dsh-word-lookup/client.js&rev=4d334bd4d211\",\"inject\":[\"@deepseek-ai/dsh-client-ui-layout\",\"@deepseek-ai/dsh-client-ui-renderer\",\"@deepseek-ai/dsh-client-shortcuts\",\"@deepseek-ai/dsh-client-ui-settings\",\"@deepseek-ai/dsh-client-locale\"]}]"
     },
     {
       "id": "B02",
       "name": "the plugin is served inside the concatenated application batch",
       "ok": true,
-      "detail": "plugins/??@deepseek-ai/dsh-client-ui-open-in-app/client.js,@deepseek-ai/dsh-api-gateway/client.js,@deepseek-ai/dsh-api-job-controller/client.js,@deepseek-ai/dsh-api-terminal-controller/client.js,@deepseek-ai/dsh-api-workspace-files/client.js,@deepseek-ai/dsh-client-ui-settings-account/client.js,@deepseek-ai/dsh-client-hmr/client.js,@deepseek-ai/dsh-cordis-client-runner/client.js,@deepseek-ai/dsh-client-ui-theme/client.js,@deepseek-ai/dsh-client-locale/client.js,@deepseek-ai/dsh-client-shortcuts/client.js,@deepseek-ai/dsh-client-ui-shortcuts/client.js,@deepseek-ai/dsh-client-ui-layout/client.js,@deepseek-ai/dsh-client-ui-renderer/client.js,@deepseek-ai/dsh-client-ui-session/client.js,@deepseek-ai/dsh-client-resources/client.js,@deepseek-ai/dsh-client-ui-sidebar/client.js,@deepseek-ai/dsh-client-ui-sidebar-right/client.js,@deepseek-ai/dsh-client-ui-sidebar-documentpreview/client.js,@deepseek-ai/dsh-client-ui-sidebar-terminal/client.js,@deepseek-ai/dsh-client-ui-sidebar-files/client.js,@deepseek-ai/dsh-client-ui-settings/client.js,@deepseek-ai/dsh-client-ui-settings-general/client.js,@deepseek-ai/dsh-client-ui-settings-models/client.js,@deepseek-ai/dsh-client-ui-plugin-manager/client.js,@deepseek-ai/dsh-client-ui-settings-plugin-inventory/client.js,@deepseek-ai/dsh-client-ui-conversation/client.js,@deepseek-ai/dsh-client-ui-approval/client.js,@deepseek-ai/dsh-client-ui-chat/client.js,@deepseek-ai/dsh-client-ui-brand-official/client.js,@deepseek-ai/dsh-client-ui-attachment/client.js,@deepseek-ai/dsh-client-ui-tool/client.js,@deepseek-ai/dsh-client-ui-cordis/client.js,@deepseek-ai/dsh-client-ui-workspace/client.js,@deepseek-ai/dsh-client-ui-workflow-run/client.js,@deepseek-ai/dsh-client-ui-input-trigger/client.js,@deepseek-ai/dsh-client-ui-commands/client.js,@deepseek-ai/dsh-client-ui-skill/client.js,@deepseek-ai/dsh-client-ui-subagent/client.js,@deepseek-ai/dsh-client-ui-reference/client.js,@deepseek-ai/dsh-client-ui-jobs/client.js,@deepseek-ai/dsh-client-ui-goal/client.js,@deepseek-ai/dsh-client-ui-message-feedback/client.js,@deepseek-ai/dsh-client-ui-model-selection/client.js,@deepseek-ai/dsh-client-ui-permission-presets/client.js,@deepseek-ai/dsh-client-ui-agent-preset/client.js,@deepseek-ai/dsh-client-ui-settings-session-log/client.js,@deepseek-ai/dsh-client-ui-settings-plugins/client.js,@deepseek-ai/dsh-client-ui-settings-shell/client.js,@deepseek-ai/dsh-client-ui-settings-agent-loop/client.js,@deepseek-ai/dsh-client-ui-settings-subagent/client.js,@deepseek-ai/dsh-client-ui-settings-web-search/client.js,@deepseek-ai/dsh-client-ui-plan/client.js,@deepseek-ai/dsh-client-ui-user-questions/client.js,@deepseek-ai/dsh-client-ui-trajectory/client.js,dsh-word-lookup/client.js,@deepseek-ai/dsh-session-log-export/client.js,@deepseek-ai/dsh-client-file-upload/client.js&rev=d8251020b2f3"
+      "detail": "plugins/??@deepseek-ai/dsh-client-ui-open-in-app/client.js,@deepseek-ai/dsh-api-gateway/client.js,@deepseek-ai/dsh-api-job-controller/client.js,@deepseek-ai/dsh-api-terminal-controller/client.js,@deepseek-ai/dsh-api-workspace-files/client.js,@deepseek-ai/dsh-client-ui-settings-account/client.js,@deepseek-ai/dsh-client-hmr/client.js,@deepseek-ai/dsh-cordis-client-runner/client.js,@deepseek-ai/dsh-client-ui-theme/client.js,@deepseek-ai/dsh-client-locale/client.js,@deepseek-ai/dsh-client-shortcuts/client.js,@deepseek-ai/dsh-client-ui-shortcuts/client.js,@deepseek-ai/dsh-client-ui-layout/client.js,@deepseek-ai/dsh-client-ui-renderer/client.js,@deepseek-ai/dsh-client-ui-session/client.js,@deepseek-ai/dsh-client-resources/client.js,@deepseek-ai/dsh-client-ui-sidebar/client.js,@deepseek-ai/dsh-client-ui-sidebar-right/client.js,@deepseek-ai/dsh-client-ui-sidebar-documentpreview/client.js,@deepseek-ai/dsh-client-ui-sidebar-terminal/client.js,@deepseek-ai/dsh-client-ui-sidebar-files/client.js,@deepseek-ai/dsh-client-ui-settings/client.js,@deepseek-ai/dsh-client-ui-settings-general/client.js,@deepseek-ai/dsh-client-ui-settings-models/client.js,@deepseek-ai/dsh-client-ui-plugin-manager/client.js,@deepseek-ai/dsh-client-ui-settings-plugin-inventory/client.js,@deepseek-ai/dsh-client-ui-conversation/client.js,@deepseek-ai/dsh-client-ui-approval/client.js,@deepseek-ai/dsh-client-ui-chat/client.js,@deepseek-ai/dsh-client-ui-brand-official/client.js,@deepseek-ai/dsh-client-ui-attachment/client.js,@deepseek-ai/dsh-client-ui-tool/client.js,@deepseek-ai/dsh-client-ui-cordis/client.js,@deepseek-ai/dsh-client-ui-workspace/client.js,@deepseek-ai/dsh-client-ui-workflow-run/client.js,@deepseek-ai/dsh-client-ui-input-trigger/client.js,@deepseek-ai/dsh-client-ui-commands/client.js,@deepseek-ai/dsh-client-ui-skill/client.js,@deepseek-ai/dsh-client-ui-subagent/client.js,@deepseek-ai/dsh-client-ui-reference/client.js,@deepseek-ai/dsh-client-ui-jobs/client.js,@deepseek-ai/dsh-client-ui-goal/client.js,@deepseek-ai/dsh-client-ui-message-feedback/client.js,@deepseek-ai/dsh-client-ui-model-selection/client.js,@deepseek-ai/dsh-client-ui-permission-presets/client.js,@deepseek-ai/dsh-client-ui-agent-preset/client.js,@deepseek-ai/dsh-client-ui-settings-session-log/client.js,@deepseek-ai/dsh-client-ui-settings-plugins/client.js,@deepseek-ai/dsh-client-ui-settings-shell/client.js,@deepseek-ai/dsh-client-ui-settings-agent-loop/client.js,@deepseek-ai/dsh-client-ui-settings-subagent/client.js,@deepseek-ai/dsh-client-ui-settings-web-search/client.js,@deepseek-ai/dsh-client-ui-plan/client.js,@deepseek-ai/dsh-client-ui-user-questions/client.js,@deepseek-ai/dsh-client-ui-trajectory/client.js,dsh-word-lookup/client.js,@deepseek-ai/dsh-session-log-export/client.js,@deepseek-ai/dsh-client-file-upload/client.js&rev=9b9ab06a0f1f"
     },
     {
       "id": "B03",
@@ -71,7 +71,7 @@
       "id": "BA0",
       "name": "a command declaring no modals is blocked and consumed while a dialog is open",
       "ok": true,
-      "detail": "open=[\"Add an API key to get started\"] requests=0 counters={\"resolveCalls\":0,\"passReturns\":0,\"handledReturns\":0,\"runCalls\":0,\"lastOutcome\":null,\"lastContext\":null}"
+      "detail": "open=[\"Preview Notice\"] requests=0 counters={\"resolveCalls\":0,\"passReturns\":0,\"handledReturns\":0,\"runCalls\":0,\"lastOutcome\":null,\"lastContext\":null}"
     },
     {
       "id": "BA1",
@@ -89,13 +89,13 @@
       "id": "B08",
       "name": "a selection outside a conversation flow item does not qualify",
       "ok": true,
-      "detail": "snapshot={\"present\":true,\"eligible\":false,\"text\":\"\",\"at\":1790856196044,\"rect\":null,\"gesture\":{\"kind\":\"none\",\"completedAt\":null,\"pointer\":null,\"gestureId\":0}} requests=0"
+      "detail": "snapshot={\"present\":true,\"eligible\":false,\"text\":\"\",\"at\":1790857136129,\"rect\":null,\"gesture\":{\"kind\":\"none\",\"completedAt\":null,\"pointer\":null,\"gestureId\":0}} requests=0"
     },
     {
       "id": "B09",
       "name": "a selection inside the composer does not qualify (T08)",
       "ok": true,
-      "detail": "snapshot={\"present\":true,\"eligible\":false,\"text\":\"\",\"at\":1790856196653,\"rect\":null,\"gesture\":{\"kind\":\"none\",\"completedAt\":null,\"pointer\":null,\"gestureId\":0}} requests=0"
+      "detail": "snapshot={\"present\":true,\"eligible\":false,\"text\":\"\",\"at\":1790857136745,\"rect\":null,\"gesture\":{\"kind\":\"none\",\"completedAt\":null,\"pointer\":null,\"gestureId\":0}} requests=0"
     },
     {
       "id": "B10",
@@ -161,7 +161,7 @@
       "id": "B19",
       "name": "with both switches off, double click and drag selection produce zero lookups (T01/T02/T22)",
       "ok": true,
-      "detail": "requests=0 snapshot={\"present\":true,\"eligible\":true,\"text\":\"he serializer must derive the wire form from the boundary conditions.\",\"at\":1790856198777,\"rect\":{\"x\":45.328125,\"y\":175,\"width\":427.515625,\"height\":19},\"gesture\":{\"kind\":\"drag\",\"completedAt\":1790856198779,\"pointer\":{\"startX\":44,\"startY\":185.1953125,\"endX\":472,\"endY\":185.1953125,\"distance\":428},\"gestureId\":3}}"
+      "detail": "requests=0 snapshot={\"present\":true,\"eligible\":true,\"text\":\"he serializer must derive the wire form from the boundary conditions.\",\"at\":1790857138873,\"rect\":{\"x\":45.328125,\"y\":175,\"width\":427.515625,\"height\":19},\"gesture\":{\"kind\":\"drag\",\"completedAt\":1790857138874,\"pointer\":{\"startX\":44,\"startY\":185.1953125,\"endX\":472,\"endY\":185.1953125,\"distance\":428},\"gestureId\":3}}"
     },
     {
       "id": "B23",
@@ -263,13 +263,13 @@
       "id": "BP01",
       "name": "S00 — with both switches off a real drag selection issues no lookup, and the gate says why (T01/T22)",
       "ok": true,
-      "detail": "{\"requests\":0,\"queries\":[],\"status\":null,\"responseQuery\":null,\"headword\":null,\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":0},\"trigger\":{\"decision\":\"ignored\",\"reason\":\"switch-off\",\"origin\":null,\"gestureId\":307},\"capture\":{\"eligible\":true,\"text\":\"derive\",\"rect\":{\"x\":1142,\"y\":161,\"width\":37.859375,\"height\":19}},\"kind\":\"drag\",\"gestureId\":307}"
+      "detail": "{\"requests\":0,\"queries\":[],\"status\":null,\"responseQuery\":null,\"headword\":null,\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":0},\"trigger\":{\"decision\":\"ignored\",\"reason\":\"switch-off\",\"origin\":null,\"gestureId\":307},\"capture\":{\"eligible\":true,\"text\":\"derive\",\"rect\":{\"x\":1142,\"y\":161,\"width\":37.859375,\"height\":19}},\"selection\":null,\"kind\":\"drag\",\"gestureId\":307}"
     },
     {
       "id": "BP02",
       "name": "S00 — with both switches off a real double click issues no lookup, and the gate says why (T02)",
       "ok": true,
-      "detail": "{\"requests\":0,\"queries\":[],\"status\":null,\"responseQuery\":null,\"headword\":null,\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":0},\"trigger\":{\"decision\":\"ignored\",\"reason\":\"switch-off\",\"origin\":null,\"gestureId\":309},\"capture\":{\"eligible\":true,\"text\":\"derive\",\"rect\":{\"x\":1142,\"y\":161,\"width\":37.859375,\"height\":19}},\"kind\":\"double-click\",\"gestureId\":309}"
+      "detail": "{\"requests\":0,\"queries\":[],\"status\":null,\"responseQuery\":null,\"headword\":null,\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":0},\"trigger\":{\"decision\":\"ignored\",\"reason\":\"switch-off\",\"origin\":null,\"gestureId\":309},\"capture\":{\"eligible\":true,\"text\":\"derive\",\"rect\":{\"x\":1142,\"y\":161,\"width\":37.859375,\"height\":19}},\"selection\":{\"present\":true,\"eligible\":true,\"text\":\"derive\"},\"kind\":\"double-click\",\"gestureId\":309}"
     },
     {
       "id": "BP03",
@@ -281,13 +281,13 @@
       "id": "BP04",
       "name": "S10 — autoSelection on: a real drag selection issues exactly one lookup, from the auto-selection path (T05)",
       "ok": true,
-      "detail": "{\"requests\":1,\"queries\":[\"derive\"],\"status\":200,\"responseQuery\":\"derive\",\"headword\":\"derive\",\"delta\":{\"shortcut\":0,\"auto-selection\":1,\"auto-double-click\":0},\"trigger\":{\"decision\":\"lookup\",\"reason\":\"accepted\",\"origin\":\"auto-selection\",\"gestureId\":310},\"capture\":{\"eligible\":true,\"text\":\"derive\",\"rect\":{\"x\":1142,\"y\":161,\"width\":37.859375,\"height\":19}},\"kind\":\"drag\",\"gestureId\":310}"
+      "detail": "{\"requests\":1,\"queries\":[\"derive\"],\"status\":200,\"responseQuery\":\"derive\",\"headword\":\"derive\",\"delta\":{\"shortcut\":0,\"auto-selection\":1,\"auto-double-click\":0},\"trigger\":{\"decision\":\"lookup\",\"reason\":\"accepted\",\"origin\":\"auto-selection\",\"gestureId\":310},\"capture\":{\"eligible\":true,\"text\":\"derive\",\"rect\":{\"x\":1142,\"y\":161,\"width\":37.859375,\"height\":19}},\"selection\":null,\"kind\":\"drag\",\"gestureId\":310}"
     },
     {
       "id": "BP05",
       "name": "S10 — autoSelection on: a real double click still issues nothing, because it is not that switch’s gesture",
       "ok": true,
-      "detail": "{\"requests\":0,\"queries\":[],\"status\":null,\"responseQuery\":null,\"headword\":null,\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":0},\"trigger\":{\"decision\":\"ignored\",\"reason\":\"switch-off\",\"origin\":null,\"gestureId\":312},\"capture\":{\"eligible\":true,\"text\":\"derive\",\"rect\":{\"x\":1142,\"y\":161,\"width\":37.859375,\"height\":19}},\"kind\":\"double-click\",\"gestureId\":312}"
+      "detail": "{\"requests\":0,\"queries\":[],\"status\":null,\"responseQuery\":null,\"headword\":null,\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":0},\"trigger\":{\"decision\":\"ignored\",\"reason\":\"switch-off\",\"origin\":null,\"gestureId\":312},\"capture\":{\"eligible\":true,\"text\":\"derive\",\"rect\":{\"x\":1142,\"y\":161,\"width\":37.859375,\"height\":19}},\"selection\":{\"present\":true,\"eligible\":true,\"text\":\"derive\"},\"kind\":\"double-click\",\"gestureId\":312}"
     },
     {
       "id": "BP06",
@@ -299,13 +299,13 @@
       "id": "BP07",
       "name": "S01 — autoDoubleClick on: a real drag selection issues nothing, because it is not that switch’s gesture",
       "ok": true,
-      "detail": "{\"requests\":0,\"queries\":[],\"status\":null,\"responseQuery\":null,\"headword\":null,\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":0},\"trigger\":{\"decision\":\"ignored\",\"reason\":\"switch-off\",\"origin\":null,\"gestureId\":313},\"capture\":{\"eligible\":true,\"text\":\"derive\",\"rect\":{\"x\":1142,\"y\":161,\"width\":37.859375,\"height\":19}},\"kind\":\"drag\",\"gestureId\":313}"
+      "detail": "{\"requests\":0,\"queries\":[],\"status\":null,\"responseQuery\":null,\"headword\":null,\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":0},\"trigger\":{\"decision\":\"ignored\",\"reason\":\"switch-off\",\"origin\":null,\"gestureId\":313},\"capture\":{\"eligible\":true,\"text\":\"derive\",\"rect\":{\"x\":1142,\"y\":161,\"width\":37.859375,\"height\":19}},\"selection\":null,\"kind\":\"drag\",\"gestureId\":313}"
     },
     {
       "id": "BP08",
       "name": "S01 — autoDoubleClick on: a real double click issues exactly one lookup, from the auto-double-click path (T04)",
       "ok": true,
-      "detail": "{\"requests\":1,\"queries\":[\"derive\"],\"status\":200,\"responseQuery\":\"derive\",\"headword\":\"derive\",\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":1},\"trigger\":{\"decision\":\"lookup\",\"reason\":\"accepted\",\"origin\":\"auto-double-click\",\"gestureId\":315},\"capture\":{\"eligible\":true,\"text\":\"derive\",\"rect\":{\"x\":1142,\"y\":161,\"width\":37.859375,\"height\":19}},\"kind\":\"double-click\",\"gestureId\":315}"
+      "detail": "{\"requests\":1,\"queries\":[\"derive\"],\"status\":200,\"responseQuery\":\"derive\",\"headword\":\"derive\",\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":1},\"trigger\":{\"decision\":\"lookup\",\"reason\":\"accepted\",\"origin\":\"auto-double-click\",\"gestureId\":315},\"capture\":{\"eligible\":true,\"text\":\"derive\",\"rect\":{\"x\":1142,\"y\":161,\"width\":37.859375,\"height\":19}},\"selection\":{\"present\":true,\"eligible\":true,\"text\":\"derive\"},\"kind\":\"double-click\",\"gestureId\":315}"
     },
     {
       "id": "BP09",
@@ -317,19 +317,19 @@
       "id": "BP10",
       "name": "S11 — both switches on: one drag is exactly one lookup and one double click is exactly one lookup, on their own paths (T06)",
       "ok": true,
-      "detail": "{\"drag\":{\"requests\":1,\"queries\":[\"derive\"],\"status\":200,\"responseQuery\":\"derive\",\"headword\":\"derive\",\"delta\":{\"shortcut\":0,\"auto-selection\":1,\"auto-double-click\":0},\"trigger\":{\"decision\":\"lookup\",\"reason\":\"accepted\",\"origin\":\"auto-selection\",\"gestureId\":316},\"capture\":{\"eligible\":true,\"text\":\"derive\",\"rect\":{\"x\":1142,\"y\":161,\"width\":37.859375,\"height\":19}},\"kind\":\"drag\",\"gestureId\":316},\"double\":{\"requests\":1,\"queries\":[\"derive\"],\"status\":200,\"responseQuery\":\"derive\",\"headword\":\"derive\",\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":1},\"trigger\":{\"decision\":\"lookup\",\"reason\":\"accepted\",\"origin\":\"auto-double-click\",\"gestureId\":318},\"capture\":{\"eligible\":true,\"text\":\"derive\",\"rect\":{\"x\":1142,\"y\":161,\"width\":37.859375,\"height\":19}},\"kind\":\"double-click\",\"gestureId\":318}}"
+      "detail": "{\"drag\":{\"requests\":1,\"queries\":[\"derive\"],\"status\":200,\"responseQuery\":\"derive\",\"headword\":\"derive\",\"delta\":{\"shortcut\":0,\"auto-selection\":1,\"auto-double-click\":0},\"trigger\":{\"decision\":\"lookup\",\"reason\":\"accepted\",\"origin\":\"auto-selection\",\"gestureId\":316},\"capture\":{\"eligible\":true,\"text\":\"derive\",\"rect\":{\"x\":1142,\"y\":161,\"width\":37.859375,\"height\":19}},\"selection\":null,\"kind\":\"drag\",\"gestureId\":316},\"double\":{\"requests\":1,\"queries\":[\"derive\"],\"status\":200,\"responseQuery\":\"derive\",\"headword\":\"derive\",\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":1},\"trigger\":{\"decision\":\"lookup\",\"reason\":\"accepted\",\"origin\":\"auto-double-click\",\"gestureId\":318},\"capture\":{\"eligible\":true,\"text\":\"derive\",\"rect\":{\"x\":1142,\"y\":161,\"width\":37.859375,\"height\":19}},\"selection\":{\"present\":true,\"eligible\":true,\"text\":\"derive\"},\"kind\":\"double-click\",\"gestureId\":318}}"
     },
     {
       "id": "BP11",
-      "name": "S11 — the trailing selectionchange of a double click cannot buy a second lookup through autoSelection",
+      "name": "S11 — a double click leaves an eligible selection behind, and still buys exactly one lookup, through its own path",
       "ok": true,
-      "detail": "{\"requests\":1,\"queries\":[\"derive\"],\"status\":200,\"responseQuery\":\"derive\",\"headword\":\"derive\",\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":1},\"trigger\":{\"decision\":\"lookup\",\"reason\":\"accepted\",\"origin\":\"auto-double-click\",\"gestureId\":318},\"capture\":{\"eligible\":true,\"text\":\"derive\",\"rect\":{\"x\":1142,\"y\":161,\"width\":37.859375,\"height\":19}},\"kind\":\"double-click\",\"gestureId\":318}"
+      "detail": "{\"requests\":1,\"queries\":[\"derive\"],\"status\":200,\"responseQuery\":\"derive\",\"headword\":\"derive\",\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":1},\"trigger\":{\"decision\":\"lookup\",\"reason\":\"accepted\",\"origin\":\"auto-double-click\",\"gestureId\":318},\"capture\":{\"eligible\":true,\"text\":\"derive\",\"rect\":{\"x\":1142,\"y\":161,\"width\":37.859375,\"height\":19}},\"selection\":{\"present\":true,\"eligible\":true,\"text\":\"derive\"},\"kind\":\"double-click\",\"gestureId\":318}"
     },
     {
       "id": "BP12",
       "name": "S10 — fifty programmatic selection changes are observed, and issue zero lookups, so selectionchange is not a trigger (§36)",
       "ok": true,
-      "detail": "{\"requests\":[],\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":0},\"trigger\":{\"decision\":\"lookup\",\"reason\":\"accepted\",\"origin\":\"auto-double-click\",\"gestureId\":318,\"query\":\"derive\"},\"selection\":{\"present\":true,\"eligible\":true,\"text\":\"he ser\"},\"gestures\":{\"drags\":0,\"doubleClicks\":0}}"
+      "detail": "{\"requests\":[],\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":0},\"selection\":{\"present\":true,\"eligible\":true,\"text\":\"he ser\"},\"gestures\":{\"drags\":0,\"doubleClicks\":0}}"
     },
     {
       "id": "BP13",
@@ -345,15 +345,15 @@
     },
     {
       "id": "BP15",
-      "name": "two independent double clicks on the same word are two gestures and two lookups, never one (T06 regression)",
+      "name": "two double clicks on the same word inside 300 ms are two gestures and two lookups, never one",
       "ok": true,
-      "detail": "{\"requests\":[\"derive\",\"derive\"],\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":2},\"firstId\":329,\"secondId\":331}"
+      "detail": "{\"requests\":[\"derive\",\"derive\"],\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":2},\"firstId\":329,\"secondId\":331,\"gapMs\":8}"
     },
     {
       "id": "BP16",
-      "name": "two independent drag selections of the same word are two gestures and two lookups, never one",
+      "name": "two drag selections of the same word inside 300 ms are two gestures and two lookups, never one",
       "ok": true,
-      "detail": "{\"requests\":[\"derive\",\"derive\"],\"delta\":{\"shortcut\":0,\"auto-selection\":2,\"auto-double-click\":0},\"firstId\":332,\"secondId\":333}"
+      "detail": "{\"requests\":[\"derive\",\"derive\"],\"delta\":{\"shortcut\":0,\"auto-selection\":2,\"auto-double-click\":0},\"firstId\":332,\"secondId\":333,\"gapMs\":102}"
     },
     {
       "id": "BP17",
@@ -410,6 +410,24 @@
       "detail": "{\"requests\":25,\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":25},\"drags\":25,\"doubleClicks\":25,\"cancels\":0}"
     },
     {
+      "id": "BP27",
+      "name": "S10 — a double click whose second release drifts past the drag threshold is still at most one lookup",
+      "ok": true,
+      "detail": "{\"gapRequests\":1,\"delta\":{\"shortcut\":0,\"auto-selection\":1,\"auto-double-click\":0},\"kind\":\"drag\",\"doubleClicks\":0,\"drags\":1,\"trigger\":{\"decision\":\"lookup\",\"reason\":\"accepted\",\"origin\":\"auto-selection\",\"gestureId\":1098,\"query\":\"i\"}}"
+    },
+    {
+      "id": "BP28",
+      "name": "S11 — the same drifting double click produces exactly one lookup, never one per switch",
+      "ok": true,
+      "detail": "{\"requests\":1,\"delta\":{\"shortcut\":0,\"auto-selection\":1,\"auto-double-click\":0},\"kind\":\"drag\",\"reason\":\"accepted\",\"gestureId\":1100}"
+    },
+    {
+      "id": "BP29",
+      "name": "an unverified pointer kind produces no automatic lookup even with both switches on (mouse only)",
+      "ok": true,
+      "detail": "{\"requests\":0,\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":0},\"kind\":\"drag\",\"pointerTypeGate\":{\"decision\":\"ignored\",\"reason\":\"unverified-pointer-kind\",\"origin\":null,\"gestureId\":1101,\"query\":\"\"},\"box\":{\"x\":1142,\"y\":161,\"width\":37.859375,\"height\":19}}"
+    },
+    {
       "id": "BP26",
       "name": "the trigger matrix left the two switches exactly as this boot loaded them",
       "ok": true,
@@ -425,7 +443,7 @@
       "id": "S01",
       "name": "a settings write is accepted and the client snapshot changes without a restart",
       "ok": true,
-      "detail": "{\"accepted\":true,\"value\":{\"autoDoubleClick\":false,\"autoSelection\":true},\"revision\":25}"
+      "detail": "{\"accepted\":true,\"value\":{\"autoDoubleClick\":false,\"autoSelection\":true},\"revision\":29}"
     },
     {
       "id": "S02",
@@ -459,13 +477,13 @@
     },
     {
       "id": "L06",
-      "name": "after a full client reload one double click still issues exactly one lookup, so no listener was stacked",
+      "name": "after a full client reload the automatic path still issues exactly one lookup for one double click",
       "ok": true,
       "detail": "{\"requests\":[\"derive\"],\"gates\":{\"autoDoubleClick\":true,\"autoSelection\":true},\"trigger\":{\"decision\":\"lookup\",\"reason\":\"accepted\",\"origin\":\"auto-double-click\",\"gestureId\":2,\"query\":\"derive\"}}"
     },
     {
       "id": "L07",
-      "name": "after a full client reload one drag selection still issues exactly one lookup",
+      "name": "after a full client reload the automatic path still issues exactly one lookup for one drag selection",
       "ok": true,
       "detail": "{\"requests\":[\"went\"],\"gates\":{\"autoDoubleClick\":true,\"autoSelection\":true},\"trigger\":{\"decision\":\"lookup\",\"reason\":\"accepted\",\"origin\":\"auto-selection\",\"gestureId\":3,\"query\":\"went\"}}"
     },
@@ -479,7 +497,7 @@
       "id": "H02",
       "name": "the first isolated process stopped cleanly",
       "ok": true,
-      "detail": "pid=20684"
+      "detail": "pid=44900"
     },
     {
       "id": "H03",
@@ -491,13 +509,13 @@
       "id": "R01",
       "name": "the plugin appears in the boot manifest as a browser entry",
       "ok": true,
-      "detail": "[{\"id\":\"dsh-word-lookup\",\"url\":\"plugins/??dsh-word-lookup/client.js&rev=0e714c009732\",\"inject\":[\"@deepseek-ai/dsh-client-ui-layout\",\"@deepseek-ai/dsh-client-ui-renderer\",\"@deepseek-ai/dsh-client-shortcuts\",\"@deepseek-ai/dsh-client-ui-settings\",\"@deepseek-ai/dsh-client-locale\"]}]"
+      "detail": "[{\"id\":\"dsh-word-lookup\",\"url\":\"plugins/??dsh-word-lookup/client.js&rev=4d334bd4d211\",\"inject\":[\"@deepseek-ai/dsh-client-ui-layout\",\"@deepseek-ai/dsh-client-ui-renderer\",\"@deepseek-ai/dsh-client-shortcuts\",\"@deepseek-ai/dsh-client-ui-settings\",\"@deepseek-ai/dsh-client-locale\"]}]"
     },
     {
       "id": "R02",
       "name": "the plugin is served inside the concatenated application batch",
       "ok": true,
-      "detail": "plugins/??@deepseek-ai/dsh-client-ui-open-in-app/client.js,@deepseek-ai/dsh-api-gateway/client.js,@deepseek-ai/dsh-api-job-controller/client.js,@deepseek-ai/dsh-api-terminal-controller/client.js,@deepseek-ai/dsh-api-workspace-files/client.js,@deepseek-ai/dsh-client-ui-settings-account/client.js,@deepseek-ai/dsh-client-hmr/client.js,@deepseek-ai/dsh-cordis-client-runner/client.js,@deepseek-ai/dsh-client-ui-theme/client.js,@deepseek-ai/dsh-client-locale/client.js,@deepseek-ai/dsh-client-shortcuts/client.js,@deepseek-ai/dsh-client-ui-shortcuts/client.js,@deepseek-ai/dsh-client-ui-layout/client.js,@deepseek-ai/dsh-client-ui-renderer/client.js,@deepseek-ai/dsh-client-ui-session/client.js,@deepseek-ai/dsh-client-resources/client.js,@deepseek-ai/dsh-client-ui-sidebar/client.js,@deepseek-ai/dsh-client-ui-sidebar-right/client.js,@deepseek-ai/dsh-client-ui-sidebar-documentpreview/client.js,@deepseek-ai/dsh-client-ui-sidebar-terminal/client.js,@deepseek-ai/dsh-client-ui-sidebar-files/client.js,@deepseek-ai/dsh-client-ui-settings/client.js,@deepseek-ai/dsh-client-ui-settings-general/client.js,@deepseek-ai/dsh-client-ui-settings-models/client.js,@deepseek-ai/dsh-client-ui-plugin-manager/client.js,@deepseek-ai/dsh-client-ui-settings-plugin-inventory/client.js,@deepseek-ai/dsh-client-ui-conversation/client.js,@deepseek-ai/dsh-client-ui-approval/client.js,@deepseek-ai/dsh-client-ui-chat/client.js,@deepseek-ai/dsh-client-ui-brand-official/client.js,@deepseek-ai/dsh-client-ui-attachment/client.js,@deepseek-ai/dsh-client-ui-tool/client.js,@deepseek-ai/dsh-client-ui-cordis/client.js,@deepseek-ai/dsh-client-ui-workspace/client.js,@deepseek-ai/dsh-client-ui-workflow-run/client.js,@deepseek-ai/dsh-client-ui-input-trigger/client.js,@deepseek-ai/dsh-client-ui-commands/client.js,@deepseek-ai/dsh-client-ui-skill/client.js,@deepseek-ai/dsh-client-ui-subagent/client.js,@deepseek-ai/dsh-client-ui-reference/client.js,@deepseek-ai/dsh-client-ui-jobs/client.js,@deepseek-ai/dsh-client-ui-goal/client.js,@deepseek-ai/dsh-client-ui-message-feedback/client.js,@deepseek-ai/dsh-client-ui-model-selection/client.js,@deepseek-ai/dsh-client-ui-permission-presets/client.js,@deepseek-ai/dsh-client-ui-agent-preset/client.js,@deepseek-ai/dsh-client-ui-settings-session-log/client.js,@deepseek-ai/dsh-client-ui-settings-plugins/client.js,@deepseek-ai/dsh-client-ui-settings-shell/client.js,@deepseek-ai/dsh-client-ui-settings-agent-loop/client.js,@deepseek-ai/dsh-client-ui-settings-subagent/client.js,@deepseek-ai/dsh-client-ui-settings-web-search/client.js,@deepseek-ai/dsh-client-ui-plan/client.js,@deepseek-ai/dsh-client-ui-user-questions/client.js,@deepseek-ai/dsh-client-ui-trajectory/client.js,dsh-word-lookup/client.js,@deepseek-ai/dsh-session-log-export/client.js,@deepseek-ai/dsh-client-file-upload/client.js&rev=d8251020b2f3"
+      "detail": "plugins/??@deepseek-ai/dsh-client-ui-open-in-app/client.js,@deepseek-ai/dsh-api-gateway/client.js,@deepseek-ai/dsh-api-job-controller/client.js,@deepseek-ai/dsh-api-terminal-controller/client.js,@deepseek-ai/dsh-api-workspace-files/client.js,@deepseek-ai/dsh-client-ui-settings-account/client.js,@deepseek-ai/dsh-client-hmr/client.js,@deepseek-ai/dsh-cordis-client-runner/client.js,@deepseek-ai/dsh-client-ui-theme/client.js,@deepseek-ai/dsh-client-locale/client.js,@deepseek-ai/dsh-client-shortcuts/client.js,@deepseek-ai/dsh-client-ui-shortcuts/client.js,@deepseek-ai/dsh-client-ui-layout/client.js,@deepseek-ai/dsh-client-ui-renderer/client.js,@deepseek-ai/dsh-client-ui-session/client.js,@deepseek-ai/dsh-client-resources/client.js,@deepseek-ai/dsh-client-ui-sidebar/client.js,@deepseek-ai/dsh-client-ui-sidebar-right/client.js,@deepseek-ai/dsh-client-ui-sidebar-documentpreview/client.js,@deepseek-ai/dsh-client-ui-sidebar-terminal/client.js,@deepseek-ai/dsh-client-ui-sidebar-files/client.js,@deepseek-ai/dsh-client-ui-settings/client.js,@deepseek-ai/dsh-client-ui-settings-general/client.js,@deepseek-ai/dsh-client-ui-settings-models/client.js,@deepseek-ai/dsh-client-ui-plugin-manager/client.js,@deepseek-ai/dsh-client-ui-settings-plugin-inventory/client.js,@deepseek-ai/dsh-client-ui-conversation/client.js,@deepseek-ai/dsh-client-ui-approval/client.js,@deepseek-ai/dsh-client-ui-chat/client.js,@deepseek-ai/dsh-client-ui-brand-official/client.js,@deepseek-ai/dsh-client-ui-attachment/client.js,@deepseek-ai/dsh-client-ui-tool/client.js,@deepseek-ai/dsh-client-ui-cordis/client.js,@deepseek-ai/dsh-client-ui-workspace/client.js,@deepseek-ai/dsh-client-ui-workflow-run/client.js,@deepseek-ai/dsh-client-ui-input-trigger/client.js,@deepseek-ai/dsh-client-ui-commands/client.js,@deepseek-ai/dsh-client-ui-skill/client.js,@deepseek-ai/dsh-client-ui-subagent/client.js,@deepseek-ai/dsh-client-ui-reference/client.js,@deepseek-ai/dsh-client-ui-jobs/client.js,@deepseek-ai/dsh-client-ui-goal/client.js,@deepseek-ai/dsh-client-ui-message-feedback/client.js,@deepseek-ai/dsh-client-ui-model-selection/client.js,@deepseek-ai/dsh-client-ui-permission-presets/client.js,@deepseek-ai/dsh-client-ui-agent-preset/client.js,@deepseek-ai/dsh-client-ui-settings-session-log/client.js,@deepseek-ai/dsh-client-ui-settings-plugins/client.js,@deepseek-ai/dsh-client-ui-settings-shell/client.js,@deepseek-ai/dsh-client-ui-settings-agent-loop/client.js,@deepseek-ai/dsh-client-ui-settings-subagent/client.js,@deepseek-ai/dsh-client-ui-settings-web-search/client.js,@deepseek-ai/dsh-client-ui-plan/client.js,@deepseek-ai/dsh-client-ui-user-questions/client.js,@deepseek-ai/dsh-client-ui-trajectory/client.js,dsh-word-lookup/client.js,@deepseek-ai/dsh-session-log-export/client.js,@deepseek-ai/dsh-client-file-upload/client.js&rev=9b9ab06a0f1f"
     },
     {
       "id": "R03",
@@ -557,13 +575,13 @@
       "id": "R08",
       "name": "a selection outside a conversation flow item does not qualify",
       "ok": true,
-      "detail": "snapshot={\"present\":true,\"eligible\":false,\"text\":\"\",\"at\":1790856315095,\"rect\":null,\"gesture\":{\"kind\":\"none\",\"completedAt\":null,\"pointer\":null,\"gestureId\":0}} requests=0"
+      "detail": "snapshot={\"present\":true,\"eligible\":false,\"text\":\"\",\"at\":1790857264481,\"rect\":null,\"gesture\":{\"kind\":\"none\",\"completedAt\":null,\"pointer\":null,\"gestureId\":0}} requests=0"
     },
     {
       "id": "R09",
       "name": "a selection inside the composer does not qualify (T08)",
       "ok": true,
-      "detail": "snapshot={\"present\":true,\"eligible\":false,\"text\":\"\",\"at\":1790856315708,\"rect\":null,\"gesture\":{\"kind\":\"none\",\"completedAt\":null,\"pointer\":null,\"gestureId\":0}} requests=0"
+      "detail": "snapshot={\"present\":true,\"eligible\":false,\"text\":\"\",\"at\":1790857265100,\"rect\":null,\"gesture\":{\"kind\":\"none\",\"completedAt\":null,\"pointer\":null,\"gestureId\":0}} requests=0"
     },
     {
       "id": "R10",
@@ -629,7 +647,7 @@
       "id": "R19",
       "name": "with both switches off, double click and drag selection produce zero lookups (T01/T02/T22)",
       "ok": true,
-      "detail": "requests=0 snapshot={\"present\":true,\"eligible\":true,\"text\":\"he serializer must derive the wire form from the boundary conditions.\",\"at\":1790856319572,\"rect\":{\"x\":45.328125,\"y\":175,\"width\":427.515625,\"height\":19},\"gesture\":{\"kind\":\"drag\",\"completedAt\":1790856319573,\"pointer\":{\"startX\":44,\"startY\":185.1953125,\"endX\":472,\"endY\":185.1953125,\"distance\":428},\"gestureId\":3}}"
+      "detail": "requests=0 snapshot={\"present\":true,\"eligible\":true,\"text\":\"he serializer must derive the wire form from the boundary conditions.\",\"at\":1790857268967,\"rect\":{\"x\":45.328125,\"y\":175,\"width\":427.515625,\"height\":19},\"gesture\":{\"kind\":\"drag\",\"completedAt\":1790857268968,\"pointer\":{\"startX\":44,\"startY\":185.1953125,\"endX\":472,\"endY\":185.1953125,\"distance\":428},\"gestureId\":3}}"
     },
     {
       "id": "R23",
@@ -731,13 +749,13 @@
       "id": "RP01",
       "name": "S00 — with both switches off a real drag selection issues no lookup, and the gate says why (T01/T22)",
       "ok": true,
-      "detail": "{\"requests\":0,\"queries\":[],\"status\":null,\"responseQuery\":null,\"headword\":null,\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":0},\"trigger\":{\"decision\":\"ignored\",\"reason\":\"switch-off\",\"origin\":null,\"gestureId\":307},\"capture\":{\"eligible\":true,\"text\":\"derive\",\"rect\":{\"x\":1142,\"y\":161,\"width\":37.859375,\"height\":19}},\"kind\":\"drag\",\"gestureId\":307}"
+      "detail": "{\"requests\":0,\"queries\":[],\"status\":null,\"responseQuery\":null,\"headword\":null,\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":0},\"trigger\":{\"decision\":\"ignored\",\"reason\":\"switch-off\",\"origin\":null,\"gestureId\":307},\"capture\":{\"eligible\":true,\"text\":\"derive\",\"rect\":{\"x\":1142,\"y\":161,\"width\":37.859375,\"height\":19}},\"selection\":null,\"kind\":\"drag\",\"gestureId\":307}"
     },
     {
       "id": "RP02",
       "name": "S00 — with both switches off a real double click issues no lookup, and the gate says why (T02)",
       "ok": true,
-      "detail": "{\"requests\":0,\"queries\":[],\"status\":null,\"responseQuery\":null,\"headword\":null,\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":0},\"trigger\":{\"decision\":\"ignored\",\"reason\":\"switch-off\",\"origin\":null,\"gestureId\":309},\"capture\":{\"eligible\":true,\"text\":\"derive\",\"rect\":{\"x\":1142,\"y\":161,\"width\":37.859375,\"height\":19}},\"kind\":\"double-click\",\"gestureId\":309}"
+      "detail": "{\"requests\":0,\"queries\":[],\"status\":null,\"responseQuery\":null,\"headword\":null,\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":0},\"trigger\":{\"decision\":\"ignored\",\"reason\":\"switch-off\",\"origin\":null,\"gestureId\":309},\"capture\":{\"eligible\":true,\"text\":\"derive\",\"rect\":{\"x\":1142,\"y\":161,\"width\":37.859375,\"height\":19}},\"selection\":{\"present\":true,\"eligible\":true,\"text\":\"derive\"},\"kind\":\"double-click\",\"gestureId\":309}"
     },
     {
       "id": "RP03",
@@ -749,13 +767,13 @@
       "id": "RP04",
       "name": "S10 — autoSelection on: a real drag selection issues exactly one lookup, from the auto-selection path (T05)",
       "ok": true,
-      "detail": "{\"requests\":1,\"queries\":[\"derive\"],\"status\":200,\"responseQuery\":\"derive\",\"headword\":\"derive\",\"delta\":{\"shortcut\":0,\"auto-selection\":1,\"auto-double-click\":0},\"trigger\":{\"decision\":\"lookup\",\"reason\":\"accepted\",\"origin\":\"auto-selection\",\"gestureId\":310},\"capture\":{\"eligible\":true,\"text\":\"derive\",\"rect\":{\"x\":1142,\"y\":161,\"width\":37.859375,\"height\":19}},\"kind\":\"drag\",\"gestureId\":310}"
+      "detail": "{\"requests\":1,\"queries\":[\"derive\"],\"status\":200,\"responseQuery\":\"derive\",\"headword\":\"derive\",\"delta\":{\"shortcut\":0,\"auto-selection\":1,\"auto-double-click\":0},\"trigger\":{\"decision\":\"lookup\",\"reason\":\"accepted\",\"origin\":\"auto-selection\",\"gestureId\":310},\"capture\":{\"eligible\":true,\"text\":\"derive\",\"rect\":{\"x\":1142,\"y\":161,\"width\":37.859375,\"height\":19}},\"selection\":null,\"kind\":\"drag\",\"gestureId\":310}"
     },
     {
       "id": "RP05",
       "name": "S10 — autoSelection on: a real double click still issues nothing, because it is not that switch’s gesture",
       "ok": true,
-      "detail": "{\"requests\":0,\"queries\":[],\"status\":null,\"responseQuery\":null,\"headword\":null,\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":0},\"trigger\":{\"decision\":\"ignored\",\"reason\":\"switch-off\",\"origin\":null,\"gestureId\":312},\"capture\":{\"eligible\":true,\"text\":\"derive\",\"rect\":{\"x\":1142,\"y\":161,\"width\":37.859375,\"height\":19}},\"kind\":\"double-click\",\"gestureId\":312}"
+      "detail": "{\"requests\":0,\"queries\":[],\"status\":null,\"responseQuery\":null,\"headword\":null,\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":0},\"trigger\":{\"decision\":\"ignored\",\"reason\":\"switch-off\",\"origin\":null,\"gestureId\":312},\"capture\":{\"eligible\":true,\"text\":\"derive\",\"rect\":{\"x\":1142,\"y\":161,\"width\":37.859375,\"height\":19}},\"selection\":{\"present\":true,\"eligible\":true,\"text\":\"derive\"},\"kind\":\"double-click\",\"gestureId\":312}"
     },
     {
       "id": "RP06",
@@ -767,13 +785,13 @@
       "id": "RP07",
       "name": "S01 — autoDoubleClick on: a real drag selection issues nothing, because it is not that switch’s gesture",
       "ok": true,
-      "detail": "{\"requests\":0,\"queries\":[],\"status\":null,\"responseQuery\":null,\"headword\":null,\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":0},\"trigger\":{\"decision\":\"ignored\",\"reason\":\"switch-off\",\"origin\":null,\"gestureId\":313},\"capture\":{\"eligible\":true,\"text\":\"derive\",\"rect\":{\"x\":1142,\"y\":161,\"width\":37.859375,\"height\":19}},\"kind\":\"drag\",\"gestureId\":313}"
+      "detail": "{\"requests\":0,\"queries\":[],\"status\":null,\"responseQuery\":null,\"headword\":null,\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":0},\"trigger\":{\"decision\":\"ignored\",\"reason\":\"switch-off\",\"origin\":null,\"gestureId\":313},\"capture\":{\"eligible\":true,\"text\":\"derive\",\"rect\":{\"x\":1142,\"y\":161,\"width\":37.859375,\"height\":19}},\"selection\":null,\"kind\":\"drag\",\"gestureId\":313}"
     },
     {
       "id": "RP08",
       "name": "S01 — autoDoubleClick on: a real double click issues exactly one lookup, from the auto-double-click path (T04)",
       "ok": true,
-      "detail": "{\"requests\":1,\"queries\":[\"derive\"],\"status\":200,\"responseQuery\":\"derive\",\"headword\":\"derive\",\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":1},\"trigger\":{\"decision\":\"lookup\",\"reason\":\"accepted\",\"origin\":\"auto-double-click\",\"gestureId\":315},\"capture\":{\"eligible\":true,\"text\":\"derive\",\"rect\":{\"x\":1142,\"y\":161,\"width\":37.859375,\"height\":19}},\"kind\":\"double-click\",\"gestureId\":315}"
+      "detail": "{\"requests\":1,\"queries\":[\"derive\"],\"status\":200,\"responseQuery\":\"derive\",\"headword\":\"derive\",\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":1},\"trigger\":{\"decision\":\"lookup\",\"reason\":\"accepted\",\"origin\":\"auto-double-click\",\"gestureId\":315},\"capture\":{\"eligible\":true,\"text\":\"derive\",\"rect\":{\"x\":1142,\"y\":161,\"width\":37.859375,\"height\":19}},\"selection\":{\"present\":true,\"eligible\":true,\"text\":\"derive\"},\"kind\":\"double-click\",\"gestureId\":315}"
     },
     {
       "id": "RP09",
@@ -785,19 +803,19 @@
       "id": "RP10",
       "name": "S11 — both switches on: one drag is exactly one lookup and one double click is exactly one lookup, on their own paths (T06)",
       "ok": true,
-      "detail": "{\"drag\":{\"requests\":1,\"queries\":[\"derive\"],\"status\":200,\"responseQuery\":\"derive\",\"headword\":\"derive\",\"delta\":{\"shortcut\":0,\"auto-selection\":1,\"auto-double-click\":0},\"trigger\":{\"decision\":\"lookup\",\"reason\":\"accepted\",\"origin\":\"auto-selection\",\"gestureId\":316},\"capture\":{\"eligible\":true,\"text\":\"derive\",\"rect\":{\"x\":1142,\"y\":161,\"width\":37.859375,\"height\":19}},\"kind\":\"drag\",\"gestureId\":316},\"double\":{\"requests\":1,\"queries\":[\"derive\"],\"status\":200,\"responseQuery\":\"derive\",\"headword\":\"derive\",\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":1},\"trigger\":{\"decision\":\"lookup\",\"reason\":\"accepted\",\"origin\":\"auto-double-click\",\"gestureId\":318},\"capture\":{\"eligible\":true,\"text\":\"derive\",\"rect\":{\"x\":1142,\"y\":161,\"width\":37.859375,\"height\":19}},\"kind\":\"double-click\",\"gestureId\":318}}"
+      "detail": "{\"drag\":{\"requests\":1,\"queries\":[\"derive\"],\"status\":200,\"responseQuery\":\"derive\",\"headword\":\"derive\",\"delta\":{\"shortcut\":0,\"auto-selection\":1,\"auto-double-click\":0},\"trigger\":{\"decision\":\"lookup\",\"reason\":\"accepted\",\"origin\":\"auto-selection\",\"gestureId\":316},\"capture\":{\"eligible\":true,\"text\":\"derive\",\"rect\":{\"x\":1142,\"y\":161,\"width\":37.859375,\"height\":19}},\"selection\":null,\"kind\":\"drag\",\"gestureId\":316},\"double\":{\"requests\":1,\"queries\":[\"derive\"],\"status\":200,\"responseQuery\":\"derive\",\"headword\":\"derive\",\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":1},\"trigger\":{\"decision\":\"lookup\",\"reason\":\"accepted\",\"origin\":\"auto-double-click\",\"gestureId\":318},\"capture\":{\"eligible\":true,\"text\":\"derive\",\"rect\":{\"x\":1142,\"y\":161,\"width\":37.859375,\"height\":19}},\"selection\":{\"present\":true,\"eligible\":true,\"text\":\"derive\"},\"kind\":\"double-click\",\"gestureId\":318}}"
     },
     {
       "id": "RP11",
-      "name": "S11 — the trailing selectionchange of a double click cannot buy a second lookup through autoSelection",
+      "name": "S11 — a double click leaves an eligible selection behind, and still buys exactly one lookup, through its own path",
       "ok": true,
-      "detail": "{\"requests\":1,\"queries\":[\"derive\"],\"status\":200,\"responseQuery\":\"derive\",\"headword\":\"derive\",\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":1},\"trigger\":{\"decision\":\"lookup\",\"reason\":\"accepted\",\"origin\":\"auto-double-click\",\"gestureId\":318},\"capture\":{\"eligible\":true,\"text\":\"derive\",\"rect\":{\"x\":1142,\"y\":161,\"width\":37.859375,\"height\":19}},\"kind\":\"double-click\",\"gestureId\":318}"
+      "detail": "{\"requests\":1,\"queries\":[\"derive\"],\"status\":200,\"responseQuery\":\"derive\",\"headword\":\"derive\",\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":1},\"trigger\":{\"decision\":\"lookup\",\"reason\":\"accepted\",\"origin\":\"auto-double-click\",\"gestureId\":318},\"capture\":{\"eligible\":true,\"text\":\"derive\",\"rect\":{\"x\":1142,\"y\":161,\"width\":37.859375,\"height\":19}},\"selection\":{\"present\":true,\"eligible\":true,\"text\":\"derive\"},\"kind\":\"double-click\",\"gestureId\":318}"
     },
     {
       "id": "RP12",
       "name": "S10 — fifty programmatic selection changes are observed, and issue zero lookups, so selectionchange is not a trigger (§36)",
       "ok": true,
-      "detail": "{\"requests\":[],\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":0},\"trigger\":{\"decision\":\"lookup\",\"reason\":\"accepted\",\"origin\":\"auto-double-click\",\"gestureId\":318,\"query\":\"derive\"},\"selection\":{\"present\":true,\"eligible\":true,\"text\":\"he ser\"},\"gestures\":{\"drags\":0,\"doubleClicks\":0}}"
+      "detail": "{\"requests\":[],\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":0},\"selection\":{\"present\":true,\"eligible\":true,\"text\":\"he ser\"},\"gestures\":{\"drags\":0,\"doubleClicks\":0}}"
     },
     {
       "id": "RP13",
@@ -813,15 +831,15 @@
     },
     {
       "id": "RP15",
-      "name": "two independent double clicks on the same word are two gestures and two lookups, never one (T06 regression)",
+      "name": "two double clicks on the same word inside 300 ms are two gestures and two lookups, never one",
       "ok": true,
-      "detail": "{\"requests\":[\"derive\",\"derive\"],\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":2},\"firstId\":329,\"secondId\":331}"
+      "detail": "{\"requests\":[\"derive\",\"derive\"],\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":2},\"firstId\":329,\"secondId\":331,\"gapMs\":9}"
     },
     {
       "id": "RP16",
-      "name": "two independent drag selections of the same word are two gestures and two lookups, never one",
+      "name": "two drag selections of the same word inside 300 ms are two gestures and two lookups, never one",
       "ok": true,
-      "detail": "{\"requests\":[\"derive\",\"derive\"],\"delta\":{\"shortcut\":0,\"auto-selection\":2,\"auto-double-click\":0},\"firstId\":332,\"secondId\":333}"
+      "detail": "{\"requests\":[\"derive\",\"derive\"],\"delta\":{\"shortcut\":0,\"auto-selection\":2,\"auto-double-click\":0},\"firstId\":332,\"secondId\":333,\"gapMs\":97}"
     },
     {
       "id": "RP17",
@@ -876,6 +894,24 @@
       "name": "S01 stress — real gestures produce exactly one lookup per double click and none per drag",
       "ok": true,
       "detail": "{\"requests\":25,\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":25},\"drags\":25,\"doubleClicks\":25,\"cancels\":0}"
+    },
+    {
+      "id": "RP27",
+      "name": "S10 — a double click whose second release drifts past the drag threshold is still at most one lookup",
+      "ok": true,
+      "detail": "{\"gapRequests\":1,\"delta\":{\"shortcut\":0,\"auto-selection\":1,\"auto-double-click\":0},\"kind\":\"drag\",\"doubleClicks\":0,\"drags\":1,\"trigger\":{\"decision\":\"lookup\",\"reason\":\"accepted\",\"origin\":\"auto-selection\",\"gestureId\":1098,\"query\":\"i\"}}"
+    },
+    {
+      "id": "RP28",
+      "name": "S11 — the same drifting double click produces exactly one lookup, never one per switch",
+      "ok": true,
+      "detail": "{\"requests\":1,\"delta\":{\"shortcut\":0,\"auto-selection\":1,\"auto-double-click\":0},\"kind\":\"drag\",\"reason\":\"accepted\",\"gestureId\":1100}"
+    },
+    {
+      "id": "RP29",
+      "name": "an unverified pointer kind produces no automatic lookup even with both switches on (mouse only)",
+      "ok": true,
+      "detail": "{\"requests\":0,\"delta\":{\"shortcut\":0,\"auto-selection\":0,\"auto-double-click\":0},\"kind\":\"drag\",\"pointerTypeGate\":{\"decision\":\"ignored\",\"reason\":\"unverified-pointer-kind\",\"origin\":null,\"gestureId\":1101,\"query\":\"\"},\"box\":{\"x\":1142,\"y\":161,\"width\":37.859375,\"height\":19}}"
     },
     {
       "id": "RP26",
@@ -936,16 +972,16 @@
     {
       "bootIndex": 1,
       "stdout": "dsh web: http://127.0.0.1:50991/?token=<redacted>\n",
-      "stderr": "(node:46604) ExperimentalWarning: SQLite is an experimental feature and might change at any time\n(Use `node --trace-warnings ...` to show where the warning was created)\n",
-      "startedAt": "2026-10-01T12:03:08.279Z",
-      "pid": 20684
+      "stderr": "(node:20688) ExperimentalWarning: SQLite is an experimental feature and might change at any time\n(Use `node --trace-warnings ...` to show where the warning was created)\n",
+      "startedAt": "2026-10-01T12:18:47.502Z",
+      "pid": 44900
     },
     {
       "bootIndex": 2,
       "stdout": "dsh web: http://127.0.0.1:50991/?token=<redacted>\n",
-      "stderr": "(node:29612) ExperimentalWarning: SQLite is an experimental feature and might change at any time\n(Use `node --trace-warnings ...` to show where the warning was created)\n",
-      "startedAt": "2026-10-01T12:05:07.646Z",
-      "pid": 40856
+      "stderr": "(node:47332) ExperimentalWarning: SQLite is an experimental feature and might change at any time\n(Use `node --trace-warnings ...` to show where the warning was created)\n",
+      "startedAt": "2026-10-01T12:20:57.004Z",
+      "pid": 52088
     }
   ],
   "facts": {
@@ -956,7 +992,7 @@
         "own": [
           {
             "id": "dsh-word-lookup",
-            "url": "plugins/??dsh-word-lookup/client.js&rev=0e714c009732",
+            "url": "plugins/??dsh-word-lookup/client.js&rev=4d334bd4d211",
             "inject": [
               "@deepseek-ai/dsh-client-ui-layout",
               "@deepseek-ai/dsh-client-ui-renderer",
@@ -968,7 +1004,7 @@
         ],
         "batchUrls": [
           "plugins/??@deepseek-ai/dsh-client-modules/client.js&rev=4f95304bf137",
-          "plugins/??@deepseek-ai/dsh-client-ui-open-in-app/client.js,@deepseek-ai/dsh-api-gateway/client.js,@deepseek-ai/dsh-api-job-controller/client.js,@deepseek-ai/dsh-api-terminal-controller/client.js,@deepseek-ai/dsh-api-workspace-files/client.js,@deepseek-ai/dsh-client-ui-settings-account/client.js,@deepseek-ai/dsh-client-hmr/client.js,@deepseek-ai/dsh-cordis-client-runner/client.js,@deepseek-ai/dsh-client-ui-theme/client.js,@deepseek-ai/dsh-client-locale/client.js,@deepseek-ai/dsh-client-shortcuts/client.js,@deepseek-ai/dsh-client-ui-shortcuts/client.js,@deepseek-ai/dsh-client-ui-layout/client.js,@deepseek-ai/dsh-client-ui-renderer/client.js,@deepseek-ai/dsh-client-ui-session/client.js,@deepseek-ai/dsh-client-resources/client.js,@deepseek-ai/dsh-client-ui-sidebar/client.js,@deepseek-ai/dsh-client-ui-sidebar-right/client.js,@deepseek-ai/dsh-client-ui-sidebar-documentpreview/client.js,@deepseek-ai/dsh-client-ui-sidebar-terminal/client.js,@deepseek-ai/dsh-client-ui-sidebar-files/client.js,@deepseek-ai/dsh-client-ui-settings/client.js,@deepseek-ai/dsh-client-ui-settings-general/client.js,@deepseek-ai/dsh-client-ui-settings-models/client.js,@deepseek-ai/dsh-client-ui-plugin-manager/client.js,@deepseek-ai/dsh-client-ui-settings-plugin-inventory/client.js,@deepseek-ai/dsh-client-ui-conversation/client.js,@deepseek-ai/dsh-client-ui-approval/client.js,@deepseek-ai/dsh-client-ui-chat/client.js,@deepseek-ai/dsh-client-ui-brand-official/client.js,@deepseek-ai/dsh-client-ui-attachment/client.js,@deepseek-ai/dsh-client-ui-tool/client.js,@deepseek-ai/dsh-client-ui-cordis/client.js,@deepseek-ai/dsh-client-ui-workspace/client.js,@deepseek-ai/dsh-client-ui-workflow-run/client.js,@deepseek-ai/dsh-client-ui-input-trigger/client.js,@deepseek-ai/dsh-client-ui-commands/client.js,@deepseek-ai/dsh-client-ui-skill/client.js,@deepseek-ai/dsh-client-ui-subagent/client.js,@deepseek-ai/dsh-client-ui-reference/client.js,@deepseek-ai/dsh-client-ui-jobs/client.js,@deepseek-ai/dsh-client-ui-goal/client.js,@deepseek-ai/dsh-client-ui-message-feedback/client.js,@deepseek-ai/dsh-client-ui-model-selection/client.js,@deepseek-ai/dsh-client-ui-permission-presets/client.js,@deepseek-ai/dsh-client-ui-agent-preset/client.js,@deepseek-ai/dsh-client-ui-settings-session-log/client.js,@deepseek-ai/dsh-client-ui-settings-plugins/client.js,@deepseek-ai/dsh-client-ui-settings-shell/client.js,@deepseek-ai/dsh-client-ui-settings-agent-loop/client.js,@deepseek-ai/dsh-client-ui-settings-subagent/client.js,@deepseek-ai/dsh-client-ui-settings-web-search/client.js,@deepseek-ai/dsh-client-ui-plan/client.js,@deepseek-ai/dsh-client-ui-user-questions/client.js,@deepseek-ai/dsh-client-ui-trajectory/client.js,dsh-word-lookup/client.js,@deepseek-ai/dsh-session-log-export/client.js,@deepseek-ai/dsh-client-file-upload/client.js&rev=d8251020b2f3",
+          "plugins/??@deepseek-ai/dsh-client-ui-open-in-app/client.js,@deepseek-ai/dsh-api-gateway/client.js,@deepseek-ai/dsh-api-job-controller/client.js,@deepseek-ai/dsh-api-terminal-controller/client.js,@deepseek-ai/dsh-api-workspace-files/client.js,@deepseek-ai/dsh-client-ui-settings-account/client.js,@deepseek-ai/dsh-client-hmr/client.js,@deepseek-ai/dsh-cordis-client-runner/client.js,@deepseek-ai/dsh-client-ui-theme/client.js,@deepseek-ai/dsh-client-locale/client.js,@deepseek-ai/dsh-client-shortcuts/client.js,@deepseek-ai/dsh-client-ui-shortcuts/client.js,@deepseek-ai/dsh-client-ui-layout/client.js,@deepseek-ai/dsh-client-ui-renderer/client.js,@deepseek-ai/dsh-client-ui-session/client.js,@deepseek-ai/dsh-client-resources/client.js,@deepseek-ai/dsh-client-ui-sidebar/client.js,@deepseek-ai/dsh-client-ui-sidebar-right/client.js,@deepseek-ai/dsh-client-ui-sidebar-documentpreview/client.js,@deepseek-ai/dsh-client-ui-sidebar-terminal/client.js,@deepseek-ai/dsh-client-ui-sidebar-files/client.js,@deepseek-ai/dsh-client-ui-settings/client.js,@deepseek-ai/dsh-client-ui-settings-general/client.js,@deepseek-ai/dsh-client-ui-settings-models/client.js,@deepseek-ai/dsh-client-ui-plugin-manager/client.js,@deepseek-ai/dsh-client-ui-settings-plugin-inventory/client.js,@deepseek-ai/dsh-client-ui-conversation/client.js,@deepseek-ai/dsh-client-ui-approval/client.js,@deepseek-ai/dsh-client-ui-chat/client.js,@deepseek-ai/dsh-client-ui-brand-official/client.js,@deepseek-ai/dsh-client-ui-attachment/client.js,@deepseek-ai/dsh-client-ui-tool/client.js,@deepseek-ai/dsh-client-ui-cordis/client.js,@deepseek-ai/dsh-client-ui-workspace/client.js,@deepseek-ai/dsh-client-ui-workflow-run/client.js,@deepseek-ai/dsh-client-ui-input-trigger/client.js,@deepseek-ai/dsh-client-ui-commands/client.js,@deepseek-ai/dsh-client-ui-skill/client.js,@deepseek-ai/dsh-client-ui-subagent/client.js,@deepseek-ai/dsh-client-ui-reference/client.js,@deepseek-ai/dsh-client-ui-jobs/client.js,@deepseek-ai/dsh-client-ui-goal/client.js,@deepseek-ai/dsh-client-ui-message-feedback/client.js,@deepseek-ai/dsh-client-ui-model-selection/client.js,@deepseek-ai/dsh-client-ui-permission-presets/client.js,@deepseek-ai/dsh-client-ui-agent-preset/client.js,@deepseek-ai/dsh-client-ui-settings-session-log/client.js,@deepseek-ai/dsh-client-ui-settings-plugins/client.js,@deepseek-ai/dsh-client-ui-settings-shell/client.js,@deepseek-ai/dsh-client-ui-settings-agent-loop/client.js,@deepseek-ai/dsh-client-ui-settings-subagent/client.js,@deepseek-ai/dsh-client-ui-settings-web-search/client.js,@deepseek-ai/dsh-client-ui-plan/client.js,@deepseek-ai/dsh-client-ui-user-questions/client.js,@deepseek-ai/dsh-client-ui-trajectory/client.js,dsh-word-lookup/client.js,@deepseek-ai/dsh-session-log-export/client.js,@deepseek-ai/dsh-client-file-upload/client.js&rev=9b9ab06a0f1f",
           "plugins/??@deepseek-ai/dsh-api-remotes/client.js,@deepseek-ai/dsh-client-ui-deliverables/client.js,@deepseek-ai/dsh-typert-registry/client.js,@deepseek-ai/dsh-client-connection/client.js,@deepseek-ai/dsh-api-workspace-controller/client.js,@deepseek-ai/dsh-api-session-controller/client.js,@deepseek-ai/dsh-client-ui-directory-picker-native/client.js&rev=cff9ad5fd71b"
         ],
         "hasPluginInBatch": true,
@@ -1020,14 +1056,14 @@
       },
       "modalBefore": {
         "dialogs": [
-          "Add an API key to get started"
+          "Preview Notice"
         ],
         "menus": 0
       },
       "modalBlock": {
         "modalBefore": {
           "dialogs": [
-            "Add an API key to get started"
+            "Preview Notice"
           ],
           "menus": 0
         },
@@ -1089,7 +1125,7 @@
           "present": true,
           "eligible": false,
           "text": "",
-          "at": 1790856196044,
+          "at": 1790857136129,
           "rect": null,
           "gesture": {
             "kind": "none",
@@ -1113,7 +1149,7 @@
           "present": true,
           "eligible": false,
           "text": "",
-          "at": 1790856196653,
+          "at": 1790857136745,
           "rect": null,
           "gesture": {
             "kind": "none",
@@ -1129,7 +1165,7 @@
           "present": true,
           "eligible": true,
           "text": "derive",
-          "at": 1790856197273,
+          "at": 1790857137367,
           "rect": {
             "x": 156.6875,
             "y": 175,
@@ -1300,7 +1336,7 @@
           "present": true,
           "eligible": true,
           "text": "he serializer must derive the wire form from the boundary conditions.",
-          "at": 1790856198777,
+          "at": 1790857138873,
           "rect": {
             "x": 45.328125,
             "y": 175,
@@ -1309,7 +1345,7 @@
           },
           "gesture": {
             "kind": "drag",
-            "completedAt": 1790856198779,
+            "completedAt": 1790857138874,
             "pointer": {
               "startX": 44,
               "startY": 185.1953125,
@@ -1351,7 +1387,7 @@
         },
         "last": {
           "kind": "drag",
-          "completedAt": 1790856199528,
+          "completedAt": 1790857139625,
           "pointer": {
             "startX": 62,
             "startY": 185.1953125,
@@ -1365,7 +1401,7 @@
           "present": true,
           "eligible": true,
           "text": " serializer must derive the wire",
-          "at": 1790856199527,
+          "at": 1790857139623,
           "rect": {
             "x": 60.578125,
             "y": 175,
@@ -1374,7 +1410,7 @@
           },
           "gesture": {
             "kind": "drag",
-            "completedAt": 1790856199528,
+            "completedAt": 1790857139625,
             "pointer": {
               "startX": 62,
               "startY": 185.1953125,
@@ -1391,7 +1427,7 @@
           "present": true,
           "eligible": true,
           "text": "derive",
-          "at": 1790856200141,
+          "at": 1790857140240,
           "rect": {
             "x": 156.6875,
             "y": 175,
@@ -1400,7 +1436,7 @@
           },
           "gesture": {
             "kind": "drag",
-            "completedAt": 1790856199528,
+            "completedAt": 1790857139625,
             "pointer": {
               "startX": 62,
               "startY": 185.1953125,
@@ -1415,7 +1451,7 @@
       "doubleClick": {
         "immediatelyAfter": {
           "kind": "double-click",
-          "completedAt": 1790856200752,
+          "completedAt": 1790857140846,
           "pointer": {
             "startX": 128,
             "startY": 185.1953125,
@@ -1427,7 +1463,7 @@
         },
         "afterTrailing": {
           "kind": "double-click",
-          "completedAt": 1790856200752,
+          "completedAt": 1790857140846,
           "pointer": {
             "startX": 128,
             "startY": 185.1953125,
@@ -1442,7 +1478,7 @@
           "present": true,
           "eligible": true,
           "text": "must ",
-          "at": 1790856200759,
+          "at": 1790857140856,
           "rect": {
             "x": 122.1875,
             "y": 175,
@@ -1451,7 +1487,7 @@
           },
           "gesture": {
             "kind": "double-click",
-            "completedAt": 1790856200752,
+            "completedAt": 1790857140846,
             "pointer": {
               "startX": 128,
               "startY": 185.1953125,
@@ -2395,6 +2431,7 @@
                 "height": 19
               }
             },
+            "selection": null,
             "kind": "drag",
             "gestureId": 307
           },
@@ -2424,6 +2461,11 @@
                 "width": 37.859375,
                 "height": 19
               }
+            },
+            "selection": {
+              "present": true,
+              "eligible": true,
+              "text": "derive"
             },
             "kind": "double-click",
             "gestureId": 309
@@ -2525,6 +2567,7 @@
                 "height": 19
               }
             },
+            "selection": null,
             "kind": "drag",
             "gestureId": 310
           },
@@ -2554,6 +2597,11 @@
                 "width": 37.859375,
                 "height": 19
               }
+            },
+            "selection": {
+              "present": true,
+              "eligible": true,
+              "text": "derive"
             },
             "kind": "double-click",
             "gestureId": 312
@@ -2653,6 +2701,7 @@
                 "height": 19
               }
             },
+            "selection": null,
             "kind": "drag",
             "gestureId": 313
           },
@@ -2684,6 +2733,11 @@
                 "width": 37.859375,
                 "height": 19
               }
+            },
+            "selection": {
+              "present": true,
+              "eligible": true,
+              "text": "derive"
             },
             "kind": "double-click",
             "gestureId": 315
@@ -2785,6 +2839,7 @@
                 "height": 19
               }
             },
+            "selection": null,
             "kind": "drag",
             "gestureId": 316
           },
@@ -2817,6 +2872,11 @@
                 "height": 19
               }
             },
+            "selection": {
+              "present": true,
+              "eligible": true,
+              "text": "derive"
+            },
             "kind": "double-click",
             "gestureId": 318
           }
@@ -2827,13 +2887,6 @@
             "shortcut": 0,
             "auto-selection": 0,
             "auto-double-click": 0
-          },
-          "trigger": {
-            "decision": "lookup",
-            "reason": "accepted",
-            "origin": "auto-double-click",
-            "gestureId": 318,
-            "query": "derive"
           },
           "selection": {
             "present": true,
@@ -2950,7 +3003,8 @@
             "auto-double-click": 2
           },
           "firstId": 329,
-          "secondId": 331
+          "secondId": 331,
+          "gapMs": 8
         },
         "repeatDrag": {
           "requests": [
@@ -2963,7 +3017,8 @@
             "auto-double-click": 0
           },
           "firstId": 332,
-          "secondId": 333
+          "secondId": 333,
+          "gapMs": 102
         },
         "derivedAuto": {
           "response": {
@@ -3103,6 +3158,57 @@
           "doubleClicks": 25,
           "cancels": 0
         },
+        "driftDouble": {
+          "gapRequests": 1,
+          "delta": {
+            "shortcut": 0,
+            "auto-selection": 1,
+            "auto-double-click": 0
+          },
+          "kind": "drag",
+          "doubleClicks": 0,
+          "drags": 1,
+          "trigger": {
+            "decision": "lookup",
+            "reason": "accepted",
+            "origin": "auto-selection",
+            "gestureId": 1098,
+            "query": "i"
+          }
+        },
+        "driftBoth": {
+          "requests": 1,
+          "delta": {
+            "shortcut": 0,
+            "auto-selection": 1,
+            "auto-double-click": 0
+          },
+          "kind": "drag",
+          "reason": "accepted",
+          "gestureId": 1100
+        },
+        "touchGesture": {
+          "requests": 0,
+          "delta": {
+            "shortcut": 0,
+            "auto-selection": 0,
+            "auto-double-click": 0
+          },
+          "kind": "drag",
+          "pointerTypeGate": {
+            "decision": "ignored",
+            "reason": "unverified-pointer-kind",
+            "origin": null,
+            "gestureId": 1101,
+            "query": ""
+          },
+          "box": {
+            "x": 1142,
+            "y": 161,
+            "width": 37.859375,
+            "height": 19
+          }
+        },
         "bootGates": {
           "autoDoubleClick": false,
           "autoSelection": false
@@ -3125,7 +3231,7 @@
         "status": "ready",
         "mode": "host",
         "writable": true,
-        "revision": 25,
+        "revision": 29,
         "value": {
           "autoDoubleClick": false,
           "autoSelection": true
@@ -3335,6 +3441,7 @@
       "POST http://127.0.0.1:50991/api/dsh-word-lookup: net::ERR_ABORTED",
       "POST http://127.0.0.1:50991/api/dsh-word-lookup: net::ERR_ABORTED",
       "POST http://127.0.0.1:50991/api/dsh-word-lookup: net::ERR_ABORTED",
+      "POST http://127.0.0.1:50991/api/dsh-word-lookup: net::ERR_ABORTED",
       "POST http://127.0.0.1:50991/api/dsh-word-lookup: net::ERR_ABORTED"
     ],
     "secondBootLog": "dsh web: http://127.0.0.1:50991/?token=<redacted>\n",
@@ -3343,7 +3450,7 @@
         "status": "ready",
         "mode": "host",
         "writable": true,
-        "revision": 26,
+        "revision": 28,
         "value": {
           "autoDoubleClick": true,
           "autoSelection": true
@@ -3360,7 +3467,7 @@
         "status": "ready",
         "mode": "host",
         "writable": true,
-        "revision": 28,
+        "revision": 30,
         "value": {
           "autoDoubleClick": false,
           "autoSelection": false
@@ -3381,7 +3488,7 @@
         "own": [
           {
             "id": "dsh-word-lookup",
-            "url": "plugins/??dsh-word-lookup/client.js&rev=0e714c009732",
+            "url": "plugins/??dsh-word-lookup/client.js&rev=4d334bd4d211",
             "inject": [
               "@deepseek-ai/dsh-client-ui-layout",
               "@deepseek-ai/dsh-client-ui-renderer",
@@ -3393,7 +3500,7 @@
         ],
         "batchUrls": [
           "plugins/??@deepseek-ai/dsh-client-modules/client.js&rev=4f95304bf137",
-          "plugins/??@deepseek-ai/dsh-client-ui-open-in-app/client.js,@deepseek-ai/dsh-api-gateway/client.js,@deepseek-ai/dsh-api-job-controller/client.js,@deepseek-ai/dsh-api-terminal-controller/client.js,@deepseek-ai/dsh-api-workspace-files/client.js,@deepseek-ai/dsh-client-ui-settings-account/client.js,@deepseek-ai/dsh-client-hmr/client.js,@deepseek-ai/dsh-cordis-client-runner/client.js,@deepseek-ai/dsh-client-ui-theme/client.js,@deepseek-ai/dsh-client-locale/client.js,@deepseek-ai/dsh-client-shortcuts/client.js,@deepseek-ai/dsh-client-ui-shortcuts/client.js,@deepseek-ai/dsh-client-ui-layout/client.js,@deepseek-ai/dsh-client-ui-renderer/client.js,@deepseek-ai/dsh-client-ui-session/client.js,@deepseek-ai/dsh-client-resources/client.js,@deepseek-ai/dsh-client-ui-sidebar/client.js,@deepseek-ai/dsh-client-ui-sidebar-right/client.js,@deepseek-ai/dsh-client-ui-sidebar-documentpreview/client.js,@deepseek-ai/dsh-client-ui-sidebar-terminal/client.js,@deepseek-ai/dsh-client-ui-sidebar-files/client.js,@deepseek-ai/dsh-client-ui-settings/client.js,@deepseek-ai/dsh-client-ui-settings-general/client.js,@deepseek-ai/dsh-client-ui-settings-models/client.js,@deepseek-ai/dsh-client-ui-plugin-manager/client.js,@deepseek-ai/dsh-client-ui-settings-plugin-inventory/client.js,@deepseek-ai/dsh-client-ui-conversation/client.js,@deepseek-ai/dsh-client-ui-approval/client.js,@deepseek-ai/dsh-client-ui-chat/client.js,@deepseek-ai/dsh-client-ui-brand-official/client.js,@deepseek-ai/dsh-client-ui-attachment/client.js,@deepseek-ai/dsh-client-ui-tool/client.js,@deepseek-ai/dsh-client-ui-cordis/client.js,@deepseek-ai/dsh-client-ui-workspace/client.js,@deepseek-ai/dsh-client-ui-workflow-run/client.js,@deepseek-ai/dsh-client-ui-input-trigger/client.js,@deepseek-ai/dsh-client-ui-commands/client.js,@deepseek-ai/dsh-client-ui-skill/client.js,@deepseek-ai/dsh-client-ui-subagent/client.js,@deepseek-ai/dsh-client-ui-reference/client.js,@deepseek-ai/dsh-client-ui-jobs/client.js,@deepseek-ai/dsh-client-ui-goal/client.js,@deepseek-ai/dsh-client-ui-message-feedback/client.js,@deepseek-ai/dsh-client-ui-model-selection/client.js,@deepseek-ai/dsh-client-ui-permission-presets/client.js,@deepseek-ai/dsh-client-ui-agent-preset/client.js,@deepseek-ai/dsh-client-ui-settings-session-log/client.js,@deepseek-ai/dsh-client-ui-settings-plugins/client.js,@deepseek-ai/dsh-client-ui-settings-shell/client.js,@deepseek-ai/dsh-client-ui-settings-agent-loop/client.js,@deepseek-ai/dsh-client-ui-settings-subagent/client.js,@deepseek-ai/dsh-client-ui-settings-web-search/client.js,@deepseek-ai/dsh-client-ui-plan/client.js,@deepseek-ai/dsh-client-ui-user-questions/client.js,@deepseek-ai/dsh-client-ui-trajectory/client.js,dsh-word-lookup/client.js,@deepseek-ai/dsh-session-log-export/client.js,@deepseek-ai/dsh-client-file-upload/client.js&rev=d8251020b2f3",
+          "plugins/??@deepseek-ai/dsh-client-ui-open-in-app/client.js,@deepseek-ai/dsh-api-gateway/client.js,@deepseek-ai/dsh-api-job-controller/client.js,@deepseek-ai/dsh-api-terminal-controller/client.js,@deepseek-ai/dsh-api-workspace-files/client.js,@deepseek-ai/dsh-client-ui-settings-account/client.js,@deepseek-ai/dsh-client-hmr/client.js,@deepseek-ai/dsh-cordis-client-runner/client.js,@deepseek-ai/dsh-client-ui-theme/client.js,@deepseek-ai/dsh-client-locale/client.js,@deepseek-ai/dsh-client-shortcuts/client.js,@deepseek-ai/dsh-client-ui-shortcuts/client.js,@deepseek-ai/dsh-client-ui-layout/client.js,@deepseek-ai/dsh-client-ui-renderer/client.js,@deepseek-ai/dsh-client-ui-session/client.js,@deepseek-ai/dsh-client-resources/client.js,@deepseek-ai/dsh-client-ui-sidebar/client.js,@deepseek-ai/dsh-client-ui-sidebar-right/client.js,@deepseek-ai/dsh-client-ui-sidebar-documentpreview/client.js,@deepseek-ai/dsh-client-ui-sidebar-terminal/client.js,@deepseek-ai/dsh-client-ui-sidebar-files/client.js,@deepseek-ai/dsh-client-ui-settings/client.js,@deepseek-ai/dsh-client-ui-settings-general/client.js,@deepseek-ai/dsh-client-ui-settings-models/client.js,@deepseek-ai/dsh-client-ui-plugin-manager/client.js,@deepseek-ai/dsh-client-ui-settings-plugin-inventory/client.js,@deepseek-ai/dsh-client-ui-conversation/client.js,@deepseek-ai/dsh-client-ui-approval/client.js,@deepseek-ai/dsh-client-ui-chat/client.js,@deepseek-ai/dsh-client-ui-brand-official/client.js,@deepseek-ai/dsh-client-ui-attachment/client.js,@deepseek-ai/dsh-client-ui-tool/client.js,@deepseek-ai/dsh-client-ui-cordis/client.js,@deepseek-ai/dsh-client-ui-workspace/client.js,@deepseek-ai/dsh-client-ui-workflow-run/client.js,@deepseek-ai/dsh-client-ui-input-trigger/client.js,@deepseek-ai/dsh-client-ui-commands/client.js,@deepseek-ai/dsh-client-ui-skill/client.js,@deepseek-ai/dsh-client-ui-subagent/client.js,@deepseek-ai/dsh-client-ui-reference/client.js,@deepseek-ai/dsh-client-ui-jobs/client.js,@deepseek-ai/dsh-client-ui-goal/client.js,@deepseek-ai/dsh-client-ui-message-feedback/client.js,@deepseek-ai/dsh-client-ui-model-selection/client.js,@deepseek-ai/dsh-client-ui-permission-presets/client.js,@deepseek-ai/dsh-client-ui-agent-preset/client.js,@deepseek-ai/dsh-client-ui-settings-session-log/client.js,@deepseek-ai/dsh-client-ui-settings-plugins/client.js,@deepseek-ai/dsh-client-ui-settings-shell/client.js,@deepseek-ai/dsh-client-ui-settings-agent-loop/client.js,@deepseek-ai/dsh-client-ui-settings-subagent/client.js,@deepseek-ai/dsh-client-ui-settings-web-search/client.js,@deepseek-ai/dsh-client-ui-plan/client.js,@deepseek-ai/dsh-client-ui-user-questions/client.js,@deepseek-ai/dsh-client-ui-trajectory/client.js,dsh-word-lookup/client.js,@deepseek-ai/dsh-session-log-export/client.js,@deepseek-ai/dsh-client-file-upload/client.js&rev=9b9ab06a0f1f",
           "plugins/??@deepseek-ai/dsh-api-remotes/client.js,@deepseek-ai/dsh-client-ui-deliverables/client.js,@deepseek-ai/dsh-typert-registry/client.js,@deepseek-ai/dsh-client-connection/client.js,@deepseek-ai/dsh-api-workspace-controller/client.js,@deepseek-ai/dsh-api-session-controller/client.js,@deepseek-ai/dsh-client-ui-directory-picker-native/client.js&rev=cff9ad5fd71b"
         ],
         "hasPluginInBatch": true,
@@ -3514,7 +3621,7 @@
           "present": true,
           "eligible": false,
           "text": "",
-          "at": 1790856315095,
+          "at": 1790857264481,
           "rect": null,
           "gesture": {
             "kind": "none",
@@ -3538,7 +3645,7 @@
           "present": true,
           "eligible": false,
           "text": "",
-          "at": 1790856315708,
+          "at": 1790857265100,
           "rect": null,
           "gesture": {
             "kind": "none",
@@ -3554,7 +3661,7 @@
           "present": true,
           "eligible": true,
           "text": "derive",
-          "at": 1790856316321,
+          "at": 1790857265719,
           "rect": {
             "x": 156.6875,
             "y": 175,
@@ -3725,7 +3832,7 @@
           "present": true,
           "eligible": true,
           "text": "he serializer must derive the wire form from the boundary conditions.",
-          "at": 1790856319572,
+          "at": 1790857268967,
           "rect": {
             "x": 45.328125,
             "y": 175,
@@ -3734,7 +3841,7 @@
           },
           "gesture": {
             "kind": "drag",
-            "completedAt": 1790856319573,
+            "completedAt": 1790857268968,
             "pointer": {
               "startX": 44,
               "startY": 185.1953125,
@@ -3776,7 +3883,7 @@
         },
         "last": {
           "kind": "drag",
-          "completedAt": 1790856320340,
+          "completedAt": 1790857269718,
           "pointer": {
             "startX": 62,
             "startY": 185.1953125,
@@ -3790,7 +3897,7 @@
           "present": true,
           "eligible": true,
           "text": " serializer must derive the wire",
-          "at": 1790856320339,
+          "at": 1790857269718,
           "rect": {
             "x": 60.578125,
             "y": 175,
@@ -3799,7 +3906,7 @@
           },
           "gesture": {
             "kind": "drag",
-            "completedAt": 1790856320340,
+            "completedAt": 1790857269718,
             "pointer": {
               "startX": 62,
               "startY": 185.1953125,
@@ -3816,7 +3923,7 @@
           "present": true,
           "eligible": true,
           "text": "derive",
-          "at": 1790856320950,
+          "at": 1790857270335,
           "rect": {
             "x": 156.6875,
             "y": 175,
@@ -3825,7 +3932,7 @@
           },
           "gesture": {
             "kind": "drag",
-            "completedAt": 1790856320340,
+            "completedAt": 1790857269718,
             "pointer": {
               "startX": 62,
               "startY": 185.1953125,
@@ -3840,7 +3947,7 @@
       "doubleClick": {
         "immediatelyAfter": {
           "kind": "double-click",
-          "completedAt": 1790856321566,
+          "completedAt": 1790857270952,
           "pointer": {
             "startX": 128,
             "startY": 185.1953125,
@@ -3852,7 +3959,7 @@
         },
         "afterTrailing": {
           "kind": "double-click",
-          "completedAt": 1790856321566,
+          "completedAt": 1790857270952,
           "pointer": {
             "startX": 128,
             "startY": 185.1953125,
@@ -3867,7 +3974,7 @@
           "present": true,
           "eligible": true,
           "text": "must ",
-          "at": 1790856321572,
+          "at": 1790857270967,
           "rect": {
             "x": 122.1875,
             "y": 175,
@@ -3876,7 +3983,7 @@
           },
           "gesture": {
             "kind": "double-click",
-            "completedAt": 1790856321566,
+            "completedAt": 1790857270952,
             "pointer": {
               "startX": 128,
               "startY": 185.1953125,
@@ -4820,6 +4927,7 @@
                 "height": 19
               }
             },
+            "selection": null,
             "kind": "drag",
             "gestureId": 307
           },
@@ -4849,6 +4957,11 @@
                 "width": 37.859375,
                 "height": 19
               }
+            },
+            "selection": {
+              "present": true,
+              "eligible": true,
+              "text": "derive"
             },
             "kind": "double-click",
             "gestureId": 309
@@ -4950,6 +5063,7 @@
                 "height": 19
               }
             },
+            "selection": null,
             "kind": "drag",
             "gestureId": 310
           },
@@ -4979,6 +5093,11 @@
                 "width": 37.859375,
                 "height": 19
               }
+            },
+            "selection": {
+              "present": true,
+              "eligible": true,
+              "text": "derive"
             },
             "kind": "double-click",
             "gestureId": 312
@@ -5078,6 +5197,7 @@
                 "height": 19
               }
             },
+            "selection": null,
             "kind": "drag",
             "gestureId": 313
           },
@@ -5109,6 +5229,11 @@
                 "width": 37.859375,
                 "height": 19
               }
+            },
+            "selection": {
+              "present": true,
+              "eligible": true,
+              "text": "derive"
             },
             "kind": "double-click",
             "gestureId": 315
@@ -5210,6 +5335,7 @@
                 "height": 19
               }
             },
+            "selection": null,
             "kind": "drag",
             "gestureId": 316
           },
@@ -5242,6 +5368,11 @@
                 "height": 19
               }
             },
+            "selection": {
+              "present": true,
+              "eligible": true,
+              "text": "derive"
+            },
             "kind": "double-click",
             "gestureId": 318
           }
@@ -5252,13 +5383,6 @@
             "shortcut": 0,
             "auto-selection": 0,
             "auto-double-click": 0
-          },
-          "trigger": {
-            "decision": "lookup",
-            "reason": "accepted",
-            "origin": "auto-double-click",
-            "gestureId": 318,
-            "query": "derive"
           },
           "selection": {
             "present": true,
@@ -5375,7 +5499,8 @@
             "auto-double-click": 2
           },
           "firstId": 329,
-          "secondId": 331
+          "secondId": 331,
+          "gapMs": 9
         },
         "repeatDrag": {
           "requests": [
@@ -5388,7 +5513,8 @@
             "auto-double-click": 0
           },
           "firstId": 332,
-          "secondId": 333
+          "secondId": 333,
+          "gapMs": 97
         },
         "derivedAuto": {
           "response": {
@@ -5528,6 +5654,57 @@
           "doubleClicks": 25,
           "cancels": 0
         },
+        "driftDouble": {
+          "gapRequests": 1,
+          "delta": {
+            "shortcut": 0,
+            "auto-selection": 1,
+            "auto-double-click": 0
+          },
+          "kind": "drag",
+          "doubleClicks": 0,
+          "drags": 1,
+          "trigger": {
+            "decision": "lookup",
+            "reason": "accepted",
+            "origin": "auto-selection",
+            "gestureId": 1098,
+            "query": "i"
+          }
+        },
+        "driftBoth": {
+          "requests": 1,
+          "delta": {
+            "shortcut": 0,
+            "auto-selection": 1,
+            "auto-double-click": 0
+          },
+          "kind": "drag",
+          "reason": "accepted",
+          "gestureId": 1100
+        },
+        "touchGesture": {
+          "requests": 0,
+          "delta": {
+            "shortcut": 0,
+            "auto-selection": 0,
+            "auto-double-click": 0
+          },
+          "kind": "drag",
+          "pointerTypeGate": {
+            "decision": "ignored",
+            "reason": "unverified-pointer-kind",
+            "origin": null,
+            "gestureId": 1101,
+            "query": ""
+          },
+          "box": {
+            "x": 1142,
+            "y": 161,
+            "width": 37.859375,
+            "height": 19
+          }
+        },
         "bootGates": {
           "autoDoubleClick": true,
           "autoSelection": true
@@ -5554,10 +5731,10 @@
       "pageErrors": []
     }
   },
-  "finishedAt": "2026-10-01T12:07:08.135Z",
+  "finishedAt": "2026-10-01T12:23:01.454Z",
   "summary": {
-    "total": 153,
-    "passed": 153,
+    "total": 159,
+    "passed": 159,
     "failed": []
   },
   "status": "PASS"
