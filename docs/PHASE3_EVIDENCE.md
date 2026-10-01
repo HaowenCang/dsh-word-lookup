@@ -488,8 +488,8 @@ enumerated exception stops matching, so an exception cannot silently widen.
 | check | result |
 | --- | --- |
 | `npm run scan:credentials` | `PASS — no usable launch token in any tracked file or evidence directory` |
-| files scanned | 85 (tracked + `docs/evidence` + `verify-out` + `reports`) |
-| credential-shaped values found | 2, both enumerated synthetic fixtures in `tests/redact.spec.ts` |
+| files scanned | 97 (tracked + `docs/evidence` + `verify-out` + `reports`) |
+| credential-shaped values found | 4, all of them the two enumerated synthetic fixtures — two occurrences in `tests/redact.spec.ts` and two in the scanner's own exception list, which has to name the value it excuses |
 | negative control | a token planted in `docs/evidence/` → `FAIL`, exit 1; removed → `PASS`, exit 0 |
 | tokens in the committed Phase 3 report | 7 × `token=<redacted>`, 0 unredacted |
 | live isolated-instance credential in any committed/evidence file | **0 occurrences** |
@@ -877,9 +877,34 @@ config and route are untouched.
 | | value |
 | --- | --- |
 | `START_SHA` | `cce8ef51edac511c85d02df2f8f8846d4406142e` |
-| commits | see §21 |
-| worktree after commit | clean |
+| Branch | `master` |
+| Phase 3 implementation commit | `d4c34dc6e745b8740db6a3c818d544e0317d2f5b` — `feat: add sqlite dictionary core` |
+| Evidence document | committed immediately after that, as `docs: record phase 3 evidence`; `git log -1 --format=%H` prints the resulting `HEAD` |
+| Worktree after commit | clean — `git status --porcelain` reports 0 entries |
 | `git diff --check` | no whitespace errors |
+
+The implementation is one commit, not several: the dictionary, the protocol
+change, the tests, the harness extension and the credential scan are one
+coherent change, and splitting them would have produced intermediate commits
+that neither build nor pass. The only commit after it adds this document, which
+cannot name its own SHA.
+
+Git discipline observed:
+
+```text
+no force push              no remote was created
+no push to an unknown remote         (no remote is configured at all)
+Phase 1 / Phase 2 commits  not amended, not rebased, not rewritten
+history                    not rewritten
+git reset --hard           not run
+git clean -fd              not run
+git checkout . / restore . not run
+```
+
+The only deletions performed were of files this phase generated itself and could
+prove worthless: the fixture database and its SQLite sidecars, which
+`scripts/build-fixture-db.mjs` deletes before an explicit `--force` rebuild and
+which are reproduced byte-for-byte by it.
 
 ```text
 Production DSH environment modified during this work: NO

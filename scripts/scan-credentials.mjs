@@ -60,7 +60,8 @@ const ALWAYS_SCANNED = ['docs/evidence', 'verify-out', 'reports']
 const SYNTHETIC = [
   {
     value: 'token=NOTAREALCREDENTIALAAAAAAAAAAAAAAAAAAAAAAAAA',
-    reason: 'tests/redact.spec.ts — a 43-character fabricated fixture, labelled as such in the source',
+    reason:
+      'tests/redact.spec.ts — a 43-character fabricated fixture, labelled as such in the source; also named here, which is why this file reports it too',
   },
   {
     value: 'token=FIXTUREONLYVALUEBBBBBBBBBBBBBBBBBBBBBBBBBBB',
