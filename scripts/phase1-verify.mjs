@@ -1534,6 +1534,402 @@ async function runBrowserChecks(page, state, boot) {
   // reported a lookup it never made. Both are asserted together.
   const phase4 = {}
 
+  // =========================================================================
+  // Phase 4.1 — the platform's click multiplicity, measured before anything is
+  // asserted about it.
+  //
+  // The semantic defect this section exists for: `autoDoubleClick` and
+  // `autoSelection` are supposed to answer two *different* gestures, but a
+  // double click whose second press drifts past the classifier's 5 CSS px drag
+  // threshold was classified as a `drag` at `pointerup`, offered to
+  // `autoSelection`, and consumed — with the platform's own `dblclick` arriving
+  // afterwards and being refused as a duplicate. One platform gesture, looked up
+  // on the wrong switch's path.
+  //
+  // Phase 4 could not see this because its `driftDouble()` issued two *plain*
+  // press/release pairs: Playwright's `mouse.down()`/`mouse.up()` send
+  // `clickCount: 1` on both presses, so Chromium never treated the pair as a
+  // double click at all (`doubleClicks = 0`, `drags = 1` in the sealed Phase 4
+  // report). The positions were measured; the *gesture* was assumed.
+  //
+  // So this phase measures the platform first:
+  //
+  // 1. what `detail` the current Chromium really reports on `mousedown`,
+  //    `click` and `dblclick` for a double click;
+  // 2. whether two plain press/release pairs produce a `dblclick` at all (the
+  //    question the old check silently answered "no" to);
+  // 3. whether the browser's own click-count detector is reachable through CDP
+  //    input, or whether the automation client has to supply the count;
+  // 4. a movement sweep over the second press, recording for every distance
+  //    whether `dblclick` is emitted, what multiplicity the events carry, what
+  //    the selection is, and how the plugin classified the gesture.
+  //
+  // Everything is recorded as evidence; the assertions that depend on it are
+  // written against what the sweep actually observed, and the drift checks below
+  // say which of the two shapes (`platform` or `controlled`) they used.
+  // =========================================================================
+
+  /** Phase 4.1's recorded evidence, kept separate from Phase 4's own. */
+  const phase41 = {}
+
+  /**
+   * The classifier's drag threshold, mirrored here because this harness is plain
+   * JavaScript and the product's copy lives in `src/client/gesture.ts`.
+   *
+   * It cannot be imported, so the two are kept honest from the other side:
+   * `tests/client-gesture.spec.ts` pins the product constant to exactly this
+   * value, and this harness asserts the *overlap* the threshold creates rather
+   * than trusting the number.
+   */
+  const PROBE_DRAG_THRESHOLD_PX = 5
+
+  /** The second press's travel: past the threshold, and the distance the checks use. */
+  const OVERLAP_DISTANCE = 8
+
+  const PLATFORM_EVENT_TYPES = [
+    'pointerdown',
+    'mousedown',
+    'pointermove',
+    'mousemove',
+    'pointerup',
+    'mouseup',
+    'click',
+    'dblclick',
+    'selectionchange',
+  ]
+
+  /** Install a capture-phase trace of every event the platform emits. */
+  const startPlatformTrace = async () => {
+    await page.evaluate((types) => {
+      const events = []
+      const started = performance.now()
+      const listener = (event) => {
+        const selection = document.getSelection()
+        events.push({
+          n: events.length,
+          type: event.type,
+          ms: Math.round((performance.now() - started) * 10) / 10,
+          detail: typeof event.detail === 'number' ? event.detail : null,
+          pointerType: typeof event.pointerType === 'string' ? event.pointerType : null,
+          button: typeof event.button === 'number' ? event.button : null,
+          buttons: typeof event.buttons === 'number' ? event.buttons : null,
+          x: typeof event.clientX === 'number' ? Math.round(event.clientX * 100) / 100 : null,
+          y: typeof event.clientY === 'number' ? Math.round(event.clientY * 100) / 100 : null,
+          text: (selection?.toString() ?? '').slice(0, 32),
+          collapsed: selection?.isCollapsed ?? null,
+        })
+      }
+      window.__PHASE41__ = { events, listener, types, started }
+      for (const type of types) document.addEventListener(type, listener, true)
+    }, PLATFORM_EVENT_TYPES)
+  }
+
+  /** How many events the trace has recorded so far. */
+  const platformTraceLength = async () => await page.evaluate(() => window.__PHASE41__.events.length)
+
+  /**
+   * Read the trace from an index.
+   *
+   * @param from - the index the gesture started at.
+   * @returns the raw event records.
+   */
+  const platformTraceSince = async (from) => await page.evaluate((index) => window.__PHASE41__.events.slice(index), from)
+
+  /**
+   * Project a raw trace onto the facts the checks assert about.
+   *
+   * @param events - the raw records.
+   * @returns the summary.
+   */
+  const summariseTrace = (events) => {
+    const lastOf = (type) => events.filter((event) => event.type === type).at(-1) ?? null
+    const release = lastOf('pointerup')
+    return {
+      order: events.map((event) => `${event.type}${event.detail === null ? '' : `/${String(event.detail)}`}`),
+      mouseDowns: events.filter((event) => event.type === 'mousedown').map((event) => ({ detail: event.detail, button: event.button })),
+      clicks: events.filter((event) => event.type === 'click').map((event) => event.detail),
+      doubleClicks: events.filter((event) => event.type === 'dblclick').map((event) => event.detail),
+      emittedDoubleClick: events.some((event) => event.type === 'dblclick'),
+      pointerType: release?.pointerType ?? null,
+      selectionAtRelease: release?.text ?? null,
+      collapsedAtRelease: release?.collapsed ?? null,
+      // The raw recording the brief asks for: every event, in order, with its
+      // type, detail, pointer kind, button state, position, timestamp and the
+      // selection as it stood when the event was delivered.
+      events,
+    }
+  }
+
+  /**
+   * Two press/release pairs at one point, with the click multiplicity supplied
+   * explicitly.
+   *
+   * Playwright's `mouse.down()`/`up()` send `clickCount: 1` unless told
+   * otherwise, so a caller that wants the platform to recognise a multi-click
+   * sequence has to supply the count the platform itself would have computed —
+   * which is exactly what the probe above establishes.
+   *
+   * @param x - the press x.
+   * @param y - the press y.
+   * @param options - the counts and the second press's travel.
+   */
+  const pressPairs = async (x, y, options = {}) => {
+    const firstCount = options.firstCount ?? 1
+    const secondCount = options.secondCount ?? 1
+    const firstRelease = options.firstRelease ?? 1
+    const secondRelease = options.secondRelease ?? 1
+    const drift = options.drift ?? 0
+    for (let index = 0; index < 2; index += 1) {
+      const count = index === 0 ? firstCount : secondCount
+      const release = index === 0 ? firstRelease : secondRelease
+      await page.mouse.move(x, y)
+      await page.mouse.down({ clickCount: count })
+      if (index === 1 && drift > 0) await page.mouse.move(x + drift, y, { steps: 2 })
+      await page.mouse.up({ clickCount: release })
+    }
+  }
+
+  /**
+   * One probe gesture: perform it, then read the trace, the wire and the plugin.
+   *
+   * @param perform - the gesture.
+   * @returns the measurement.
+   */
+  const probeGesture = async (perform) => {
+    const before = await readPluginView(page)
+    const from = await platformTraceLength()
+    state.requests.length = 0
+    state.responses.length = 0
+    await perform()
+    await settle()
+    const after = await readPluginView(page)
+    const trace = summariseTrace(await platformTraceSince(from))
+    return {
+      events: trace.events,
+      trace: { order: trace.order, mouseDowns: trace.mouseDowns, clicks: trace.clicks, doubleClicks: trace.doubleClicks },
+      emittedDoubleClick: trace.emittedDoubleClick,
+      selectionAtRelease: trace.selectionAtRelease,
+      collapsedAtRelease: trace.collapsedAtRelease,
+      pointerType: trace.pointerType,
+      requests: [...state.requests].length,
+      delta: originDelta(before, after),
+      kind: after.gestures.last.kind,
+      clickMultiplicity: after.gestures.last.clickMultiplicity,
+      drags: after.gestures.counters.drags - before.gestures.counters.drags,
+      doubleClickGestures: after.gestures.counters.doubleClickGestures - before.gestures.counters.doubleClickGestures,
+      trigger:
+        after.trigger === null
+          ? null
+          : { decision: after.trigger.decision, reason: after.trigger.reason, origin: after.trigger.origin, gestureId: after.trigger.gestureId },
+    }
+  }
+
+  await ensureSwitches(page, QUADRANTS.S00)
+  await startPlatformTrace()
+
+  // (1) A normal double click, exactly as the product's own path issues it.
+  const normalBox = await wordBox(page, 'derive')
+  const normalPoint = normalBox === null ? null : { x: normalBox.x + normalBox.width / 2, y: normalBox.y + normalBox.height / 2 }
+  const probeNormalDouble = await probeGesture(async () => {
+    if (normalPoint === null) return
+    await clearSelection(page)
+    await page.mouse.dblclick(normalPoint.x, normalPoint.y)
+  })
+
+  // (2) Two plain press/release pairs — the shape the sealed Phase 4 check used.
+  const probePlainPairs = await probeGesture(async () => {
+    if (normalPoint === null) return
+    await clearSelection(page)
+    await pressPairs(normalPoint.x, normalPoint.y)
+  })
+
+  // (2b) The sealed Phase 4 check exactly: two plain presses with the second one
+  // drifting 8 px. This is `driftDouble()` as it was written, and it is the
+  // measurement that shows the old check could not have observed a double click.
+  const probePlainDriftPairs = await probeGesture(async () => {
+    if (normalPoint === null) return
+    await clearSelection(page)
+    await pressPairs(normalPoint.x, normalPoint.y, { drift: OVERLAP_DISTANCE })
+  })
+
+  // (3) The same two pairs through raw CDP with no `clickCount` at all: this
+  // asks whether the browser's own click-count detector can be reached from
+  // automation input, or whether the count has to be supplied by the client.
+  let rawCdp = { supported: false, error: null }
+  try {
+    const cdp = await page.context().newCDPSession(page)
+    rawCdp = await probeGesture(async () => {
+      if (normalPoint === null) return
+      await clearSelection(page)
+      for (let index = 0; index < 2; index += 1) {
+        await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: normalPoint.x, y: normalPoint.y, button: 'none', buttons: 0 })
+        await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: normalPoint.x, y: normalPoint.y, button: 'left', buttons: 1 })
+        await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: normalPoint.x, y: normalPoint.y, button: 'left', buttons: 0 })
+      }
+    })
+    rawCdp.supported = true
+    await cdp.detach()
+  } catch (error) {
+    rawCdp = { supported: false, error: String(error?.message ?? error) }
+  }
+
+  // (4) The movement sweep. Second press at the same point, released with the
+  // multiplicity a real second press carries, after travelling N CSS px.
+  const MOVEMENT_SWEEP = [0, 1, 2, 3, 4, 5, 6, 8, 10, 12]
+  const sweep = []
+  for (const distance of MOVEMENT_SWEEP) {
+    const measured = await probeGesture(async () => {
+      if (normalPoint === null) return
+      await clearSelection(page)
+      await pressPairs(normalPoint.x, normalPoint.y, { secondCount: 2, secondRelease: 2, drift: distance })
+    })
+    sweep.push({ distance, ...measured })
+  }
+
+  // (5) A second press the platform flags as a multi-click, released with a
+  // *single* click count: does the platform withhold its `dblclick` because the
+  // release did not complete one? Measured rather than assumed — the answer
+  // decides whether the §9 fallback ("flagged as a multi-click, no `dblclick`
+  // arrives") is reachable through automation input at all.
+  const probeMultiClickPressSingleRelease = await probeGesture(async () => {
+    if (normalPoint === null) return
+    await clearSelection(page)
+    await pressPairs(normalPoint.x, normalPoint.y, { secondCount: 2, secondRelease: 1, drift: OVERLAP_DISTANCE })
+  })
+
+  // The overlap the fix has to answer: the second press travels at least the
+  // classifier's drag threshold *and* the platform still reports the gesture as
+  // a double click. `overlapObserved` is read off the row the drift checks use,
+  // not off the whole sweep, so the checks below and the mode they announce
+  // cannot disagree with the sweep.
+  const overlapRow = sweep.find((row) => row.distance === OVERLAP_DISTANCE) ?? null
+  const overlapObserved = overlapRow?.emittedDoubleClick === true
+  const overlapMode = overlapObserved ? 'platform' : 'controlled'
+
+  phase41.probe = {
+    normalDouble: probeNormalDouble,
+    plainPairs: probePlainPairs,
+    plainDriftPairs: probePlainDriftPairs,
+    rawCdp,
+    sweep,
+    multiClickPressSingleRelease: probeMultiClickPressSingleRelease,
+    threshold: PROBE_DRAG_THRESHOLD_PX,
+    overlapDistance: OVERLAP_DISTANCE,
+    overlapObserved,
+    overlapMode,
+  }
+
+  record(
+    `${prefix}P41A`,
+    'the current Chromium still reports click multiplicity on a double click: mousedown/click/dblclick carry detail 1 then 2',
+    probeNormalDouble.emittedDoubleClick === true &&
+      JSON.stringify(probeNormalDouble.trace.mouseDowns.map((entry) => entry.detail)) === '[1,2]' &&
+      JSON.stringify(probeNormalDouble.trace.clicks) === '[1,2]' &&
+      JSON.stringify(probeNormalDouble.trace.doubleClicks) === '[2]' &&
+      probeNormalDouble.doubleClickGestures === 1,
+    JSON.stringify(probeNormalDouble),
+  )
+  record(
+    `${prefix}P41B`,
+    'the sealed Phase 4 P27/P28 sequence — two plain presses, the second drifting 8 px — produces no dblclick at all, so that check measured a drag',
+    probePlainPairs.emittedDoubleClick === false &&
+      probePlainDriftPairs.emittedDoubleClick === false &&
+      JSON.stringify(probePlainDriftPairs.trace.mouseDowns.map((entry) => entry.detail)) === '[1,1]' &&
+      JSON.stringify(probePlainDriftPairs.trace.clicks) === '[1,1]' &&
+      probePlainDriftPairs.doubleClickGestures === 0 &&
+      probePlainDriftPairs.drags === 1,
+    JSON.stringify({ plainPairs: { order: probePlainPairs.trace.order, md: probePlainPairs.trace.mouseDowns.map((entry) => entry.detail), kind: probePlainPairs.kind }, plainDriftPairs: { order: probePlainDriftPairs.trace.order, md: probePlainDriftPairs.trace.mouseDowns.map((entry) => entry.detail), kind: probePlainDriftPairs.kind, drags: probePlainDriftPairs.drags, doubleClicks: probePlainDriftPairs.doubleClickGestures } }),
+  )
+  record(
+    `${prefix}P41C`,
+    overlapObserved
+      ? `NO NATURAL OVERLAP is not the case here: a second press that drifts past ${String(PROBE_DRAG_THRESHOLD_PX)} px is still reported as a double click (movement sweep complete)`
+      : 'NO NATURAL OVERLAP OBSERVED — this Chromium emitted no dblclick for a drifting second press; the sweep is recorded and the drift checks use a controlled dblclick',
+    sweep.length === MOVEMENT_SWEEP.length && (overlapObserved ? overlapRow?.emittedDoubleClick === true : true),
+    JSON.stringify({
+      overlapObserved,
+      overlapMode,
+      overlapDistance: OVERLAP_DISTANCE,
+      rows: sweep.map((row) => ({
+        d: row.distance,
+        dblclick: row.emittedDoubleClick,
+        md: row.trace.mouseDowns.map((entry) => entry.detail),
+        clicks: row.trace.clicks,
+        kind: row.kind,
+        selection: row.selectionAtRelease,
+      })),
+    }),
+  )
+
+  /**
+   * The overlap gesture in one switch state, with the platform's own dblclick.
+   *
+   * @param gatesWanted - the switch state to establish.
+   * @param word - the fixture word to aim at.
+   * @param options - the release multiplicity, the travel, and whether to escalate
+   * with a separate controlled pair when the platform emits no `dblclick` for a
+   * drifting press.
+   * @returns the measurement.
+   */
+  const measureDrift = async (gatesWanted, word, options = {}) => {
+    const active = await ensureSwitches(page, gatesWanted)
+    const before = await readPluginView(page)
+    const box = await wordBox(page, word)
+    const from = await platformTraceLength()
+    state.requests.length = 0
+    state.responses.length = 0
+    if (box !== null) {
+      const cx = box.x + box.width / 2
+      const cy = box.y + box.height / 2
+      await clearSelection(page)
+      await page.mouse.move(cx, cy)
+      await page.mouse.down({ clickCount: 1 })
+      await page.mouse.up({ clickCount: 1 })
+      await page.mouse.move(cx, cy)
+      await page.mouse.down({ clickCount: 2 })
+      await page.mouse.move(cx + (options.drift ?? OVERLAP_DISTANCE), cy, { steps: 2 })
+      await page.mouse.up({ clickCount: options.releaseCount ?? 2 })
+      if (options.escalate === true) {
+        // The controlled fallback: the one shape this Chromium does emit
+        // `dblclick` for, delivered after the drifting press rather than by it.
+        await page.mouse.move(cx, cy)
+        await page.mouse.down({ clickCount: 2 })
+        await page.mouse.up({ clickCount: 2 })
+      }
+      await settle()
+    }
+    const requests = await waitForQuiescence()
+    const after = await readPluginView(page)
+    const trace = summariseTrace(await platformTraceSince(from))
+    return {
+      active,
+      box,
+      mode: options.escalate === true ? 'controlled-dblclick' : 'platform-dblclick',
+      requests: requests.length,
+      queries: requestQueries(requests),
+      delta: originDelta(before, after),
+      kind: after.gestures.last.kind,
+      clickMultiplicity: after.gestures.last.clickMultiplicity,
+      drags: after.gestures.counters.drags - before.gestures.counters.drags,
+      doubleClicks: after.gestures.counters.doubleClickGestures - before.gestures.counters.doubleClickGestures,
+      emittedDoubleClick: trace.emittedDoubleClick,
+      events: trace.events,
+      trace: { order: trace.order, mouseDowns: trace.mouseDowns, clicks: trace.clicks, doubleClicks: trace.doubleClicks },
+      selectionAtRelease: trace.selectionAtRelease,
+      trigger:
+        after.trigger === null
+          ? null
+          : {
+              decision: after.trigger.decision,
+              reason: after.trigger.reason,
+              origin: after.trigger.origin,
+              gestureId: after.trigger.gestureId,
+              query: after.trigger.query,
+            },
+      capture: { eligible: after.capture.eligible, text: after.capture.text },
+    }
+  }
+
   /** Wait until the observed request stream stops growing. */
   async function waitForQuiescence(timeoutMs = 20_000) {
     const deadline = Date.now() + timeoutMs
@@ -1703,6 +2099,11 @@ async function runBrowserChecks(page, state, boot) {
       s10.double.doubleClicks === 1 &&
       s10.double.kind === 'double-click' &&
       s10.double.trigger?.reason === 'switch-off' &&
+      // The autoSelection-only regression stated as deltas: the platform really
+      // recognised a double click (+1), and neither automatic path issued
+      // anything for it — including `auto-selection`, which is ON here.
+      s10.double.delta['auto-selection'] === 0 &&
+      s10.double.delta['auto-double-click'] === 0 &&
       noAutomaticOrigin(s10.double.delta),
     JSON.stringify(phase4.s10.double),
   )
@@ -2118,12 +2519,12 @@ async function runBrowserChecks(page, state, boot) {
   )
 
   // --- stress ---------------------------------------------------------------
-  // The gesture storm is replayed in every quadrant. 100 + 100 is run for the two
-  // states the brief requires in a real browser (both off, both on) and a reduced
-  // 25 + 25 batch for the two single-switch states, whose only additional claim
-  // is *which* switch fired — a claim the batch size cannot weaken. The full
-  // 100 + 100 combinatorial matrix is covered exhaustively and cheaply in
-  // `tests/client-trigger.spec.ts` and `tests/client-runtime-harness.spec.ts`.
+  // The gesture storm is replayed in **all four** quadrants of the isolated
+  // instance, 100 drags + 100 double clicks each, on both boots. Phase 4.1
+  // raised the two single-switch batches from 25 to 100 and every row asserts
+  // `doubleClicks === 100`: a "true double click" is only true if the platform's
+  // own `dblclick` was recognised, and the old drifting check (`B/R P27`) is the
+  // reason that has to be asserted rather than assumed.
   async function storm(dragCount, doubleClickCount) {
     const before = await readPluginView(page)
     state.requests.length = 0
@@ -2176,108 +2577,200 @@ async function runBrowserChecks(page, state, boot) {
   )
 
   await ensureSwitches(page, QUADRANTS.S10)
-  const stress10 = await storm(25, 25)
+  const stress10 = await storm(100, 100)
   phase4.stress10 = stress10
   record(
     `${prefix}P24`,
-    'S10 stress — real drags and double clicks produce exactly one lookup per drag and none per double click',
-    stress10.drags === 25 &&
-      stress10.doubleClicks === 25 &&
-      stress10.requests === 25 &&
-      stress10.delta['auto-selection'] === 25 &&
+    'S10 stress — 100 true drags and 100 true double clicks produce exactly one lookup per drag and none per double click',
+    stress10.drags === 100 &&
+      stress10.doubleClicks === 100 &&
+      stress10.requests === 100 &&
+      stress10.delta['auto-selection'] === 100 &&
       stress10.delta['auto-double-click'] === 0,
     JSON.stringify(stress10),
   )
 
   await ensureSwitches(page, QUADRANTS.S01)
-  const stress01 = await storm(25, 25)
+  const stress01 = await storm(100, 100)
   phase4.stress01 = stress01
   record(
     `${prefix}P25`,
-    'S01 stress — real gestures produce exactly one lookup per double click and none per drag',
-    stress01.drags === 25 &&
-      stress01.doubleClicks === 25 &&
-      stress01.requests === 25 &&
-      stress01.delta['auto-double-click'] === 25 &&
+    'S01 stress — 100 true drags and 100 true double clicks produce exactly one lookup per double click and none per drag',
+    stress01.drags === 100 &&
+      stress01.doubleClicks === 100 &&
+      stress01.requests === 100 &&
+      stress01.delta['auto-double-click'] === 100 &&
       stress01.delta['auto-selection'] === 0,
     JSON.stringify(stress01),
   )
 
-  // --- a double click that also travels, and a pointer kind nobody measured ---
-  // Two platform facts this phase must not *assume*. `dblclick` is the browser's
-  // own recognition and the plugin consumes it, but the classifier's drag
-  // threshold (5 CSS px) and the platform's double-click area are different rules:
-  // a second press that drifts past 5 px while selecting a word can be BOTH a drag
-  // and the second half of a double click. The plugin's rule is that a press-release
-  // pair which travels far enough over an eligible selection is a drag, and the
-  // `dblclick` that follows promotes that same identity and is therefore refused as
-  // a duplicate — one platform gesture, one lookup, on the drag's path. This
-  // measures that, rather than asserting which one wins.
-  const driftDouble = async (word) => {
-    const box = await wordBox(page, word)
-    if (box === null) return null
-    const cx = box.x + box.width / 2
-    const cy = box.y + box.height / 2
-    await clearSelection(page)
-    await page.mouse.move(cx, cy)
-    await page.mouse.down()
-    await page.mouse.up()
-    await clearSelection(page)
-    await page.mouse.move(cx, cy)
-    await page.mouse.down()
-    await page.mouse.move(cx + 8, cy, { steps: 3 })
-    await page.mouse.up()
-    await settle()
-    return box
-  }
+  // --- the overlap, in the three switch states that can answer it ------------
+  // Phase 4 measured this sequence with two *plain* press/release pairs, which
+  // this Chromium does not treat as a double click at all (`P41B`). The old
+  // checks therefore never observed a `dblclick`, and their assertions —
+  // `drags + doubleClicks >= 1` — were satisfied by the drag alone. Phase 4.1
+  // replaces them with checks that assert the platform's own recognition
+  // (`doubleClickGestures +1`) and the *path* the lookup may use.
+  //
+  // Each row below is one real gesture in one switch state:
+  //
+  //   press#1 (detail 1)   press#2 (detail 2) + drift >= 5 px   release   dblclick
+  //
+  // `driftFallback` is true only if `P41C` reported NO NATURAL OVERLAP OBSERVED,
+  // in which case the drifting press is followed by a separate zero-movement
+  // pair that does produce the platform's `dblclick`; the recorded `mode` says
+  // which shape was used.
+  const driftFallback = overlapObserved !== true
 
   await ensureSwitches(page, QUADRANTS.S10)
-  state.requests.length = 0
-  state.responses.length = 0
-  const driftBefore = await readPluginView(page)
-  await driftDouble('derive')
-  const driftRequests = await waitForQuiescence()
-  const driftAfter = await readPluginView(page)
-  const drift = {
-    gapRequests: driftRequests.length,
-    delta: originDelta(driftBefore, driftAfter),
-    kind: driftAfter.gestures.last.kind,
-    doubleClicks: driftAfter.gestures.counters.doubleClickGestures - driftBefore.gestures.counters.doubleClickGestures,
-    drags: driftAfter.gestures.counters.drags - driftBefore.gestures.counters.drags,
-    trigger: driftAfter.trigger,
-  }
-  phase4.driftDouble = drift
+  const drift10 = await measureDrift(QUADRANTS.S10, 'derive', {
+    drift: OVERLAP_DISTANCE,
+    releaseCount: driftFallback ? 1 : 2,
+    escalate: driftFallback,
+  })
+  phase41.drift10 = drift10
   record(
     `${prefix}P27`,
-    'S10 — a double click whose second release drifts past the drag threshold is still at most one lookup',
-    drift.gapRequests <= 1 &&
-      drift.drags + drift.doubleClicks >= 1 &&
-      Object.values(drift.delta).reduce((total, value) => total + value, 0) <= 1,
-    JSON.stringify(drift),
+    'S10 — autoSelection on: a platform double click whose second press drifts past the drag threshold is one double-click gesture and zero lookups',
+    drift10.emittedDoubleClick === true &&
+      drift10.doubleClicks === 1 &&
+      drift10.requests === 0 &&
+      drift10.kind === 'double-click' &&
+      drift10.delta['auto-selection'] === 0 &&
+      drift10.delta['auto-double-click'] === 0 &&
+      noAutomaticOrigin(drift10.delta),
+    JSON.stringify(drift10),
+  )
+
+  await ensureSwitches(page, QUADRANTS.S01)
+  const drift01 = await measureDrift(QUADRANTS.S01, 'derive', {
+    drift: OVERLAP_DISTANCE,
+    releaseCount: driftFallback ? 1 : 2,
+    escalate: driftFallback,
+  })
+  phase41.drift01 = drift01
+  record(
+    `${prefix}P30`,
+    'S01 — autoDoubleClick on: the same drifting double click is one double-click gesture and exactly one auto-double-click lookup',
+    drift01.emittedDoubleClick === true &&
+      drift01.doubleClicks === 1 &&
+      drift01.requests === 1 &&
+      drift01.delta['auto-double-click'] === 1 &&
+      drift01.delta['auto-selection'] === 0 &&
+      drift01.trigger?.origin === 'auto-double-click',
+    JSON.stringify(drift01),
   )
 
   await ensureSwitches(page, QUADRANTS.S11)
-  state.requests.length = 0
-  state.responses.length = 0
-  const driftBothBefore = await readPluginView(page)
-  await driftDouble('derive')
-  const driftBothRequests = await waitForQuiescence()
-  const driftBothAfter = await readPluginView(page)
-  const driftBoth = {
-    requests: driftBothRequests.length,
-    delta: originDelta(driftBothBefore, driftBothAfter),
-    kind: driftBothAfter.gestures.last.kind,
-    reason: driftBothAfter.trigger?.reason ?? null,
-    gestureId: driftBothAfter.trigger?.gestureId ?? null,
-  }
-  phase4.driftBoth = driftBoth
+  const drift11 = await measureDrift(QUADRANTS.S11, 'derive', {
+    drift: OVERLAP_DISTANCE,
+    releaseCount: driftFallback ? 1 : 2,
+    escalate: driftFallback,
+  })
+  phase41.drift11 = drift11
   record(
     `${prefix}P28`,
-    'S11 — the same drifting double click produces exactly one lookup, never one per switch',
-    driftBoth.requests === 1 &&
-      driftBoth.delta['auto-selection'] + driftBoth.delta['auto-double-click'] === 1 &&
-      driftBoth.delta.shortcut === 0,
-    JSON.stringify(driftBoth),
+    'S11 — both on: the same drifting double click is exactly one lookup, from the auto-double-click path, never one per switch',
+    drift11.emittedDoubleClick === true &&
+      drift11.doubleClicks === 1 &&
+      drift11.requests === 1 &&
+      drift11.delta['auto-double-click'] === 1 &&
+      drift11.delta['auto-selection'] === 0 &&
+      drift11.trigger?.origin === 'auto-double-click',
+    JSON.stringify(drift11),
+  )
+
+  // The safe direction, measured. Two shapes have to be told apart here, and the
+  // probe above decided which of them this runtime can produce:
+  //
+  // - a press the platform *flags* as a multi-click whose `dblclick` never
+  //   arrives: not reachable through automation input, because Chromium takes
+  //   the count from the press and emits `dblclick` from it — probe (5) measured
+  //   exactly that. The shape is therefore covered by the harness, where the
+  //   event stream is exact, and not claimed here.
+  // - a drag-shaped sequence whose click multiplicity was never observed at all:
+  //   reachable, and refused. It is the same safety rule applied to the other
+  //   way a press can be unverified.
+  //
+  // Both halves are asserted: nothing is issued for the unverified press, and a
+  // real drag in the same switch state still issues exactly one lookup.
+  await ensureSwitches(page, QUADRANTS.S11)
+  const syntheticBox = await wordBox(page, 'derive')
+  state.requests.length = 0
+  state.responses.length = 0
+  const unverifiedBefore = await readPluginView(page)
+  if (syntheticBox !== null) {
+    await page.evaluate(
+      ({ x, y }) => {
+        const host = document.querySelector('[data-phase1-word="derive"]')
+        const range = document.createRange()
+        range.selectNodeContents(host)
+        const selection = document.getSelection()
+        selection.removeAllRanges()
+        selection.addRange(range)
+        // Deliberately *no* `mousedown`: this is what a synthetic or
+        // automation-delivered drag looks like, so the platform's click
+        // multiplicity never reaches the plugin.
+        const base = {
+          bubbles: true,
+          cancelable: true,
+          composed: true,
+          pointerId: 4343,
+          pointerType: 'mouse',
+          isPrimary: true,
+          button: 0,
+          buttons: 1,
+          clientX: x,
+          clientY: y,
+        }
+        document.dispatchEvent(new PointerEvent('pointerdown', base))
+        document.dispatchEvent(new PointerEvent('pointermove', { ...base, clientX: x + 40 }))
+        document.dispatchEvent(new PointerEvent('pointerup', { ...base, buttons: 0, clientX: x + 40 }))
+      },
+      { x: syntheticBox.x + 2, y: syntheticBox.y + syntheticBox.height / 2 },
+    )
+  }
+  await settle()
+  const unverifiedAfter = await readPluginView(page)
+  const unverified = {
+    requests: [...state.requests].length,
+    delta: originDelta(unverifiedBefore, unverifiedAfter),
+    kind: unverifiedAfter.gestures.last.kind,
+    clickMultiplicity: unverifiedAfter.gestures.last.clickMultiplicity,
+    mouseDowns: unverifiedAfter.gestures.counters.mouseDowns - unverifiedBefore.gestures.counters.mouseDowns,
+    trigger: unverifiedAfter.trigger,
+  }
+  state.requests.length = 0
+  state.responses.length = 0
+  const verifiedBefore = await readPluginView(page)
+  await dragSelectWord(page, 'went')
+  const verifiedRequests = requestQueries([...state.requests])
+  const verifiedAfter = await readPluginView(page)
+  phase41.unverifiedMultiplicity = {
+    ...unverified,
+    recovery: {
+      requests: verifiedRequests,
+      delta: originDelta(verifiedBefore, verifiedAfter),
+      mouseDowns: verifiedAfter.gestures.counters.mouseDowns - verifiedBefore.gestures.counters.mouseDowns,
+    },
+  }
+  record(
+    `${prefix}P31`,
+    'S11 — a drag-shaped sequence whose click multiplicity was never observed issues nothing, and a real drag in the same state still fires once',
+    syntheticBox !== null &&
+      unverified.requests === 0 &&
+      unverified.kind === 'drag' &&
+      unverified.clickMultiplicity === 'unknown' &&
+      unverified.mouseDowns === 0 &&
+      noAutomaticOrigin(unverified.delta) &&
+      unverified.trigger?.reason === 'unverified-click-multiplicity' &&
+      verifiedRequests.length === 1 &&
+      verifiedAfter.trigger?.origin === 'auto-selection' &&
+      // The only difference between the two sequences is the missing event: the
+      // real drag was preceded by a `mousedown`, and the counter proves the
+      // listener was alive for both.
+      phase41.unverifiedMultiplicity.recovery.mouseDowns === 1,
+    JSON.stringify(phase41.unverifiedMultiplicity),
   )
 
   // --- an unverified pointer kind produces no automatic I/O ------------------
@@ -2358,6 +2851,10 @@ async function runBrowserChecks(page, state, boot) {
   phase4.bootGates = bootGates
   phase4.restoredGates = restoredGates
   facts.phase4 = phase4
+  // Phase 4.1's own record: the platform probe, the movement sweep and the four
+  // overlap checks, kept beside Phase 4's facts rather than inside them so the
+  // sealed Phase 4 evidence stays readable as what it measured.
+  facts.phase41 = phase41
 
   // --- settings mirror ------------------------------------------------------
   // Already measured at `${prefix}20`/`${prefix}21`, before any write could move

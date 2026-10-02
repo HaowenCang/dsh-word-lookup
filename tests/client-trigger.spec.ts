@@ -40,7 +40,10 @@ function classification(
   kind: GestureClassification['kind'],
   overrides: Partial<GestureClassification> = {},
 ): GestureClassification {
-  return { id, kind, pointerType: 'mouse', at: 1000 + id, ...overrides }
+  // `single` by default: every case below is about a press the platform reported
+  // as a first click, which is what a real drag carries. The multi-click cases
+  // say so explicitly.
+  return { id, kind, pointerType: 'mouse', clickMultiplicity: 'single', at: 1000 + id, ...overrides }
 }
 
 /** A selection that passed qualification. */
@@ -186,6 +189,92 @@ describe('only a real gesture qualifies', () => {
   it('refuses an unclassified kind even when an identity exists', () => {
     const decision = evaluate({ classification: classification(3, 'none'), selection: eligible() }, S11)
     expect(decision).toMatchObject({ decision: 'ignored', reason: 'not-a-trigger-gesture' })
+  })
+})
+
+describe('a multi-click press never buys an auto-selection lookup', () => {
+  it('refuses a drag whose press the platform reported as a second click', () => {
+    const decision = evaluate(
+      { classification: classification(1, 'drag', { clickMultiplicity: 'multi' }), selection: eligible() },
+      S10,
+    )
+    expect(decision).toMatchObject({ decision: 'ignored', reason: 'multi-click-sequence', origin: null })
+    expect(decision.ledger).toBe(EMPTY_LEDGER)
+  })
+
+  it('refuses a drag whose press multiplicity was never observed', () => {
+    const decision = evaluate(
+      { classification: classification(1, 'drag', { clickMultiplicity: 'unknown' }), selection: eligible() },
+      S10,
+    )
+    expect(decision).toMatchObject({ decision: 'ignored', reason: 'unverified-click-multiplicity', origin: null })
+    expect(decision.ledger).toBe(EMPTY_LEDGER)
+  })
+
+  it('lets the double click the same press belongs to through, on its own switch', () => {
+    // The identity was refused, not consumed, so the platform's own recognition
+    // of the gesture is still answered — and by the switch that owns it.
+    const refused = evaluate(
+      { classification: classification(7, 'drag', { clickMultiplicity: 'multi' }), selection: eligible() },
+      S11,
+    )
+    const accepted = evaluate(
+      { classification: classification(7, 'double-click', { clickMultiplicity: 'multi' }), selection: eligible() },
+      S11,
+      refused.ledger,
+    )
+    expect(accepted).toMatchObject({ decision: 'lookup', origin: 'auto-double-click', query: 'derive' })
+    expect(accepted.ledger.consumed).toEqual([7])
+  })
+
+  it('never applies the rule to the double-click path', () => {
+    // A `double-click` classification is the platform's own recognition; it is
+    // answered by its own switch whatever the press counter said, including
+    // `unknown` for a `dblclick` delivered with no pointer events at all.
+    for (const clickMultiplicity of ['single', 'multi', 'unknown'] as const) {
+      const decision = evaluate(
+        { classification: classification(2, 'double-click', { clickMultiplicity }), selection: eligible() },
+        S01,
+      )
+      expect(decision, clickMultiplicity).toMatchObject({ decision: 'lookup', origin: 'auto-double-click' })
+    }
+  })
+
+  it('reports the switch first and the pointer kind second, so each refusal keeps its own name', () => {
+    const off = evaluate(
+      { classification: classification(1, 'drag', { clickMultiplicity: 'multi' }), selection: eligible() },
+      S00,
+    )
+    const unverifiedPointer = evaluate(
+      {
+        classification: classification(2, 'drag', { clickMultiplicity: 'multi', pointerType: 'touch' }),
+        selection: eligible(),
+      },
+      S11,
+    )
+    expect(off.reason).toBe('switch-off')
+    expect(unverifiedPointer.reason).toBe('unverified-pointer-kind')
+  })
+
+  it('holds the four-state matrix for a multi-click drag, state by state', () => {
+    for (const gates of [S00, S10, S01, S11]) {
+      const decision = evaluate(
+        { classification: classification(1, 'drag', { clickMultiplicity: 'multi' }), selection: eligible() },
+        gates,
+      )
+      expect(decision.decision, JSON.stringify(gates)).toBe('ignored')
+      expect(decision.origin).toBeNull()
+    }
+  })
+
+  it('accepts the one press kind a drag may come from', () => {
+    for (const gates of [S10, S11]) {
+      const decision = evaluate(
+        { classification: classification(1, 'drag', { clickMultiplicity: 'single' }), selection: eligible() },
+        gates,
+      )
+      expect(decision).toMatchObject({ decision: 'lookup', origin: 'auto-selection' })
+    }
   })
 })
 

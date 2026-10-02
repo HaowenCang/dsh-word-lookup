@@ -26,6 +26,18 @@
  * consumes. That is what makes "one semantic gesture, at most one automatic
  * lookup" provable without consulting the clock, the text or the geometry.
  *
+ * **Multiplicity.** Phase 4.1 added one more platform fact, because identity
+ * alone could not keep the two automatic switches independent: a double click
+ * whose second press drifted past {@link DRAG_THRESHOLD_PX} was classified as a
+ * drag at `pointerup`, and the `dblclick` that arrived afterwards was refused as
+ * a duplicate of the identity the drag had already spent. The classification
+ * therefore also carries the platform's own click multiplicity for the press
+ * ({@link ClickMultiplicity}, read from the compatibility `mousedown` that lands
+ * between `pointerdown` and `pointerup`), and the trigger gate refuses an
+ * `auto-selection` lookup that is not verifiably a single click. Classifying
+ * movement is unchanged; what changed is that the verdict now says which press
+ * produced it.
+ *
  * **This module still classifies only.** Nothing here issues a request or knows
  * that a dictionary exists; the decision to look something up lives in
  * `./trigger.js`, and the request itself in `./lookup.js`.
@@ -41,14 +53,47 @@
  * text drag covers. It is a named constant rather than a literal so that the
  * unit tests decide on the same value the product does.
  *
- * Deliberately **not** derived from the platform double-click interval: the
- * browser already performs that recognition and reports it as `dblclick`, and
- * re-deriving it in user space would duplicate a decision the platform makes
- * better.
+ * Deliberately **not** derived from the platform's double-click interval or its
+ * double-click area: the browser already performs that recognition and reports
+ * it as `dblclick` plus a click count, and re-deriving it in user space would
+ * duplicate a decision the platform makes better. The two rules are genuinely
+ * different, which is why a press can satisfy both at once — and why the
+ * multiplicity the platform reports is carried alongside this threshold rather
+ * than folded into it (see {@link ClickMultiplicity}).
  */
 export declare const DRAG_THRESHOLD_PX = 5;
 /** The semantic gestures the product distinguishes. */
 export type GestureKind = 'none' | 'drag' | 'double-click' | 'other';
+/**
+ * What the platform's own click counter said about the press that opened a
+ * gesture.
+ *
+ * `MouseEvent.detail` is the browser's click multiplicity: it is `1` for a
+ * fresh press and `2` for the second press of a double click. Phase 4.1 measured
+ * it in the current runtime rather than assuming it (see
+ * `docs/PHASE4_EVIDENCE.md`, the movement sweep), because the whole
+ * `autoSelection` / `autoDoubleClick` separation rests on it:
+ *
+ * ```text
+ * a selection produced as part of a double click must not trigger autoSelection
+ * ```
+ *
+ * `unknown` is a real category rather than a placeholder, exactly like
+ * {@link PointerKind}'s: it is what a press reports when nothing ever observed
+ * its `mousedown` — a synthetic or automation-delivered sequence, or a platform
+ * that omitted the compatibility event. The trigger gate refuses an
+ * `auto-selection` lookup whose press is not verifiably `single`, so an
+ * unmeasured input can never become automatic I/O.
+ */
+export type ClickMultiplicity = 'unknown' | 'single' | 'multi';
+/**
+ * Narrow a DOM `MouseEvent.detail` value to a {@link ClickMultiplicity}.
+ *
+ * @param detail - the `detail` of a `mousedown`, if there was one.
+ * @returns `single` for a first click, `multi` for a second or later click, and
+ * `unknown` for anything this build has not measured.
+ */
+export declare function clickMultiplicityOf(detail: number | undefined): ClickMultiplicity;
 /**
  * The pointer kinds the classifier distinguishes.
  *
@@ -89,6 +134,15 @@ export interface GestureClassification {
     readonly kind: GestureKind;
     /** The pointer kind that opened the sequence. */
     readonly pointerType: PointerKind;
+    /**
+     * The platform's click multiplicity for the press that opened the sequence.
+     *
+     * Carried on the classification rather than kept private because it is a
+     * **trigger policy** input: the gate refuses an `auto-selection` lookup unless
+     * this is `single`, which is what keeps a double click's second press — drift
+     * or no drift — off the drag path.
+     */
+    readonly clickMultiplicity: ClickMultiplicity;
     /** When the classification completed, from the same clock as the event. */
     readonly at: number;
 }
@@ -140,6 +194,15 @@ export interface GestureSnapshot {
      * one identity consumed twice.
      */
     readonly gestureId: number;
+    /**
+     * The platform's click multiplicity for the press that opened that gesture.
+     *
+     * Exposed for the same reason `gestureId` is: the Phase 4.1 contract — a
+     * multi-click press may not produce an `auto-selection` lookup — is otherwise
+     * only visible as an absence, and an absence cannot be told apart from a
+     * listener that never ran.
+     */
+    readonly clickMultiplicity: ClickMultiplicity;
 }
 /** The classifier's full state, including what is in flight. */
 export interface GestureState extends GestureSnapshot {
@@ -183,6 +246,15 @@ export interface GestureState extends GestureSnapshot {
      * would share one identity and collapse into a single lookup.
      */
     readonly promotable: boolean;
+    /**
+     * What the platform's click counter said about the *open* press; `unknown`
+     * while nothing is in flight.
+     *
+     * Per press, not per gesture pair: it is cleared when a press opens a sequence
+     * and set by that sequence's own `mousedown`, so it always describes the
+     * identity `gestureId` names rather than a neighbour's.
+     */
+    readonly clickMultiplicity: ClickMultiplicity;
 }
 /**
  * The state before any gesture.
@@ -241,6 +313,24 @@ export declare function isDragDistance(distance: number): boolean;
  * @returns the next state.
  */
 export declare function beginPointer(state: GestureState, point: GesturePoint, button?: number, pointerType?: PointerKind): GestureState;
+/**
+ * Attach the platform's click multiplicity to the press that is in flight.
+ *
+ * The browser dispatches `pointerdown` and then the compatibility `mousedown`
+ * that carries `detail`, so the press's identity already exists when this is
+ * folded in. A `mousedown` that arrives with no press open (a right-button
+ * press, or a synthetic event) is ignored rather than recorded: it does not
+ * describe any sequence this classifier is tracking, and letting it overwrite
+ * the state would attribute one press's multiplicity to another's identity.
+ *
+ * Returns the same object when nothing changed, so a caller may assign the
+ * result unconditionally.
+ *
+ * @param state - the current state.
+ * @param detail - the `MouseEvent.detail` of the press.
+ * @returns the next state.
+ */
+export declare function attachClickMultiplicity(state: GestureState, detail: number | undefined): GestureState;
 /**
  * Record pointer travel while a gesture is open.
  *
@@ -334,6 +424,16 @@ export interface GestureCounters {
     readonly pointerdowns: number;
     /** `pointerup` events observed. */
     readonly pointerups: number;
+    /**
+     * `mousedown` events observed.
+     *
+     * Counted separately from `pointerdowns` because the two carry different
+     * facts: the press opens the gesture, the compatibility event carries the
+     * platform's click multiplicity. A gate that refuses an unverified press makes
+     * "the multiplicity never arrived" a real failure mode, and this is the
+     * instrument that tells it apart from "the platform said `single`".
+     */
+    readonly mouseDowns: number;
     /** Completed gestures classified as `drag`. */
     readonly drags: number;
     /** `dblclick` events observed. */
@@ -370,6 +470,19 @@ export declare function observePointerDown(observation: GestureObservation, poin
  * @returns the next observation.
  */
 export declare function observePointerMove(observation: GestureObservation, point: GesturePoint): GestureObservation;
+/**
+ * Fold the platform's click multiplicity into the observation.
+ *
+ * A non-primary press is ignored, matching {@link beginPointer}: a right-click
+ * opens no sequence here, so its multiplicity describes nothing this classifier
+ * tracks and must not be attached to a left press that happens to be in flight.
+ *
+ * @param observation - the current observation.
+ * @param detail - the `MouseEvent.detail` of the press.
+ * @param button - the DOM `button` value; `0` is the primary button.
+ * @returns the next observation.
+ */
+export declare function observeMouseDown(observation: GestureObservation, detail: number | undefined, button?: number): GestureObservation;
 /**
  * Fold a pointer release into the observation, counting the classification.
  *

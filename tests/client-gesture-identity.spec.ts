@@ -42,6 +42,7 @@ import {
 const ZERO_COUNTERS: GestureCounters = Object.freeze({
   pointerdowns: 0,
   pointerups: 0,
+  mouseDowns: 0,
   drags: 0,
   doubleClicks: 0,
   doubleClickGestures: 0,
@@ -73,7 +74,13 @@ describe('a verdict is offered under the identity it was produced for', () => {
   it('offers the drag with the identity of the press that produced it', () => {
     const state = drag()
     expect(state.gestureId).toBe(1)
-    expect(classificationOf(state)).toEqual({ id: 1, kind: 'drag', pointerType: 'unknown', at: 1010 })
+    expect(classificationOf(state)).toEqual({
+      id: 1,
+      kind: 'drag',
+      pointerType: 'unknown',
+      clickMultiplicity: 'unknown',
+      at: 1010,
+    })
   })
 
   it('offers nothing while a press is in flight, even though the previous verdict is still readable', () => {
@@ -116,7 +123,13 @@ describe('identity reuse across a double click', () => {
     const secondId = state.gestureId
     state = registerDoubleClick(state, at(200, 200, 2110), true)
     expect(state.gestureId).toBe(secondId)
-    expect(classificationOf(state)).toEqual({ id: secondId, kind: 'double-click', pointerType: 'unknown', at: 2110 })
+    expect(classificationOf(state)).toEqual({
+      id: secondId,
+      kind: 'double-click',
+      pointerType: 'unknown',
+      clickMultiplicity: 'unknown',
+      at: 2110,
+    })
   })
 
   it('allocates a fresh identity when it promotes nothing', () => {

@@ -392,16 +392,29 @@ function pointer(x: number, y: number, pointerType = 'mouse') {
  * Replay the measured pointer-drag order from Phase 0 §7.3.
  *
  * The selection is updated while the pointer is down, which is what a real drag
- * does; the runtime reads it at `pointerup`.
+ * does; the runtime reads it at `pointerup`. The compatibility `mousedown`
+ * between `pointerdown` and the travel is part of that measured order, and since
+ * Phase 4.1 it also carries the platform's click multiplicity — a press whose
+ * multiplicity was never observed is refused by the gate, so a driver that
+ * omitted it would be replaying a sequence no real mouse produces.
  *
  * @param harness - the harness.
- * @param options - the word to select, where, with which pointer, and whether to
- * wait for the request accounting before returning.
+ * @param options - the word to select, where, with which pointer, how far it
+ * travels, whether to wait for the request accounting, and which click
+ * multiplicity to replay (`mouseDown: false` omits the event entirely).
  * @returns nothing.
  */
 async function drag(
   harness: Harness,
-  options: { text: string; node?: FakeElement; pointerType?: string; distance?: number; quiet?: boolean } = {
+  options: {
+    text: string
+    node?: FakeElement
+    pointerType?: string
+    distance?: number
+    quiet?: boolean
+    multiClick?: boolean
+    mouseDown?: boolean
+  } = {
     text: 'derive',
   },
 ): Promise<void> {
@@ -410,6 +423,7 @@ async function drag(
   const distance = options.distance ?? 40
   harness.doc.selection.clear()
   harness.doc.emit('pointerdown', pointer(100, 100, pointerType))
+  if (options.mouseDown !== false) harness.doc.emit('mousedown', { detail: options.multiClick === true ? 2 : 1, button: 0 })
   harness.select(node, options.text)
   harness.doc.emit('pointermove', pointer(100 + distance, 100, pointerType))
   harness.doc.emit('pointerup', pointer(100 + distance, 100, pointerType))
@@ -420,25 +434,34 @@ async function drag(
  * Replay the measured double-click order from Phase 0 §7.3.
  *
  * Two presses, two releases, then the platform's `dblclick`, then the trailing
- * `selectionchange` — in that order, which is the order Phase 0 recorded.
+ * `selectionchange` — in that order, which is the order Phase 0 recorded. Each
+ * press carries the click multiplicity the platform really reports: `1` for the
+ * first, `2` for the second, which is what makes the pair recognisable as one
+ * gesture rather than two clicks.
  *
  * @param harness - the harness.
- * @param options - the word to select, where, with which pointer, and whether to
- * wait for the request accounting before returning.
+ * @param options - the word to select, where, with which pointer, whether to
+ * wait for the request accounting, and how far the second press travels.
  * @returns nothing.
  */
 async function doubleClick(
   harness: Harness,
-  options: { text: string; node?: FakeElement; pointerType?: string; quiet?: boolean } = { text: 'derive' },
+  options: { text: string; node?: FakeElement; pointerType?: string; quiet?: boolean; drift?: number } = {
+    text: 'derive',
+  },
 ): Promise<void> {
   const node = options.node ?? harness.flow
   const pointerType = options.pointerType ?? 'mouse'
+  const drift = options.drift ?? 0
   harness.doc.selection.clear()
   harness.doc.emit('pointerdown', pointer(200, 200, pointerType))
+  harness.doc.emit('mousedown', { detail: 1, button: 0 })
   harness.doc.emit('pointerup', pointer(200, 200, pointerType))
   harness.doc.emit('pointerdown', pointer(200, 200, pointerType))
+  harness.doc.emit('mousedown', { detail: 2, button: 0 })
   harness.select(node, options.text)
-  harness.doc.emit('pointerup', pointer(200, 200, pointerType))
+  if (drift > 0) harness.doc.emit('pointermove', pointer(200 + drift, 200, pointerType))
+  harness.doc.emit('pointerup', pointer(200 + drift, 200, pointerType))
   harness.doc.emit('dblclick', { clientX: 200, clientY: 200 })
   // The trailing change the browser dispatches after `dblclick`.
   harness.select(node, options.text)
@@ -640,32 +663,160 @@ describe('live settings transitions need no reload', () => {
   })
 })
 
-describe('de-duplication', () => {
-  it('absorbs a duplicate offer of an identity that was already consumed', async () => {
-    // The real duplicate path, and the one the brief's de-duplication rule is
-    // about: a release classifies as `drag` and is consumed, and the `dblclick`
-    // that follows promotes that very sequence, so it carries the same identity.
-    // The platform reported one gesture; it must buy one lookup.
+/**
+ * The overlap semantic.
+ *
+ * One sequence, four platforms facts, and the rule the product actually states:
+ *
+ * ```text
+ * pointerdown  mousedown(detail 2)  selection  move > DRAG_THRESHOLD  pointerup  dblclick
+ * ```
+ *
+ * The press travels far enough to be a `drag` **and** the platform's own click
+ * counter says it is the second press of a double click, and the platform then
+ * delivers its `dblclick`. Phase 4 allowed this to be answered by
+ * `autoSelection` (the release was consumed as a drag, and the `dblclick` that
+ * followed was refused as `duplicate-gesture`); the product says the
+ * `autoDoubleClick` switch owns every gesture the platform calls a double click.
+ * These cases replace that assertion.
+ */
+describe('the overlap: a double click that also travels', () => {
+  /** The overlap sequence, with the platform's `dblclick` at the end. */
+  async function overlappingDoubleClick(harness: Harness, word = 'derive'): Promise<void> {
+    harness.doc.selection.clear()
+    harness.doc.emit('pointerdown', pointer(200, 200))
+    harness.doc.emit('mousedown', { detail: 1, button: 0 })
+    harness.doc.emit('pointerup', pointer(200, 200))
+    harness.doc.emit('pointerdown', pointer(200, 200))
+    harness.doc.emit('mousedown', { detail: 2, button: 0 })
+    harness.select(harness.flow, word)
+    harness.doc.emit('pointermove', pointer(240, 200))
+    harness.doc.emit('pointerup', pointer(240, 200))
+    harness.doc.emit('dblclick', { clientX: 240, clientY: 200 })
+    await settle()
+  }
+
+  it('S10: autoSelection alone answers nothing, even though the press moved far enough to be a drag', async () => {
+    const harness = createHarness()
+    harness.boot()
+    await useState(harness, STATES.S10)
+
+    await overlappingDoubleClick(harness)
+
+    expect(view(harness).lookups()).toBe(0)
+    expect(harness.requests).toEqual([])
+    expect(view(harness).lookupsByOrigin()).toEqual({ shortcut: 0, 'auto-selection': 0, 'auto-double-click': 0 })
+    // The sequence really happened: the movement verdict exists, and the
+    // platform really reported one double click. A zero request count on its own
+    // would also be satisfied by a dead listener.
+    expect(view(harness).gestures().counters.drags).toBe(1)
+    expect(view(harness).gestures().counters.doubleClickGestures).toBe(1)
+    expect(view(harness).trigger()).toMatchObject({ decision: 'ignored', reason: 'switch-off' })
+  })
+
+  it('S01: autoDoubleClick alone answers exactly one lookup, from its own path', async () => {
+    const harness = createHarness()
+    harness.boot()
+    await useState(harness, STATES.S01)
+
+    await overlappingDoubleClick(harness)
+
+    expect(harness.requests).toEqual(['derive'])
+    expect(view(harness).lookupsByOrigin()).toEqual({ shortcut: 0, 'auto-selection': 0, 'auto-double-click': 1 })
+    expect(view(harness).gestures().counters.doubleClickGestures).toBe(1)
+    expect(view(harness).trigger()).toMatchObject({
+      decision: 'lookup',
+      reason: 'accepted',
+      origin: 'auto-double-click',
+      query: 'derive',
+    })
+  })
+
+  it('S11: both switches on answer exactly one lookup, and it is the double-click path that answers it', async () => {
     const harness = createHarness()
     harness.boot()
     await useState(harness, STATES.S11)
 
-    harness.doc.selection.clear()
-    harness.doc.emit('pointerdown', pointer(100, 100))
-    harness.select(harness.flow, 'derive')
-    harness.doc.emit('pointermove', pointer(160, 100))
-    harness.doc.emit('pointerup', pointer(160, 100))
-    await settle()
-    expect(view(harness).lookups()).toBe(1)
-    const dragId = view(harness).trigger()?.gestureId
+    await overlappingDoubleClick(harness)
 
-    // The platform's own recognition of the same press-release pair.
-    harness.doc.emit('dblclick', { clientX: 130, clientY: 100 })
-    await settle()
-    expect(view(harness).lookups()).toBe(1)
-    expect(view(harness).trigger()).toMatchObject({ decision: 'ignored', reason: 'duplicate-gesture', gestureId: dragId })
+    expect(harness.requests).toEqual(['derive'])
+    expect(view(harness).lookupsByOrigin()).toEqual({ shortcut: 0, 'auto-selection': 0, 'auto-double-click': 1 })
+    expect(view(harness).gestures().counters.doubleClickGestures).toBe(1)
+    expect(view(harness).trigger()).toMatchObject({ origin: 'auto-double-click', gestureId: view(harness).gestures().last.gestureId })
   })
 
+  it('S11: the drag verdict is refused, not consumed, so the gesture identity survives to be answered as a double click', async () => {
+    const harness = createHarness()
+    harness.boot()
+    await useState(harness, STATES.S11)
+
+    // The multi-click press and release, with no platform `dblclick` after it —
+    // the sequence that must not become an `auto-selection` lookup.
+    harness.doc.selection.clear()
+    harness.doc.emit('pointerdown', pointer(200, 200))
+    harness.doc.emit('mousedown', { detail: 1, button: 0 })
+    harness.doc.emit('pointerup', pointer(200, 200))
+    harness.doc.emit('pointerdown', pointer(200, 200))
+    harness.doc.emit('mousedown', { detail: 2, button: 0 })
+    harness.select(harness.flow, 'derive')
+    harness.doc.emit('pointermove', pointer(240, 200))
+    harness.doc.emit('pointerup', pointer(240, 200))
+    await settle()
+
+    expect(view(harness).gestures().counters.drags).toBe(1)
+    expect(view(harness).lookups()).toBe(0)
+    expect(harness.requests).toEqual([])
+    expect(view(harness).trigger()).toMatchObject({ decision: 'ignored', reason: 'multi-click-sequence' })
+
+    // The same identity is still free, so the platform's `dblclick` — which is
+    // what a reader who made this gesture was actually asking for — is answered
+    // once, on its own path.
+    harness.doc.emit('dblclick', { clientX: 240, clientY: 200 })
+    await settle()
+    expect(harness.requests).toEqual(['derive'])
+    expect(view(harness).lookupsByOrigin()).toEqual({ shortcut: 0, 'auto-selection': 0, 'auto-double-click': 1 })
+
+    // ...and the next real drag is unaffected.
+    await drag(harness, { text: 'went' })
+    expect(harness.requests).toEqual(['derive', 'went'])
+    expect(view(harness).lookupsByOrigin()).toEqual({ shortcut: 0, 'auto-selection': 1, 'auto-double-click': 1 })
+  })
+
+  it('S10: a drag whose click multiplicity was never observed is refused, and the next real drag still fires', async () => {
+    const harness = createHarness()
+    harness.boot()
+    await useState(harness, STATES.S10)
+
+    // A synthetic or automation-delivered drag: the press and the release are
+    // real to the classifier, but no `mousedown` ever carried the platform's
+    // click counter, so this build cannot tell whether the press was a second
+    // click. It must not guess.
+    await drag(harness, { text: 'derive', mouseDown: false })
+    expect(view(harness).gestures().counters.drags).toBe(1)
+    expect(view(harness).gestures().counters.mouseDowns).toBe(0)
+    expect(harness.requests).toEqual([])
+    expect(view(harness).trigger()).toMatchObject({ decision: 'ignored', reason: 'unverified-click-multiplicity' })
+
+    await drag(harness, { text: 'derive' })
+    expect(harness.requests).toEqual(['derive'])
+    expect(view(harness).gestures().counters.mouseDowns).toBe(1)
+  })
+
+  it('S11: a multi-click press that travelled and was classified as a drag cannot buy an auto-selection lookup', async () => {
+    const harness = createHarness()
+    harness.boot()
+    await useState(harness, STATES.S11)
+
+    await drag(harness, { text: 'derive', multiClick: true })
+    expect(view(harness).gestures().counters.drags).toBe(1)
+    expect(harness.requests).toEqual([])
+    expect(view(harness).trigger()).toMatchObject({ decision: 'ignored', reason: 'multi-click-sequence' })
+    // Nothing was consumed: the ledger only holds what produced a lookup.
+    expect(view(harness).lookups()).toBe(0)
+  })
+})
+
+describe('de-duplication', () => {
   it('treats a second platform double click as a second gesture, not as a duplicate event', async () => {
     // Two `dblclick` events are two gestures: the plugin has no timer and no
     // other way to tell a synthesised repeat from a reader double-clicking twice,
@@ -922,14 +1073,14 @@ describe('lifecycle: repeated load and unload cannot multiply a gesture', () => 
   it('removes every listener it added', () => {
     const harness = createHarness()
     harness.boot()
-    for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'dblclick', 'selectionchange']) {
+    for (const type of ['pointerdown', 'mousedown', 'pointermove', 'pointerup', 'pointercancel', 'dblclick', 'selectionchange']) {
       expect(harness.doc.count(type), type).toBe(1)
     }
     expect(harness.win.count('blur')).toBe(1)
     expect(harness.diagnostics()).not.toBeNull()
 
     harness.dispose()
-    for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'dblclick', 'selectionchange']) {
+    for (const type of ['pointerdown', 'mousedown', 'pointermove', 'pointerup', 'pointercancel', 'dblclick', 'selectionchange']) {
       expect(harness.doc.count(type), type).toBe(0)
     }
     expect(harness.win.count('blur')).toBe(0)

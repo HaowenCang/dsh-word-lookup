@@ -14,6 +14,8 @@ import { describe, expect, it } from 'vitest'
 
 import * as gestureModule from '../src/client/gesture.js'
 import {
+  attachClickMultiplicity,
+  clickMultiplicityOf,
   DRAG_THRESHOLD_PX,
   gestureSnapshot,
   IDLE_GESTURE,
@@ -21,6 +23,7 @@ import {
   isDragDistance,
   observeCancel,
   observeDoubleClick,
+  observeMouseDown,
   observePointerDown,
   observePointerMove,
   observePointerUp,
@@ -35,13 +38,19 @@ function at(x: number, y: number, time = 1000) {
 /**
  * Replay the measured pointer-drag order from Phase 0 §7.3.
  *
+ * `mousedown` is part of that order and carries the platform's click
+ * multiplicity; the drag replay issues it with `detail: 1`, the value a real
+ * first press reports.
+ *
  * @param selectionAtRelease - whether the drag selected usable text.
  * @param distance - how far the pointer travelled.
+ * @param detail - the click multiplicity to replay.
  * @returns the observation after the gesture.
  */
-function replayDrag(selectionAtRelease: boolean, distance = 40): GestureObservation {
+function replayDrag(selectionAtRelease: boolean, distance = 40, detail = 1): GestureObservation {
   let observation = IDLE_OBSERVATION
   observation = observePointerDown(observation, at(100, 100, 1000))
+  observation = observeMouseDown(observation, detail)
   observation = observePointerMove(observation, at(100 + distance, 100, 1005))
   observation = observePointerUp(observation, at(100 + distance, 100, 1010), selectionAtRelease)
   return observation
@@ -52,6 +61,7 @@ function replayDrag(selectionAtRelease: boolean, distance = 40): GestureObservat
  *
  * The second press and release happen first, the platform then reports
  * `dblclick`, and only afterwards does the trailing `selectionchange` arrive.
+ * Both presses carry the multiplicity the platform really reports.
  *
  * @param selectionAtDoubleClick - whether a word is selected when `dblclick` fires.
  * @returns the observation after the trailing selectionchange.
@@ -60,9 +70,11 @@ function replayDoubleClick(selectionAtDoubleClick = true): GestureObservation {
   let observation = IDLE_OBSERVATION
   // First click of the pair.
   observation = observePointerDown(observation, at(200, 200, 2000))
+  observation = observeMouseDown(observation, 1)
   observation = observePointerUp(observation, at(200, 200, 2003), false)
   // Second click: the word is already selected by the time it ends.
   observation = observePointerDown(observation, at(200, 200, 2100))
+  observation = observeMouseDown(observation, 2)
   observation = observePointerUp(observation, at(200, 200, 2103), selectionAtDoubleClick)
   // The platform's own recognition.
   observation = observeDoubleClick(observation, at(200, 200, 2110), selectionAtDoubleClick)
@@ -206,6 +218,74 @@ describe('double-click precedence over its trailing selectionchange', () => {
   })
 })
 
+describe('click multiplicity', () => {
+  it('narrows the platform values it has measured and refuses to guess at the rest', () => {
+    expect(clickMultiplicityOf(1)).toBe('single')
+    expect(clickMultiplicityOf(2)).toBe('multi')
+    expect(clickMultiplicityOf(3)).toBe('multi')
+    expect(clickMultiplicityOf(undefined)).toBe('unknown')
+    expect(clickMultiplicityOf(0)).toBe('unknown')
+    expect(clickMultiplicityOf(Number.NaN)).toBe('unknown')
+    expect(clickMultiplicityOf(Number.POSITIVE_INFINITY)).toBe('unknown')
+  })
+
+  it('is unknown until the press that opened the gesture reports it', () => {
+    const pressed = observePointerDown(IDLE_OBSERVATION, at(10, 10, 1))
+    expect(pressed.state.clickMultiplicity).toBe('unknown')
+    expect(gestureSnapshot(pressed.state).clickMultiplicity).toBe('unknown')
+  })
+
+  it('attaches to the open press, and travels with the verdict it produced', () => {
+    const observation = replayDrag(true, 40, 1)
+    expect(observation.state.kind).toBe('drag')
+    expect(observation.state.clickMultiplicity).toBe('single')
+    expect(gestureSnapshot(observation.state).clickMultiplicity).toBe('single')
+  })
+
+  it('records a second press as multi without changing how movement is classified', () => {
+    // The classifier's movement rule is deliberately untouched: a press that
+    // travels far enough over usable text is still a `drag`. What changed is that
+    // the verdict now says which press produced it, and the trigger gate — not
+    // this module — refuses to spend an `auto-selection` lookup on a multi-click.
+    const observation = replayDrag(true, 40, 2)
+    expect(observation.state.kind).toBe('drag')
+    expect(observation.state.clickMultiplicity).toBe('multi')
+  })
+
+  it('is per press: a new press starts unverified until its own mousedown', () => {
+    let observation = replayDrag(true, 40, 2)
+    observation = observePointerDown(observation, at(300, 300, 2000))
+    expect(observation.state.clickMultiplicity).toBe('unknown')
+    observation = observeMouseDown(observation, 1)
+    expect(observation.state.clickMultiplicity).toBe('single')
+  })
+
+  it('ignores a mousedown that belongs to no open press', () => {
+    const observation = observeMouseDown(IDLE_OBSERVATION, 2)
+    expect(observation).toBe(IDLE_OBSERVATION)
+    expect(observation.counters.mouseDowns).toBe(0)
+  })
+
+  it('ignores a non-primary press entirely', () => {
+    const pressed = observePointerDown(IDLE_OBSERVATION, at(10, 10, 1))
+    expect(observeMouseDown(pressed, 1, 2)).toBe(pressed)
+    expect(attachClickMultiplicity(pressed.state, 2)).not.toBe(pressed.state)
+  })
+
+  it('is cleared when a gesture is abandoned', () => {
+    let observation = observePointerDown(IDLE_OBSERVATION, at(10, 10, 1))
+    observation = observeMouseDown(observation, 2)
+    observation = observeCancel(observation)
+    expect(observation.state.clickMultiplicity).toBe('unknown')
+  })
+
+  it('counts the events it observed, so a missing one is distinguishable', () => {
+    const observation = replayDoubleClick(true)
+    expect(observation.counters.mouseDowns).toBe(2)
+    expect(observation.state.clickMultiplicity).toBe('multi')
+  })
+})
+
 describe('cancellation', () => {
   it('abandons an in-flight gesture without leaving half-built state', () => {
     let observation = observePointerDown(IDLE_OBSERVATION, at(0, 0, 1))
@@ -250,6 +330,7 @@ describe('counters', () => {
     expect(IDLE_OBSERVATION.counters).toEqual({
       pointerdowns: 0,
       pointerups: 0,
+      mouseDowns: 0,
       drags: 0,
       doubleClicks: 0,
       doubleClickGestures: 0,
@@ -262,6 +343,7 @@ describe('counters', () => {
     const { counters } = replayDrag(true, 40)
     expect(counters.pointerdowns).toBe(1)
     expect(counters.pointerups).toBe(1)
+    expect(counters.mouseDowns).toBe(1)
     expect(counters.drags).toBe(1)
     expect(counters.simpleGestures).toBe(0)
   })
@@ -304,6 +386,7 @@ describe('100 drags + 100 double clicks', () => {
     for (let index = 0; index < 100; index += 1) {
       let step: GestureObservation = { state: observation.state, counters: observation.counters }
       step = observePointerDown(step, at(index, 100, index * 10))
+      step = observeMouseDown(step, 1)
       step = observePointerMove(step, at(index + 60, 100, index * 10 + 1))
       step = observePointerUp(step, at(index + 60, 100, index * 10 + 2), true)
       observation = step
@@ -311,8 +394,12 @@ describe('100 drags + 100 double clicks', () => {
     for (let index = 0; index < 100; index += 1) {
       let step: GestureObservation = { state: observation.state, counters: observation.counters }
       step = observePointerDown(step, at(index, 200, 10_000 + index * 10))
+      step = observeMouseDown(step, 1)
       step = observePointerUp(step, at(index, 200, 10_000 + index * 10 + 1), true)
-      step = observeDoubleClick(step, at(index, 200, 10_000 + index * 10 + 2), true)
+      step = observePointerDown(step, at(index, 200, 10_000 + index * 10 + 2))
+      step = observeMouseDown(step, 2)
+      step = observePointerUp(step, at(index, 200, 10_000 + index * 10 + 3), true)
+      step = observeDoubleClick(step, at(index, 200, 10_000 + index * 10 + 4), true)
       observation = step
     }
     return observation
@@ -329,7 +416,8 @@ describe('100 drags + 100 double clicks', () => {
   })
 
   it('observed every event it was given', () => {
-    expect(final.counters.pointerdowns).toBe(200)
+    expect(final.counters.pointerdowns).toBe(300)
+    expect(final.counters.mouseDowns).toBe(300)
     expect(final.counters.doubleClicks).toBe(100)
   })
 

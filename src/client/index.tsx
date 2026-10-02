@@ -57,6 +57,7 @@ import {
   IDLE_OBSERVATION,
   observeCancel,
   observeDoubleClick,
+  observeMouseDown,
   observePointerDown,
   observePointerMove,
   observePointerUp,
@@ -545,6 +546,16 @@ function createRuntime(ctx: ClientContext): () => void {
       )
     }
 
+    // The compatibility event that carries the platform's own click counter:
+    // `pointerdown` opens the gesture, `mousedown` says which click of a
+    // multi-click sequence this press was, and both land before any
+    // `pointerup`. It classifies nothing — it attaches one fact to the press
+    // that is already open — and a press whose multiplicity never arrives stays
+    // `unknown`, which the gate refuses rather than assumes.
+    const onMouseDown = (event: MouseEvent): void => {
+      gesture = observeMouseDown(gesture, event.detail, event.button)
+    }
+
     const onPointerMove = (event: PointerEvent): void => {
       gesture = observePointerMove(gesture, { x: event.clientX, y: event.clientY, at: Date.now() })
     }
@@ -578,6 +589,7 @@ function createRuntime(ctx: ClientContext): () => void {
     // listener on the bubble phase would miss a gesture the transcript consumed.
     const GESTURE_OPTIONS = { capture: true } as const
     document.addEventListener('pointerdown', onPointerDown, GESTURE_OPTIONS)
+    document.addEventListener('mousedown', onMouseDown, GESTURE_OPTIONS)
     document.addEventListener('pointermove', onPointerMove, GESTURE_OPTIONS)
     document.addEventListener('pointerup', onPointerUp, GESTURE_OPTIONS)
     document.addEventListener('pointercancel', onCancelGesture, GESTURE_OPTIONS)
@@ -586,6 +598,7 @@ function createRuntime(ctx: ClientContext): () => void {
     window.addEventListener('blur', onCancelGesture)
     disposer.add(() => {
       document.removeEventListener('pointerdown', onPointerDown, GESTURE_OPTIONS)
+      document.removeEventListener('mousedown', onMouseDown, GESTURE_OPTIONS)
       document.removeEventListener('pointermove', onPointerMove, GESTURE_OPTIONS)
       document.removeEventListener('pointerup', onPointerUp, GESTURE_OPTIONS)
       document.removeEventListener('pointercancel', onCancelGesture, GESTURE_OPTIONS)

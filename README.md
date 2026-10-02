@@ -36,6 +36,16 @@ autoDoubleClick  a double click the browser recognised
 Neither switch affects the manual `Primary+Shift+L` shortcut, which is the only
 path that reaches the dictionary with both switches off.
 
+**A double click is never answered by `autoSelection`.** The classifier's 5 px
+drag threshold and the browser's own double-click recognition are different
+rules, so a second press that drifts while selecting a word can satisfy both —
+and the browser still reports the whole thing as `dblclick`. The plugin reads the
+platform's click multiplicity off the `mousedown` that opens each press and
+refuses an `auto-selection` lookup unless the press was verifiably a *single*
+click, so a gesture the platform calls a double click is answered by
+`autoDoubleClick` and nothing else. A press whose multiplicity was never observed
+is refused too: an unmeasured press does not become automatic I/O.
+
 **`autoSelection` is not "the selection changed."** A keyboard selection, a
 programmatic one and the selection a double click produces are all deliberately
 outside it, and the plugin never issues a lookup from a `selectionchange` event.
@@ -82,14 +92,18 @@ Three paths, and only three:
 Every automatic lookup passes through one gate (`src/client/trigger.ts`) which
 decides, in order: is this a real drag or double click; has this gesture identity
 already been used; is the switch that owns it on *right now*; is the pointer a
-kind this build measured; and was the selection captured when the gesture
-completed eligible. A refusal never consumes the gesture, so turning a switch on
-makes the very next gesture work and nothing else.
+kind this build measured; for a drag, was the press the platform's own *single*
+click; and was the selection captured when the gesture completed eligible. A
+refusal never consumes the gesture, so turning a switch on makes the very next
+gesture work and nothing else.
 
 Identity is a monotonic number allocated when a pointer press opens a gesture —
 never the text, never the rectangle, never a time window. Two deliberate
 double-clicks on the same word are therefore two lookups, and one gesture can
-never buy two.
+never buy two. Identity alone was not enough to keep the two switches apart: a
+drifting double click spent its identity on the drag path before the browser's
+`dblclick` arrived, which is why the platform's click multiplicity is carried
+with the classification and checked by the gate.
 
 Requests are numbered too, so the newest lookup owns the card: a slow answer for
 A cannot roll the card back from B, and a superseded failure cannot bury a newer

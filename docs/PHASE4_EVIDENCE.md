@@ -1,5 +1,17 @@
 # Phase 4 Evidence — Automatic Trigger Gate, De-duplication and Request Concurrency
 
+> **Phase 4.1 remediation, 2026-10-02 (`START_SHA` `39ab443`).** An independent
+> audit found that this phase's two automatic switches were **not** semantically
+> independent: a double click whose second press drifted past the classifier's
+> 5 px drag threshold was answered by `autoSelection` at `pointerup`, and the
+> platform's own `dblclick` — arriving after it — was then refused as a duplicate
+> of the identity the drag had spent. §4's "deliberate choice", §20.7, §21.6 and
+> the old `B/R P27`/`P28` are the record of that decision; they are **superseded**
+> by §24, which is the current contract and carries the platform measurement the
+> fix is based on. Nothing below was deleted or rewritten: the audit trail of
+> what Phase 4 believed, and of the check that made the belief look measured, is
+> kept exactly as it was written.
+
 ## 1. Baseline
 
 | Fact | Value |
@@ -176,6 +188,22 @@ Rebuilding the classifier to consult the platform's click count would remove the
 ambiguity, and was rejected: the brief forbids rewriting the verified Phase 2
 classifier to serve the automatic paths, and `MouseEvent.detail` on pointer events
 is a platform behaviour this project has not measured.
+
+> **Corrected in Phase 4.1 (§24).** This paragraph is wrong on both counts, and it
+> is kept because it is what Phase 4 decided.
+>
+> - The rule it states — a drifting double click attributed to `auto-selection` —
+>   is not the product's rule. The product says a gesture the platform recognises
+>   as a double click is governed by `autoDoubleClick` alone.
+> - `MouseEvent.detail` **has** now been measured, in this runtime: `mousedown`
+>   carries `1` then `2` across a double click, and §24.4's movement sweep shows
+>   the platform still reports `dblclick` at every drift from 0 to 12 px, from the
+>   classifier's threshold (5 px) onwards.
+>
+> What Phase 4 was right about is that the classifier must not be rebuilt: the
+> movement rule is unchanged. What changed is that the verdict now carries the
+> platform's click multiplicity, and the **gate** refuses to spend an
+> `auto-selection` lookup on a press the platform reported as a multi-click.
 
 The event order this is built on is the one Phase 0 §7.3 measured in real
 Chromium, and Phase 4 did not re-derive it:
@@ -501,6 +529,12 @@ itself is proven by the unit harness, which is the only place it can be.
 
 ## 17. Tests
 
+> Phase 4.1 (§24.8) moved these totals to **17 files / 372 tests** and bundle
+> checks to **94/94**, without weakening any assertion below. The two exceptions
+> are named in §24.10: the harness's `dblclick`-as-duplicate case was removed
+> because it asserted the defect as the allowed behaviour, and the harness
+> drivers now emit the `mousedown` a real mouse always emits.
+
 `npm run verify` -> **PASS**
 
 | step | result |
@@ -552,6 +586,9 @@ the settings schema as the gesture they actually answer
 "look up whenever the selection changes".
 
 ## 18. Isolated runtime
+
+> Phase 4.1 (§24.9) re-ran the same entry point against the same isolated
+> environment and reports **169/169**; the text below is Phase 4's own run.
 
 ```text
 $ npm run test:runtime
@@ -640,6 +677,23 @@ unrelated DSH instance was touched.
 | `B/R P26` | the matrix restored the switches to what the boot loaded |
 | `L06`/`L07` | after a full client reload, one gesture is still exactly one request |
 
+> Phase 4.1 (§24.6) replaced `P27`/`P28` and added `P41A`, `P41B`, `P41C`,
+> `P30` and `P31`. The old rows above are kept with their original wording
+> because that wording is part of the finding: `P27` claimed a drifting double
+> click was "at most one lookup" while the check never observed a `dblclick` at
+> all (`B/R P41B` measures exactly that). The Phase 4.1 rows are:
+>
+> | check | what it measures |
+> | --- | --- |
+> | `B/R P41A` | the current Chromium's click multiplicity on a double click: `mousedown`/`click`/`dblclick` carry detail `1,2` / `1,2` / `2` |
+> | `B/R P41B` | the sealed `P27`/`P28` sequence produces **no** `dblclick` (`mousedown detail [1,1]`, `doubleClickGestures +0`, release classified `drag`) |
+> | `B/R P41C` | the movement sweep: `dblclick` is still emitted at 0–12 px, and the classifier's `drag` verdict starts exactly at 5 px |
+> | `B/R P27` (rewritten) | S10: drifting double click → 0 requests, `doubleClickGestures +1`, `auto-selection 0` |
+> | `B/R P30` | S01: drifting double click → exactly 1, origin `auto-double-click` |
+> | `B/R P28` (rewritten) | S11: drifting double click → exactly 1, origin `auto-double-click`, `auto-selection 0` |
+> | `B/R P31` | S11: a drag-shaped sequence with no observed multiplicity → 0 requests, reason `unverified-click-multiplicity`, then the next real drag fires once |
+
+
 ## 20. Deviations
 
 1. **One pre-existing runtime check changed its comparison.** `B/R 35` ("the
@@ -692,6 +746,10 @@ unrelated DSH instance was touched.
    classifier's 5 CSS px drag threshold and the platform's double-click area are
    different rules, and the brief forbids rebuilding the verified Phase 2
    classifier to consult a click count this project has not measured.
+   **Superseded by §24**: the ambiguity is real, the click count is now measured,
+   and the attribution is `auto-double-click` in every switch state — the
+   classifier's movement verdict is still `drag`, but the gate refuses to spend
+   an `auto-selection` lookup on a multi-click press.
 8. **Two `dblclick` events are two gestures.** The plugin has no timer and the
    platform emits one `dblclick` per gesture, so it cannot distinguish a
    synthesised repeat from a reader double-clicking twice. Duplicate absorption is
@@ -736,7 +794,9 @@ unrelated DSH instance was touched.
    `auto-selection`** (§4, §20.7). It is still exactly one lookup — never two —
    but the settings matrix's "double click -> `auto-double-click`" holds for a
    double click that is not also a drag, which is what both harnesses and a
-   reader's own double click produce.
+   reader's own double click produce. **Resolved by §24**: it is attributed to
+   `auto-double-click`, in every switch state, and `§24.11` lists what the fix
+   costs instead.
 7. **The browser "rapid pair" measurement is not a race.** The real dictionary
    answers in milliseconds, so `B/R P18` proves the normal rapid path. The
    out-of-order orderings are proven with a deferred transport instead, in
@@ -759,6 +819,9 @@ unrelated DSH instance was touched.
     the evidence must not be read as naming fixture words.
 12. **No remote is configured and nothing was pushed.** No force push, no history
     rewrite, and the sealed Phase 1 / Phase 2 / Phase 3 commits were not amended.
+    **Superseded by §23.1**: `origin` now exists
+    (`https://github.com/HaowenCang/dsh-word-lookup.git`) and `master` was
+    pushed to it without force or history rewriting.
 
 ## 22. Phase 5 readiness
 
@@ -828,6 +891,412 @@ git checkout . / git restore .       not run
 
 The only deletions performed were of files this phase generated itself and could
 prove worthless: none. Phase 4 deleted no file.
+
+### 23.1 Remote and the Phase 4.1 push
+
+| | value |
+| --- | --- |
+| remote | `origin` = `https://github.com/HaowenCang/dsh-word-lookup.git` |
+| branch | `master` |
+| Phase 4 tip at audit | `39ab4436aafbe0272d7ac2f866c5546da9e10126` |
+| push | `git push origin master`, fast-forward, no `--force`, no `--force-with-lease` |
+| verification | `local HEAD == origin/master`, `ahead/behind = 0/0` (§24.12) |
+
+## 24. Phase 4.1 — semantic independence remediation
+
+Status of this section: **the current contract**. Where §4, §17, §18, §19, §20.7,
+§21.6 or §23 disagree with it, this section is what the build does and the older
+text is kept as the record of what Phase 4 decided at the time.
+
+```text
+REVIEW FAIL — PHASE 4.1 REQUIRED / PHASE 5 NOT READY     (the audited state, 39ab443)
+PASS — PHASE 4.1 COMPLETE / PHASE 5 READY                (after this remediation)
+```
+
+### 24.1 The defect
+
+The product rule the two automatic switches have to satisfy is narrow and
+absolute:
+
+```text
+autoSelection    controls a real drag-selection automatic lookup
+autoDoubleClick  controls automatic lookup for a double click
+
+a selection produced as part of a double click must NOT trigger autoSelection
+```
+
+The audited build violated it whenever the second press of a double click moved
+at all. `endPointer()` decided the verdict from movement alone:
+
+```ts
+const dragged = isDragDistance(distance) && hasEligibleSelection
+```
+
+and the runtime offered that verdict to the gate from `onPointerUp` — which the
+browser dispatches **before** it dispatches `dblclick`. So:
+
+```text
+second press drifts >= 5 px  ->  pointerup classifies `drag`
+                             ->  autoSelection gate accepts and consumes identity N
+                             ->  dblclick arrives, promotes identity N
+                             ->  refused as `duplicate-gesture`
+```
+
+One platform gesture, one lookup, on the wrong switch's path. With
+`autoSelection` on and `autoDoubleClick` off the reader's double click produced a
+lookup they had disabled; with both on it produced an `auto-selection` lookup
+instead of an `auto-double-click` one.
+
+### 24.2 Why the sealed Phase 4 checks could not see it
+
+`B/R P27`/`P28` drove `driftDouble()`, which issued two **plain** press/release
+pairs:
+
+```js
+await page.mouse.down(); await page.mouse.up()          // clickCount defaults to 1
+await page.mouse.down(); await page.mouse.move(cx + 8, cy); await page.mouse.up()
+```
+
+Playwright sends `clickCount: 1` on both presses unless told otherwise, so
+Chromium never treated the pair as a double click: the sealed Phase 4 report
+records `doubleClicks = 0`, `drags = 1`, and the accepted lookup's query as `"i"`
+— the character the drag happened to select. The checks asserted
+
+```js
+drift.gapRequests <= 1 && drift.drags + drift.doubleClicks >= 1 && ...
+```
+
+so the drag alone satisfied them, and `P28`'s `auto-selection + auto-double-click === 1`
+was satisfied by the `auto-selection` half. The positions were measured; the
+*gesture* was assumed.
+
+```text
+Old P27/P28 did not actually observe a dblclick event.
+```
+
+That is a measured fact, not a reconstruction: `B/R P41B` replays the same two
+plain presses — including the literal `driftDouble()` shape with its 8 px second
+press — and records `mousedown detail [1,1]`, `click detail [1,1]`, **no
+`dblclick` event at all**, `doubleClickGestures +0`, and a release classified
+`drag`. Phase 4 §20.7 then documented the resulting behaviour (a drifting double
+click attributed to `auto-selection`) as a deliberate choice. It was a defect:
+the choice was made by the classifier's 5 px constant, not by the product.
+
+### 24.3 The event probe, before any production change
+
+`scripts/phase1-verify.mjs` installs a capture-phase trace of `pointerdown`,
+`mousedown`, `pointermove`, `mousemove`, `pointerup`, `mouseup`, `click`,
+`dblclick` and `selectionchange`, recording `type`, `detail`, `pointerType`,
+`button`, `buttons`, `clientX`/`clientY`, the selection text and whether it was
+collapsed, an order index and a `performance.now()` timestamp — for every event,
+on both boots, with the two switches forced OFF so the probe itself issues
+nothing. Chromium `153.0.8010.12`, DSH `0.2.0-rc.2`.
+
+A normal double click (`page.mouse.dblclick`), `B/R P41A` — **PASS**:
+
+```text
+selectionchange  pointermove  mousemove
+pointerdown  mousedown/1  pointerup  mouseup/1  click/1
+pointerdown  mousedown/2  pointerup  mouseup/2  click/2  dblclick/2
+selectionchange
+
+mousedown detail   [1, 2]
+click detail       [1, 2]
+dblclick detail    [2]
+doubleClickGestures +1
+```
+
+Phase 0's `mousedown(detail=2) / click(detail=2) / dblclick(detail=2)` is
+therefore re-verified in the runtime this work ran in, rather than inherited.
+
+Two more shapes were measured because the fix depends on them:
+
+| probe | input | result | what it decides |
+| --- | --- | --- | --- |
+| two plain pairs | `mouse.down()/up()` twice, `clickCount` defaulted to 1 | `mousedown [1,1]`, `click [1,1]`, **no dblclick** | the sealed `P27`/`P28` shape could not observe a double click |
+| raw CDP pairs | `Input.dispatchMouseEvent` pressed/released twice with **no** `clickCount` | `mousedown detail [0,0]`, **no `click` events**, **no dblclick** | Chromium's own click-count detector is not reachable from automation input; the client supplies the count |
+| multi-click press, single release | `mousePressed(clickCount: 2)` … `mouseReleased(clickCount: 1)`, 8 px drift | **dblclick still emitted**, `detail 2` | Chromium takes the count from the *press*; a "flagged multi-click whose dblclick never arrives" cannot be produced through automation input, so that shape is covered by the harness, not claimed here |
+
+The last row is why the runtime check below does not try to assert the
+§9 fallback directly, and why the honest caveat in 24.11 exists: what was
+measured is Chromium's *renderer* behaviour given a click count, not the
+platform's native spatial tolerance for recognising a double click, which CDP
+input bypasses.
+
+### 24.4 The movement sweep
+
+`B/R P41C` — **PASS**. Second press at the word's centre, released with the
+multiplicity a real second press carries, after travelling N CSS px. The plugin's
+classification is read from its own diagnostics in the same run.
+
+| drift | browser `dblclick`? | `mousedown.detail` | `click.detail` | plugin kind | `drags` | `doubleClickGestures` | selection |
+| ---: | --- | --- | --- | --- | ---: | ---: | --- |
+| 0 | yes | `[1,2]` | `[1,2]` | `double-click` | 0 | 1 | `derive` |
+| 1 | yes | `[1,2]` | `[1,2]` | `double-click` | 0 | 1 | `derive` |
+| 2 | yes | `[1,2]` | `[1,2]` | `double-click` | 0 | 1 | `derive` |
+| 3 | yes | `[1,2]` | `[1,2]` | `double-click` | 0 | 1 | `derive` |
+| 4 | yes | `[1,2]` | `[1,2]` | `double-click` | 0 | 1 | `derive` |
+| **5** | yes | `[1,2]` | `[1,2]` | `double-click` | **1** | 1 | `derive` |
+| 6 | yes | `[1,2]` | `[1,2]` | `double-click` | 1 | 1 | `derive` |
+| 8 | yes | `[1,2]` | `[1,2]` | `double-click` | 1 | 1 | `derive` |
+| 10 | yes | `[1,2]` | `[1,2]` | `double-click` | 1 | 1 | `derive` |
+| 12 | yes | `[1,2]` | `[1,2]` | `double-click` | 1 | 1 | `derive` |
+
+The overlap is real and starts exactly at the classifier's constant: at 5 px the
+platform still reports one double click **and** the plugin has a `drag` verdict
+for the same sequence. `NO NATURAL OVERLAP OBSERVED` is therefore **not** the
+case here (`overlapObserved: true`, mode `platform`), and the drift checks below
+use the platform's own `dblclick` rather than a controlled substitute.
+
+### 24.5 The fix
+
+Minimal, and confined to the gesture→gate integration. The classifier's
+**movement rule is untouched** — a press-release pair that travels far enough
+over an eligible selection is still classified `drag` — and no timer, no text
+comparison and no time window was introduced.
+
+| file | change |
+| --- | --- |
+| `src/client/gesture.ts` | new `ClickMultiplicity` (`'unknown' | 'single' | 'multi'`), `clickMultiplicityOf(detail)`, one state field, one reducer `attachClickMultiplicity`, one fold `observeMouseDown`, and one counter `mouseDowns`. `beginPointer` clears it per press; `cancelGesture` clears it; `endPointer`/`registerDoubleClick` carry it; `classificationOf`/`gestureSnapshot` project it. |
+| `src/client/trigger.ts` | the gate refuses an `auto-selection` lookup unless the press was verifiably a **single** click: `multi-click-sequence` (the platform said second click) or `unverified-click-multiplicity` (nothing ever said). The double-click path is **not** subject to it — `dblclick` is the platform's own recognition and is answered by its own switch. The check sits after the switch and pointer-kind checks, so every pre-existing refusal keeps its own reason. |
+| `src/client/index.tsx` | one capture-phase `mousedown` listener (registered and disposed with the others) folds `event.detail` into the open press. Nothing else about the runtime changed: `selectionchange` still reaches no I/O, the gate is still consulted only from the two classification handlers, and the two `runLookup` call sites are unchanged. |
+| `scripts/check-bundle.mjs` | the emitted client is asserted to carry both new reasons and a `mousedown` listener; the host bundle is asserted not to carry either (`88 → 94` checks). |
+
+Why the gate rather than the classifier: "this press belongs to a multi-click
+sequence" is *trigger policy*, and it is the drag path alone that must not act on
+it. Keeping it in the gate also preserves the touch/pen refusal, which must keep
+reporting `unverified-pointer-kind` and is checked before the multiplicity — a
+classifier-level suppression would have made a synthetic touch drag `other` and
+hidden the pointer-kind gate behind `not-a-trigger-gesture`.
+
+The refusal direction is the safe one, and it is deliberate: a press the platform
+flags as a multi-click whose `dblclick` never arrives produces **no** automatic
+lookup, and neither does a press whose multiplicity was never observed. A missed
+automatic lookup is recoverable with `Primary+Shift+L`; an unexpected one is what
+both switches exist to prevent.
+
+### 24.6 Acceptance matrix — real browser, real mouse, both boots
+
+`autoSelection=true / autoDoubleClick=false`, a **platform double click** whose
+second press drifts 8 px (Case A, `B/R P27`) — **PASS**, and FAIL before the fix:
+
+| measurement | before (`39ab443`) | after |
+| --- | --- | --- |
+| requests | 1 | **0** |
+| `auto-selection` delta | 1 | **0** |
+| `auto-double-click` delta | 0 | **0** |
+| `doubleClickGestures` delta | 1 | **1** |
+| runner-up gate reason | drag `accepted`, then `duplicate-gesture` | `switch-off` |
+| classifier's press multiplicity | not recorded | `multi` |
+
+`autoSelection=false / autoDoubleClick=true` (Case B, `B/R P30`) — **PASS**:
+requests **1**, `auto-double-click` **+1**, `auto-selection` **0**,
+`doubleClickGestures` **+1**.
+
+Both on (Case C, `B/R P28`) — **PASS**, and FAIL before the fix:
+
+| measurement | before (`39ab443`) | after |
+| --- | --- | --- |
+| requests | 1 | **1** |
+| `auto-selection` delta | **1** | **0** |
+| `auto-double-click` delta | **0** | **1** |
+| `doubleClickGestures` delta | 1 | 1 |
+| origin of the accepted lookup | `auto-selection` | **`auto-double-click`** |
+
+A real independent drag (Case D) is unaffected: `B/R P04` (S10) and `B/R P10`
+(S11) still issue exactly one `auto-selection` lookup each, and `B/R P16` still
+produces two lookups for two drags of the same word **under 100 ms apart**
+(95–97 ms across runs, on two identities, with the check asserting the gap is
+below 300 ms). `B/R P01`/`P07` (a drag with its own switch off) still issue none.
+
+Case A's second half — `autoSelection` on, a *zero-movement* double click — is
+`B/R P05`, strengthened to assert the deltas rather than only the absence of
+requests: `doubleClickGestures +1`, `auto-selection 0`, `auto-double-click 0`.
+
+Two further runtime checks cover the rules that have no `dblclick` to observe:
+
+- `B/R P31` — a drag-shaped sequence delivered **without** the `mousedown` that
+  carries the multiplicity (synthetic `PointerEvent`s, the shape an automation
+  agent or extension produces) issues **0** requests, is classified `drag`, is
+  refused as `unverified-click-multiplicity`, and the very next real drag in the
+  same switch state issues exactly 1 `auto-selection` lookup with
+  `mouseDowns +1`. The counter is asserted on both sides so the zero cannot be
+  explained by a listener that never ran.
+- the harness case in 24.7 covers the multi-click press whose `dblclick` never
+  arrives, which 24.3 measured as unreachable through automation input.
+
+### 24.7 Harness evidence (real runtime wiring, fake DOM)
+
+`tests/client-runtime-harness.spec.ts` replays the overlap through the real
+`apply()`, the real listeners, classifier, gate, controller and store:
+
+```text
+pointerdown  mousedown(detail 2)  selection  move > DRAG_THRESHOLD  pointerup  dblclick
+```
+
+| state | requests | `auto-selection` | `auto-double-click` | double-click gestures |
+| --- | ---: | ---: | ---: | ---: |
+| S10 | **0** | 0 | 0 | 1 |
+| S01 | **1** | 0 | 1 | 1 |
+| S11 | **1** | 0 | **1** | 1 |
+
+plus:
+
+- the multi-click press whose `dblclick` never arrives: **0** requests, reason
+  `multi-click-sequence`, the identity **not** consumed, so the `dblclick` that
+  follows is still answered once as `auto-double-click`, and the next real drag
+  still fires;
+- a drag with no observed multiplicity: refused as
+  `unverified-click-multiplicity`, then the next real drag fires;
+- a multi-click drag with both switches on: refused, nothing consumed.
+
+The Phase 4 assertion that a `drag` release followed by a `dblclick` is absorbed
+as `duplicate-gesture` was **removed**, as the brief requires: it asserted the
+defect as the allowed behaviour. Duplicate absorption is still covered where it
+is still reachable — at the gate, by `tests/client-trigger.spec.ts`.
+
+New pure coverage in `tests/client-gesture.spec.ts` pins the narrowing
+(`1 → single`, `≥2 → multi`, anything unmeasured → `unknown`), the per-press
+lifetime, the non-primary refusal, the cancel clearing, the counter, and the fact
+that a drifting multi-click press is *still* classified `drag` — the classifier's
+movement rule was not weakened to make this work.
+
+### 24.8 Totals
+
+| | Phase 4 | Phase 4.1 |
+| --- | --- | --- |
+| unit/integration (`npm run test`) | 17 files / **351** tests | 17 files / **372** tests (+21, none weakened) |
+| bundle static checks | **88/88** | **94/94** |
+| isolated runtime (`npm run test:runtime`) | **159/159** | **169/169** |
+| browser | Chromium 153.0.8010.12 | Chromium 153.0.8010.12 (same run-time environment) |
+
+The runtime run before the fix — the reproduction — was **161/169** with these
+failures on **both** boots: `B/R P41B` (a wrong expectation of mine about the
+plain-pair shape, corrected against the measurement, not the other way round),
+`B/R P27`, `B/R P28` and `B/R P31`. `B/R P30` passed before and after, which is
+the expected asymmetry: with `autoSelection` off the drag could not win.
+
+169 = Phase 1's 64 + Phase 2's 13 + Phase 3's 20 + Phase 4's 62 + **Phase 4.1's
+10** (`B/R P41A`, `P41B`, `P41C`, `P30`, `P31` = 5 per boot × 2 boots). The four
+browser stress storms were raised to **100 drags + 100 double clicks in all four
+quadrants** on both boots, each asserting `drags = 100`, `doubleClicks = 100` and
+the exact per-origin counts, so "true double click" is proven by
+`doubleClickGestures` rather than assumed.
+
+```text
+S00  100 true drags + 100 true double clicks ->   0 requests
+S10  100 true drags + 100 true double clicks -> 100, all auto-selection
+S01  100 true drags + 100 true double clicks -> 100, all auto-double-click
+S11  100 true drags + 100 true double clicks -> 200, 100 + 100
+```
+
+Every Phase 4 regression the brief lists is re-measured and still passes:
+`selectionchange` → 0 I/O (`B/R P12`, plus the AST reachability check), normal
+drag → `auto-selection`, normal double click → `auto-double-click`, same text +
+new gesture → new lookup (`B/R P15`/`P16`), same identity → at most one lookup,
+the manual shortcut independent and still exactly one everywhere, latest-request-
+wins, stale success and stale failure ignored, loading ownership, composer
+exclusion (`B/R P20`/`P21`), mouse-only automatic support (`B/R P29` — still
+refused as `unverified-pointer-kind`), settings live update (`B/R P13`/`P14`),
+and one lookup per gesture after a client reload (`L06`/`L07`).
+
+### 24.9 Isolation
+
+```text
+$ npm run test:runtime
+ISOLATION CHECK: PASS          (runner gate)
+ISOLATION CHECK: PASS          (harness gate)
+phase1-verify: PASS — 169/169 checks
+```
+
+| | value |
+| --- | --- |
+| `DSH_HOME` | `C:\Users\20659\AppData\Local\Temp\dsh-word-lookup-test\home` |
+| profile | `word-lookup-test` |
+| port | `50991` (free again after the run; only `TIME_WAIT` entries remain) |
+| browser | Chromium `153.0.8010.12`, headless |
+| authentication | the isolated instance's own launch token |
+| boots | 2, `H02` stopping cleanly and `H03` restarting from the same profile |
+| result | **169/169**, `summary.failed = []` |
+| wall clock | `15:23:05Z` → `15:28:30Z` (the acceptance run on the committed bundle) |
+| report | `docs/evidence/phase41-verification-20261002.json` |
+
+The pre-fix run used the same entry point and the same environment and printed
+`ISOLATION CHECK: PASS` twice as well; its report is kept as
+`docs/evidence/phase41-verification-prefix-20261002.json`.
+
+### 24.10 Test totals and what changed in them
+
+| file | before | after | what was added |
+| --- | ---: | ---: | --- |
+| `tests/client-gesture.spec.ts` | 31 | 40 | the multiplicity narrowing, per-press lifetime, non-primary and cancel cases, the counter, and the "movement rule unchanged" case |
+| `tests/client-trigger.spec.ts` | 33 | 40 | the multi-click refusal on both paths, the switch/pointer-kind ordering, the four-state matrix for a multi-click drag |
+| `tests/client-runtime-harness.spec.ts` | 46 | 51 | the overlap matrix (S10/S01/S11), refused-not-consumed, the un-delivered `dblclick`, the unverified multiplicity; the duplicate-absorption case it replaces was removed |
+| `tests/client-gesture-identity.spec.ts` | 17 | 17 | the projected classification now spells out `clickMultiplicity` |
+
+No pre-existing assertion was weakened. The two that changed *shape* are named
+here: the harness's `dblclick`-as-duplicate case was removed (it asserted the
+defect), and the harness drivers now emit the `mousedown` that a real mouse
+always emits — a stricter replay of the Phase 0 §7.3 order, without which the
+drivers would have been testing a sequence no device produces.
+
+### 24.11 Residual risks
+
+1. **A multi-click press whose `dblclick` never arrives is suppressed.** The
+   rule is deliberate (24.5), but it is a *behavioural* consequence: if a reader
+   clicks a word and then, within the platform's double-click time and area,
+   starts a drag from the same spot, the second gesture is suppressed. The
+   spatial window is the platform's own (a few pixels), the manual shortcut is
+   unaffected, and the safe direction was chosen on purpose — but it is a real
+   cost and it is not measured here, because that window is not reachable through
+   automation input.
+2. **A press whose `mousedown` is never observed cannot produce an
+   `auto-selection` lookup.** Real mouse input always delivers it, and `B/R P31`
+   proves the counter moves for real drags; but an environment where another
+   capture-phase listener stops the compatibility event before this plugin sees
+   it would disable the automatic drag path (it would still be diagnosable: the
+   gate reports `unverified-click-multiplicity` and `mouseDowns` stays put). The
+   plugin registers on `document` capture, as it did in Phase 2; moving that one
+   listener to `window` capture is the mitigation if a host ever needs it.
+3. **The platform's native double-click tolerance was not measured.** CDP input
+   supplies the click count, so 24.4 measures what Chromium's renderer does with
+   a multiplicity the platform would have computed, not the browser's own
+   recognition distance. The fix does not depend on that distance: it consumes
+   the multiplicity the platform actually reports, whatever the platform's rule
+   for computing it is.
+4. **The multiplicity is read from the compatibility event, not from a pointer
+   event.** `PointerEvent` has no click count, so `mousedown` is the only source.
+   It is a DOM-standard field (`UIEvent.detail`), re-measured here rather than
+   assumed, and the fallback when it is absent is refusal rather than guessing.
+5. Residual risks 1–12 of §21 remain as written, except **§21.6** (the drifting
+   double click attributed to `auto-selection`) which this section resolves, and
+   **§21.12** (no remote) which §23.1 replaces.
+
+### 24.12 Git
+
+| | value |
+| --- | --- |
+| `START_SHA` | `39ab4436aafbe0272d7ac2f866c5546da9e10126` |
+| Phase 4.1 | `fix: keep double-click and drag auto lookup independent` |
+| history | `9db08b5` and `39ab443` **not** amended, not rebased, not rewritten |
+| force push | not run (`--force` and `--force-with-lease` never used) |
+| remote | `origin` = `https://github.com/HaowenCang/dsh-word-lookup.git`, `master` fast-forwarded |
+| `git diff --check` | no whitespace errors |
+| worktree after commit | clean (`git status --porcelain` reports 0 entries) |
+| build reproducibility | `lib/client.js` `sha256 D232C191…82CB` — the artifact the 169/169 acceptance run served, rebuilt byte-identically from the committed sources by `npm run verify` |
+
+The commit is one change, not several: the classifier records a platform fact,
+the gate refuses on it, the runtime observes the event that carries it, and the
+checks that were wrong are replaced. Splitting it would produce intermediate
+commits whose tests assert the defect.
+
+The production instance (`127.0.0.1:19387`, pid `51344`) was left running and
+untouched throughout; it wrote its own usage and session state while it served
+this conversation, as it always does. No action of this work addressed it: every
+runtime test ran against the isolated scratch home above, the production profile
+still contains no `dsh-word-lookup` row (`package.json`, `cordis.yml`,
+`cordis.patch.yml`), the production port was never bound or connected to, and no
+production session, cookie, loader or route was read, copied or modified.
 
 ```text
 Production DSH environment modified during this work: NO

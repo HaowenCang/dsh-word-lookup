@@ -314,6 +314,11 @@ for (const [label, needle] of [
   ['the switched-off refusal reason', '"switch-off"'],
   ['the unverified-pointer refusal reason', '"unverified-pointer-kind"'],
   ['the not-a-trigger refusal reason', '"not-a-trigger-gesture"'],
+  // Phase 4.1: the semantic-independence rule and the event that supplies it.
+  ['the multi-click refusal reason', '"multi-click-sequence"'],
+  ['the unverified-multiplicity refusal reason', '"unverified-click-multiplicity"'],
+  ['the platform click-multiplicity values', '"single"'],
+  ['a listener for the event that carries the click counter', '"mousedown"'],
 ]) {
   check(`client bundle carries ${label}`, client.includes(needle), needle)
 }
@@ -338,7 +343,7 @@ check(
 )
 // The interaction concern stays on the client: the host answers queries and
 // knows nothing about how one was asked for.
-for (const token of ['auto-selection', 'auto-double-click', 'gestureId', 'pointerType', 'duplicate-gesture']) {
+for (const token of ['auto-selection', 'auto-double-click', 'gestureId', 'pointerType', 'duplicate-gesture', 'multi-click-sequence', 'clickMultiplicity']) {
   check(`host bundle carries no gesture concern ("${token}")`, !host.includes(token))
 }
 check(

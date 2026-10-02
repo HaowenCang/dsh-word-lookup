@@ -24,6 +24,12 @@
  *    twice, and deciding it from rectangle equality would mis-identify a
  *    gesture the moment the transcript reflowed or the page scrolled.
  *
+ * What it *does* consume about a gesture is a closed list of platform facts: the
+ * kind the classifier reached, the pointer kind that produced it, the
+ * platform's own click multiplicity for the press, and the selection captured
+ * with it. Every one of those is either measured in a real browser or refused —
+ * never guessed at.
+ *
  * The two switches are read as values on every evaluation rather than captured
  * once, so a settings change takes effect on the reader's next gesture with no
  * reload: see {@link TriggerGates}.
@@ -80,7 +86,7 @@ export interface AutomaticTriggerInput {
  * told apart from "the gate never ran": `switch-off` is the gate working, and an
  * absent reason would be the gate missing.
  */
-export type TriggerReason = 'accepted' | 'no-classification' | 'not-a-trigger-gesture' | 'duplicate-gesture' | 'switch-off' | 'unverified-pointer-kind' | 'ineligible-selection';
+export type TriggerReason = 'accepted' | 'no-classification' | 'not-a-trigger-gesture' | 'duplicate-gesture' | 'switch-off' | 'unverified-pointer-kind' | 'multi-click-sequence' | 'unverified-click-multiplicity' | 'ineligible-selection';
 /**
  * The identities already consumed, most recent first.
  *
@@ -146,7 +152,31 @@ export interface TriggerDecision {
  *    `mouse`; `pen`, `touch` and an unidentifiable pointer are refused rather
  *    than guessed at, because an unverified gesture type must not produce
  *    automatic I/O;
- * 6. the selection captured at completion must be eligible and non-empty.
+ * 6. an `auto-selection` lookup additionally requires the platform's own click
+ *    counter to say the press was a **single** click. This is step 6 rather than
+ *    an earlier one on purpose: a `drag` classification is a movement fact, and
+ *    only the drag path cares whose press it was. A `double-click`
+ *    classification is the platform's own recognition and is answered by its own
+ *    switch;
+ * 7. the selection captured at completion must be eligible and non-empty.
+ *
+ * Step 6 is what keeps the two switches semantically independent. A double click
+ * whose second press drifted past the drag threshold is still classified `drag`
+ * by movement, and the platform still reports it as a multi-click press; without
+ * this check the drag path would consume the identity, and the `dblclick` that
+ * followed — the platform's own, unambiguous recognition of the gesture the
+ * reader made — would be refused as a duplicate of it. The reader asked for
+ * `autoDoubleClick` semantics and would have got `autoSelection`'s.
+ *
+ * The refusal is deliberately the *safe* direction in the ambiguous cases: a
+ * press reported as part of a multi-click sequence that never completes one
+ * produces no automatic lookup at all, and neither does a press whose
+ * multiplicity was never observed. (Phase 4.1 measured that this Chromium emits
+ * its `dblclick` from the press's click count, so the first shape is hard to
+ * produce through automation input; the rule exists for the platforms and input
+ * paths where it is not.) A missed automatic lookup is recoverable with the
+ * manual command; an unexpected one is the thing both switches exist to
+ * prevent.
  *
  * A refusal never consumes the identity unless it was already consumed. That is
  * what lets `autoSelection` be switched on and the *next* drag work, and it is
