@@ -52,6 +52,8 @@
     "test-profile:create": "node scripts/create-test-profile.mjs",
     "test-profile:cleanup": "node scripts/cleanup-test-profile.mjs",
     "test:runtime": "node scripts/run-integration-test.mjs",
+    "test:native-input": "node scripts/phase421-native-input-probe.mjs",
+    "test:native-input:preflight": "node scripts/phase421-native-input-probe.mjs --preflight",
     "profile:install": "node scripts/profile-install.mjs install",
     "profile:uninstall": "node scripts/profile-install.mjs uninstall"
   },
