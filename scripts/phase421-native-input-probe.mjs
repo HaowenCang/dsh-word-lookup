@@ -727,6 +727,67 @@ async function readPluginView(page) {
 }
 
 /**
+ * Dismiss the client's first-run onboarding dialog, if it is up.
+ *
+ * A fresh isolated browser profile opens the client on "Add an API key to get
+ * started" behind a full-page mask. That mask is the topmost hit-test target
+ * everywhere on the page, so a genuine `SendInput` press aimed at the probe word
+ * lands on the mask: no text is selected, the product classifies every row as
+ * `other`, and the sweep would report a confident "the overlap is not reachable"
+ * that is really "the click never reached the text". With CDP input — which
+ * Phase 4.2 used — the same trap is invisible, because dispatching to the
+ * renderer is not the same thing as a click arriving.
+ *
+ * This is setup, not measurement: it is a DOM activation of the client's own
+ * button, and it supplies no multiplicity to any measured gesture. The
+ * hit-test gate below is what actually guarantees the protector worked.
+ *
+ * @param page - the authenticated page.
+ * @returns what it found and what it activated.
+ */
+async function dismissOnboarding(page) {
+  return await page.evaluate(() => {
+    const label = (element) => (element.textContent ?? '').trim()
+    const buttons = [...document.querySelectorAll('button, [role="button"]')]
+    const pattern = /configure later|save and continue|skip|later|稍后|以后|跳过/i
+    const hit = buttons.find((button) => pattern.test(label(button)))
+    const report = {
+      buttonCount: buttons.length,
+      clicked: hit === undefined ? null : { label: label(hit), className: String(hit.className) },
+    }
+    if (hit !== undefined) hit.click()
+    return report
+  })
+}
+
+/**
+ * Ask the renderer what a real click at one CSS point would actually hit.
+ *
+ * @param page - the authenticated page.
+ * @param point - the CSS client point to test.
+ * @param word - the probe word whose span must be the hit target.
+ * @returns the hit-test facts.
+ */
+async function hitTest(page, point, word) {
+  return await page.evaluate(
+    ({ target, name }) => {
+      const describe = (node) => (node === null ? null : `${node.tagName.toLowerCase()}${node.id === '' ? '' : `#${node.id}`}.${String(node.className).slice(0, 60)}`)
+      const element = document.elementFromPoint(target.x, target.y)
+      const span = document.querySelector(`[data-phase421-word="${name}"]`)
+      return {
+        element: describe(element),
+        probeWordPresent: span !== null,
+        probeWordBox: span === null ? null : span.getBoundingClientRect().toJSON(),
+        isProbeWord: span !== null && element !== null && (element === span || span.contains(element)),
+        looksLikeModalMask: element !== null && /_mask_/i.test(String(element.className)),
+        activeElement: document.activeElement === null ? null : document.activeElement.tagName,
+      }
+    },
+    { target: point, name: word },
+  )
+}
+
+/**
  * Difference between two origin counts.
  *
  * @param before - the earlier view.
@@ -1205,6 +1266,15 @@ await startPlatformTrace(page)
 await pinWindowTitle(page, MARKER)
 await sleep(400)
 
+// --- clear the first-run dialog, then prove the word is actually hittable ---
+const onboarding = await dismissOnboarding(page)
+await sleep(700)
+await pinWindowTitle(page, MARKER)
+console.log(
+  `phase421: first-run dialog — ${onboarding.clicked === null ? 'no dismiss control found' : `activated "${onboarding.clicked.label}"`} ` +
+    `of ${String(onboarding.buttonCount)} button(s)`,
+)
+
 // --- the window must be real, visible and foreground -----------------------
 const found = await mouse.findWindow(MARKER)
 if (found.windows.length === 0) {
@@ -1311,6 +1381,25 @@ if (box === null) {
 const anchor = { x: Math.round(box.x) + 2, y: Math.round(box.y + box.height / 2) }
 console.log(`phase421: anchor client point ${JSON.stringify(anchor)} (word box ${JSON.stringify(box)})`)
 
+// The gate that makes every sweep row meaningful. A press that lands on a mask
+// selects nothing, and "nothing was selected" is indistinguishable downstream
+// from "the platform refused the double click" — so the probe refuses to run
+// rather than produce a negative it cannot support.
+const anchorHit = await hitTest(page, anchor, 'derivation')
+console.log(`phase421: hit test at the anchor -> ${JSON.stringify(anchorHit)}`)
+if (anchorHit.isProbeWord !== true && !PREFLIGHT_ONLY) {
+  console.error(
+    `phase421: a real click at ${JSON.stringify(anchor)} would hit ${String(anchorHit.element)}, not the probe word.\n` +
+      '  Every measurement taken now would classify as "nothing was selected" and read as a\n' +
+      '  false negative, so the probe is refusing to start.',
+  )
+  await mouse.restore()
+  await mouse.close()
+  await browserContext.close()
+  await stopDsh(child)
+  process.exit(2)
+}
+
 // A picture of the page the input was aimed at, for an auditor who wants to see
 // what the coordinates referred to. `page.screenshot` reads pixels; it injects
 // nothing.
@@ -1353,12 +1442,13 @@ if (PREFLIGHT_ONLY) {
   console.log(`phase421: page state ${JSON.stringify(under)}`)
   console.log(`phase421: idle distinct positions ${String(idleDistinct)}/10 — external input ${externalInputObserved ? 'OBSERVED' : 'not observed'}`)
   console.log(`phase421: idle samples ${JSON.stringify(idleSamples)}`)
+  console.log(`phase421: anchor hit test ${JSON.stringify(anchorHit)}`)
   console.log(`phase421: screenshot ${screenshots[0] ?? 'none'}`)
   await mouse.restore()
   await mouse.close()
   await browserContext.close()
   await stopDsh(child)
-  process.exit(calibration.ok ? 0 : 2)
+  process.exit(calibration.ok && anchorHit.isProbeWord === true ? 0 : 2)
 }
 
 const context = {
@@ -1691,6 +1781,10 @@ const report = {
   word: 'derivation',
   wordBox: box,
   anchor,
+  setup: {
+    firstRunDialog: onboarding,
+    anchorHitTest: anchorHit,
+  },
   dragThresholdPx: DRAG_THRESHOLD_PX,
   firstPressSweep: [...FIRST_PRESS_SWEEP],
   calibration,
