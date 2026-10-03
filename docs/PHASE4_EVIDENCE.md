@@ -12,6 +12,17 @@
 > what Phase 4 believed, and of the check that made the belief look measured, is
 > kept exactly as it was written.
 
+> **Phase 4.2 audit, 2026-10-02 (`START_SHA` `58384d7`).** An independent audit
+> confirmed that §24's fix is real and effective for the press it targets, and
+> asked the symmetric question §24 did not answer: can a **first** press that
+> drifts far enough to be classified as a drag still become the first half of a
+> platform-recognised double click? §25 is the answer. It is a measurement, not a
+> repair: the overlap **is** observable in Chromium, the defect is reproduced on
+> the wire in S10 and S11, no synchronous signal exists at the first `pointerup`,
+> and the platform's multi-click window — the only possible commit boundary for a
+> deferral — is not obtainable by the plugin. **No production file was changed.**
+> §25.11 lists the three ways to close it and what each costs.
+
 ## 1. Baseline
 
 | Fact | Value |
@@ -1297,6 +1308,345 @@ runtime test ran against the isolated scratch home above, the production profile
 still contains no `dsh-word-lookup` row (`package.json`, `cordis.yml`,
 `cordis.patch.yml`), the production port was never bound or connected to, and no
 production session, cookie, loader or route was read, copied or modified.
+
+```text
+Production DSH environment modified during this work: NO
+```
+
+## 25. Phase 4.2 — first-press drift audit
+
+Status of this section: **the record of a measurement, not a fix**. Where §24
+describes what the build does, this section reports an open boundary and why it
+was left open.
+
+```text
+FIRST-PRESS OVERLAP OBSERVED
+BLOCKED — PRODUCT TRADE-OFF REQUIRED / PHASE 5 NOT READY
+```
+
+### 25.1 What was hypothesised
+
+Phase 4.1 closed the **second**-press half of the double-click / drag overlap: an
+`auto-selection` lookup is refused unless the press's `mousedown.detail` is
+verifiably `1`. That works because a second press carries `detail === 2` and the
+gate can see it *before* it spends anything.
+
+The first press of any double click, however, always arrives as
+`mousedown.detail === 1` — the platform cannot know a second click is coming
+either. So the symmetric case has no such guard:
+
+```text
+press #1   detail 1   drift >= 5 px   eligible selection   ->  classifier says `drag`
+                                                           ->  gate says `single`, accepts
+                                                           ->  autoSelection issues a lookup
+press #2   detail 2   ...             dblclick            ->  autoDoubleClick issues a second
+```
+
+Two lookups for one platform gesture, one per switch — the coupling §24 removed.
+
+### 25.2 How it was measured, and what automation cannot measure
+
+`scripts/phase42-probe.mjs` is the probe. It boots the isolated instance, installs
+a capture-phase trace of `pointerdown`, `mousedown`, `pointermove`, `mousemove`,
+`pointerup`, `mouseup`, `click`, `dblclick` and `selectionchange` (recording order,
+`detail`, `pointerType`, `button`, `buttons`, `clientX`/`clientY`, the selection
+text, whether it was collapsed, and a `performance.now()` timestamp for each), and
+sweeps the **first** press over `0, 1, 2, 3, 4, 5, 6, 8, 10, 12` px while the
+second press stays at the origin. The gap between the two presses is measured
+(~87–102 ms), not assumed. Evidence: `docs/evidence/phase42-probe-20261002.json`.
+
+The probe is explicit about the limit §8 of the brief requires. CDP input has to
+be **told** the click count, so the sweep is run in four multiplicity modes, and
+each row records which one produced it:
+
+| mode | who supplies the count | why it exists |
+| --- | --- | --- |
+| `supplied-2` | the automation client sets `clickCount: 2` on the second press | reproduces the multiplicity a real second press carries; this is the input the product consumes |
+| `plain-1` | both presses are plain clicks | the shape Playwright sends by default, and the shape the sealed Phase 4 check used |
+| `raw-cdp` | nobody — raw `Input.dispatchMouseEvent` with no `clickCount` | control: is any built-in click-count detector reachable from automation input? |
+| `supplied-2-late` | `clickCount: 2`, but with a ≈1300 ms gap | control: does the renderer check **time** as well as space? |
+
+Nothing below calls a supplied count a native recognition. What is measured is the
+renderer's behaviour *given* a multiplicity — the same class of measurement Phase
+4.1's `P41A`/`P41C` already rest on.
+
+### 25.3 The first-press movement sweep
+
+Both switches **off**, so the probe itself issues no I/O. `md` is
+`mousedown.detail`, read from the trace.
+
+| first drift | first `md` | selection at first `pointerup` | plugin kind | multiplicity | second `md` | `dblclick` | gap |
+| ---: | --- | --- | --- | --- | --- | --- | ---: |
+| 0 | `1` | `""` | `other` | `single` | `2` | **yes** | 90.0 ms |
+| 1 | `1` | `""` | `other` | `single` | `2` | **yes** | 88.7 ms |
+| 2 | `1` | `""` | `other` | `single` | `2` | **yes** | 102.1 ms |
+| 3 | `1` | `""` | `other` | `single` | `2` | **yes** | 92.5 ms |
+| 4 | `1` | `i` | `other` | `single` | `2` | **yes** | 96.9 ms |
+| **5** | `1` | `i` | **`drag`** | `single` | `2` | **yes** | 97.5 ms |
+| **6** | `1` | `i` | **`drag`** | `single` | `2` | **yes** | 89.2 ms |
+| **8** | `1` | `i` | **`drag`** | `single` | `2` | **yes** | 94.0 ms |
+| **10** | `1` | `iv` | **`drag`** | `single` | `2` | **yes** | 87.1 ms |
+| **12** | `1` | `iv` | **`drag`** | `single` | `2` | **yes** | 89.1 ms |
+
+The classifier's `drag` verdict starts exactly at its 5 px constant, and from that
+row onwards **every** element of the hypothesised overlap is present at once:
+`distance >= 5`, an eligible selection at the first `pointerup`, a `drag`
+classification, a `single` multiplicity the gate accepts, and a `dblclick` the
+platform reports for the pair. The two runs of the probe in this session agree row
+for row.
+
+Verbatim, the drift-8 pair (from the probe's own trace):
+
+```text
+press #1   pointermove/0  mousemove/0  pointerdown/0  mousedown/1
+           pointermove/0  mousemove/0  selectionchange
+           pointermove/0  mousemove/0  selectionchange
+           pointerup/0    mouseup/1    click/1                 selection "i"
+
+           ... 94.0 ms with no event at all ...
+
+press #2   pointermove/0  mousemove/0  pointerdown/0  mousedown/2
+           pointerup/0    mouseup/2    click/2    dblclick/2
+```
+
+### 25.4 The controls
+
+| mode | result across all ten distances | what it establishes |
+| --- | --- | --- |
+| `plain-1` | second `md` `1`; **no `dblclick`** at any drift; final kind `other` | re-confirms Phase 4.1 §24.3: the sealed `P27`/`P28` shape could never have observed a double click |
+| `raw-cdp` | second `md` `0`; no `click`, **no `dblclick`** at any drift | **no click-count detector is reachable from automation input**; the count is the automation client's, not the platform's |
+| `supplied-2-late` | **`dblclick` still emitted at every drift**, with a ≈1300 ms gap | the renderer checks **neither space nor time**: its `dblclick` is a pure function of the multiplicity it was handed |
+
+The third control is the one that matters for honesty, and it cuts both ways. It
+proves that the sweep's `dblclick` is not evidence about the browser's or the
+operating system's own recognition — but it equally proves the renderer applies
+**no spatial validation of the pair**, so nothing inside the page prevents a first
+press that drifted ≥ 5 px from being the first half of the double click the
+platform reports.
+
+### 25.5 Verdict
+
+```text
+FIRST-PRESS OVERLAP OBSERVED
+```
+
+`overlapObserved: true`, computed by the probe from its own rows: the five
+distances `5, 6, 8, 10, 12` satisfy the brief's §9 test exactly
+(`distance >= 5` ∧ eligible selection at the first `pointerup` ∧ plugin classifies
+`drag` ∧ `dblclick` emitted). No row that formed a genuine drag failed to produce
+one (`dragRowsWithoutDoubleClick: []`), which is the boundary the brief's CASE A
+would have required.
+
+### 25.6 The defect, reproduced on the wire before any change
+
+`auto-selection` decisions are read from the plugin's own accounting; `requests`
+from Playwright's network layer. The two are asserted together, as everywhere else
+in this document. Overlap gesture: first press drifts 8 px, second press at the
+origin.
+
+| state | `autoSelection` | `autoDoubleClick` | requests | `auto-selection` | `auto-double-click` | first `pointerup` already issued | required by §11 | verdict |
+| --- | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| **S10** | true | false | **1** | **1** | 0 | 1 (`auto-selection`, `"i"`) | 0 | **VIOLATED** |
+| **S01** | false | true | 1 | 0 | 1 | 0 | exactly 1, `auto-double-click` | holds |
+| **S11** | true | true | **2** | **1** | **1** | 1 (`auto-selection`, `"i"`) | exactly 1, `auto-double-click` | **VIOLATED** |
+
+So the defect is confirmed in the two states the brief names, and the asymmetry
+matches Phase 4.1's: with `autoSelection` off the drag cannot win, so S01 was
+already correct.
+
+The wire count is what makes it a defect rather than a display artefact: the
+reader made one platform gesture and two POSTs left the page, one for a one- or
+two-character drag selection (`i`/`iv`) and one for the word the platform's own
+double click selected (`derive`). The card ends on the right answer, which is why
+the extra request is invisible unless the wire is counted — and why Phase 4's
+"one semantic gesture, at most one automatic lookup" is the property under test.
+
+### 25.7 Is there a synchronous signal at the first `pointerup`? No.
+
+This is the fact the whole repair decision turns on, and it is measured rather
+than argued. At the moment the first press classifies — the only moment at which
+`autoSelection` can act, and the moment `credential`-free evidence shows the
+lookup leaving — the plugin's entire observable stream is:
+
+```text
+pointerdown  mousedown/1  pointermove…  selectionchange…  pointerup  mouseup/1  click/1
+```
+
+Every field in it describes a lone drag. `mousedown.detail` is `1` and will be
+`1` whether or not a second press follows, because the platform has not decided
+yet either; `click.detail` is `1` for the same reason; there is no "a second press
+is pending" flag, no `dblclick` (it is dispatched only after the second release),
+and no counter that resets. The second press's `mousedown/2` arrives ~90 ms later —
+measured, not estimated — long after the request is gone.
+
+```text
+Strict semantic ownership requires deferring the auto-selection commitment.
+```
+
+There is no synchronous alternative, so the brief's §13 mechanism is the only
+shape that can satisfy §11, and the brief's §14 condition on it is met.
+
+### 25.8 Why production code was not changed
+
+Deferring the commitment needs a **commit boundary**, and the probe says what it
+cannot be. It cannot be an event: after a lone drag there is no further event at
+all until the reader does something else, so a pending intent would never
+commit and a drag would never look itself up. It therefore has to be a timer
+bounded by the platform's own multi-click window — and that window is **not
+obtainable by the plugin**:
+
+- the renderer implements no part of it — `raw-cdp` finds no detector at all, and
+  `supplied-2-late` shows the renderer ignores both space (12 px) and time
+  (1300 ms) when it is handed a count;
+- no web API exposes it, and the plugin's client half has no other channel to it;
+- the only value reachable at all is the host operating system's own, which is a
+  different fact about a possibly different machine, and would need a new
+  host→client configuration channel to reach the browser at all.
+
+The platform parameters on the machine this work ran on are, for scale,
+`GetDoubleClickTime() = 500 ms` and `DoubleClickSpeed = 500`,
+`DoubleClickWidth = 4`, `DoubleClickHeight = 4` in `HKCU\Control Panel\Mouse`. A
+bound of that order would add **up to half a second of latency to every automatic
+drag selection** — the product's primary automatic path — to suppress one extra
+request in an ambiguous case. That is a product decision, not an audit fix, and
+the brief's §14 is explicit that the honest response is to report the trade-off
+rather than hard-code an unverified constant. **No constant was chosen and no
+production file was touched.**
+
+The probe's ownership rows are the evidence for that conclusion, and they are also
+the acceptance test any future fix must flip:
+
+```text
+S10  requests 1  (auto-selection 1, auto-double-click 0)   product invariant VIOLATED
+S01  requests 1  (auto-selection 0, auto-double-click 1)   product invariant HOLDS
+S11  requests 2  (auto-selection 1, auto-double-click 1)   product invariant VIOLATED
+```
+
+The options, with their measured costs, are stated in §25.11.
+
+### 25.9 The native half of the question is still unmeasured
+
+This section must not be read as a claim about the operating system. The sweep
+supplies the click count; §8 of the brief forbids describing that as the
+browser's or the OS's own recognition tolerance, and the `raw-cdp` and
+`supplied-2-late` controls show why the distinction is real rather than
+ceremonial.
+
+What is left unmeasured is narrow and nameable: the platform's double-click
+rectangle is anchored at "the location of a first click", and this work could not
+establish — without network access to the Chromium or Windows sources, and
+without real OS-level input injection into a desktop session — whether that anchor
+is the first press's **button-down** position or its **release** position:
+
+- anchored at **button-down**, the drift is irrelevant, the pair is still inside
+  the 4 px rectangle, the platform reports a multi-click, and the overlap is
+  reachable in production;
+- anchored at **release**, a first press that drifted ≥ 5 px ends more than 4 px
+  from where it began, the pair falls outside the rectangle, no `dblclick` is
+  produced, and the overlap is **not** reachable in production — which would make
+  this phase's CASE A the truthful one.
+
+Automation input bypasses that decision entirely, so it cannot be settled from
+inside the page. Deciding it needs real OS-level input against a real Chromium
+window, which this phase deliberately did not manufacture. This is the same blind
+spot §24.11 residual risk 3 recorded; Phase 4.2 has narrowed it to one question
+with two answers, and has shown that the *renderer* does not supply the answer.
+
+### 25.10 Isolation
+
+```text
+$ node scripts/phase42-probe.mjs
+ISOLATION CHECK: PASS
+```
+
+| | value |
+| --- | --- |
+| `DSH_HOME` | `C:\Users\20659\AppData\Local\Temp\dsh-word-lookup-test\home` |
+| profile | `word-lookup-test` |
+| port | `50991` (free again after the run) |
+| browser | Chromium `153.0.8010.12`, headless |
+| authentication | the isolated instance's own launch token |
+| boots | 1 per probe run; 2 runs |
+| sweeps | 5 × 10 rows, plus 3 ownership gestures |
+
+The probe's first executable statement is the same isolation assertion the other
+runtime entry points use; it refuses to start against anything that is not
+provably scratch. The production instance on `127.0.0.1:19387` was never bound or
+connected to, and no production home, profile, session, cookie, loader or route
+was read, copied or modified. No desktop input was injected.
+
+### 25.11 Residual risks and the decision this phase leaves open
+
+1. **The overlap is open.** S10 issues a lookup for a gesture the platform
+   subsequently recognises as a double click, and S11 issues two for it. Phase 4's
+   one-gesture-one-lookup property therefore does **not** hold for this shape.
+2. **The native reachability is unmeasured** (§25.9). Until it is settled, nobody
+   can say whether the overlap costs anything in production, and the two candidate
+   answers point at opposite decisions.
+3. **The three available resolutions**, each with what it costs:
+
+   | option | what it does | cost |
+   | --- | --- | --- |
+   | **A. accept and document** | leave the trigger as it is; record the overlap | one extra request and a transient card update in an ambiguous case; the one-gesture property stays untrue for this shape |
+   | **B. defer auto-selection** | pending intent at `pointerup`; cancel on `mousedown.detail >= 2` or the promoting `dblclick`; commit on a platform-derived bound | up to the platform's multi-click interval (≈500 ms here) added to **every** automatic drag; needs a host→client channel for a value the renderer cannot see |
+   | **C. settle §25.9 first** | drive the same sweep with real OS-level input in an isolated desktop session | decides whether B is needed at all; if the anchor is the release position, the overlap is production-unreachable and the phase closes with no fix |
+
+   Option C is the cheapest and is the recommended next step: it converts an
+   unmeasurable assumption into a measurement, and it can retire options A and B
+   entirely.
+4. **No assertion was added to the sealed runtime harness.** An assertion on the
+   required ownership would fail today, and an assertion that recorded the current
+   ownership as expected would be exactly the kind of check §24.10 removed for the
+   mirrored case — a test that asserts the defect. The probe is the permanent
+   artefact instead: it re-measures all five sweeps on every run and recomputes
+   `overlapObserved` from the rows, so a Chromium or Playwright change that alters
+   any of them is visible immediately rather than silently absorbed.
+5. §21 and §24.11 residual risks remain as written; this section supersedes
+   nothing in them, and adds one more.
+
+### 25.12 Verification
+
+`npm run verify` and `npm run test:runtime` were re-run after this work and are
+**unchanged**: the production sources, the tests and the sealed bundle are
+byte-identical to `58384d7`, because nothing outside `scripts/phase42-probe.mjs`,
+the evidence file and this document was written.
+
+| | value |
+| --- | --- |
+| `npm run verify` | PASS — 17 files / 372 tests, bundle checks 94/94, credential scan PASS |
+| `npm run test:runtime` | PASS — **169/169** checks, `ISOLATION CHECK: PASS` twice |
+| `git diff --check` | no whitespace errors |
+| production sources touched | **none** — `git status --short` lists only `docs/PHASE4_EVIDENCE.md`, `docs/evidence/phase42-probe-20261002.json` and `scripts/phase42-probe.mjs` |
+
+One failed attempt is recorded rather than smoothed over, because the failure was
+real and the fix matters. The first acceptance run after the probe reported
+**168/169**: `B20` ("the settings namespace is served to the browser and both
+defaults are false") failed on boot 1 with `{autoDoubleClick: true,
+autoSelection: true}`. The cause was the probe, not the product. The probe's last
+sweep leaves `S11` in force, and `ConfigForm.set` **persists** — so the probe had
+written `true/true` into the isolated profile's patch, and the next boot correctly
+loaded it. Phase 4's own note in §18 that the retained profile ends on
+`false/false` is exactly the invariant that was broken, and `S07` in the
+acceptance harness restores it for the same reason the probe now does:
+`scripts/phase42-probe.mjs` ends by putting both switches back through the same
+settings write and records the result as `restoredSwitches`. The re-run above is
+the probe's third execution, from the committed script, with the acceptance run
+immediately after it, and both are green.
+
+This is worth stating plainly because it is a small instance of the thing this
+whole phase is about: a measurement that changes the state it measures is not a
+measurement. It was caught by the existing gate rather than by inspection, which
+is the gate working.
+
+### 25.13 Git
+
+| | value |
+| --- | --- |
+| `START_SHA` | `58384d737d913dc4a839131b9b23484725dbbb02` |
+| `58384d7` amended / rebased | no |
+| force push | not run |
+| push | **not run** — the brief gates `git push origin master` on PASS, and this phase is BLOCKED |
+| worktree | see the commit created for this phase below |
 
 ```text
 Production DSH environment modified during this work: NO
