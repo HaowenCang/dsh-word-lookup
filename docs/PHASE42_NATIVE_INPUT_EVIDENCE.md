@@ -168,4 +168,82 @@ Both Group A and Group B drop double click recognition once movement exceeds 1 C
 
 - JSON Evidence: `docs/evidence/phase42-native-input-20261004.json`
 - Verification Log / Screen: `verify-out/phase421-probe-page.png`
-- Instrument Repair Commit: `6fded22`
+- Instrument Repair Commit: `6fded22302b0f6605d9d63ce48db36744416dd67`
+- Evidence Recording Commit: `5a64897cd6736fe73fac8b48e0d8d01e4dce499f`
+
+---
+
+## 7. Provenance Addendum & Audit Correction
+
+### 7.1 Commit Provenance and Sequence Reconstructed from Git
+
+- **Instrument repair commit actually used by the committed run:**
+  `6fded22302b0f6605d9d63ce48db36744416dd67`
+  - AuthorDate / CommitDate: `2026-10-04T00:52:56-07:00` (`2026-10-04T07:52:56Z`)
+- **Measurement artifact generation:**
+  `docs/evidence/phase42-native-input-20261004.json`
+  - Timestamp (`generatedAt`): `2026-10-04T07:53:54.519Z` (`2026-10-04T00:53:54.519-07:00`)
+  - Raw JSON field: `startSha = null`
+- **Evidence commit:**
+  `5a64897cd6736fe73fac8b48e0d8d01e4dce499f`
+  - AuthorDate / CommitDate: `2026-10-04T00:55:44-07:00` (`2026-10-04T07:55:44Z`)
+
+### 7.2 Omission of `--start-sha` and Raw Evidence Integrity
+
+The native probe invocation omitted `--start-sha`, resulting in `startSha: null` in the raw measurement artifact.
+The raw measurement JSON is preserved unchanged.
+Provenance is reconstructed from Git history rather than retroactively rewriting the raw evidence artifact.
+
+The chronological sequence verified directly from Git and artifact timestamps is:
+```text
+repair commit (2026-10-04T07:52:56Z, 6fded22302b0f6605d9d63ce48db36744416dd67)
+  ↓
+measurement generated (2026-10-04T07:53:54.519Z, phase42-native-input-20261004.json)
+  ↓
+evidence commit (2026-10-04T07:55:44Z, 5a64897cd6736fe73fac8b48e0d8d01e4dce499f)
+```
+
+### 7.3 Gemini SHA Reporting Error Audit Correction
+
+A prior execution-model report stated a non-existent full repair SHA:
+`6fded220970eb2db78817a026e7a2b97841c60b2`.
+
+The repository source of truth is:
+`6fded22302b0f6605d9d63ce48db36744416dd67`.
+
+This correction is recorded for audit transparency; repository Git history is strictly preserved and not rewritten.
+
+---
+
+## 8. Precise Scope of Measurement & Portability Release Blocker
+
+### 8.1 Precise Conclusion Scope
+
+Native first-press overlap was **NOT OBSERVED** in the verified environment:
+- Windows 11 Pro for Workstations (Build 26220, 64-bit)
+- Chromium 153.0.8010.12 (Playwright 1.63.0)
+- Display scale: 150% DPI (`devicePixelRatio = 1.5`, DPI = 144)
+- `SM_CXDOUBLECLK` / `SM_CYDOUBLECLK` = 4 px / 4 px
+- `GetDoubleClickTime()` = 500 ms
+
+This measurement **does not** claim:
+- that the overlap is impossible on Windows in general;
+- that the overlap is impossible on all platforms;
+- that the issue is globally fixed;
+- that all platform and system configurations are safe.
+
+### 8.2 RELEASE BLOCKER — Automatic-Selection Portability
+
+```text
+RELEASE BLOCKER — automatic-selection portability
+```
+
+**Context & Rationale:**
+- Official Windows APIs (`SystemParametersInfo` with `SPI_SETDOUBLECLKWIDTH` / `SPI_SETDOUBLECLKHEIGHT`) and registry keys allow the operating system's double-click rectangle to be reconfigured by users or system utilities.
+- The committed native measurement only demonstrates that under the **current 4 px Windows configuration**, the native double-click spatial boundary (< 2 CSS px / 3.0 physical px, empirical boundary 1 CSS px / 1.5 physical px) is smaller than the product drag classification threshold (5 CSS px).
+- The measurement does **not** prove that other Windows double-click rectangle settings, other DPI / display configurations, macOS, or Linux satisfy this relation.
+- Preserved architectural fact: CDP / synthetic testing has already demonstrated that if a platform does recognise the first-drag sequence as part of a double click, the conditional overlap is reachable.
+
+**Resolution Policy:**
+- No production code is modified in this closeout.
+- This release blocker is formally tracked as an open blocker for subsequent cross-platform portability and release phases.

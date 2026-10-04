@@ -1603,6 +1603,7 @@ was read, copied or modified. No desktop input was injected.
    any of them is visible immediately rather than silently absorbed.
 5. §21 and §24.11 residual risks remain as written; this section supersedes
    nothing in them, and adds one more.
+6. **Portability release blocker recorded (Phase 4.2 closeout).** See `docs/PHASE42_NATIVE_INPUT_EVIDENCE.md` §8 (`RELEASE BLOCKER — automatic-selection portability`). Native measurement demonstrated CASE A for the tested Windows 11 / Chromium / 4 px double-click configuration, but system-wide double-click rectangle configurability, different DPI metrics, and non-Windows platforms leave cross-platform automatic-selection portability as an open release blocker.
 
 ### 25.12 Verification
 
