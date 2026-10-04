@@ -86,6 +86,18 @@ import {
   ISOLATION_BANNER,
   IsolationError,
 } from './assert-isolated-env.mjs'
+import {
+  assertSpatialRowsIntegrity,
+  calculateGapError,
+  calculateGapWait,
+  calculateRowCooldownMs,
+  DEFAULT_TIMING_TOLERANCE_MS,
+  evaluateSpatialControl,
+  evaluateTimeoutControl,
+  findEmpiricalSpatialBoundary,
+  isGapWithinTolerance,
+  validateRowFreshness,
+} from './phase421-instrument-logic.mjs'
 import { redactTokens } from './redact.mjs'
 
 /** Repository root, derived from this script's own location. */
@@ -164,9 +176,10 @@ const HOME = resolve(options.home ?? join(TEST_ROOT, 'home'))
 const PROFILE = options.profile ?? 'word-lookup-test'
 const PORT = Number(options.port ?? 50991)
 const WORKDIR = resolve(options.workdir ?? REPO_ROOT)
-const OUT_PATH = resolve(options.out ?? join(REPO_ROOT, 'docs', 'evidence', 'phase42-native-input-20261003.json'))
+const OUT_PATH = resolve(options.out ?? join(REPO_ROOT, 'docs', 'evidence', 'phase42-native-input-20261004.json'))
 const SCREENSHOT_DIR = resolve(options['screenshot-dir'] ?? join(REPO_ROOT, 'verify-out'))
 const USER_DATA_DIR = resolve(options['user-data-dir'] ?? join(REPO_ROOT, 'verify-out', 'phase421-chromium-profile'))
+const TIMING_TOLERANCE_MS = Number(options['timing-tolerance'] ?? DEFAULT_TIMING_TOLERANCE_MS)
 
 /**
  * Stop after the window, calibration and interference checks.
@@ -1009,6 +1022,13 @@ async function runRow(context, spec) {
     throw new ContaminatedRowError(`the cursor would not settle on ${JSON.stringify(point)}`)
   }
 
+  if (typeof context.lastMouseUpMs === 'number') {
+    const elapsed = performance.now() - context.lastMouseUpMs
+    if (elapsed < context.rowCooldownMs) {
+      await sleep(Math.ceil(context.rowCooldownMs - elapsed))
+    }
+  }
+
   await ensureSwitches(page, spec.gates)
   await clearSelection(page)
 
@@ -1033,7 +1053,7 @@ async function runRow(context, spec) {
 
   // --- first press: drifts, releases, and is classified on its own ----------
   await parkAt(x0)
-  await mouse.down('left')
+  const firstDown = await mouse.down('left')
   if (spec.distancePx > 0) {
     const steps = spec.distancePx >= 8 ? 3 : 2
     for (let step = 1; step <= steps; step += 1) {
@@ -1041,8 +1061,18 @@ async function runRow(context, spec) {
     }
   }
   await mouse.up('left')
+  context.lastMouseUpMs = performance.now()
 
   const firstTrace = summariseTrace(await traceSince(page, traceFrom))
+
+  // Invariant: fresh click sequence must start with detail === 1
+  const freshness = validateRowFreshness({ first: { mouseDownDetail: firstTrace.mouseDowns.map((e) => e.detail) } })
+  if (!freshness.valid) {
+    interference.push({ row: spec.id, kind: 'click-sequence-not-reset', detail: freshness.detail, reason: freshness.reason })
+    await clearSelection(page)
+    throw new ContaminatedRowError(`row ${spec.id} click sequence did not reset: ${freshness.reason}`)
+  }
+
   const firstRequests = requests.slice(requestFrom)
   const afterFirst = await readPluginView(page)
 
@@ -1065,13 +1095,18 @@ async function runRow(context, spec) {
     throw new ContaminatedRowError(`the cursor drifted ${String(round2(preDrift))} px before the gap`)
   }
 
+  // Monotonic gap wait: trace-relative clock avoids origin mismatch
   if (spec.gapMs !== null && firstReleaseMs !== null) {
-    const clock = await page.evaluate(() => performance.now())
-    const targetNode = Date.now() + (firstReleaseMs + spec.gapMs - clock)
-    const remaining = targetNode - Date.now()
-    if (remaining > 6) await sleep(remaining - 4)
-    while (Date.now() < targetNode) {
-      // Deliberately a spin: the double-click interval is the measurement.
+    const currentTraceMs = await page.evaluate(() => performance.now() - window.__PHASE421__.started)
+    const { remainingMs } = calculateGapWait(firstReleaseMs, spec.gapMs, currentTraceMs)
+    if (remainingMs > 0) {
+      const nodeStart = performance.now()
+      if (remainingMs > 15) {
+        await sleep(Math.floor(remainingMs - 8))
+      }
+      while (performance.now() - nodeStart < remainingMs) {
+        // High-resolution spin for precise double-click interval timing
+      }
     }
   }
 
@@ -1079,6 +1114,7 @@ async function runRow(context, spec) {
   const atPressDrift = Math.hypot(secondDown.cursor.x - expectedSecond.x, secondDown.cursor.y - expectedSecond.y)
   await sleep(spec.holdMs)
   await mouse.up('left')
+  context.lastMouseUpMs = performance.now()
   await settle()
 
   if (atPressDrift > CALIBRATION_TOLERANCE_PX) {
@@ -1092,6 +1128,8 @@ async function runRow(context, spec) {
   const afterSecond = await readPluginView(page)
 
   const secondDownMs = secondTrace.events.filter((event) => event.type === 'pointerdown')[0]?.ms ?? null
+  const measuredGapMs = firstReleaseMs === null || secondDownMs === null ? null : round2(secondDownMs - firstReleaseMs)
+  const gapErrorMs = calculateGapError(spec.gapMs, measuredGapMs)
 
   return {
     id: spec.id,
@@ -1101,13 +1139,24 @@ async function runRow(context, spec) {
     gates: afterSecond.gates,
     requestedTravelPx: spec.distancePx,
     secondPressAt: spec.secondAt,
+    offsetPx: typeof spec.offsetPx === 'number' ? spec.offsetPx : (spec.offsetPx ?? null),
     requestedGapMs: spec.gapMs,
-    measuredGapMs: firstReleaseMs === null || secondDownMs === null ? null : round2(secondDownMs - firstReleaseMs),
+    measuredGapMs,
+    gapErrorMs,
+    timingValid: spec.gapMs === null ? null : isGapWithinTolerance(spec.gapMs, measuredGapMs, TIMING_TOLERANCE_MS),
     anchor: { x: round2(x0.x), y: round2(x0.y) },
+    firstCoordinate: { x: round2(x0.x), y: round2(x0.y) },
+    secondCoordinate: { x: round2(secondPoint.x), y: round2(secondPoint.y) },
+    cssSeparationPx: round2(Math.hypot(secondPoint.x - x0.x, secondPoint.y - x0.y)),
+    firstScreenCoordinate: toScreen(x0),
+    secondScreenCoordinate: expectedSecond,
+    actualFirstScreenCoordinate: firstDown.cursor,
+    actualSecondScreenCoordinate: secondDown.cursor,
     first: {
       observedTravelPx: observedTravel(firstTrace),
       classifierTravelPx: afterFirst.gestures.last.pointer?.distance ?? null,
       mouseDownDetail: firstTrace.mouseDowns.map((entry) => entry.detail),
+      clicks: firstTrace.clicks,
       pointerType: firstTrace.pointerDowns[0]?.pointerType ?? null,
       selectionAtRelease: firstTrace.selectionAtRelease,
       collapsedAtRelease: firstTrace.collapsedAtRelease,
@@ -1194,10 +1243,19 @@ async function runRowResilient(context, spec) {
       if (!(error instanceof ContaminatedRowError)) throw error
       failures.push(String(error.message))
       await context.mouse.up('left').catch(() => {})
-      await sleep(120)
+      context.lastMouseUpMs = performance.now()
+      await sleep(context.rowCooldownMs)
     }
   }
-  return { id: spec.id, kind: spec.kind, group: spec.group, contaminated: true, failures }
+  return {
+    id: spec.id,
+    kind: spec.kind,
+    group: spec.group,
+    offsetPx: typeof spec.offsetPx === 'number' ? spec.offsetPx : (spec.offsetPx ?? null),
+    requestedTravelPx: spec.distancePx,
+    contaminated: true,
+    failures,
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1451,6 +1509,8 @@ if (PREFLIGHT_ONLY) {
   process.exit(calibration.ok && anchorHit.isProbeWord === true ? 0 : 2)
 }
 
+const rowCooldownMs = calculateRowCooldownMs(systemMetrics.doubleClickTimeMs, 100)
+
 const context = {
   page,
   mouse,
@@ -1458,6 +1518,8 @@ const context = {
   calibration,
   interference,
   anchor,
+  rowCooldownMs,
+  lastMouseUpMs: null,
 }
 
 /** Run a list of row specs in order, logging as it goes. */
@@ -1472,9 +1534,9 @@ async function runRows(specs) {
     }
     console.log(
       `  ${spec.id} travel ${String(row.requestedTravelPx).padStart(2)} px (observed ${String(row.first.observedTravelPx)}) ` +
-        `${row.group ?? ''} -> first(md ${JSON.stringify(row.first.mouseDownDetail)} kind ${row.first.kind} ` +
+        `${row.group ?? ''}${typeof row.offsetPx === 'number' ? ` offset ${String(row.offsetPx)} px` : ''} -> first(md ${JSON.stringify(row.first.mouseDownDetail)} kind ${row.first.kind} ` +
         `sel ${JSON.stringify(row.first.selectionAtRelease)}) | second(md ${JSON.stringify(row.second.mouseDownDetail)} ` +
-        `${row.second.emittedDoubleClick ? 'DBLCLICK' : 'no-dblclick'}) | gap ${String(row.measuredGapMs)} ms`,
+        `${row.second.emittedDoubleClick ? 'DBLCLICK' : 'no-dblclick'}) | gap req=${String(row.requestedGapMs)} meas=${String(row.measuredGapMs)} err=${String(row.gapErrorMs)} ms`,
     )
   }
   return rows
@@ -1512,26 +1574,46 @@ const spatialRows = await runRows(
   })),
 )
 
-const timeoutBelow = timeoutRows.find((row) => row.id === 'T-BELOW') ?? null
-const timeoutAbove = timeoutRows.find((row) => row.id === 'T-ABOVE') ?? null
-const spatialNear = spatialRows.find((row) => row.offsetPx === 0) ?? null
-const spatialFar = spatialRows.find((row) => row.offsetPx === SPATIAL_FAR_PX) ?? null
+// Invariant: every spatial control row MUST have numeric offsetPx
+assertSpatialRowsIntegrity(spatialRows)
 
-const timeoutControl = {
-  doubleClickTimeMs: doubleClickTime,
-  belowTimeout: { id: 'T-BELOW', gapMs: timeoutBelow?.requestedGapMs ?? null, measuredGapMs: timeoutBelow?.measuredGapMs ?? null, doubleClick: timeoutBelow?.second?.emittedDoubleClick ?? null },
-  aboveTimeout: { id: 'T-ABOVE', gapMs: timeoutAbove?.requestedGapMs ?? null, measuredGapMs: timeoutAbove?.measuredGapMs ?? null, doubleClick: timeoutAbove?.second?.emittedDoubleClick ?? null },
-  pass: timeoutBelow?.second?.emittedDoubleClick === true && timeoutAbove?.second?.emittedDoubleClick === false,
-}
-const spatialControl = {
-  samePoint: { id: 'S-000', offsetPx: 0, doubleClick: spatialNear?.second?.emittedDoubleClick ?? null },
-  farPoint: { id: `S-${String(SPATIAL_FAR_PX).padStart(3, '0')}`, offsetPx: SPATIAL_FAR_PX, doubleClick: spatialFar?.second?.emittedDoubleClick ?? null },
-  pass: spatialNear?.second?.emittedDoubleClick === true && spatialFar?.second?.emittedDoubleClick === false,
-}
-const probeValid = timeoutControl.pass && spatialControl.pass
+const timeoutControl = evaluateTimeoutControl(timeoutRows, doubleClickTime, TIMING_TOLERANCE_MS)
+const spatialControl = evaluateSpatialControl(spatialRows, SPATIAL_FAR_PX, TIMING_TOLERANCE_MS)
+const empiricalSpatialBoundary = findEmpiricalSpatialBoundary(spatialRows)
 
-console.log(`phase421: timeout control ${timeoutControl.pass ? 'PASS' : 'FAIL'} — below=${String(timeoutControl.belowTimeout.doubleClick)} above=${String(timeoutControl.aboveTimeout.doubleClick)}`)
-console.log(`phase421: spatial control ${spatialControl.pass ? 'PASS' : 'FAIL'} — same=${String(spatialControl.samePoint.doubleClick)} far=${String(spatialControl.farPoint.doubleClick)}`)
+const invalidTimedRows = [...timeoutRows, ...spatialRows].filter(
+  (row) => row.requestedGapMs !== null && !isGapWithinTolerance(row.requestedGapMs, row.measuredGapMs, TIMING_TOLERANCE_MS),
+)
+
+if (invalidTimedRows.length > 0) {
+  for (const row of invalidTimedRows) {
+    console.error(
+      `phase421: BLOCKED — TIMING CONTROL INVALID: row ${row.id} requested ${String(row.requestedGapMs)} ms, measured ${String(row.measuredGapMs)} ms (error ${String(row.gapErrorMs)} ms, tolerance <= ${String(TIMING_TOLERANCE_MS)} ms)`,
+    )
+  }
+}
+
+const probeValid = timeoutControl.pass && spatialControl.pass && invalidTimedRows.length === 0
+
+console.log(
+  `phase421: timeout control ${timeoutControl.pass ? 'PASS' : 'FAIL'} — ` +
+    `below(req=${String(timeoutControl.belowTimeout.requestedGapMs)} meas=${String(timeoutControl.belowTimeout.measuredGapMs)} dbl=${String(timeoutControl.belowTimeout.doubleClick)}) ` +
+    `above(req=${String(timeoutControl.aboveTimeout.requestedGapMs)} meas=${String(timeoutControl.aboveTimeout.measuredGapMs)} dbl=${String(timeoutControl.aboveTimeout.doubleClick)})`,
+)
+if (!timeoutControl.pass) {
+  console.error(`phase421: timeout control failure reasons: ${timeoutControl.reasons.join('; ')}`)
+}
+
+console.log(
+  `phase421: spatial control ${spatialControl.pass ? 'PASS' : 'FAIL'} — ` +
+    `near(offset=0 dbl=${String(spatialControl.samePoint.doubleClick)}) ` +
+    `far(offset=${String(SPATIAL_FAR_PX)} dbl=${String(spatialControl.farPoint.doubleClick)})`,
+)
+if (!spatialControl.pass) {
+  console.error(`phase421: spatial control failure reasons: ${spatialControl.reasons.join('; ')}`)
+}
+
+console.log(`phase421: empirical spatial boundary — ${empiricalSpatialBoundary.transitionSummary}`)
 
 // --- the movement sweeps ----------------------------------------------------
 let groupA = []
@@ -1715,8 +1797,7 @@ const verdict = !probeValid
       status: 'BLOCKED — NATIVE INPUT PROBE INVALID',
       case: 'INVALID',
       nativeOverlap: null,
-      summary:
-        'the negative controls failed, so nothing measured here can be called Windows-native double-click evidence',
+      summary: `the negative controls failed (${[...timeoutControl.reasons, ...spatialControl.reasons].join('; ')}), so nothing measured here can be called Windows-native double-click evidence`,
     }
   : nativeOverlapObserved
     ? {
@@ -1731,7 +1812,7 @@ const verdict = !probeValid
         case: 'A',
         nativeOverlap: 'NOT OBSERVED',
         summary:
-          'through the real Windows input stack no first press that the product classified as a drag was followed by a platform-recognised double click',
+          'through the real Windows input stack no first press that the product classified as a drag was followed by a platform-recognised double click in this verified Windows/Chromium environment',
       }
 
 const report = {
@@ -1799,6 +1880,8 @@ const report = {
   controls: {
     timeout: timeoutControl,
     spatial: spatialControl,
+    empiricalSpatialBoundary,
+    timingToleranceMs: TIMING_TOLERANCE_MS,
     probeValid,
     timeoutRows,
     spatialRows,

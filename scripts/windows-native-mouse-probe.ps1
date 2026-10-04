@@ -382,6 +382,8 @@ function Get-Snapshot {
 
   $foreground = $W::GetForegroundWindow()
 
+  $regMouse = Get-ItemProperty -Path 'HKCU:\Control Panel\Mouse' -ErrorAction SilentlyContinue
+
   return [ordered]@{
     os = (Get-OperatingSystemInfo)
     doubleClickTimeMs = $W::GetDoubleClickTime()
@@ -406,6 +408,11 @@ function Get-Snapshot {
       scalePercent = if ($dpiX -gt 0) { [math]::Round($dpiX * 100.0 / 96.0, 4) } else { $null }
       doubleClickWidthForDpi = if ($dpiX -gt 0) { $W::GetSystemMetricsForDpi($W::SM_CXDOUBLECLK, $dpiX) } else { $null }
       doubleClickHeightForDpi = if ($dpiX -gt 0) { $W::GetSystemMetricsForDpi($W::SM_CYDOUBLECLK, $dpiX) } else { $null }
+    }
+    registry = [ordered]@{
+      doubleClickWidth = if ($regMouse -and $null -ne $regMouse.DoubleClickWidth) { [int]$regMouse.DoubleClickWidth } else { $null }
+      doubleClickHeight = if ($regMouse -and $null -ne $regMouse.DoubleClickHeight) { [int]$regMouse.DoubleClickHeight } else { $null }
+      doubleClickSpeed = if ($regMouse -and $null -ne $regMouse.DoubleClickSpeed) { [int]$regMouse.DoubleClickSpeed } else { $null }
     }
     cursor = [ordered]@{ x = $cursor.X; y = $cursor.Y }
     foreground = [ordered]@{
