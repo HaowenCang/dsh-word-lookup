@@ -1,0 +1,38 @@
+{
+  "phase": "Phase 6.1",
+  "generatedAt": "2026-10-04T15:02:00.000Z",
+  "testedGitSha": "aa4f492e078804a71d8716e80c08df1179d1cf08",
+  "sourceVerification": {
+    "sourceFile": ".cache/corpus/ecdict.csv",
+    "verifiedSha256": "1a6947e04785db63613a92e14903cdae7954f7e84860b10e68e5c7cbb3f9c3cf",
+    "verifiedByteSize": 65933428,
+    "manifestSha256": "1a6947e04785db63613a92e14903cdae7954f7e84860b10e68e5c7cbb3f9c3cf",
+    "manifestByteSize": 65933428,
+    "matches": true,
+    "headerValidation": {
+      "status": "PASS",
+      "columnCount": 13,
+      "columns": [
+        "word",
+        "phonetic",
+        "definition",
+        "translation",
+        "pos",
+        "collins",
+        "oxford",
+        "tag",
+        "bnc",
+        "frq",
+        "exchange",
+        "detail",
+        "audio"
+      ],
+      "bomStripped": true
+    },
+    "provenanceGateEnforcement": {
+      "verifiedBeforeDbCreation": true,
+      "verifiedBeforeFileRemoval": true,
+      "existingDbUntouchedOnMismatch": true
+    }
+  }
+}

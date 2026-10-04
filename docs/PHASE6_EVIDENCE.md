@@ -1,10 +1,22 @@
 # Phase 6 Evidence: Production Corpus Ingestion & Pipeline Verification
 
-**Phase Status**: `PASS — PHASE 6 PRODUCTION CORPUS PIPELINE COMPLETE`  
-**Tested Git SHA**: `9589db72fb88188613ed88dfba002f58e7874260`  
+**Phase Status**: `SUPERSEDED BY PHASE 6.1 REMEDIATION`  
+**Historical Tested Git SHA**: `9589db72fb88188613ed88dfba002f58e7874260`  
 **Distribution Gate**: Full corpus redistribution authorized: **NO**  
 **Production DSH Modification**: Production DSH environment modified: **NO**  
 **Automatic Selection Portability**: `RELEASE BLOCKER — automatic-selection portability` remains **OPEN**
+
+---
+
+## 0. Phase 6.1 Remediation Notice (Historical Defects & Supersession)
+
+The findings recorded below represent historical Phase 6 state. An independent audit identified that:
+1. **Source Integrity Not Enforced by Builder**: Source integrity was operationally verified by a separate script (`verify-source.mjs`), but `build-production-db.mjs` itself did not verify source bytes before deleting/mutating the database.
+2. **Runtime Still Fixture-Only**: The host plugin runtime in `src/index.ts` was hardcoded to `openFixtureDictionary()`; the production corpus was not active in the DSH host runtime.
+3. **Data Quality & Schema Gating Defects**: Field length bounds counted oversized fields but still inserted them; UTF-8 validation was hardcoded (`invalidUtf8: 0`) rather than fatal; CSV header was skipped rather than verified against pinned 13 columns; batch boundary transaction handling leaked on `rowCount % batchSize === 0`.
+4. **Unit Test Skips**: `tests/corpus-production.spec.ts` contained `if (!existsSync(prodPath)) return`, skipping live verification when the database was not present.
+
+All of these issues have been remediated in Phase 6.1. Historical `docs/evidence/phase6-*.json` files are preserved for provenance, but authoritative verified state is documented in `docs/evidence/phase61-*.json`.
 
 ---
 

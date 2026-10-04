@@ -1,0 +1,52 @@
+{
+  "phase": "Phase 6.1",
+  "generatedAt": "2026-10-04T15:02:00.000Z",
+  "testedGitSha": "aa4f492e078804a71d8716e80c08df1179d1cf08",
+  "pipelineVersion": "phase6.1-remediated",
+  "sourceArtifact": {
+    "path": ".cache/corpus/ecdict.csv",
+    "verifiedByteSize": 65933428,
+    "verifiedSha256": "1a6947e04785db63613a92e14903cdae7954f7e84860b10e68e5c7cbb3f9c3cf",
+    "totalCsvRows": 770612,
+    "headerColumnCount": 13,
+    "utf8Decoder": "fatal (TextDecoder with fatal: true)",
+    "invalidUtf8Sequences": 0
+  },
+  "ingestion": {
+    "validEntriesInserted": 770611,
+    "rejectedRows": 0,
+    "oversizedFieldsCount": 0,
+    "maxFieldLength": 65536,
+    "nullPosFieldCount": 770611,
+    "nullPosFieldRatio": 1.0,
+    "nullPosFieldExplanation": "In ECDICT upstream schema, the standalone 'pos' column is empty across 100% of data rows; grammatical tags are embedded inside translation strings (e.g. 'n. ...\\n[化] ...')",
+    "unambiguousFormsInserted": 57689,
+    "ambiguousFormsExcluded": 463
+  },
+  "databaseArtifact": {
+    "outputPath": "build/corpus/ecdict.db",
+    "fileByteSize": 86827008,
+    "fileSha256": "a4d53848b95c4b27cde29cf91d96be202a68fd47909e0b76275a8ef9cdbe530d",
+    "logicalSha256": "591e53bdd8e3d227fd92c21ce2cfe7d375fffcd90f97a9f6a64f7d26e7c78bd9",
+    "pragmaIntegrityCheck": "ok",
+    "vacuumExecuted": true
+  },
+  "reproducibility": {
+    "run1LogicalSha256": "591e53bdd8e3d227fd92c21ce2cfe7d375fffcd90f97a9f6a64f7d26e7c78bd9",
+    "run1FileSha256": "a4d53848b95c4b27cde29cf91d96be202a68fd47909e0b76275a8ef9cdbe530d",
+    "run2LogicalSha256": "591e53bdd8e3d227fd92c21ce2cfe7d375fffcd90f97a9f6a64f7d26e7c78bd9",
+    "run2FileSha256": "a4d53848b95c4b27cde29cf91d96be202a68fd47909e0b76275a8ef9cdbe530d",
+    "logicalDeterminismIdentical": true,
+    "fileDeterminismIdentical": true
+  },
+  "metaTable": {
+    "schema_version": "1",
+    "corpus_name": "ECDICT",
+    "upstream_commit": "bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b",
+    "source_sha256": "1a6947e04785db63613a92e14903cdae7954f7e84860b10e68e5c7cbb3f9c3cf",
+    "entry_count": "770611",
+    "form_count": "57689",
+    "example_count": "0",
+    "logical_sha256": "591e53bdd8e3d227fd92c21ce2cfe7d375fffcd90f97a9f6a64f7d26e7c78bd9"
+  }
+}
