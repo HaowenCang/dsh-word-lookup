@@ -1,0 +1,60 @@
+{
+  "testedGitSha": "9589db72fb88188613ed88dfba002f58e7874260",
+  "upstream": {
+    "repository": "https://github.com/skywind3000/ECDICT",
+    "commit": "bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b",
+    "sourcePath": "ecdict.csv",
+    "sourceSha256": "1a6947e04785db63613a92e14903cdae7954f7e84860b10e68e5c7cbb3f9c3cf",
+    "licensePath": "LICENSE",
+    "licenseSha256": "f8552dd246f61a4e064569eae6194a01c6b3d63b03bf27c6ca863593c549ed0f"
+  },
+  "schemaVersion": 1,
+  "sourceRows": 770612,
+  "importedEntries": 770611,
+  "forms": 57689,
+  "rejectedRows": 0,
+  "collisionCounts": {
+    "totalForms": 137766,
+    "uniqueForms": 58152,
+    "unambiguous": 57689,
+    "ambiguous": 463,
+    "selfReferentialExcluded": 11909
+  },
+  "logicalDbSha256": "591e53bdd8e3d227fd92c21ce2cfe7d375fffcd90f97a9f6a64f7d26e7c78bd9",
+  "dbFileSha256": "192d82ba51e9a475186f1f5afb9e40ed4f1c012faff18e9a42cb50786d9db8fd",
+  "dbBytes": 86827008,
+  "integrityCheck": "ok",
+  "performance": {
+    "durationMs": 6136,
+    "rowsPerSec": 125588,
+    "peakMemoryMb": 802
+  },
+  "benchmark": {
+    "databaseOpenMs": 0.63,
+    "firstQueryUs": 144.2,
+    "medianUs": 22.9,
+    "p95Us": 32.4,
+    "maxUs": 595.0,
+    "totalQueries": 6000
+  },
+  "unitTotals": {
+    "testFiles": 25,
+    "passed": 440,
+    "failed": 0
+  },
+  "runtimeTotals": {
+    "passed": 169,
+    "failed": 0
+  },
+  "browserTotals": {
+    "passed": 37,
+    "failed": 0
+  },
+  "redistributionStatus": "REDISTRIBUTION REVIEW REQUIRED",
+  "productionSafety": {
+    "networkAccessDuringBuild": false,
+    "runtimeNetworkAllowed": false,
+    "aiFallbackAllowed": false,
+    "fullCorpusTrackedInGit": false
+  }
+}

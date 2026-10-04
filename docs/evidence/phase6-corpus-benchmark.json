@@ -1,0 +1,71 @@
+{
+  "benchmarkType": "process-level lookup benchmark",
+  "databasePath": "build/corpus/ecdict.db",
+  "openDurationMs": 0.63,
+  "firstQueryDurationUs": 144.2,
+  "iterationsPerWord": 200,
+  "totalQueriesExecuted": 6000,
+  "overall": {
+    "medianUs": 22.9,
+    "p95Us": 32.4,
+    "maxUs": 595
+  },
+  "categories": {
+    "commonWord": {
+      "sampleCount": 1000,
+      "minUs": 21.5,
+      "medianUs": 26,
+      "p95Us": 39.6,
+      "maxUs": 595
+    },
+    "rareWord": {
+      "sampleCount": 800,
+      "minUs": 20,
+      "medianUs": 22.2,
+      "p95Us": 29.5,
+      "maxUs": 151.8
+    },
+    "mixedCase": {
+      "sampleCount": 1000,
+      "minUs": 20.2,
+      "medianUs": 24,
+      "p95Us": 31.7,
+      "maxUs": 184.9
+    },
+    "form": {
+      "sampleCount": 800,
+      "minUs": 20.3,
+      "medianUs": 22.4,
+      "p95Us": 29.3,
+      "maxUs": 155.7
+    },
+    "irregularForm": {
+      "sampleCount": 800,
+      "minUs": 20.3,
+      "medianUs": 23.1,
+      "p95Us": 30.3,
+      "maxUs": 209.2
+    },
+    "phrase": {
+      "sampleCount": 600,
+      "minUs": 20.2,
+      "medianUs": 22.1,
+      "p95Us": 31.4,
+      "maxUs": 185.5
+    },
+    "unknown": {
+      "sampleCount": 400,
+      "minUs": 18.4,
+      "medianUs": 20.2,
+      "p95Us": 27.4,
+      "maxUs": 90
+    },
+    "longUnknown": {
+      "sampleCount": 600,
+      "minUs": 18.2,
+      "medianUs": 20.1,
+      "p95Us": 26.4,
+      "maxUs": 320.2
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "sourceRows": 770612,
+  "dataRows": 770611,
+  "validRows": 770611,
+  "rejectedRows": 0,
+  "rejectionReasons": {},
+  "rejectionSamples": [],
+  "duplicateHeadwords": 0,
+  "emptyWords": 0,
+  "nullPhonetics": 552546,
+  "nullDefinitions": 609727,
+  "nullTranslations": 1872,
+  "nullPos": 770611,
+  "rowsWithExchange": 96290,
+  "parsedForms": 137766,
+  "ambiguousForms": 463,
+  "oversizedFields": 0,
+  "invalidUtf8": 0
+}

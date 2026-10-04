@@ -1,0 +1,370 @@
+{
+  "totalParsedForms": 137766,
+  "uniqueForms": 58152,
+  "unambiguousForms": 57689,
+  "ambiguousForms": 463,
+  "selfReferentialExcluded": 11909,
+  "policyOutcome": "Ambiguous forms pointing to multiple distinct headwords are excluded from forms table to ensure deterministic single-headword resolution and prevent arbitrary overrides.",
+  "sampleCollisions": [
+    {
+      "form": "abought",
+      "candidates": [
+        {
+          "headword": "aby",
+          "kinds": [
+            "d",
+            "p"
+          ]
+        },
+        {
+          "headword": "abye",
+          "kinds": [
+            "d",
+            "p",
+            "pd"
+          ]
+        }
+      ]
+    },
+    {
+      "form": "abying",
+      "candidates": [
+        {
+          "headword": "aby",
+          "kinds": [
+            "i"
+          ]
+        },
+        {
+          "headword": "abye",
+          "kinds": [
+            "i"
+          ]
+        }
+      ]
+    },
+    {
+      "form": "accoutred",
+      "candidates": [
+        {
+          "headword": "accoutr",
+          "kinds": [
+            "pd"
+          ]
+        },
+        {
+          "headword": "accoutre",
+          "kinds": [
+            "d",
+            "p"
+          ]
+        }
+      ]
+    },
+    {
+      "form": "accustoming",
+      "candidates": [
+        {
+          "headword": "accustom",
+          "kinds": [
+            "i"
+          ]
+        },
+        {
+          "headword": "accustome",
+          "kinds": [
+            "i"
+          ]
+        }
+      ]
+    },
+    {
+      "form": "aches",
+      "candidates": [
+        {
+          "headword": "ACH",
+          "kinds": [
+            "3",
+            "s",
+            "s3"
+          ]
+        },
+        {
+          "headword": "ache",
+          "kinds": [
+            "3"
+          ]
+        }
+      ]
+    },
+    {
+      "form": "analyses",
+      "candidates": [
+        {
+          "headword": "analyse",
+          "kinds": [
+            "3",
+            "s"
+          ]
+        },
+        {
+          "headword": "analysis",
+          "kinds": [
+            "s"
+          ]
+        }
+      ]
+    },
+    {
+      "form": "anchored",
+      "candidates": [
+        {
+          "headword": "anchor",
+          "kinds": [
+            "d",
+            "p"
+          ]
+        },
+        {
+          "headword": "anchore",
+          "kinds": [
+            "dp"
+          ]
+        }
+      ]
+    },
+    {
+      "form": "aped",
+      "candidates": [
+        {
+          "headword": "AP",
+          "kinds": [
+            "d",
+            "p",
+            "pd"
+          ]
+        },
+        {
+          "headword": "ape",
+          "kinds": [
+            "d",
+            "p"
+          ]
+        }
+      ]
+    },
+    {
+      "form": "appalled",
+      "candidates": [
+        {
+          "headword": "appal",
+          "kinds": [
+            "d",
+            "p"
+          ]
+        },
+        {
+          "headword": "appall",
+          "kinds": [
+            "d",
+            "p"
+          ]
+        }
+      ]
+    },
+    {
+      "form": "appalling",
+      "candidates": [
+        {
+          "headword": "appal",
+          "kinds": [
+            "i"
+          ]
+        },
+        {
+          "headword": "appall",
+          "kinds": [
+            "i"
+          ]
+        }
+      ]
+    },
+    {
+      "form": "armored",
+      "candidates": [
+        {
+          "headword": "armor",
+          "kinds": [
+            "d",
+            "p"
+          ]
+        },
+        {
+          "headword": "armore",
+          "kinds": [
+            "p"
+          ]
+        }
+      ]
+    },
+    {
+      "form": "atoned",
+      "candidates": [
+        {
+          "headword": "aton",
+          "kinds": [
+            "d",
+            "p",
+            "pd"
+          ]
+        },
+        {
+          "headword": "atone",
+          "kinds": [
+            "d",
+            "p"
+          ]
+        }
+      ]
+    },
+    {
+      "form": "atoning",
+      "candidates": [
+        {
+          "headword": "aton",
+          "kinds": [
+            "i"
+          ]
+        },
+        {
+          "headword": "atone",
+          "kinds": [
+            "i"
+          ]
+        }
+      ]
+    },
+    {
+      "form": "augured",
+      "candidates": [
+        {
+          "headword": "augur",
+          "kinds": [
+            "d",
+            "p"
+          ]
+        },
+        {
+          "headword": "augure",
+          "kinds": [
+            "pd"
+          ]
+        }
+      ]
+    },
+    {
+      "form": "auguring",
+      "candidates": [
+        {
+          "headword": "augur",
+          "kinds": [
+            "i"
+          ]
+        },
+        {
+          "headword": "augure",
+          "kinds": [
+            "i"
+          ]
+        }
+      ]
+    },
+    {
+      "form": "authored",
+      "candidates": [
+        {
+          "headword": "author",
+          "kinds": [
+            "d",
+            "p"
+          ]
+        },
+        {
+          "headword": "authore",
+          "kinds": [
+            "dp"
+          ]
+        }
+      ]
+    },
+    {
+      "form": "authoring",
+      "candidates": [
+        {
+          "headword": "author",
+          "kinds": [
+            "i"
+          ]
+        },
+        {
+          "headword": "authore",
+          "kinds": [
+            "i"
+          ]
+        }
+      ]
+    },
+    {
+      "form": "avalanched",
+      "candidates": [
+        {
+          "headword": "avalanch",
+          "kinds": [
+            "dp"
+          ]
+        },
+        {
+          "headword": "avalanche",
+          "kinds": [
+            "d",
+            "p"
+          ]
+        }
+      ]
+    },
+    {
+      "form": "avalanches",
+      "candidates": [
+        {
+          "headword": "avalanch",
+          "kinds": [
+            "s3"
+          ]
+        },
+        {
+          "headword": "avalanche",
+          "kinds": [
+            "3"
+          ]
+        }
+      ]
+    },
+    {
+      "form": "avalanching",
+      "candidates": [
+        {
+          "headword": "avalanch",
+          "kinds": [
+            "i"
+          ]
+        },
+        {
+          "headword": "avalanche",
+          "kinds": [
+            "i"
+          ]
+        }
+      ]
+    }
+  ]
+}
