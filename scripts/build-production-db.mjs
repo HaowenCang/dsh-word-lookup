@@ -1,37 +1,45 @@
 #!/usr/bin/env node
 /**
- * Deterministic production SQLite corpus builder.
+ * Deterministic production SQLite corpus builder with fail-closed source verification.
  *
- * Implements Phase 6 production corpus ingestion:
- * - Reads pinned `.cache/corpus/ecdict.csv` via `StreamingCsvParser`.
- * - Validates schema bounds and data safety limits.
+ * Implements Phase 6.1 production corpus ingestion:
+ * - Loads and validates pinned `corpus/ecdict.manifest.json`.
+ * - Verifies source byte size and SHA-256 BEFORE touching the output database.
+ * - Preflights and enforces exact 13-column CSV header schema with UTF-8 BOM stripping.
+ * - Streams pinned `.cache/corpus/ecdict.csv` via fatal `StreamingCsvParser`.
+ * - Enforces field-size safety bounds (deterministic rejection of oversized fields).
+ * - Manages clean SQLite transactions without batch-boundary leakage.
  * - Extracts morphological inflections via `ExchangeCollector`.
  * - Filters self-referential forms and disambiguates collisions.
  * - Emits `entries`, `forms`, and `examples` conforming to the product schema.
  * - Indexes:
  *   - `idx_forms_headword`
+ *   - `idx_forms_headword_raw`
  *   - `idx_examples_headword`
- *   (primary keys `entries(word)` and `forms(form)` are indexed by SQLite).
- * - Computes:
- *   - Logical database SHA-256 (canonical ordered content dump).
- *   - Physical database file SHA-256 and byte size.
+ * - Computes logical database SHA-256 and physical file SHA-256.
+ * - Writes verified source SHA-256 into DB `meta` table.
  * - Runs `PRAGMA integrity_check`.
- * - Records machine-readable evidence:
- *   - `docs/evidence/phase6-form-collisions.json`
- *   - `docs/evidence/phase6-corpus-quality.json`
- *   - `docs/evidence/phase6-corpus-build.json`
  *
  * @module dsh-word-lookup/scripts/build-production-db
  */
 
 import { DatabaseSync } from 'node:sqlite'
 import { createHash } from 'node:crypto'
-import { createReadStream, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { createReadStream, existsSync, mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { StreamingCsvParser } from '../src/host/csv-parser.ts'
 import { ExchangeCollector } from '../src/host/exchange-parser.ts'
+import {
+  DEFAULT_MANIFEST_PATH,
+  DEFAULT_SOURCE_PATH,
+  EXPECTED_CORPUS_HEADER,
+  loadCorpusManifest,
+  preflightCorpusHeader,
+  validateCorpusHeader,
+  verifyCorpusSource,
+} from './lib/corpus-source.mjs'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 const MANIFEST_PATH = join(ROOT, 'corpus', 'ecdict.manifest.json')
@@ -43,30 +51,45 @@ const EVIDENCE_DIR = join(ROOT, 'docs', 'evidence')
 // Safety bounds
 const MAX_WORD_LENGTH = 128
 const MAX_FIELD_LENGTH = 65536
-const BATCH_SIZE = 25000
+const DEFAULT_BATCH_SIZE = 25000
 
 export async function buildCorpus(options = {}) {
   const startTime = Date.now()
   console.log('build-production-db: starting production corpus build...')
 
-  if (!existsSync(MANIFEST_PATH)) {
-    throw new Error(`Manifest not found at ${MANIFEST_PATH}`)
+  const manifestPath = options.manifestPath ?? MANIFEST_PATH
+  const sourceFile = options.sourceFile ?? SOURCE_FILE
+  const outDb = options.outDb ?? OUT_DB
+  const batchSize = options.batchSize ?? DEFAULT_BATCH_SIZE
+  const evidenceDir = options.evidenceDir ?? EVIDENCE_DIR
+  const writeEvidence = options.writeEvidence !== false
+
+  // 1. Load and validate manifest
+  const manifest = loadCorpusManifest(manifestPath)
+
+  // 2. HARD GATE: Verify source artifact size and SHA-256 BEFORE mutating any database
+  console.log(`build-production-db: verifying source artifact ${sourceFile}...`)
+  const { actualByteSize, actualSha256: verifiedSourceSha256 } = await verifyCorpusSource(sourceFile, manifest)
+  console.log(`build-production-db: source artifact verified (${verifiedSourceSha256}, ${actualByteSize} bytes).`)
+
+  // 3. HARD GATE: Preflight header schema before touching output DB
+  console.log('build-production-db: preflighting CSV header schema...')
+  const verifiedHeader = await preflightCorpusHeader(sourceFile)
+  console.log(`build-production-db: CSV header preflight PASS (${verifiedHeader.length} columns).`)
+
+  // 4. NOW safe to prepare output directory and remove existing DB
+  mkdirSync(dirname(outDb), { recursive: true })
+  if (writeEvidence) {
+    mkdirSync(evidenceDir, { recursive: true })
   }
-  const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf8'))
 
-  if (!existsSync(SOURCE_FILE)) {
-    throw new Error(`Source artifact not found at ${SOURCE_FILE}; run "npm run corpus:fetch" first`)
+  if (options.cleanExisting !== false) {
+    for (const suffix of ['', '-journal', '-wal', '-shm']) {
+      rmSync(outDb + suffix, { force: true })
+    }
   }
 
-  mkdirSync(OUT_DIR, { recursive: true })
-  mkdirSync(EVIDENCE_DIR, { recursive: true })
-
-  // Clean existing output database and sidecars
-  for (const suffix of ['', '-journal', '-wal', '-shm']) {
-    rmSync(OUT_DB + suffix, { force: true })
-  }
-
-  const db = new DatabaseSync(OUT_DB)
+  const db = new DatabaseSync(outDb)
 
   // Configure SQLite PRAGMAs for safe, deterministic bulk insertion
   db.exec('PRAGMA page_size = 4096')
@@ -132,17 +155,32 @@ export async function buildCorpus(options = {}) {
 
   const seenHeadwords = new Set()
 
-  db.exec('BEGIN TRANSACTION')
+  // Robust transaction lifecycle helper
+  let inTransaction = false
+  function ensureTx() {
+    if (!inTransaction) {
+      db.exec('BEGIN TRANSACTION')
+      inTransaction = true
+    }
+  }
+  function commitTx() {
+    if (inTransaction) {
+      db.exec('COMMIT')
+      inTransaction = false
+    }
+  }
+
   let currentBatch = 0
 
   const parser = new StreamingCsvParser((row, rowIndex) => {
     sourceTotalRows += 1
     if (sourceTotalRows === 1) {
-      // Header row
+      // Validate header exact match at runtime parser level
+      validateCorpusHeader(row)
       return
     }
 
-    if (row.length !== 13) {
+    if (row.length !== EXPECTED_CORPUS_HEADER.length) {
       rejectedRowsCount += 1
       const reason = `malformed-field-count-${row.length}`
       rejectionReasons.set(reason, (rejectionReasons.get(reason) || 0) + 1)
@@ -173,6 +211,23 @@ export async function buildCorpus(options = {}) {
       return
     }
 
+    // Deterministic field-size bound policy: reject rows with any oversized text field
+    let fieldOversized = false
+    for (let c = 0; c < row.length; c += 1) {
+      if (row[c] && row[c].length > MAX_FIELD_LENGTH) {
+        fieldOversized = true
+        break
+      }
+    }
+    if (fieldOversized) {
+      oversizedFieldsCount += 1
+      rejectedRowsCount += 1
+      const reason = 'field-too-large'
+      rejectionReasons.set(reason, (rejectionReasons.get(reason) || 0) + 1)
+      if (rejectionSamples.length < 5) rejectionSamples.push({ line: rowIndex, word: cleanWord.slice(0, 30), reason })
+      return
+    }
+
     if (seenHeadwords.has(lowerWord)) {
       duplicateWordsCount += 1
       rejectedRowsCount += 1
@@ -195,9 +250,6 @@ export async function buildCorpus(options = {}) {
     if (!cleanPos) nullPosCount += 1
     if (cleanExchange) rowsWithExchangeCount += 1
 
-    if (cleanDef && cleanDef.length > MAX_FIELD_LENGTH) oversizedFieldsCount += 1
-    if (cleanTrans && cleanTrans.length > MAX_FIELD_LENGTH) oversizedFieldsCount += 1
-
     // Frequency from BNC or FRQ rank
     let freqNumber = null
     if (bnc && bnc.trim()) {
@@ -205,6 +257,7 @@ export async function buildCorpus(options = {}) {
       if (!Number.isNaN(num) && num > 0) freqNumber = num
     }
 
+    ensureTx()
     insertEntryStmt.run(
       cleanWord,
       cleanPhonetic,
@@ -221,22 +274,20 @@ export async function buildCorpus(options = {}) {
     }
 
     currentBatch += 1
-    if (currentBatch >= BATCH_SIZE) {
-      db.exec('COMMIT')
-      db.exec('BEGIN TRANSACTION')
+    if (currentBatch >= batchSize) {
+      commitTx()
       currentBatch = 0
     }
   })
 
-  const stream = createReadStream(SOURCE_FILE)
+  const stream = createReadStream(sourceFile)
   for await (const chunk of stream) {
     parser.push(chunk)
   }
   parser.end()
 
-  if (currentBatch > 0) {
-    db.exec('COMMIT')
-  }
+  // Commit any pending entries cleanly
+  commitTx()
 
   console.log(`build-production-db: inserted ${validRows} valid entries. Resolving morphological forms...`)
 
@@ -300,15 +351,15 @@ export async function buildCorpus(options = {}) {
 
   const logicalSha256 = logicalHash.digest('hex')
 
-  // Write Metadata into DB
+  // Write Metadata into DB — using verifiedSourceSha256 (not blind manifest string)
   const insertMetaStmt = db.prepare('INSERT INTO meta (key, value) VALUES (?, ?)')
   db.exec('BEGIN TRANSACTION')
-  insertMetaStmt.run('schema_version', '1')
+  insertMetaStmt.run('schema_version', String(manifest.schemaVersion))
   insertMetaStmt.run('corpus_name', 'ECDICT')
   insertMetaStmt.run('upstream_commit', manifest.sourceCommit)
-  insertMetaStmt.run('source_sha256', manifest.sourceSha256)
-  insertMetaStmt.run('builder_version', '1.0.0')
-  insertMetaStmt.run('parser_version', '1.0.0')
+  insertMetaStmt.run('source_sha256', verifiedSourceSha256)
+  insertMetaStmt.run('builder_version', '1.1.0')
+  insertMetaStmt.run('parser_version', '1.1.0')
   insertMetaStmt.run('entry_count', String(validRows))
   insertMetaStmt.run('form_count', String(forms.length))
   insertMetaStmt.run('example_count', '0')
@@ -329,9 +380,9 @@ export async function buildCorpus(options = {}) {
   db.close()
 
   // Calculate file hash and size
-  const fileStats = statSync(OUT_DB)
+  const fileStats = statSync(outDb)
   const fileHash = createHash('sha256')
-  const fileStream = createReadStream(OUT_DB)
+  const fileStream = createReadStream(outDb)
   for await (const chunk of fileStream) {
     fileHash.update(chunk)
   }
@@ -350,25 +401,6 @@ export async function buildCorpus(options = {}) {
   console.log(`  File SHA-256: ${fileSha256}`)
   console.log(`  Database size: ${fileStats.size} bytes`)
 
-  // Write Evidence Files
-  // 1. Form collisions
-  const formCollisionsDoc = {
-    totalParsedForms: collisionStats.totalParsedForms,
-    uniqueForms: collisionStats.uniqueForms,
-    unambiguousForms: collisionStats.unambiguousForms,
-    ambiguousForms: collisionStats.ambiguousForms,
-    selfReferentialExcluded: collisionStats.selfReferentialExcluded,
-    policyOutcome:
-      'Ambiguous forms pointing to multiple distinct headwords are excluded from forms table to ensure deterministic single-headword resolution and prevent arbitrary overrides.',
-    sampleCollisions: ambiguous.slice(0, 20),
-  }
-  writeFileSync(
-    join(EVIDENCE_DIR, 'phase6-form-collisions.json'),
-    JSON.stringify(formCollisionsDoc, null, 2) + '\n',
-    'utf8',
-  )
-
-  // 2. Corpus quality
   const corpusQualityDoc = {
     sourceRows: sourceTotalRows,
     dataRows: sourceTotalRows - 1,
@@ -387,14 +419,10 @@ export async function buildCorpus(options = {}) {
     ambiguousForms: collisionStats.ambiguousForms,
     oversizedFields: oversizedFieldsCount,
     invalidUtf8: 0,
+    utf8Validation: 'fatal decoder; complete source parsed successfully',
+    fieldSizePolicy: 'reject-row-field-too-large',
   }
-  writeFileSync(
-    join(EVIDENCE_DIR, 'phase6-corpus-quality.json'),
-    JSON.stringify(corpusQualityDoc, null, 2) + '\n',
-    'utf8',
-  )
 
-  // 3. Corpus build summary
   const corpusBuildDoc = {
     testedGitSha: options.testedGitSha ?? 'PENDING',
     upstream: {
@@ -405,7 +433,19 @@ export async function buildCorpus(options = {}) {
       licensePath: manifest.licensePath,
       licenseSha256: manifest.licenseSha256,
     },
-    schemaVersion: 1,
+    sourceVerification: {
+      verifiedBeforeMutation: true,
+      actualSourceSha256: verifiedSourceSha256,
+      actualSourceBytes: actualByteSize,
+      hashMatch: verifiedSourceSha256 === manifest.sourceSha256,
+      sizeMatch: actualByteSize === manifest.sourceByteSize,
+    },
+    headerValidation: {
+      expected: EXPECTED_CORPUS_HEADER,
+      observed: verifiedHeader,
+      match: true,
+    },
+    schemaVersion: manifest.schemaVersion,
     sourceRows: sourceTotalRows,
     importedEntries: validRows,
     forms: forms.length,
@@ -434,13 +474,44 @@ export async function buildCorpus(options = {}) {
       fullCorpusTrackedInGit: false,
     },
   }
-  writeFileSync(
-    join(EVIDENCE_DIR, 'phase6-corpus-build.json'),
-    JSON.stringify(corpusBuildDoc, null, 2) + '\n',
-    'utf8',
-  )
 
-  return corpusBuildDoc
+  if (writeEvidence) {
+    // 1. Form collisions
+    const formCollisionsDoc = {
+      totalParsedForms: collisionStats.totalParsedForms,
+      uniqueForms: collisionStats.uniqueForms,
+      unambiguousForms: collisionStats.unambiguousForms,
+      ambiguousForms: collisionStats.ambiguousForms,
+      selfReferentialExcluded: collisionStats.selfReferentialExcluded,
+      policyOutcome:
+        'Ambiguous forms pointing to multiple distinct headwords are excluded from forms table to ensure deterministic single-headword resolution and prevent arbitrary overrides.',
+      sampleCollisions: ambiguous.slice(0, 20),
+    }
+    writeFileSync(
+      join(evidenceDir, 'phase6-form-collisions.json'),
+      JSON.stringify(formCollisionsDoc, null, 2) + '\n',
+      'utf8',
+    )
+
+    // 2. Corpus quality
+    writeFileSync(
+      join(evidenceDir, 'phase6-corpus-quality.json'),
+      JSON.stringify(corpusQualityDoc, null, 2) + '\n',
+      'utf8',
+    )
+
+    // 3. Corpus build summary
+    writeFileSync(
+      join(evidenceDir, 'phase6-corpus-build.json'),
+      JSON.stringify(corpusBuildDoc, null, 2) + '\n',
+      'utf8',
+    )
+  }
+
+  return {
+    corpusBuild: corpusBuildDoc,
+    corpusQuality: corpusQualityDoc,
+  }
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {

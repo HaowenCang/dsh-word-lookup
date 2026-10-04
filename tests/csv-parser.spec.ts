@@ -128,4 +128,43 @@ describe('StreamingCsvParser', () => {
 
     expect(rows).toEqual([['word', 'phonetic']])
   })
+
+  describe('Fatal UTF-8 verification', () => {
+    it('fails loud on invalid UTF-8 continuation byte', () => {
+      const rows: string[][] = []
+      const parser = new StreamingCsvParser((row) => rows.push(row))
+
+      // 0xFF is never valid UTF-8
+      const invalidBuf = Buffer.from([0x77, 0x6f, 0x72, 0x64, 0x2c, 0xff, 0x2c, 0x31, 0x0a])
+      expect(() => {
+        parser.push(invalidBuf)
+      }).toThrow(TypeError)
+    })
+
+    it('fails loud on truncated multibyte sequence at EOF', () => {
+      const rows: string[][] = []
+      const parser = new StreamingCsvParser((row) => rows.push(row))
+
+      // Start of 3-byte CJK character '中' (E4 B8 AD) without the final byte
+      const truncatedBuf = Buffer.from([0x77, 0x6f, 0x72, 0x64, 0x2c, 0xe4, 0xb8])
+      parser.push(truncatedBuf)
+
+      expect(() => {
+        parser.end()
+      }).toThrow(TypeError)
+    })
+
+    it('fails loud on invalid UTF-8 inside quoted field', () => {
+      const rows: string[][] = []
+      const parser = new StreamingCsvParser((row) => rows.push(row))
+
+      // "hello <invalid byte> world" inside quotes
+      const invalidQuotedBuf = Buffer.from([
+        0x22, 0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0xfe, 0x20, 0x77, 0x6f, 0x72, 0x6c, 0x64, 0x22, 0x0a,
+      ])
+      expect(() => {
+        parser.push(invalidQuotedBuf)
+      }).toThrow(TypeError)
+    })
+  })
 })

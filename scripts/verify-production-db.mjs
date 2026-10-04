@@ -6,6 +6,8 @@
  * - Read-only open
  * - PRAGMA integrity_check
  * - Metadata keys and counts
+ * - Source SHA-256 bound to manifest
+ * - Source CSV verification (when available)
  * - Logical database digest
  * - Query execution plans (index usage)
  * - Required probes: go, went, gone, tooth, teeth, derive, derived, conservation, wave, function, wave function
@@ -21,25 +23,41 @@ import { existsSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { loadCorpusManifest, verifyCorpusSource } from './lib/corpus-source.mjs'
+
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 const DB_PATH = join(ROOT, 'build', 'corpus', 'ecdict.db')
 const MANIFEST_PATH = join(ROOT, 'corpus', 'ecdict.manifest.json')
+const SOURCE_FILE = join(ROOT, '.cache', 'corpus', 'ecdict.csv')
 
-export async function verifyProductionDb() {
+export async function verifyProductionDb(options = {}) {
   console.log('verify-production-db: verifying production SQLite corpus...')
 
-  if (!existsSync(DB_PATH)) {
-    throw new Error(`Production database not found at ${DB_PATH}; run "npm run corpus:build" first`)
+  const dbPath = options.dbPath ?? DB_PATH
+  const manifestPath = options.manifestPath ?? MANIFEST_PATH
+  const sourceFile = options.sourceFile ?? SOURCE_FILE
+
+  if (!existsSync(dbPath)) {
+    throw new Error(`Production database not found at ${dbPath}; run "npm run corpus:build" first`)
   }
 
-  const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf8'))
-  const stats = statSync(DB_PATH)
+  const manifest = loadCorpusManifest(manifestPath)
+  const stats = statSync(dbPath)
   console.log(`  Database file size: ${stats.size} bytes`)
 
-  // Open raw SQLite connection read-only for metadata & integrity inspection
-  const db = new DatabaseSync(DB_PATH, { readOnly: true })
+  // 1. If source CSV artifact is present, verify source SHA-256 against manifest
+  if (existsSync(sourceFile)) {
+    console.log(`  Verifying source artifact at ${sourceFile}...`)
+    const sourceResult = await verifyCorpusSource(sourceFile, manifest)
+    console.log(`  Source artifact verified: ${sourceResult.actualSha256}`)
+  } else {
+    console.log(`  Source artifact not present at ${sourceFile}; proceeding with database metadata audit.`)
+  }
 
-  // 1. PRAGMA integrity_check
+  // Open raw SQLite connection read-only for metadata & integrity inspection
+  const db = new DatabaseSync(dbPath, { readOnly: true })
+
+  // 2. PRAGMA integrity_check
   const integrityRow = db.prepare('PRAGMA integrity_check').get()
   const integrity = Object.values(integrityRow ?? {})[0]
   console.log(`  PRAGMA integrity_check: ${integrity}`)
@@ -47,7 +65,7 @@ export async function verifyProductionDb() {
     throw new Error(`integrity_check failed: ${integrity}`)
   }
 
-  // 2. Metadata verification
+  // 3. Metadata verification
   const metaMap = new Map()
   for (const row of db.prepare('SELECT key, value FROM meta').all()) {
     metaMap.set(row.key, row.value)
@@ -57,18 +75,32 @@ export async function verifyProductionDb() {
   console.log('    schema_version:', metaMap.get('schema_version'))
   console.log('    corpus_name:', metaMap.get('corpus_name'))
   console.log('    upstream_commit:', metaMap.get('upstream_commit'))
+  console.log('    source_sha256:', metaMap.get('source_sha256'))
   console.log('    entry_count:', metaMap.get('entry_count'))
   console.log('    form_count:', metaMap.get('form_count'))
   console.log('    example_count:', metaMap.get('example_count'))
   console.log('    logical_sha256:', metaMap.get('logical_sha256'))
 
-  if (metaMap.get('schema_version') !== '1') throw new Error('schema_version mismatch')
-  if (metaMap.get('corpus_name') !== 'ECDICT') throw new Error('corpus_name mismatch')
-  if (metaMap.get('upstream_commit') !== manifest.sourceCommit) throw new Error('upstream_commit mismatch')
-  if (metaMap.get('entry_count') !== '770611') throw new Error('entry_count mismatch')
-  if (metaMap.get('form_count') !== '57689') throw new Error('form_count mismatch')
+  if (metaMap.get('schema_version') !== String(manifest.schemaVersion)) {
+    throw new Error(`schema_version mismatch: expected ${manifest.schemaVersion}, found ${metaMap.get('schema_version')}`)
+  }
+  if (metaMap.get('corpus_name') !== 'ECDICT') {
+    throw new Error(`corpus_name mismatch: expected ECDICT, found ${metaMap.get('corpus_name')}`)
+  }
+  if (metaMap.get('upstream_commit') !== manifest.sourceCommit) {
+    throw new Error(`upstream_commit mismatch: expected ${manifest.sourceCommit}, found ${metaMap.get('upstream_commit')}`)
+  }
+  if (metaMap.get('source_sha256') !== manifest.sourceSha256) {
+    throw new Error(`source_sha256 mismatch: expected ${manifest.sourceSha256}, found ${metaMap.get('source_sha256')}`)
+  }
+  if (metaMap.get('entry_count') !== '770611') {
+    throw new Error(`entry_count mismatch: expected 770611, found ${metaMap.get('entry_count')}`)
+  }
+  if (metaMap.get('form_count') !== '57689') {
+    throw new Error(`form_count mismatch: expected 57689, found ${metaMap.get('form_count')}`)
+  }
 
-  // 3. Verify Logical Digest
+  // 4. Verify Logical Digest
   console.log('  Recomputing logical digest for verification...')
   const hash = createHash('sha256')
 
@@ -109,7 +141,7 @@ export async function verifyProductionDb() {
   }
   console.log('  Logical digest matches stored meta digest.')
 
-  // 4. Query Plan Inspection (Index usage)
+  // 5. Query Plan Inspection (Index usage)
   console.log('  Inspecting query execution plans...')
   const plans = [
     {
@@ -139,7 +171,7 @@ export async function verifyProductionDb() {
     }
   }
 
-  // 5. Lookup Compatibility using identical product SQL semantics
+  // 6. Lookup Compatibility using identical product SQL semantics
   console.log('  Testing lookup compatibility via product SQL semantics...')
   const entryStmt = db.prepare(
     'SELECT word, phonetic, definition_en, translation_zh, pos, exchange, frequency FROM entries WHERE word = ?',
@@ -189,8 +221,6 @@ export async function verifyProductionDb() {
   }
 
   // Exact canonical precedence probe
-  // A word that exists in `entries` and also as a `form`:
-  // Exact entry must be returned without matchedForm
   const exactResult = lookup('wave')
   if (!exactResult.found || exactResult.headword !== 'wave' || exactResult.matchedForm !== null) {
     throw new Error('Exact canonical precedence failed for "wave"')

@@ -3,60 +3,32 @@
  * Offline source artifact verification script.
  *
  * Checks that `.cache/corpus/ecdict.csv` exists and verifies byte-for-byte SHA-256
- * against `corpus/ecdict.manifest.json`.
+ * against `corpus/ecdict.manifest.json` using the shared corpus-source helper.
  *
  * @module dsh-word-lookup/scripts/verify-source
  */
 
-import { createHash } from 'node:crypto'
-import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs'
-import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-
-const ROOT = fileURLToPath(new URL('..', import.meta.url))
-const MANIFEST_PATH = join(ROOT, 'corpus', 'ecdict.manifest.json')
-const SOURCE_FILE = join(ROOT, '.cache', 'corpus', 'ecdict.csv')
+import {
+  DEFAULT_MANIFEST_PATH,
+  DEFAULT_SOURCE_PATH,
+  loadCorpusManifest,
+  verifyCorpusSource,
+} from './lib/corpus-source.mjs'
 
 async function run() {
-  if (!existsSync(MANIFEST_PATH)) {
-    console.error(`verify-source: manifest not found at ${MANIFEST_PATH}`)
-    process.exit(1)
-  }
-
-  const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf8'))
-  const { sourceSha256, sourceByteSize } = manifest
-
-  if (!existsSync(SOURCE_FILE)) {
-    console.error(`verify-source: source artifact not found at ${SOURCE_FILE}; run "npm run corpus:fetch" first`)
-    process.exit(1)
-  }
-
-  const stats = statSync(SOURCE_FILE)
-  if (sourceByteSize && stats.size !== sourceByteSize) {
-    console.error(`verify-source: size mismatch: expected ${sourceByteSize} bytes, found ${stats.size} bytes`)
-    process.exit(1)
-  }
-
-  console.log(`verify-source: hashing ${SOURCE_FILE} (${stats.size} bytes)...`)
-  const hash = createHash('sha256')
-  const stream = createReadStream(SOURCE_FILE)
-
-  for await (const chunk of stream) {
-    hash.update(chunk)
-  }
-
-  const computedSha = hash.digest('hex')
-  console.log(`verify-source: computed SHA-256: ${computedSha}`)
-
-  if (computedSha !== sourceSha256) {
-    console.error(`verify-source: SHA-256 MISMATCH! Expected ${sourceSha256}, got ${computedSha}`)
-    process.exit(1)
-  }
-
+  const manifest = loadCorpusManifest(DEFAULT_MANIFEST_PATH)
+  console.log(`verify-source: verifying ${DEFAULT_SOURCE_PATH} (${manifest.sourceByteSize} bytes expected)...`)
+  const result = await verifyCorpusSource(DEFAULT_SOURCE_PATH, manifest)
+  console.log(`verify-source: computed SHA-256: ${result.actualSha256}`)
   console.log('verify-source: PASS (source artifact SHA-256 match)')
 }
 
-run().catch((err) => {
-  console.error('verify-source failed:', err)
-  process.exit(1)
-})
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  run().catch((err) => {
+    console.error('verify-source failed:', err.message)
+    process.exit(1)
+  })
+}
+
+export { run }
