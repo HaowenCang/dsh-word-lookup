@@ -1,5 +1,5 @@
 {
-  "testedGitSha": "9589db72fb88188613ed88dfba002f58e7874260",
+  "testedGitSha": "98dec6111ae41afd9d7d2d1bdb753408fc2228cd",
   "upstream": {
     "repository": "https://github.com/skywind3000/ECDICT",
     "commit": "bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b",
@@ -7,6 +7,46 @@
     "sourceSha256": "1a6947e04785db63613a92e14903cdae7954f7e84860b10e68e5c7cbb3f9c3cf",
     "licensePath": "LICENSE",
     "licenseSha256": "f8552dd246f61a4e064569eae6194a01c6b3d63b03bf27c6ca863593c549ed0f"
+  },
+  "sourceVerification": {
+    "verifiedBeforeMutation": true,
+    "actualSourceSha256": "1a6947e04785db63613a92e14903cdae7954f7e84860b10e68e5c7cbb3f9c3cf",
+    "actualSourceBytes": 65933428,
+    "hashMatch": true,
+    "sizeMatch": true
+  },
+  "headerValidation": {
+    "expected": [
+      "word",
+      "phonetic",
+      "definition",
+      "translation",
+      "pos",
+      "collins",
+      "oxford",
+      "tag",
+      "bnc",
+      "frq",
+      "exchange",
+      "detail",
+      "audio"
+    ],
+    "observed": [
+      "word",
+      "phonetic",
+      "definition",
+      "translation",
+      "pos",
+      "collins",
+      "oxford",
+      "tag",
+      "bnc",
+      "frq",
+      "exchange",
+      "detail",
+      "audio"
+    ],
+    "match": true
   },
   "schemaVersion": 1,
   "sourceRows": 770612,
@@ -21,34 +61,20 @@
     "selfReferentialExcluded": 11909
   },
   "logicalDbSha256": "591e53bdd8e3d227fd92c21ce2cfe7d375fffcd90f97a9f6a64f7d26e7c78bd9",
-  "dbFileSha256": "192d82ba51e9a475186f1f5afb9e40ed4f1c012faff18e9a42cb50786d9db8fd",
-  "dbBytes": 86827008,
+  "dbFileSha256": "8aee00720cf7e1f19df9a515e541c4463abc816c34e95155129396361b32d37d",
+  "dbBytes": 85889024,
   "integrityCheck": "ok",
   "performance": {
-    "durationMs": 6136,
-    "rowsPerSec": 125588,
-    "peakMemoryMb": 802
+    "durationMs": 6517,
+    "rowsPerSec": 118246,
+    "peakMemoryMb": 801
   },
-  "benchmark": {
-    "databaseOpenMs": 0.63,
-    "firstQueryUs": 144.2,
-    "medianUs": 22.9,
-    "p95Us": 32.4,
-    "maxUs": 595.0,
-    "totalQueries": 6000
-  },
-  "unitTotals": {
-    "testFiles": 25,
-    "passed": 440,
-    "failed": 0
-  },
-  "runtimeTotals": {
-    "passed": 169,
-    "failed": 0
-  },
-  "browserTotals": {
-    "passed": 37,
-    "failed": 0
+  "posFieldObservation": {
+    "totalDataRows": 770611,
+    "emptyPosFieldCount": 770611,
+    "emptyPosRatio": 1,
+    "observationStatement": "In the pinned ecdict.csv artifact used by this build, the dedicated `pos` column was measured empty for all 770,611 data rows. Many translation strings contain lexical POS-style prefixes such as n./v./adj.; this observation does not redefine ECDICT’s documented `pos` schema.",
+    "upstreamSchemaDefinition": "The pinned upstream README explicitly defines pos as a standalone field and documents values such as n:46/v:54."
   },
   "redistributionStatus": "REDISTRIBUTION REVIEW REQUIRED",
   "productionSafety": {

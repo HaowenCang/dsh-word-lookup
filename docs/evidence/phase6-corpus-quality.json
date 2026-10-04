@@ -11,9 +11,17 @@
   "nullDefinitions": 609727,
   "nullTranslations": 1872,
   "nullPos": 770611,
+  "posFieldObservation": {
+    "totalDataRows": 770611,
+    "emptyPosFieldCount": 770611,
+    "emptyPosRatio": 1,
+    "observationStatement": "In the pinned ecdict.csv artifact used by this build, the dedicated `pos` column was measured empty for all 770,611 data rows. Many translation strings contain lexical POS-style prefixes such as n./v./adj.; this observation does not redefine ECDICT’s documented `pos` schema.",
+    "upstreamSchemaDefinition": "The pinned upstream README explicitly defines pos as a standalone field and documents values such as n:46/v:54."
+  },
   "rowsWithExchange": 96290,
   "parsedForms": 137766,
   "ambiguousForms": 463,
   "oversizedFields": 0,
-  "invalidUtf8": 0
+  "utf8DecodeResult": "fatal UTF-8 decoder completed the entire verified source without error",
+  "fieldSizePolicy": "reject-row-field-too-large"
 }
