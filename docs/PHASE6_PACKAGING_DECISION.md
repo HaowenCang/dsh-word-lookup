@@ -38,7 +38,7 @@ The production ECDICT database (`build/corpus/ecdict.db`) is **86,827,008 bytes 
 - **Verdict**: **Strictly Rejected**.
 
 ### Option B: Separate Downloadable Release Asset (RECOMMENDED FOR FUTURE RELEASE)
-- **Technical Advantages**: The npm package remains ~40 KB. The host runtime checks for `build/corpus/ecdict.db` (or `DSH_WORD_LOOKUP_DB_PATH`). Users or deployment tools download the pre-built, SHA-256 verified SQLite artifact once.
+- **Technical Advantages**: The npm package remains ~40 KB. The host runtime supports explicit opt-in via `DSH_WORD_LOOKUP_DB_PATH`. Users or deployment tools download the pre-built, SHA-256 verified SQLite artifact once and point to it explicitly.
 - **Redistribution Dependency**: Can only be deployed after legal/redistribution review permits public hosting of compiled ECDICT artifacts.
 
 ### Option C: Host-Side Deterministic Clean-Room Ingestion (ADOPTED FOR PHASE 6)
@@ -54,12 +54,12 @@ The production ECDICT database (`build/corpus/ecdict.db`) is **86,827,008 bytes 
    - Core npm files remain restricted to `lib/`, `cordis.patch.yml`, and `README.md`.
    - Production database is generated locally via `npm run corpus:build` into `build/corpus/ecdict.db` (gitignored).
    - Standard unit and acceptance tests remain 100% offline using the deterministic fixture.
-2. **Phase 7+ Release Plan**:
-   - Adopt **Decoupled Architecture (Option B + C)**:
-     - Core plugin ships with minimal offline fixture.
-     - Production corpus is activated by placing `ecdict.db` at `<package>/build/corpus/ecdict.db` or specifying `DSH_WORD_LOOKUP_DB_PATH`.
-     - Automated CLI command `npm run corpus:build` builds the database locally on demand.
-   - If redistribution clearance is formally granted in the future, provide pre-compiled compressed database assets under GitHub Releases with cryptographic SHA-256 verification.
+2. **Phase 6.1 Implemented & Future Roadmap**:
+   - Current Phase 6.1 runtime contract implements explicit host environment opt-in via `DSH_WORD_LOOKUP_DB_PATH`. Merely placing `build/corpus/ecdict.db` does not silently activate it without the explicit environment variable.
+   - When `DSH_WORD_LOOKUP_DB_PATH` is set, the host strictly validates production metadata (`corpus_name === 'ECDICT'`, `upstream_commit`, `source_sha256`, `schema_version`) and fails cleanly on mismatch without falling back to the fixture.
+   - When `DSH_WORD_LOOKUP_DB_PATH` is unset, the host runs in fixture mode (`sqlite-fixture`).
+   - Automated CLI command `npm run corpus:build` builds the database locally on demand.
+   - Phase 7 will determine the production default activation contract if/when full deployment is scheduled.
 
 ---
 

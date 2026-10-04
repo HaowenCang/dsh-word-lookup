@@ -88,4 +88,5 @@ export declare function isPortFree(port: number): Promise<boolean>
 export declare function buildIsolatedEnv(
   verified: VerifiedEnvironment,
   base?: Record<string, string | undefined>,
+  extra?: Record<string, string | undefined>,
 ): Record<string, string>

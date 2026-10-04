@@ -96,7 +96,11 @@ function extractQuery(raw: unknown): { readonly query: string } | { readonly err
  * @param settings - the host's live switch values.
  * @returns the payload the route returns.
  */
-function toWire(hit: DictionaryHit, settings: LookupFoundResponse['settings']): LookupFoundResponse {
+function toWire(
+  hit: DictionaryHit,
+  settings: LookupFoundResponse['settings'],
+  source: LookupFoundResponse['source'],
+): LookupFoundResponse {
   return {
     ok: true,
     found: true,
@@ -111,7 +115,7 @@ function toWire(hit: DictionaryHit, settings: LookupFoundResponse['settings']): 
     forms: hit.forms.map((form) => ({ form: form.form, kind: form.kind })),
     matchedForm: hit.matchedForm,
     examples: hit.examples.map((example) => ({ en: example.en, zh: example.zh })),
-    source: 'sqlite-fixture',
+    source,
     settings,
   }
 }
@@ -196,6 +200,6 @@ export function createLookupHandler(
     if (!answer.found) {
       return success({ ok: true, found: false, query, source: dictionary.source, settings })
     }
-    return success(toWire(answer, settings))
+    return success(toWire(answer, settings, dictionary.source))
   }
 }

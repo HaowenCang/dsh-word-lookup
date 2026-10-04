@@ -20,14 +20,10 @@
 /**
  * Provenance of a dictionary's answers.
  *
- * Phase 3 ships a deterministic fixture, so the only value is
- * `'sqlite-fixture'`. It exists as a type rather than a bare string so that a
- * later phase importing ECDICT has to state the new value at every site that
- * branches on it, instead of inheriting a claim that is no longer true. Nothing
- * may ever report `'ECDICT'`, `'Tatoeba'` or `'stub'` from this field: the
- * first two would be a lie about the data, the third about the implementation.
+ * - `'sqlite-fixture'` — built-in deterministic test fixture.
+ * - `'ecdict-local'` — local production ECDICT database build.
  */
-export type DictionarySource = 'sqlite-fixture'
+export type DictionarySource = 'sqlite-fixture' | 'ecdict-local'
 
 /** One sense of a headword, as stored. */
 export interface DictionarySense {

@@ -38,6 +38,7 @@ import {
   type DictionaryForm,
   type DictionaryLookup,
   type DictionarySense,
+  type DictionarySource,
 } from './dictionary.js'
 import {
   SCHEMA_VERSION,
@@ -46,9 +47,6 @@ import {
   seedFixture,
   validateFixture,
 } from './fixture.js'
-
-/** The provenance this implementation reports. */
-const SOURCE = 'sqlite-fixture' as const
 
 /**
  * Statements, as literals.
@@ -131,6 +129,10 @@ export interface SqliteDictionaryOptions {
    * really was persisted rather than quietly rebuilt.
    */
   readonly readOnly?: boolean
+  /**
+   * Provenance of the dictionary instance (defaults to 'sqlite-fixture').
+   */
+  readonly source?: DictionarySource
 }
 
 /**
@@ -160,7 +162,7 @@ function asNumber(value: unknown): number | null {
  * schema and rows were validated before the first query.
  */
 export class SqliteDictionary implements Dictionary {
-  readonly source = SOURCE
+  readonly source: DictionarySource
 
   readonly #db: DatabaseSync
   readonly #closed = { value: false }
@@ -169,10 +171,12 @@ export class SqliteDictionary implements Dictionary {
   /**
    * @param db - an open connection whose schema and rows are already valid.
    * @param info - what initialization did, for evidence.
+   * @param source - dictionary provenance identifier.
    */
-  constructor(db: DatabaseSync, info: DictionaryInitialization) {
+  constructor(db: DatabaseSync, info: DictionaryInitialization, source: DictionarySource = 'sqlite-fixture') {
     this.#db = db
     this.#info = info
+    this.source = source
   }
 
   /** What opening this database did. Read-only. */
@@ -388,14 +392,18 @@ export function openSqliteDictionary(options: SqliteDictionaryOptions): SqliteDi
     }
     const fixtureVersion = readMeta(db, 'fixture_version') ?? ''
 
-    return new SqliteDictionary(db, {
-      path: options.path,
-      created: setup.created,
-      seeded: setup.seeded,
-      schemaVersion,
-      fixtureVersion,
-      existed,
-    })
+    return new SqliteDictionary(
+      db,
+      {
+        path: options.path,
+        created: setup.created,
+        seeded: setup.seeded,
+        schemaVersion,
+        fixtureVersion,
+        existed,
+      },
+      options.source ?? 'sqlite-fixture',
+    )
   } catch (error) {
     // Release the handle before propagating: a caller that receives an
     // exception must not also be holding an open connection it cannot reach.

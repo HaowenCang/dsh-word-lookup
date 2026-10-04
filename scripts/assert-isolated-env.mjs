@@ -268,7 +268,7 @@ export async function isPortFree(port) {
  * @param base - the environment to derive from; defaults to this process's.
  * @returns a child environment carrying only isolated DSH variables.
  */
-export function buildIsolatedEnv(verified, base = process.env) {
+export function buildIsolatedEnv(verified, base = process.env, extra = {}) {
   const env = {}
   for (const [key, value] of Object.entries(base)) {
     if (key.startsWith('DSH_')) continue
@@ -277,6 +277,9 @@ export function buildIsolatedEnv(verified, base = process.env) {
   env.DSH_HOME = verified.home
   env.DSH_PROFILE = verified.profile
   env.DSH_PROFILE_DIR = verified.profileDir
+  for (const [k, v] of Object.entries(extra)) {
+    if (v !== undefined) env[k] = v
+  }
   return env
 }
 

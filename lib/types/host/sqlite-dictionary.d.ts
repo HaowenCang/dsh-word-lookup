@@ -27,7 +27,7 @@
  * @module dsh-word-lookup/host/sqlite-dictionary
  */
 import { DatabaseSync } from 'node:sqlite';
-import { type Dictionary, type DictionaryLookup } from './dictionary.js';
+import { type Dictionary, type DictionaryLookup, type DictionarySource } from './dictionary.js';
 /** How the database was brought to its current state, for evidence. */
 export interface DictionaryInitialization {
     /** Absolute path of the database file, or `:memory:`. */
@@ -61,6 +61,10 @@ export interface SqliteDictionaryOptions {
      * really was persisted rather than quietly rebuilt.
      */
     readonly readOnly?: boolean;
+    /**
+     * Provenance of the dictionary instance (defaults to 'sqlite-fixture').
+     */
+    readonly source?: DictionarySource;
 }
 /**
  * A SQLite connection that is opened and closed exactly once.
@@ -70,12 +74,13 @@ export interface SqliteDictionaryOptions {
  */
 export declare class SqliteDictionary implements Dictionary {
     #private;
-    readonly source: "sqlite-fixture";
+    readonly source: DictionarySource;
     /**
      * @param db - an open connection whose schema and rows are already valid.
      * @param info - what initialization did, for evidence.
+     * @param source - dictionary provenance identifier.
      */
-    constructor(db: DatabaseSync, info: DictionaryInitialization);
+    constructor(db: DatabaseSync, info: DictionaryInitialization, source?: DictionarySource);
     /** What opening this database did. Read-only. */
     get initialization(): DictionaryInitialization;
     /**

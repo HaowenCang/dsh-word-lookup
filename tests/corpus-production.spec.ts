@@ -1,87 +1,168 @@
 import { describe, expect, it } from 'vitest'
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { DatabaseSync } from 'node:sqlite'
 
 import { DictionaryUnavailableError } from '../src/host/dictionary.js'
-import { openProductionDictionary, resolveProductionDatabasePath } from '../src/host/corpus-db.js'
+import { loadRuntimeCorpusManifest, openProductionDictionary } from '../src/host/corpus-db.js'
 
-describe('Production Corpus SQLite Dictionary', () => {
-  const prodPath = resolveProductionDatabasePath()
+describe('Production Corpus SQLite Dictionary (Synthetic Production Schema)', () => {
+  const scratchDir = join(tmpdir(), `dsh-synthetic-prod-${Date.now()}`)
+  mkdirSync(scratchDir, { recursive: true })
 
-  it('resolves production database path and opens read-only', () => {
-    if (!existsSync(prodPath)) {
-      console.warn('Production database not yet built; skipping live production tests')
-      return
+  const manifest = loadRuntimeCorpusManifest()
+
+  function createSyntheticProductionDb(
+    filePath: string,
+    metaOverrides: Record<string, string> = {},
+    skipIndexes = false,
+  ): void {
+    const db = new DatabaseSync(filePath)
+    db.exec(`
+      CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE entries (
+        word TEXT PRIMARY KEY COLLATE NOCASE,
+        phonetic TEXT,
+        definition_en TEXT,
+        translation_zh TEXT,
+        pos TEXT,
+        exchange TEXT,
+        frequency INTEGER
+      );
+      CREATE TABLE forms (
+        form TEXT PRIMARY KEY COLLATE NOCASE,
+        headword TEXT NOT NULL,
+        kind TEXT
+      );
+      CREATE TABLE examples (
+        id INTEGER PRIMARY KEY,
+        headword TEXT NOT NULL COLLATE NOCASE,
+        english TEXT NOT NULL,
+        chinese TEXT,
+        source TEXT,
+        source_id TEXT,
+        score REAL
+      );
+    `)
+
+    if (!skipIndexes) {
+      db.exec(`
+        CREATE INDEX idx_forms_headword ON forms (headword COLLATE NOCASE);
+        CREATE INDEX idx_examples_headword ON examples (headword COLLATE NOCASE);
+      `)
     }
 
-    const dict = openProductionDictionary({ path: prodPath })
-    expect(dict).toBeDefined()
-    expect(dict.initialization.schemaVersion).toBe(1)
-    dict.close()
-  })
+    const defaultMeta: Record<string, string> = {
+      schema_version: String(manifest.schemaVersion),
+      corpus_name: manifest.sourceName,
+      upstream_commit: manifest.sourceCommit,
+      source_sha256: manifest.sourceSha256,
+      entry_count: '3',
+      form_count: '2',
+      example_count: '1',
+      logical_sha256: 'synthetic-digest',
+    }
 
-  it('performs exact and phrase queries matching expected probes', () => {
-    if (!existsSync(prodPath)) return
+    const effectiveMeta: Record<string, string> = { ...defaultMeta, ...metaOverrides }
+    const metaStmt = db.prepare('INSERT INTO meta (key, value) VALUES (?, ?)')
+    for (const [k, v] of Object.entries(effectiveMeta)) {
+      if (v !== undefined) {
+        metaStmt.run(k, v)
+      }
+    }
 
-    const dict = openProductionDictionary({ path: prodPath })
+    // Seed entries
+    const entryStmt = db.prepare(`
+      INSERT INTO entries (word, phonetic, definition_en, translation_zh, pos, exchange, frequency)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `)
+    entryStmt.run('go', 'gou', 'move from one place to another', '去；走', 'v', 'p:went/d:gone', 10)
+    entryStmt.run('wave', 'weiv', 'move to and fro', '波动；挥手', 'v', null, 50)
+    entryStmt.run('wave function', 'weiv fʌŋkʃən', 'quantum state mathematical description', '波函数', 'n', null, 500)
+
+    // Seed forms
+    const formStmt = db.prepare('INSERT INTO forms (form, headword, kind) VALUES (?, ?, ?)')
+    formStmt.run('went', 'go', 'past')
+    formStmt.run('gone', 'go', 'done')
+
+    // Seed examples
+    const exStmt = db.prepare(`
+      INSERT INTO examples (id, headword, english, chinese, source, source_id, score)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `)
+    exStmt.run(1, 'go', 'I go to school.', '我去上学。', 'synth', 's1', 1.0)
+
+    db.close()
+  }
+
+  const validDbPath = join(scratchDir, 'valid-production.db')
+  createSyntheticProductionDb(validDbPath)
+
+  it('opens synthetic production database with ecdict-local provenance and read-only mode', () => {
+    const dict = openProductionDictionary({ path: validDbPath })
     try {
-      // 1. Exact words
-      const go = dict.lookup('go')
-      expect(go.found).toBe(true)
-      if (go.found) {
-        expect(go.headword).toBe('go')
-        expect(go.phonetic).toBe('gou')
-        expect(go.senses.length).toBeGreaterThan(0)
-      }
-
-      const wave = dict.lookup('wave')
-      expect(wave.found).toBe(true)
-      if (wave.found) {
-        expect(wave.headword).toBe('wave')
-        expect(wave.matchedForm).toBeNull() // exact canonical precedence
-      }
-
-      // 2. Phrase
-      const waveFunction = dict.lookup('wave function')
-      expect(waveFunction.found).toBe(true)
-      if (waveFunction.found) {
-        expect(waveFunction.headword.toLowerCase()).toBe('wave function')
-      }
-
-      // 3. Case insensitivity
-      const mixed = dict.lookup('CoNsErVaTiOn')
-      expect(mixed.found).toBe(true)
-      if (mixed.found) {
-        expect(mixed.headword.toLowerCase()).toBe('conservation')
-      }
-
-      // 4. Unknown query
-      const unknown = dict.lookup('nonexistentprobexyz123')
-      expect(unknown.found).toBe(false)
-      expect(unknown.query).toBe('nonexistentprobexyz123')
+      expect(dict).toBeDefined()
+      expect(dict.source).toBe('ecdict-local')
+      expect(dict.initialization.schemaVersion).toBe(manifest.schemaVersion)
     } finally {
       dict.close()
     }
   })
 
-  it('handles irregular and inflected forms with correct canonical mapping', () => {
-    if (!existsSync(prodPath)) return
-
-    const dict = openProductionDictionary({ path: prodPath })
+  it('performs exact and phrase queries with correct canonical precedence', () => {
+    const dict = openProductionDictionary({ path: validDbPath })
     try {
-      // went, teeth, derived are entries with morphological relations in ECDICT
+      // 1. Exact headword
+      const go = dict.lookup('go')
+      expect(go.found).toBe(true)
+      if (go.found) {
+        expect(go.headword).toBe('go')
+        expect(go.phonetic).toBe('gou')
+        expect(go.matchedForm).toBeNull()
+        expect(go.senses.length).toBeGreaterThan(0)
+      }
+
+      // 2. Exact word "wave" over any morphology
+      const wave = dict.lookup('wave')
+      expect(wave.found).toBe(true)
+      if (wave.found) {
+        expect(wave.headword).toBe('wave')
+        expect(wave.matchedForm).toBeNull()
+      }
+
+      // 3. Multi-word phrase "wave function"
+      const waveFn = dict.lookup('wave function')
+      expect(waveFn.found).toBe(true)
+      if (waveFn.found) {
+        expect(waveFn.headword).toBe('wave function')
+        expect(waveFn.matchedForm).toBeNull()
+      }
+
+      // 4. Case-insensitivity
+      const mixed = dict.lookup('WaVe FuNcTiOn')
+      expect(mixed.found).toBe(true)
+      if (mixed.found) {
+        expect(mixed.headword).toBe('wave function')
+      }
+
+      // 5. Unknown query
+      const unknown = dict.lookup('notrealxyz')
+      expect(unknown.found).toBe(false)
+      expect(unknown.query).toBe('notrealxyz')
+    } finally {
+      dict.close()
+    }
+  })
+
+  it('resolves inflected forms to lemma with matchedForm', () => {
+    const dict = openProductionDictionary({ path: validDbPath })
+    try {
       const went = dict.lookup('went')
       expect(went.found).toBe(true)
-
-      const teeth = dict.lookup('teeth')
-      expect(teeth.found).toBe(true)
-
-      const tooth = dict.lookup('tooth')
-      expect(tooth.found).toBe(true)
-      if (tooth.found) {
-        expect(tooth.forms.some((f) => f.form.toLowerCase() === 'teeth')).toBe(true)
+      if (went.found) {
+        expect(went.headword).toBe('go')
+        expect(went.matchedForm).toBe('went')
       }
     } finally {
       dict.close()
@@ -89,9 +170,7 @@ describe('Production Corpus SQLite Dictionary', () => {
   })
 
   it('defends against SQL injection and hostile input strings', () => {
-    if (!existsSync(prodPath)) return
-
-    const dict = openProductionDictionary({ path: prodPath })
+    const dict = openProductionDictionary({ path: validDbPath })
     try {
       const maliciousQueries = [
         "'; DROP TABLE entries; --",
@@ -106,7 +185,7 @@ describe('Production Corpus SQLite Dictionary', () => {
         expect(res.found).toBe(false)
       }
 
-      // Verify tables still exist unharmed
+      // Check database integrity remains undamaged
       const check = dict.lookup('go')
       expect(check.found).toBe(true)
     } finally {
@@ -114,41 +193,52 @@ describe('Production Corpus SQLite Dictionary', () => {
     }
   })
 
-  describe('Corruption handling on isolated copies', () => {
-    const scratchDir = join(tmpdir(), `dsh-corpus-corruption-${Date.now()}`)
-    mkdirSync(scratchDir, { recursive: true })
-
-    it('rejects truncated / incomplete database file with controlled error', () => {
-      const truncPath = join(scratchDir, 'truncated.db')
-      // Write partial 100 bytes
-      writeFileSync(truncPath, Buffer.alloc(100, 0x42))
-
-      expect(() => openProductionDictionary({ path: truncPath })).toThrow(DictionaryUnavailableError)
-    })
-
-    it('rejects empty database file with controlled error', () => {
-      const emptyPath = join(scratchDir, 'empty.db')
-      writeFileSync(emptyPath, Buffer.alloc(0))
-
-      expect(() => openProductionDictionary({ path: emptyPath })).toThrow(DictionaryUnavailableError)
-    })
-
-    it('rejects missing database file without downloading or falling back', () => {
-      const missingPath = join(scratchDir, 'missing.db')
+  describe('Fail-Clean Metadata & Integrity Assertions (No Skips, No Fallbacks)', () => {
+    it('CR1 / Missing DB: rejects non-existent database file without falling back', () => {
+      const missingPath = join(scratchDir, 'definitely-does-not-exist.db')
       expect(() => openProductionDictionary({ path: missingPath })).toThrow(DictionaryUnavailableError)
     })
 
-    it('rejects database with invalid schema_version', () => {
-      const invalidMetaPath = join(scratchDir, 'invalid-meta.db')
-      const db = new DatabaseSync(invalidMetaPath)
-      db.exec('CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)')
-      db.exec("INSERT INTO meta (key, value) VALUES ('schema_version', '999')")
-      db.exec('CREATE TABLE entries (word TEXT PRIMARY KEY COLLATE NOCASE, phonetic TEXT, definition_en TEXT, translation_zh TEXT, pos TEXT, exchange TEXT, frequency INTEGER)')
-      db.exec('CREATE TABLE forms (form TEXT PRIMARY KEY COLLATE NOCASE, headword TEXT NOT NULL, kind TEXT)')
-      db.exec('CREATE TABLE examples (id INTEGER PRIMARY KEY, headword TEXT NOT NULL COLLATE NOCASE, english TEXT NOT NULL, chinese TEXT, source TEXT, source_id TEXT, score REAL)')
-      db.close()
+    it('Corrupt DB: rejects truncated file with controlled error', () => {
+      const truncPath = join(scratchDir, 'truncated.db')
+      writeFileSync(truncPath, Buffer.alloc(100, 0x42))
+      expect(() => openProductionDictionary({ path: truncPath })).toThrow(DictionaryUnavailableError)
+    })
 
-      expect(() => openProductionDictionary({ path: invalidMetaPath })).toThrow(DictionaryUnavailableError)
+    it('Corrupt DB: rejects empty file with controlled error', () => {
+      const emptyPath = join(scratchDir, 'empty.db')
+      writeFileSync(emptyPath, Buffer.alloc(0))
+      expect(() => openProductionDictionary({ path: emptyPath })).toThrow(DictionaryUnavailableError)
+    })
+
+    it('Wrong schema_version: rejects database with schema mismatch', () => {
+      const badPath = join(scratchDir, 'bad-schema.db')
+      createSyntheticProductionDb(badPath, { schema_version: '999' })
+      expect(() => openProductionDictionary({ path: badPath })).toThrow(/schema_version 999, expected/)
+    })
+
+    it('Wrong corpus_name: rejects database with wrong corpus_name', () => {
+      const badPath = join(scratchDir, 'bad-corpus-name.db')
+      createSyntheticProductionDb(badPath, { corpus_name: 'NOT_ECDICT' })
+      expect(() => openProductionDictionary({ path: badPath })).toThrow(/corpus_name "NOT_ECDICT", expected/)
+    })
+
+    it('Wrong upstream_commit: rejects database with wrong upstream_commit', () => {
+      const badPath = join(scratchDir, 'bad-upstream-commit.db')
+      createSyntheticProductionDb(badPath, { upstream_commit: 'deadbeef00000000000000000000000000000000' })
+      expect(() => openProductionDictionary({ path: badPath })).toThrow(/upstream_commit "deadbeef00000000000000000000000000000000", expected/)
+    })
+
+    it('Wrong source_sha256: rejects database with wrong source_sha256', () => {
+      const badPath = join(scratchDir, 'bad-source-sha.db')
+      createSyntheticProductionDb(badPath, { source_sha256: 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff' })
+      expect(() => openProductionDictionary({ path: badPath })).toThrow(/source_sha256 "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", expected/)
+    })
+
+    it('Missing required index: rejects database without idx_forms_headword', () => {
+      const badPath = join(scratchDir, 'missing-index.db')
+      createSyntheticProductionDb(badPath, {}, true) // skipIndexes = true
+      expect(() => openProductionDictionary({ path: badPath })).toThrow(/missing required index/)
     })
   })
 })

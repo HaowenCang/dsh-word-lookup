@@ -41,6 +41,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-connection'
 
 import { Config, type HostConfig } from './host/config.js'
+import { CORPUS_PATH_ENV, openProductionDictionary } from './host/corpus-db.js'
 import { openFixtureDictionary } from './host/fixture-db.js'
 import { createLookupHandler } from './host/lookup.js'
 import { LOOKUP_PATH } from './host/route.js'
@@ -67,7 +68,11 @@ export const inject: readonly string[] = ['connection']
  */
 export function apply(ctx: Context, config: HostConfig): void {
   ctx.effect(() => {
-    const dictionary = openFixtureDictionary()
+    const explicitProductionPath = process.env[CORPUS_PATH_ENV]?.trim()
+    const dictionary =
+      explicitProductionPath && explicitProductionPath.length > 0
+        ? openProductionDictionary({ path: explicitProductionPath })
+        : openFixtureDictionary()
 
     let disposeRoute: (() => Promise<void>) | undefined
     try {

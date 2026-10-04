@@ -43,13 +43,10 @@ export type LookupFailureCode = 'method-not-allowed' | 'unsupported-content-type
 /**
  * Provenance of a lookup payload.
  *
- * Phase 3 answers from a deterministic SQLite fixture built into this package,
- * and says so. The value is a closed union that contains **no** name for a
- * production corpus, a third-party dataset or an on-the-fly guess, so a payload
- * cannot claim a source this build does not have. Widening it is a deliberate
- * act that belongs to the phase that actually imports such data.
+ * - `'sqlite-fixture'` — built-in deterministic test fixture.
+ * - `'ecdict-local'` — local production ECDICT database build.
  */
-export type LookupSource = 'sqlite-fixture';
+export type LookupSource = 'sqlite-fixture' | 'ecdict-local';
 /**
  * One sense of a headword.
  *
