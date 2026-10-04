@@ -285,7 +285,7 @@ Phase 5 has not modified any trigger classification rules, event orderings, or S
 | `src/client/card.tsx` | **Complete Rewrite**: Full production Result Card component with 5 states, accessibility, theming, lemma tag, and dismissal listeners. |
 | `src/client/index.tsx` | **Enhanced**: Wired selection rect to lookup controller; exposed `surfaceGeneration`, `dismiss`, and `runLookup` on diagnostics. |
 | `package.json` | **Updated**: Added `"test:acceptance"` script for Phase 5 browser suite. |
-| `scripts/phase5-browser-acceptance.mjs` | **New**: Dedicated 24-point end-to-end browser acceptance suite for Chromium. |
+| `scripts/phase5-browser-acceptance.mjs` | **New**: Dedicated 37-point end-to-end browser acceptance suite for Chromium. |
 | `tests/client-position.spec.ts` | **New**: 11 unit tests for positioning engine. |
 | `tests/client-dismiss-race.spec.ts` | **New**: 6 unit tests for D1-D4 dismiss/request race conditions. |
 | `tests/client-card-render.spec.ts` | **New**: 12 unit tests for 5 UI states, lemma relation, null safety, and error sanitization. |
