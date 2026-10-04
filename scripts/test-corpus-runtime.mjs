@@ -22,7 +22,7 @@
 
 import { execSync, spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -45,7 +45,8 @@ import {
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url))
 const PROD_DB_PATH = join(REPO_ROOT, 'build', 'corpus', 'ecdict.db')
 const EVIDENCE_DIR = join(REPO_ROOT, 'docs', 'evidence')
-const EVIDENCE_FILE = join(EVIDENCE_DIR, 'phase61-corpus-runtime.json')
+const EVIDENCE_FILE_61 = join(EVIDENCE_DIR, 'phase61-corpus-runtime.json')
+const EVIDENCE_FILE_611 = join(EVIDENCE_DIR, 'phase611-corpus-runtime.json')
 
 const ANSI = /\x1B\[[0-?]*[ -/]*[@-~]/g
 const DEFAULT_START_PORT = 50980
@@ -82,6 +83,121 @@ function record(id, description, passed, detail = '', extra = undefined) {
   console.log(`${status}  [${id}] ${description}`)
   if (detail) {
     console.log(`      ${String(detail).slice(0, 300)}`)
+  }
+}
+
+function verifyIsolatedProfileBinding(verified, options = {}) {
+  const allowDirty = options.allowDirty ?? (args['allow-dirty'] === 'true' || process.argv.includes('--allow-dirty'))
+  let testedCodeGitSha = 'UNKNOWN'
+  try {
+    const rawStatus = execSync('git status --porcelain', { cwd: REPO_ROOT, encoding: 'utf8' }).trim()
+    const nonEvidenceDirty = rawStatus
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0 && !l.includes('docs/evidence'))
+      .join('\n')
+    if (nonEvidenceDirty && !allowDirty) {
+      throw new Error(`Working tree is dirty; authoritative evidence requires a clean commit:\n${nonEvidenceDirty}`)
+    }
+    testedCodeGitSha = execSync('git rev-parse HEAD', { cwd: REPO_ROOT, encoding: 'utf8' }).trim()
+  } catch (err) {
+    if (!allowDirty) throw err
+  }
+
+  // 1. Profile must be the isolated test profile
+  if (verified.profile !== 'word-lookup-test') {
+    throw new Error(`Profile mismatch: expected "word-lookup-test", got "${verified.profile}"`)
+  }
+
+  // 2. Profile package.json must contain dsh-word-lookup in bundles
+  const profilePkgPath = join(verified.profileDir, 'package.json')
+  if (!existsSync(profilePkgPath)) {
+    throw new Error(`Profile package.json missing at "${profilePkgPath}"`)
+  }
+  const profilePkg = JSON.parse(readFileSync(profilePkgPath, 'utf8'))
+  if (!profilePkg.dsh?.profile?.bundles?.includes('dsh-word-lookup')) {
+    throw new Error(`Profile bundles do not contain "dsh-word-lookup"`)
+  }
+
+  // 3. Dependency link must point to current repo
+  const dep = profilePkg.dependencies?.['dsh-word-lookup']
+  if (!dep || !dep.startsWith('link:')) {
+    throw new Error(`Profile dependency dsh-word-lookup is not a link dependency: ${dep}`)
+  }
+
+  // 4. Resolved plugin path in profile node_modules
+  const pluginLinkPath = join(verified.profileDir, 'node_modules', 'dsh-word-lookup')
+  if (!existsSync(pluginLinkPath)) {
+    throw new Error(`Plugin junction missing in profile at "${pluginLinkPath}"`)
+  }
+  const resolvedPluginPath = realpathSync(pluginLinkPath)
+  const realRepoRoot = realpathSync(REPO_ROOT)
+  if (resolvedPluginPath.toLowerCase() !== realRepoRoot.toLowerCase()) {
+    throw new Error(`Plugin junction resolves to "${resolvedPluginPath}", expected "${realRepoRoot}"`)
+  }
+
+  // 5. Host and Client bundles verification and SHA-256 calculation
+  const repoHostBundle = join(REPO_ROOT, 'lib', 'index.js')
+  const repoClientBundle = join(REPO_ROOT, 'lib', 'client.js')
+  const profileHostBundle = join(pluginLinkPath, 'lib', 'index.js')
+  const profileClientBundle = join(pluginLinkPath, 'lib', 'client.js')
+
+  if (!existsSync(repoHostBundle) || !existsSync(repoClientBundle)) {
+    throw new Error('Built bundles missing in repository lib/; run "npm run build" first')
+  }
+
+  const hashFile = (p) => createHash('sha256').update(readFileSync(p)).digest('hex')
+  const testedHostBundleSha256 = hashFile(repoHostBundle)
+  const loadedHostBundleSha256 = hashFile(profileHostBundle)
+  if (testedHostBundleSha256 !== loadedHostBundleSha256) {
+    throw new Error(`Host bundle mismatch between repo and profile node_modules`)
+  }
+
+  const testedClientBundleSha256 = hashFile(repoClientBundle)
+  const loadedClientBundleSha256 = hashFile(profileClientBundle)
+  if (testedClientBundleSha256 !== loadedClientBundleSha256) {
+    throw new Error(`Client bundle mismatch between repo and profile node_modules`)
+  }
+
+  return {
+    testedCodeGitSha,
+    testedHostBundleSha256,
+    testedClientBundleSha256,
+    resolvedPluginPath,
+    profileName: verified.profile,
+    profileDir: verified.profileDir,
+  }
+}
+
+function staticAiSafetyCheck() {
+  const pkg = JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8'))
+  const allDeps = {
+    ...pkg.dependencies,
+    ...pkg.devDependencies,
+    ...pkg.peerDependencies,
+  }
+  const aiKeywords = ['openai', 'anthropic', '@google/generative-ai', 'langchain', 'huggingface']
+  const matchedAiDeps = Object.keys(allDeps).filter((d) =>
+    aiKeywords.some((kw) => d.toLowerCase().includes(kw)),
+  )
+
+  const hostBundleText = readFileSync(join(REPO_ROOT, 'lib', 'index.js'), 'utf8')
+  const clientBundleText = readFileSync(join(REPO_ROOT, 'lib', 'client.js'), 'utf8')
+
+  const suspiciousEndpoints = ['api.openai.com', 'api.anthropic.com', 'generativelanguage.googleapis.com']
+  const foundEndpoints = suspiciousEndpoints.filter(
+    (ep) => hostBundleText.includes(ep) || clientBundleText.includes(ep),
+  )
+
+  return {
+    classification: 'static-architectural-invariant',
+    runtimeObservation: 'notMeasured',
+    staticVerification: {
+      passed: matchedAiDeps.length === 0 && foundEndpoints.length === 0,
+      matchedAiDependencies: matchedAiDeps,
+      foundModelEndpoints: foundEndpoints,
+      statement: '0 AI fallback mechanisms in host or client code; dictionary resolves strictly against local SQLite',
+    },
   }
 }
 
@@ -176,7 +292,7 @@ function makeSyntheticDb(filePath, metaOverrides = {}) {
       source_id TEXT,
       score REAL
     );
-    CREATE INDEX idx_forms_headword ON forms (headword COLLATE NOCASE);
+    CREATE INDEX idx_forms_headword_raw ON forms (headword);
     CREATE INDEX idx_examples_headword ON examples (headword COLLATE NOCASE);
   `)
 
@@ -188,7 +304,7 @@ function makeSyntheticDb(filePath, metaOverrides = {}) {
     entry_count: '1',
     form_count: '0',
     example_count: '0',
-    logical_sha256: 'synth',
+    logical_sha256: '0'.repeat(64),
   }
   const meta = { ...defaultMeta, ...metaOverrides }
   const metaStmt = db.prepare('INSERT INTO meta (key, value) VALUES (?, ?)')
@@ -232,6 +348,31 @@ async function run() {
   console.log(ISOLATION_BANNER)
   record('ISO-GATE', 'isolated scratch environment accepted', true, `home=${verified.home} profile=${verified.profile}`)
 
+  // 1.1 Profile Binding Verification
+  let profileBinding
+  try {
+    profileBinding = verifyIsolatedProfileBinding(verified)
+    record(
+      'ISO-PROFILE-BINDING',
+      'isolated profile bundle, link, and loaded code hashes verified against current repository',
+      true,
+      `testedGitSha=${profileBinding.testedCodeGitSha} hostSha=${profileBinding.testedHostBundleSha256.slice(0, 12)} clientSha=${profileBinding.testedClientBundleSha256.slice(0, 12)}`,
+    )
+  } catch (err) {
+    record('ISO-PROFILE-BINDING', 'profile binding check failed', false, err.message)
+    console.error('Profile binding failed:', err.message)
+    process.exit(1)
+  }
+
+  // 1.2 Static AI Invariant Check
+  const aiSafety = staticAiSafetyCheck()
+  record(
+    'STATIC-AI-INVARIANT',
+    'static bundle & dependency audit proves 0 AI fallback and 0 model endpoints',
+    aiSafety.staticVerification.passed,
+    aiSafety.staticVerification.statement,
+  )
+
   // Prepare scratch workspace for negative test artifacts
   const scratchDir = join(testRoot, 'corpus-runtime-scratch')
   mkdirSync(scratchDir, { recursive: true })
@@ -239,7 +380,10 @@ async function run() {
   const browser = await chromium.launch({ headless: true })
 
   const testState = {
-    testedGitSha: 'PENDING',
+    testedGitSha: profileBinding.testedCodeGitSha,
+    testedHostBundleSha256: profileBinding.testedHostBundleSha256,
+    testedClientBundleSha256: profileBinding.testedClientBundleSha256,
+    resolvedPluginPath: profileBinding.resolvedPluginPath,
     manifest: {
       sourceName: manifest.sourceName,
       sourceCommit: manifest.sourceCommit,
@@ -249,10 +393,6 @@ async function run() {
     cr1Probes: {},
     negativeTests: {},
   }
-
-  try {
-    testState.testedGitSha = execSync('git rev-parse HEAD', { cwd: REPO_ROOT, encoding: 'utf8' }).trim()
-  } catch {}
 
   try {
     // =========================================================================
@@ -267,6 +407,31 @@ async function run() {
 
     try {
       const page = await browser.newPage()
+
+      // Browser Network Instrumentation: track external vs local requests
+      const observedNetwork = {
+        localhostSameOriginRequests: [],
+        externalOriginRequests: [],
+      }
+
+      page.on('request', (req) => {
+        const url = req.url()
+        try {
+          const parsed = new URL(url)
+          if (
+            parsed.hostname === '127.0.0.1' ||
+            parsed.hostname === 'localhost' ||
+            parsed.origin === new URL(cr1Instance.url).origin
+          ) {
+            observedNetwork.localhostSameOriginRequests.push({ url, method: req.method() })
+          } else {
+            observedNetwork.externalOriginRequests.push({ url, method: req.method() })
+          }
+        } catch {
+          observedNetwork.externalOriginRequests.push({ url, method: req.method() })
+        }
+      })
+
       await page.goto(cr1Instance.url)
 
       // Query execution helper in browser context
@@ -354,6 +519,21 @@ async function run() {
         !fixtureFallbackObserved,
         `fixtureFallbackObserved=${fixtureFallbackObserved}`,
       )
+
+      // Network verification: assert 0 external origin requests observed by the browser
+      record(
+        'CR1-BROWSER-ZERO-EXTERNAL-NETWORK',
+        'browser-visible network traffic observed exactly 0 external-origin network requests',
+        observedNetwork.externalOriginRequests.length === 0,
+        `externalRequestsCount=${observedNetwork.externalOriginRequests.length} (localhostSameOriginRequests=${observedNetwork.localhostSameOriginRequests.length})`,
+      )
+      testState.networkObservations = {
+        scope: 'browser-visible-requests',
+        externalOriginRequestsObserved: observedNetwork.externalOriginRequests.length,
+        externalOriginRequests: observedNetwork.externalOriginRequests,
+        localhostSameOriginRequestsCount: observedNetwork.localhostSameOriginRequests.length,
+        hostProcessWideNetworkActivity: 'notMeasured',
+      }
 
       await page.close()
     } finally {
@@ -549,7 +729,19 @@ async function run() {
   console.log(`\n=== test-corpus-runtime summary: ${results.length - failed.length}/${results.length} passed ===`)
 
   const evidenceDoc = {
-    testedGitSha: testState.testedGitSha,
+    testedCodeGitSha: testState.testedGitSha,
+    testedHostBundleSha256: testState.testedHostBundleSha256,
+    testedClientBundleSha256: testState.testedClientBundleSha256,
+    resolvedPluginPath: testState.resolvedPluginPath,
+    profileBinding: {
+      profile: profileBinding.profileName,
+      profileDir: profileBinding.profileDir,
+      bundleRegisteredInProfilePackageJson: true,
+      linkDependencyVerified: true,
+      resolvedPluginMatchesRepoRoot: true,
+      hostBundleSha256MatchesLoaded: true,
+      clientBundleSha256MatchesLoaded: true,
+    },
     manifest: testState.manifest,
     isolation: {
       check: 'PASS',
@@ -558,11 +750,27 @@ async function run() {
       portsUsed: 'isolated high ports',
       productionEnvironmentUntouched: true,
     },
+    networkObservation: {
+      browserVisible: {
+        instrumentation: 'playwright-request-interception',
+        externalOriginRequestsObserved: testState.networkObservations?.externalOriginRequestsObserved ?? 0,
+        externalOriginRequests: testState.networkObservations?.externalOriginRequests ?? [],
+        localhostSameOriginRequestsObserved: testState.networkObservations?.localhostSameOriginRequestsCount ?? 0,
+      },
+      hostProcessWideNetworkActivity: 'notMeasured',
+    },
+    aiSafety: {
+      runtimeObservation: 'notMeasured',
+      staticArchitectureInvariant: {
+        passed: aiSafety.staticVerification.passed,
+        statement: aiSafety.staticVerification.statement,
+        matchedAiDependencies: aiSafety.staticVerification.matchedAiDependencies,
+        foundModelEndpoints: aiSafety.staticVerification.foundModelEndpoints,
+      },
+    },
     runtimeVerification: {
       dictionarySourceObserved: 'ecdict-local',
       fixtureFallbackObserved: false,
-      externalNetworkRequestsObserved: 0,
-      aiFallbackObserved: false,
     },
     cr1Probes: {
       'wave function': {
@@ -608,8 +816,9 @@ async function run() {
     },
   }
 
-  writeFileSync(EVIDENCE_FILE, JSON.stringify(evidenceDoc, null, 2) + '\n', 'utf8')
-  console.log(`Saved machine-readable evidence to: ${EVIDENCE_FILE}`)
+  writeFileSync(EVIDENCE_FILE_611, JSON.stringify(evidenceDoc, null, 2) + '\n', 'utf8')
+  writeFileSync(EVIDENCE_FILE_61, JSON.stringify(evidenceDoc, null, 2) + '\n', 'utf8')
+  console.log(`Saved machine-readable evidence to:\n  ${EVIDENCE_FILE_611}\n  ${EVIDENCE_FILE_61}`)
 
   if (failed.length > 0) {
     process.exit(1)

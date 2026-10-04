@@ -131,7 +131,47 @@ function validateProductionMetadata(
     }
   }
 
-  // 2. Read meta table
+  // 2. Verify table schema and primary key semantics required by SqliteDictionary
+  const requiredTableSchemas: Record<string, { pk: string; columns: string[] }> = {
+    meta: { pk: 'key', columns: ['key', 'value'] },
+    entries: {
+      pk: 'word',
+      columns: ['word', 'phonetic', 'definition_en', 'translation_zh', 'pos', 'exchange', 'frequency'],
+    },
+    forms: { pk: 'form', columns: ['form', 'headword', 'kind'] },
+    examples: {
+      pk: 'id',
+      columns: ['id', 'headword', 'english', 'chinese', 'source', 'source_id', 'score'],
+    },
+  }
+
+  for (const [table, spec] of Object.entries(requiredTableSchemas)) {
+    interface ColInfo {
+      cid: number
+      name: string
+      type: string
+      notnull: number
+      dflt_value: unknown
+      pk: number
+    }
+    const cols = db.prepare(`PRAGMA table_info("${table}")`).all() as unknown as ColInfo[]
+    const colNames = new Set(cols.map((c) => c.name))
+    for (const col of spec.columns) {
+      if (!colNames.has(col)) {
+        throw new DictionaryUnavailableError(
+          `production corpus database at "${dbPath}" table "${table}" is missing required column "${col}"`,
+        )
+      }
+    }
+    const pkCol = cols.find((c) => c.name === spec.pk)
+    if (!pkCol || pkCol.pk <= 0) {
+      throw new DictionaryUnavailableError(
+        `production corpus database at "${dbPath}" table "${table}" column "${spec.pk}" must be primary key`,
+      )
+    }
+  }
+
+  // 3. Read meta table
   const metaStmt = db.prepare('SELECT key, value FROM meta')
   const meta = new Map<string, string>()
   try {
@@ -145,7 +185,7 @@ function validateProductionMetadata(
     )
   }
 
-  // 3. Validate metadata values
+  // 4. Validate metadata contract
   const schemaVersion = Number(meta.get('schema_version'))
   if (schemaVersion !== expectedManifest.schemaVersion) {
     throw new DictionaryUnavailableError(
@@ -174,9 +214,28 @@ function validateProductionMetadata(
     )
   }
 
-  // 4. Verify required indexes exist
+  for (const countKey of ['entry_count', 'form_count', 'example_count']) {
+    const val = meta.get(countKey)
+    if (val === undefined || !/^\d+$/.test(val)) {
+      throw new DictionaryUnavailableError(
+        `production corpus database at "${dbPath}" has invalid or missing metadata count "${countKey}": ${val}`,
+      )
+    }
+  }
+
+  const logicalSha256 = meta.get('logical_sha256')
+  if (!logicalSha256 || typeof logicalSha256 !== 'string' || logicalSha256.length !== 64) {
+    throw new DictionaryUnavailableError(
+      `production corpus database at "${dbPath}" has invalid or missing metadata logical_sha256: ${logicalSha256}`,
+    )
+  }
+
+  // 5. Verify required indexes exist
+  // idx_forms_headword_raw is the raw binary headword index required by the actual product lookup:
+  // "SELECT form, kind FROM forms WHERE headword = ? ORDER BY form COLLATE NOCASE"
+  // idx_examples_headword is required by "SELECT ... FROM examples WHERE headword = ?"
   const indexStmt = db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = ?")
-  for (const index of ['idx_forms_headword', 'idx_examples_headword']) {
+  for (const index of ['idx_forms_headword_raw', 'idx_examples_headword']) {
     if (!indexStmt.get(index)) {
       throw new DictionaryUnavailableError(
         `production corpus database at "${dbPath}" is missing required index "${index}"`,

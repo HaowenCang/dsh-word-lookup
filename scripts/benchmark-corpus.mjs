@@ -1,10 +1,14 @@
 #!/usr/bin/env node
 /**
- * Process-level query latency benchmark for the production SQLite corpus.
+ * Production dictionary query latency benchmark using the real product path:
+ * openProductionDictionary() → SqliteDictionary.lookup()
  *
- * Implements Phase 6 benchmark requirements:
- * - Read-only database access.
- * - Measures process-level cold-ish open time.
+ * Implements Phase 6.1.1 benchmark requirements:
+ * - Read-only production database access.
+ * - Benchmarks real product path (openProductionDictionary() -> SqliteDictionary.lookup()).
+ * - Separately reports:
+ *   - database open & metadata validation startup latency (ms)
+ *   - steady-state lookup latency (µs)
  * - Samples query categories:
  *   - common word
  *   - rare word
@@ -14,20 +18,26 @@
  *   - phrase
  *   - unknown
  *   - long unknown
- * - Calculates min, median, p95, and max lookup latencies.
- * - Outputs structured report and optional JSON evidence.
+ * - Records min, median, p95, and max lookup latencies.
+ * - Emits machine-readable evidence to docs/evidence/phase611-corpus-benchmark.json.
  *
  * @module dsh-word-lookup/scripts/benchmark-corpus
  */
 
-import { DatabaseSync } from 'node:sqlite'
-import { existsSync, writeFileSync } from 'node:fs'
+import { execSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
+import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { DatabaseSync } from 'node:sqlite'
+
+import { openProductionDictionary } from '../lib/index.js'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 const DB_PATH = join(ROOT, 'build', 'corpus', 'ecdict.db')
 const EVIDENCE_DIR = join(ROOT, 'docs', 'evidence')
+const EVIDENCE_FILE_611 = join(EVIDENCE_DIR, 'phase611-corpus-benchmark.json')
+const EVIDENCE_FILE_6 = join(EVIDENCE_DIR, 'phase6-corpus-benchmark.json')
 
 const SAMPLES = {
   commonWord: ['go', 'wave', 'function', 'time', 'world'],
@@ -45,43 +55,22 @@ export async function runBenchmark(iterations = 200) {
     throw new Error(`Production database not found at ${DB_PATH}; run "npm run corpus:build" first`)
   }
 
-  console.log(`benchmark-corpus: starting process-level lookup benchmark (${iterations} iterations per sample)...`)
+  console.log(`benchmark-corpus: starting production dictionary benchmark (${iterations} iterations per word)...`)
 
+  // 1. Measure startup: openProductionDictionary() (connection open + schema & metadata validation)
   const openStart = process.hrtime.bigint()
-  const db = new DatabaseSync(DB_PATH, { readOnly: true })
-  const entryStmt = db.prepare(
-    'SELECT word, phonetic, definition_en, translation_zh, pos, exchange, frequency FROM entries WHERE word = ?',
-  )
-  const formStmt = db.prepare('SELECT headword FROM forms WHERE form = ?')
-  const formsByHwStmt = db.prepare('SELECT form, kind FROM forms WHERE headword = ? ORDER BY form COLLATE NOCASE')
+  const dictionary = openProductionDictionary({ path: DB_PATH })
+  const openEnd = process.hrtime.bigint()
+  const databaseOpenValidationMs = Number(openEnd - openStart) / 1_000_000
 
-  function lookup(query) {
-    const exact = entryStmt.get(query)
-    if (exact) {
-      const forms = formsByHwStmt.all(exact.word)
-      return { found: true, headword: exact.word, phonetic: exact.phonetic, forms }
-    }
-    const form = formStmt.get(query)
-    if (form) {
-      const inflected = entryStmt.get(form.headword)
-      if (inflected) {
-        const forms = formsByHwStmt.all(inflected.word)
-        return { found: true, headword: inflected.word, phonetic: inflected.phonetic, forms }
-      }
-    }
-    return { found: false, query }
+  console.log(`  Database open & validation duration: ${databaseOpenValidationMs.toFixed(2)} ms`)
+
+  // Warm-up queries (5 queries)
+  for (const warmupWord of ['warmup', 'test', 'run', 'dictionary', 'sqlite']) {
+    dictionary.lookup(warmupWord)
   }
 
-  // Measure first query as cold-ish
-  const firstQueryStart = process.hrtime.bigint()
-  lookup('conservation')
-  const firstQueryDurationUs = Number(process.hrtime.bigint() - firstQueryStart) / 1000
-
-  const openDurationMs = Number(process.hrtime.bigint() - openStart) / 1_000_000
-
-  console.log(`  Database open duration: ${openDurationMs.toFixed(2)} ms`)
-  console.log(`  First query latency (cold-ish): ${firstQueryDurationUs.toFixed(1)} µs`)
-
+  // 2. Measure steady-state lookup latency through SqliteDictionary.lookup()
   const categoryResults = {}
   const allDurationsUs = []
 
@@ -91,7 +80,7 @@ export async function runBenchmark(iterations = 200) {
     for (let i = 0; i < iterations; i += 1) {
       for (const word of words) {
         const t0 = process.hrtime.bigint()
-        const res = lookup(word)
+        const res = dictionary.lookup(word)
         const t1 = process.hrtime.bigint()
         const us = Number(t1 - t0) / 1000
         durations.push(us)
@@ -119,38 +108,68 @@ export async function runBenchmark(iterations = 200) {
   }
 
   allDurationsUs.sort((a, b) => a - b)
+  const overallMin = allDurationsUs[0]
   const overallMedian = allDurationsUs[Math.floor(allDurationsUs.length * 0.5)]
   const overallP95 = allDurationsUs[Math.floor(allDurationsUs.length * 0.95)]
   const overallMax = allDurationsUs[allDurationsUs.length - 1]
 
   console.log('------------------------------------------------------------')
   console.log(
-    `  Overall benchmark summary: total queries: ${allDurationsUs.length} | median: ${overallMedian.toFixed(1)}µs | p95: ${overallP95.toFixed(1)}µs | max: ${overallMax.toFixed(1)}µs`,
+    `  Overall steady-state lookup summary: total queries: ${allDurationsUs.length} | min: ${overallMin.toFixed(1)}µs | median: ${overallMedian.toFixed(1)}µs | p95: ${overallP95.toFixed(1)}µs | max: ${overallMax.toFixed(1)}µs`,
   )
 
-  db.close()
+  dictionary.close()
+
+  // Read DB identity
+  const stats = statSync(DB_PATH)
+  const dbHash = createHash('sha256').update(readFileSync(DB_PATH)).digest('hex')
+  const hostBundleHash = createHash('sha256').update(readFileSync(join(ROOT, 'lib', 'index.js'))).digest('hex')
+
+  let testedCodeGitSha = 'UNKNOWN'
+  try {
+    testedCodeGitSha = execSync('git rev-parse HEAD', { cwd: ROOT, encoding: 'utf8' }).trim()
+  } catch {}
+
+  const rawDb = new DatabaseSync(DB_PATH, { readOnly: true })
+  const metaRows = rawDb.prepare('SELECT key, value FROM meta').all()
+  const metaMap = new Map(metaRows.map((r) => [r.key, r.value]))
+  rawDb.close()
 
   const summary = {
-    benchmarkType: 'process-level lookup benchmark',
-    databasePath: 'build/corpus/ecdict.db',
-    openDurationMs: Number(openDurationMs.toFixed(2)),
-    firstQueryDurationUs: Number(firstQueryDurationUs.toFixed(1)),
-    iterationsPerWord: iterations,
-    totalQueriesExecuted: allDurationsUs.length,
-    overall: {
-      medianUs: Number(overallMedian.toFixed(1)),
-      p95Us: Number(overallP95.toFixed(1)),
-      maxUs: Number(overallMax.toFixed(1)),
+    benchmarkTarget: 'SqliteDictionary.lookup via openProductionDictionary()',
+    testedCodeGitSha,
+    testedHostBundleSha256: hostBundleHash,
+    database: {
+      path: 'build/corpus/ecdict.db',
+      byteSize: stats.size,
+      fileSha256: dbHash,
+      logicalSha256: metaMap.get('logical_sha256'),
+      sourceSha256: metaMap.get('source_sha256'),
+      upstreamCommit: metaMap.get('upstream_commit'),
+      entryCount: Number(metaMap.get('entry_count')),
+      formCount: Number(metaMap.get('form_count')),
     },
-    categories: categoryResults,
+    startupLatency: {
+      databaseOpenValidationMs: Number(databaseOpenValidationMs.toFixed(2)),
+      description: 'One-time startup cost to open read-only database and perform strict schema, index, and metadata validation',
+    },
+    steadyStateLookup: {
+      iterationsPerWord: iterations,
+      totalQueriesExecuted: allDurationsUs.length,
+      overall: {
+        minUs: Number(overallMin.toFixed(1)),
+        medianUs: Number(overallMedian.toFixed(1)),
+        p95Us: Number(overallP95.toFixed(1)),
+        maxUs: Number(overallMax.toFixed(1)),
+      },
+      categories: categoryResults,
+    },
   }
 
-  writeFileSync(
-    join(EVIDENCE_DIR, 'phase6-corpus-benchmark.json'),
-    JSON.stringify(summary, null, 2) + '\n',
-    'utf8',
-  )
+  writeFileSync(EVIDENCE_FILE_611, JSON.stringify(summary, null, 2) + '\n', 'utf8')
+  writeFileSync(EVIDENCE_FILE_6, JSON.stringify(summary, null, 2) + '\n', 'utf8')
 
+  console.log(`Saved benchmark evidence to: ${EVIDENCE_FILE_611}`)
   return summary
 }
 

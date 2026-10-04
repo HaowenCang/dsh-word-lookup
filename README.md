@@ -19,8 +19,8 @@ before relying on anything below.
 | Settings persistence | works, verified across a full restart |
 | Automatic lookup on double-click | works when `autoDoubleClick` is on (default off), verified in a real browser |
 | Automatic lookup on drag-select | works when `autoSelection` is on (default off), verified in a real browser |
-| Dictionary storage | local SQLite (`node:sqlite`), package-owned fixture database |
-| Dictionary data (ECDICT / Tatoeba) | **not imported** — the store holds a hand-written fixture covering six lookup shapes |
+| Dictionary storage | local SQLite (`node:sqlite`), package-owned fixture database (default development/test mode) |
+| Dictionary data (ECDICT) | local ECDICT corpus supported via explicit `DSH_WORD_LOOKUP_DB_PATH` opt-in |
 | Dictionary card UI | minimal; shows headword, phonetic, POS, Chinese meaning, forms and examples |
 | Pointer devices | mouse only — automatic lookup is refused for pen, touch and an unidentifiable pointer |
 
@@ -78,6 +78,21 @@ browser (client half)                          host (Node half)
   occupant, the command is registered with DSH's shortcut service, and the
   settings use DSH's own configuration form so the switches persist with the
   profile.
+
+### Dictionary Storage & Runtime Activation Semantics
+
+The plugin operates with fail-closed dictionary loading semantics:
+
+- **Default Pre-release / Development Mode (Unset `DSH_WORD_LOOKUP_DB_PATH`)**:
+  When `DSH_WORD_LOOKUP_DB_PATH` is not set, the plugin initializes its package-owned deterministic test fixture database (`dsh-word-lookup-fixture`). This mode is explicitly intended for development, testing, and pre-release evaluation. It is NOT production-corpus activation.
+- **Explicit Production Corpus Opt-In (`DSH_WORD_LOOKUP_DB_PATH`)**:
+  Setting `DSH_WORD_LOOKUP_DB_PATH=<path-to-db>` explicitly requests production dictionary activation. The host loads the specified SQLite database in read-only mode and strictly verifies the production schema, indexes (`idx_forms_headword_raw`, `idx_examples_headword`), primary keys, and metadata (`corpus_name === 'ECDICT'`, `upstream_commit`, `source_sha256`, `schema_version`) against the pinned `corpus/ecdict.manifest.json`.
+- **Fail-Closed Guarantee (No Silent Fallback)**:
+  If production activation is requested via `DSH_WORD_LOOKUP_DB_PATH` and the database is missing, corrupted, or fails metadata/schema verification:
+  - The plugin refuses activation with a controlled `DictionaryUnavailableError`.
+  - The lookup route is NOT registered (answering HTTP 404).
+  - No silent fallback to fixture database occurs.
+  - No fallback to AI/remote dictionary occurs.
 
 ### When a lookup happens
 

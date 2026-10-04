@@ -30,8 +30,51 @@ const DB_PATH = join(ROOT, 'build', 'corpus', 'ecdict.db')
 const MANIFEST_PATH = join(ROOT, 'corpus', 'ecdict.manifest.json')
 const SOURCE_FILE = join(ROOT, '.cache', 'corpus', 'ecdict.csv')
 
+export function verifyCorpusQueryPlans(db) {
+  const plans = [
+    {
+      name: 'exact entry by word',
+      query: 'EXPLAIN QUERY PLAN SELECT * FROM entries WHERE word = ?',
+      expectedSearch: 'SEARCH entries USING',
+    },
+    {
+      name: 'form by form key',
+      query: 'EXPLAIN QUERY PLAN SELECT headword FROM forms WHERE form = ?',
+      expectedSearch: 'SEARCH forms USING',
+    },
+    {
+      name: 'forms by headword',
+      query: 'EXPLAIN QUERY PLAN SELECT form, kind FROM forms WHERE headword = ? ORDER BY form COLLATE NOCASE',
+      expectedSearch: 'SEARCH forms USING INDEX idx_forms_headword_raw (headword=?)',
+    },
+    {
+      name: 'examples by headword',
+      query: 'EXPLAIN QUERY PLAN SELECT * FROM examples WHERE headword = ? ORDER BY score DESC, id ASC',
+      expectedSearch: 'SEARCH examples USING INDEX idx_examples_headword (headword=?)',
+    },
+  ]
+
+  for (const plan of plans) {
+    const rows = db.prepare(plan.query).all('test')
+    const detail = rows.map((r) => r.detail).join('; ')
+    console.log(`    ${plan.name}: ${detail}`)
+    if (detail.includes('SCAN')) {
+      throw new Error(`Query plan for "${plan.name}" rejected: contains full table/index SCAN: "${detail}"`)
+    }
+    if (!detail.includes('SEARCH')) {
+      throw new Error(`Query plan for "${plan.name}" rejected: does not perform indexed SEARCH: "${detail}"`)
+    }
+    if (plan.expectedSearch && !detail.includes(plan.expectedSearch)) {
+      throw new Error(
+        `Query plan for "${plan.name}" does not use expected index: expected to include "${plan.expectedSearch}", observed "${detail}"`,
+      )
+    }
+  }
+}
+
 export async function verifyProductionDb(options = {}) {
-  console.log('verify-production-db: verifying production SQLite corpus...')
+  const metadataOnly = options.metadataOnly ?? process.argv.includes('--metadata-only')
+  console.log(`verify-production-db: verifying production SQLite corpus${metadataOnly ? ' [--metadata-only]' : ''}...`)
 
   const dbPath = options.dbPath ?? DB_PATH
   const manifestPath = options.manifestPath ?? MANIFEST_PATH
@@ -45,13 +88,21 @@ export async function verifyProductionDb(options = {}) {
   const stats = statSync(dbPath)
   console.log(`  Database file size: ${stats.size} bytes`)
 
-  // 1. If source CSV artifact is present, verify source SHA-256 against manifest
-  if (existsSync(sourceFile)) {
+  // 1. Strict Source Binding Gate
+  let sourceResult = null
+  if (!metadataOnly) {
+    if (!existsSync(sourceFile)) {
+      throw new Error(
+        `BLOCKED — PINNED SOURCE ARTIFACT MISSING at "${sourceFile}". ` +
+          `Authoritative full verification requires actual source bytes ↔ manifest ↔ database binding. ` +
+          `Run "npm run corpus:fetch" to fetch source or use explicit opt-in "--metadata-only" for partial diagnostic mode.`,
+      )
+    }
     console.log(`  Verifying source artifact at ${sourceFile}...`)
-    const sourceResult = await verifyCorpusSource(sourceFile, manifest)
-    console.log(`  Source artifact verified: ${sourceResult.actualSha256}`)
+    sourceResult = await verifyCorpusSource(sourceFile, manifest)
+    console.log(`  Source artifact verified: ${sourceResult.actualSha256} (${sourceResult.actualByteSize} bytes)`)
   } else {
-    console.log(`  Source artifact not present at ${sourceFile}; proceeding with database metadata audit.`)
+    console.log('  NOTE: running in --metadata-only diagnostic mode (source bytes not reverified).')
   }
 
   // Open raw SQLite connection read-only for metadata & integrity inspection
@@ -93,11 +144,19 @@ export async function verifyProductionDb(options = {}) {
   if (metaMap.get('source_sha256') !== manifest.sourceSha256) {
     throw new Error(`source_sha256 mismatch: expected ${manifest.sourceSha256}, found ${metaMap.get('source_sha256')}`)
   }
-  if (metaMap.get('entry_count') !== '770611') {
-    throw new Error(`entry_count mismatch: expected 770611, found ${metaMap.get('entry_count')}`)
+  if (sourceResult !== null && metaMap.get('source_sha256') !== sourceResult.actualSha256) {
+    throw new Error(
+      `Tripartite binding failed: DB source_sha256 "${metaMap.get('source_sha256')}" does not match rehashed source file "${sourceResult.actualSha256}"`,
+    )
   }
-  if (metaMap.get('form_count') !== '57689') {
-    throw new Error(`form_count mismatch: expected 57689, found ${metaMap.get('form_count')}`)
+  const expectedEntryCount = options.expectedEntryCount !== undefined ? String(options.expectedEntryCount) : '770611'
+  const expectedFormCount = options.expectedFormCount !== undefined ? String(options.expectedFormCount) : '57689'
+
+  if (metaMap.get('entry_count') !== expectedEntryCount) {
+    throw new Error(`entry_count mismatch: expected ${expectedEntryCount}, found ${metaMap.get('entry_count')}`)
+  }
+  if (metaMap.get('form_count') !== expectedFormCount) {
+    throw new Error(`form_count mismatch: expected ${expectedFormCount}, found ${metaMap.get('form_count')}`)
   }
 
   // 4. Verify Logical Digest
@@ -143,33 +202,7 @@ export async function verifyProductionDb(options = {}) {
 
   // 5. Query Plan Inspection (Index usage)
   console.log('  Inspecting query execution plans...')
-  const plans = [
-    {
-      name: 'exact entry by word',
-      query: 'EXPLAIN QUERY PLAN SELECT * FROM entries WHERE word = ?',
-    },
-    {
-      name: 'form by form key',
-      query: 'EXPLAIN QUERY PLAN SELECT headword FROM forms WHERE form = ?',
-    },
-    {
-      name: 'forms by headword',
-      query: 'EXPLAIN QUERY PLAN SELECT form, kind FROM forms WHERE headword = ? ORDER BY form COLLATE NOCASE',
-    },
-    {
-      name: 'examples by headword',
-      query: 'EXPLAIN QUERY PLAN SELECT * FROM examples WHERE headword = ? ORDER BY score DESC, id ASC',
-    },
-  ]
-
-  for (const plan of plans) {
-    const rows = db.prepare(plan.query).all('test')
-    const detail = rows.map((r) => r.detail).join('; ')
-    console.log(`    ${plan.name}: ${detail}`)
-    if (detail.includes('SCAN') && !detail.includes('USING INDEX')) {
-      throw new Error(`Query plan for "${plan.name}" does not use an index: ${detail}`)
-    }
-  }
+  verifyCorpusQueryPlans(db)
 
   // 6. Lookup Compatibility using identical product SQL semantics
   console.log('  Testing lookup compatibility via product SQL semantics...')
@@ -196,51 +229,71 @@ export async function verifyProductionDb(options = {}) {
     return { found: false, query }
   }
 
-  const probes = [
-    'go',
-    'went',
-    'gone',
-    'tooth',
-    'teeth',
-    'derive',
-    'derived',
-    'conservation',
-    'wave',
-    'function',
-    'wave function',
-  ]
+  if (!options.skipProbes) {
+    const probes = [
+      'go',
+      'went',
+      'gone',
+      'tooth',
+      'teeth',
+      'derive',
+      'derived',
+      'conservation',
+      'wave',
+      'function',
+      'wave function',
+    ]
 
-  for (const probe of probes) {
-    const result = lookup(probe)
-    if (!result.found) {
-      throw new Error(`Expected probe "${probe}" to be found in production corpus, but lookup returned not found`)
+    for (const probe of probes) {
+      const result = lookup(probe)
+      if (!result.found) {
+        throw new Error(`Expected probe "${probe}" to be found in production corpus, but lookup returned not found`)
+      }
+      console.log(
+        `    probe "${probe}" -> found headword: "${result.headword}", phonetic: ${result.phonetic ? `"${result.phonetic}"` : 'null'}, matchedForm: ${result.matchedForm ? `"${result.matchedForm}"` : 'null'}`,
+      )
     }
-    console.log(
-      `    probe "${probe}" -> found headword: "${result.headword}", phonetic: ${result.phonetic ? `"${result.phonetic}"` : 'null'}, matchedForm: ${result.matchedForm ? `"${result.matchedForm}"` : 'null'}`,
-    )
-  }
 
-  // Exact canonical precedence probe
-  const exactResult = lookup('wave')
-  if (!exactResult.found || exactResult.headword !== 'wave' || exactResult.matchedForm !== null) {
-    throw new Error('Exact canonical precedence failed for "wave"')
-  }
+    // Exact canonical precedence probe
+    const exactResult = lookup('wave')
+    if (!exactResult.found || exactResult.headword !== 'wave' || exactResult.matchedForm !== null) {
+      throw new Error('Exact canonical precedence failed for "wave"')
+    }
 
-  // Phrase probe with mixed case
-  const phraseResult = lookup('Wave Function')
-  if (!phraseResult.found || phraseResult.headword.toLowerCase() !== 'wave function') {
-    throw new Error('Phrase lookup failed for "Wave Function"')
-  }
+    // Phrase probe with mixed case
+    const phraseResult = lookup('Wave Function')
+    if (!phraseResult.found || phraseResult.headword.toLowerCase() !== 'wave function') {
+      throw new Error('Phrase lookup failed for "Wave Function"')
+    }
 
-  // Unknown probe
-  const unknownResult = lookup('thisworddefinitelydoesnotexistinanydictionaryxyz')
-  if (unknownResult.found) {
-    throw new Error('Unknown word test failed')
+    // Unknown probe
+    const unknownResult = lookup('thisworddefinitelydoesnotexistinanydictionaryxyz')
+    if (unknownResult.found) {
+      throw new Error('Unknown word test failed')
+    }
+    console.log('    probe unknown word -> correctly reported not found.')
   }
-  console.log('    probe unknown word -> correctly reported not found.')
 
   db.close()
+  if (metadataOnly) {
+    console.log('verify-production-db: PARTIAL — SOURCE BINDING NOT REVERIFIED')
+    return {
+      status: 'PARTIAL',
+      verified: false,
+      sourceBindingReverified: false,
+      metadataOnly: true,
+      dbPath,
+    }
+  }
+
   console.log('verify-production-db: ALL VERIFICATIONS PASSED.')
+  return {
+    status: 'PASS',
+    verified: true,
+    sourceBindingReverified: true,
+    metadataOnly: false,
+    dbPath,
+  }
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {

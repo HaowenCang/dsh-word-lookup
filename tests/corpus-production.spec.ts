@@ -48,7 +48,7 @@ describe('Production Corpus SQLite Dictionary (Synthetic Production Schema)', ()
 
     if (!skipIndexes) {
       db.exec(`
-        CREATE INDEX idx_forms_headword ON forms (headword COLLATE NOCASE);
+        CREATE INDEX idx_forms_headword_raw ON forms (headword);
         CREATE INDEX idx_examples_headword ON examples (headword COLLATE NOCASE);
       `)
     }
@@ -61,7 +61,7 @@ describe('Production Corpus SQLite Dictionary (Synthetic Production Schema)', ()
       entry_count: '3',
       form_count: '2',
       example_count: '1',
-      logical_sha256: 'synthetic-digest',
+      logical_sha256: '0'.repeat(64),
     }
 
     const effectiveMeta: Record<string, string> = { ...defaultMeta, ...metaOverrides }
@@ -235,10 +235,75 @@ describe('Production Corpus SQLite Dictionary (Synthetic Production Schema)', ()
       expect(() => openProductionDictionary({ path: badPath })).toThrow(/source_sha256 "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", expected/)
     })
 
-    it('Missing required index: rejects database without idx_forms_headword', () => {
-      const badPath = join(scratchDir, 'missing-index.db')
-      createSyntheticProductionDb(badPath, {}, true) // skipIndexes = true
-      expect(() => openProductionDictionary({ path: badPath })).toThrow(/missing required index/)
+    it('Missing required index: rejects database without idx_forms_headword_raw (performance-critical raw index)', () => {
+      const badPath = join(scratchDir, 'missing-forms-raw-index.db')
+      createSyntheticProductionDb(badPath)
+      const db = new DatabaseSync(badPath)
+      db.exec('DROP INDEX idx_forms_headword_raw')
+      db.close()
+      expect(() => openProductionDictionary({ path: badPath })).toThrow(/missing required index "idx_forms_headword_raw"/)
+    })
+
+    it('Missing required index: rejects database without idx_examples_headword', () => {
+      const badPath = join(scratchDir, 'missing-examples-index.db')
+      createSyntheticProductionDb(badPath)
+      const db = new DatabaseSync(badPath)
+      db.exec('DROP INDEX idx_examples_headword')
+      db.close()
+      expect(() => openProductionDictionary({ path: badPath })).toThrow(/missing required index "idx_examples_headword"/)
+    })
+
+    it('Missing required column: rejects database missing column required by SqliteDictionary', () => {
+      const badPath = join(scratchDir, 'missing-column.db')
+      const db = new DatabaseSync(badPath)
+      db.exec(`
+        CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+        CREATE TABLE entries (
+          word TEXT PRIMARY KEY COLLATE NOCASE,
+          translation_zh TEXT
+        );
+        CREATE TABLE forms (form TEXT PRIMARY KEY COLLATE NOCASE, headword TEXT NOT NULL, kind TEXT);
+        CREATE TABLE examples (id INTEGER PRIMARY KEY, headword TEXT NOT NULL, english TEXT NOT NULL, chinese TEXT, source TEXT, source_id TEXT, score REAL);
+        CREATE INDEX idx_forms_headword_raw ON forms (headword);
+        CREATE INDEX idx_examples_headword ON examples (headword COLLATE NOCASE);
+      `)
+      const metaStmt = db.prepare('INSERT INTO meta (key, value) VALUES (?, ?)')
+      metaStmt.run('schema_version', String(manifest.schemaVersion))
+      metaStmt.run('corpus_name', manifest.sourceName)
+      metaStmt.run('upstream_commit', manifest.sourceCommit)
+      metaStmt.run('source_sha256', manifest.sourceSha256)
+      metaStmt.run('entry_count', '1')
+      metaStmt.run('form_count', '0')
+      metaStmt.run('example_count', '0')
+      metaStmt.run('logical_sha256', 'a'.repeat(64))
+      db.close()
+
+      expect(() => openProductionDictionary({ path: badPath })).toThrow(/missing required column "phonetic"/)
+    })
+
+    it('Missing primary key: rejects database without required primary key semantics', () => {
+      const badPath = join(scratchDir, 'missing-pk.db')
+      const db = new DatabaseSync(badPath)
+      db.exec(`
+        CREATE TABLE meta (key TEXT, value TEXT NOT NULL);
+        CREATE TABLE entries (word TEXT, phonetic TEXT, definition_en TEXT, translation_zh TEXT, pos TEXT, exchange TEXT, frequency INTEGER);
+        CREATE TABLE forms (form TEXT, headword TEXT NOT NULL, kind TEXT);
+        CREATE TABLE examples (id INTEGER, headword TEXT NOT NULL, english TEXT NOT NULL, chinese TEXT, source TEXT, source_id TEXT, score REAL);
+        CREATE INDEX idx_forms_headword_raw ON forms (headword);
+        CREATE INDEX idx_examples_headword ON examples (headword COLLATE NOCASE);
+      `)
+      const metaStmt = db.prepare('INSERT INTO meta (key, value) VALUES (?, ?)')
+      metaStmt.run('schema_version', String(manifest.schemaVersion))
+      metaStmt.run('corpus_name', manifest.sourceName)
+      metaStmt.run('upstream_commit', manifest.sourceCommit)
+      metaStmt.run('source_sha256', manifest.sourceSha256)
+      metaStmt.run('entry_count', '1')
+      metaStmt.run('form_count', '0')
+      metaStmt.run('example_count', '0')
+      metaStmt.run('logical_sha256', 'a'.repeat(64))
+      db.close()
+
+      expect(() => openProductionDictionary({ path: badPath })).toThrow(/must be primary key/)
     })
   })
 })
