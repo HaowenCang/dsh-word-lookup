@@ -203,6 +203,12 @@ export interface WordLookupDiagnostics {
             readonly target: string | null;
         } | null;
     };
+    /** Monotonic surface generation identity. */
+    surfaceGeneration?(): number;
+    /** Dismiss the card surface programmatically. */
+    dismiss?(): void;
+    /** Run a lookup programmatically for diagnostics/tests. */
+    runLookup?(query: string, origin?: LookupOrigin): Promise<void>;
     /** How many lookups this plugin has issued since page load. */
     lookups(): number;
     /**

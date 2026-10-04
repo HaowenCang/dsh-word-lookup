@@ -1,36 +1,40 @@
 /**
- * The `shell.overlay` occupant.
+ * Production Result Card UI for `shell.overlay`.
  *
- * `shell.overlay` is a **list** slot at `root` scope whose layer is
- * click-through: the frame itself ignores pointer events and each entry opts
- * back in. The card therefore sets `pointer-events: auto` on its own root and
- * nowhere else, and it never covers the composer: the panel is anchored to the
- * lower right, clear of the input column.
- *
- * Two properties this component must keep:
- *
- * 1. **Idle renders nothing.** `shell.overlay` is mounted for the whole
- *    application lifetime, so an occupant that rendered a container node while
- *    idle would put a permanent element into every page. Returning `null` keeps
- *    the layer at zero children until a lookup actually produces something.
- * 2. **The style sheet is inline.** An external client plugin is served as one
- *    classic script; there is no second asset a stylesheet could travel in, and
- *    the shipped class names are hashed and must never be relied on.
+ * Implements Phase 5 Production Result Card:
+ * - Mutually exclusive 5-state model: idle, loading, found, not-found, error.
+ * - Viewport-safe positioning relative to selection anchor with fallback.
+ * - Dismissal: Escape, outside pointer/click (no shield), and close button.
+ * - Dismiss / request race correctness via surface generation.
+ * - Accessibility: semantic region, accessible close label, readable contrast.
+ * - No focus stealing on card appearance.
+ * - Card text selectable and copyable; 0 automatic lookups for internal selection.
+ * - Responsive narrow-viewport safety and scrollable long content.
+ * - Self-contained light and dark theme support.
  *
  * @module dsh-word-lookup/client/card
  */
 import type { ReactElement } from 'react';
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots';
-import type { LookupCardStore } from './store.js';
+import type { CardState, LookupCardStore } from './store.js';
 /** Props the overlay seat supplies plus the store injected at registration. */
-export type WordLookupCardProps = PropsRuntime<'shell.overlay'> & {
+export type WordLookupCardProps = Partial<PropsRuntime<'shell.overlay'>> & {
     /** The card's observable state. */
     readonly store: LookupCardStore;
 };
+/** Formal card UI display states. */
+export type CardUiState = 'idle' | 'loading' | 'found' | 'not-found' | 'error';
 /**
- * Render the current lookup state.
+ * Classify CardState into formal UI display state.
  *
- * @param props - overlay seat props plus the injected store.
- * @returns the card, or `null` while idle.
+ * @param state - The current store snapshot.
+ * @returns One of the five mutually exclusive UI states.
+ */
+export declare function getCardUiState(state: CardState): CardUiState;
+/**
+ * Render the Production Dictionary Result Card.
+ *
+ * @param props - Overlay seat props plus the injected store.
+ * @returns The dictionary card element, or null while idle.
  */
 export declare function WordLookupCard(props: WordLookupCardProps): ReactElement | null;

@@ -20,6 +20,11 @@
  * recognised as stale and dropped. That is what {@link LookupController.owner}
  * is for.
  *
+ * Phase 5 adds surface generation identity:
+ * A card closed before its request settles must remain closed upon settlement (D1, D2).
+ * However, a new lookup request initiates a newer surface generation that displays
+ * its result normally (D3), even for the exact same query text (D4).
+ *
  * Loading is request-scoped for free, and deliberately not tracked separately:
  * the card's loading state is only ever published by the request that owns it, so
  * an older request finishing cannot clear a newer request's loading. Deriving
@@ -32,6 +37,7 @@
  *
  * @module dsh-word-lookup/client/lookup
  */
+import type { SelectionRect } from './selection.js';
 import type { CardState, LookupCardStore } from './store.js';
 import type { LookupOrigin } from './trigger.js';
 import type { LookupResult, LookupTransportFailure } from './transport.js';
@@ -51,7 +57,7 @@ export type LookupCounts = Readonly<Record<LookupOrigin, number>>;
 /** The origins, in a fixed order, so a report can iterate over all of them. */
 export declare const LOOKUP_ORIGINS: readonly LookupOrigin[];
 /**
- * Owns request identity, supersession and the card's published state.
+ * Owns request identity, supersession, surface generation, and the card's published state.
  *
  * One instance per plugin lifecycle. {@link LookupController.dispose} makes every
  * outstanding request stale, so a lookup that outlives an unload cannot republish
@@ -68,8 +74,8 @@ export declare class LookupController {
      *
      * The card moves to `loading` for this query synchronously, before the request
      * is awaited, so a caller can observe the new owner immediately. When the
-     * request settles it publishes **only if it is still the owner**; otherwise it
-     * is a superseded result and is dropped whole, success and failure alike.
+     * request settles it publishes **only if it is still the owner AND its generation
+     * has not been dismissed**; otherwise it is dropped, success and failure alike.
      *
      * The returned promise never rejects: a transport that throws is turned into
      * the same `network` failure the transport itself reports, so an automatic
@@ -77,14 +83,21 @@ export declare class LookupController {
      *
      * @param query - raw selected text; the host normalizes it.
      * @param origin - which path asked, for client-side accounting.
+     * @param anchorRect - selection bounds captured at gesture time, or null.
      * @returns settlement after the card has been updated, or after this request
-     * was recognised as stale.
+     * was recognised as stale or dismissed.
      */
-    run(query: string, origin: LookupOrigin): Promise<void>;
+    run(query: string, origin: LookupOrigin, anchorRect?: SelectionRect | null): Promise<void>;
+    /**
+     * Dismiss the active surface. Aborts any request in flight and clears store.
+     */
+    dismiss(): void;
     /** @returns the identity of the request that owns the card; `0` when none does. */
     current(): number;
     /** @returns how many lookups have been issued in total. */
     issued(): number;
+    /** @returns the active or last issued surface generation. */
+    generation(): number;
     /** @returns how many lookups have been issued, by origin. */
     counts(): LookupCounts;
     /** @returns the discriminant of the outcome the card is showing, or `null`. */

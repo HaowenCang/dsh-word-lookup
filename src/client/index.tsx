@@ -249,6 +249,12 @@ export interface WordLookupDiagnostics {
     readonly lastOutcome: 'pass' | 'handled' | null
     readonly lastContext: { readonly region: string; readonly modal: string | null; readonly target: string | null } | null
   }
+  /** Monotonic surface generation identity. */
+  surfaceGeneration?(): number
+  /** Dismiss the card surface programmatically. */
+  dismiss?(): void
+  /** Run a lookup programmatically for diagnostics/tests. */
+  runLookup?(query: string, origin?: LookupOrigin): Promise<void>
   /** How many lookups this plugin has issued since page load. */
   lookups(): number
   /**
@@ -383,9 +389,10 @@ function createRuntime(ctx: ClientContext): () => void {
      *
      * @param query - raw selected text; the host normalizes it.
      * @param origin - which path asked, for client-side accounting.
+     * @param rect - selection bounding box captured at trigger time, or null.
      */
-    const runLookup = (query: string, origin: LookupOrigin): void => {
-      void lookup.run(query, origin)
+    const runLookup = (query: string, origin: LookupOrigin, rect: SelectionRect | null = null): void => {
+      void lookup.run(query, origin, rect)
     }
 
     // --- overlay occupant -------------------------------------------------
@@ -467,7 +474,7 @@ function createRuntime(ctx: ClientContext): () => void {
             status: 'handled',
             run: () => {
               runCalls += 1
-              void runLookup(selection.text, 'shortcut')
+              void runLookup(selection.text, 'shortcut', selection.rect)
             },
           }
         },
@@ -533,7 +540,7 @@ function createRuntime(ctx: ClientContext): () => void {
       ledger = decision.ledger
       lastTrigger = decision
       if (decision.decision === 'lookup' && decision.origin !== null) {
-        runLookup(decision.query, decision.origin)
+        runLookup(decision.query, decision.origin, selection.rect)
       }
     }
 
@@ -649,6 +656,9 @@ function createRuntime(ctx: ClientContext): () => void {
         }
       },
       lookups: () => lookup.issued(),
+      surfaceGeneration: () => lookup.generation(),
+      dismiss: () => lookup.dismiss(),
+      runLookup: (query: string, origin: LookupOrigin = 'shortcut') => lookup.run(query, origin),
       lookupsByOrigin: () => lookup.counts(),
       origins: () => LOOKUP_ORIGINS,
       trigger: () =>
