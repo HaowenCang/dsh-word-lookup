@@ -17,11 +17,13 @@
 > asked the symmetric question §24 did not answer: can a **first** press that
 > drifts far enough to be classified as a drag still become the first half of a
 > platform-recognised double click? §25 is the answer. It is a measurement, not a
-> repair: the overlap **is** observable in Chromium, the defect is reproduced on
-> the wire in S10 and S11, no synchronous signal exists at the first `pointerup`,
-> and the platform's multi-click window — the only possible commit boundary for a
-> deferral — is not obtainable by the plugin. **No production file was changed.**
-> §25.11 lists the three ways to close it and what each costs.
+> repair: the overlap **is** observable in Chromium under synthetic CDP injection,
+> the defect is reproduced on the wire in S10 and S11, no synchronous signal exists
+> at the first `pointerup`, and the platform's multi-click window — the only possible
+> commit boundary for a deferral — is not obtainable by the plugin. **No production
+> file was changed.** §25.11 lists the historical ways to close it; Option C was
+> subsequently executed in Phase 4.2.2 via Windows SendInput measurement (see
+> `docs/PHASE42_NATIVE_INPUT_EVIDENCE.md` and §25.14 for current final state).
 
 ## 1. Baseline
 
@@ -1524,7 +1526,15 @@ S11  requests 2  (auto-selection 1, auto-double-click 1)   product invariant VIO
 
 The options, with their measured costs, are stated in §25.11.
 
-### 25.9 The native half of the question is still unmeasured
+### 25.9 The native half of the question (historical pre-native-measurement context)
+
+> **Historical status at Phase 4.2 audit (2026-10-02):**
+> At the time of the Phase 4.2 synthetic/CDP audit, native reachability was still unmeasured
+> and Option C was the recommended next action.
+> **SUPERSEDED:** This question was subsequently measured and resolved for the tested Windows
+> environment in Phase 4.2.2 (see `docs/PHASE42_NATIVE_INPUT_EVIDENCE.md`). The text below is
+> retained as the historical audit trail explaining the hypothesis that motivated the native
+> measurement.
 
 This section must not be read as a claim about the operating system. The sweep
 supplies the click count; §8 of the brief forbids describing that as the
@@ -1575,29 +1585,36 @@ provably scratch. The production instance on `127.0.0.1:19387` was never bound o
 connected to, and no production home, profile, session, cookie, loader or route
 was read, copied or modified. No desktop input was injected.
 
-### 25.11 Residual risks and the decision this phase leaves open
+### 25.11 Residual risks and historical decision state (superseded)
 
-1. **The overlap is open.** S10 issues a lookup for a gesture the platform
-   subsequently recognises as a double click, and S11 issues two for it. Phase 4's
-   one-gesture-one-lookup property therefore does **not** hold for this shape.
-2. **The native reachability is unmeasured** (§25.9). Until it is settled, nobody
-   can say whether the overlap costs anything in production, and the two candidate
-   answers point at opposite decisions.
-3. **The three available resolutions**, each with what it costs:
+1. **The conditional synthetic overlap.** Under synthetic CDP input injection,
+   S10 issues a lookup for a gesture the platform subsequently recognises as a
+   double click, and S11 issues two for it. When Chromium is supplied with synthetic
+   multiplicity, Phase 4's one-gesture-one-lookup property does **not** hold for this shape.
+2. **Historical pre-native-measurement decision state (SUPERSEDED):**
+   At the time of the Phase 4.2 synthetic/CDP audit, native reachability was still unmeasured
+   and Option C was the recommended next action.
 
-   | option | what it does | cost |
-   | --- | --- | --- |
-   | **A. accept and document** | leave the trigger as it is; record the overlap | one extra request and a transient card update in an ambiguous case; the one-gesture property stays untrue for this shape |
-   | **B. defer auto-selection** | pending intent at `pointerup`; cancel on `mousedown.detail >= 2` or the promoting `dblclick`; commit on a platform-derived bound | up to the platform's multi-click interval (≈500 ms here) added to **every** automatic drag; needs a host→client channel for a value the renderer cannot see |
-   | **C. settle §25.9 first** | drive the same sweep with real OS-level input in an isolated desktop session | decides whether B is needed at all; if the anchor is the release position, the overlap is production-unreachable and the phase closes with no fix |
+   This state is historical and has since been **SUPERSEDED** by the Phase 4.2.2 Windows
+   `SendInput` measurement recorded in `docs/PHASE42_NATIVE_INPUT_EVIDENCE.md`:
+   - **Current tested Windows configuration:** native first-press overlap **NOT OBSERVED**.
+     The double click drops at travel ≥ 2 CSS px (3.0 physical px, empirical boundary 1 CSS px / 1.5 physical px),
+     well before the plugin's 5 CSS px drag classification threshold (CASE A).
+   - **Cross-platform / configurable-double-click portability:** still an **OPEN RELEASE BLOCKER**
+     (see item 6 below).
+3. **The three historical resolution options (Option C executed):**
 
-   Option C is the cheapest and is the recommended next step: it converts an
-   unmeasurable assumption into a measurement, and it can retire options A and B
-   entirely.
+   | option | what it does | cost | status |
+   | --- | --- | --- | --- |
+   | **A. accept and document** | leave the trigger as it is; record the overlap | one extra request and a transient card update in an ambiguous case; the one-gesture property stays untrue for this shape | Retired for tested Windows environment; preserved as risk for unverified environments |
+   | **B. defer auto-selection** | pending intent at `pointerup`; cancel on `mousedown.detail >= 2` or the promoting `dblclick`; commit on a platform-derived bound | up to the platform's multi-click interval (≈500 ms here) added to **every** automatic drag; needs a host→client channel for a value the renderer cannot see | Not needed for verified Windows configuration; remains potential mitigation if portability requires it |
+   | **C. settle §25.9 first** | drive the same sweep with real OS-level input in an isolated desktop session | decides whether B is needed at all; if the anchor is the release position, the overlap is production-unreachable and the phase closes with no fix | **EXECUTED in Phase 4.2.2** via `scripts/phase421-native-input-probe.mjs` / `windows-native-mouse-probe.ps1` |
+
+   *Historical note:* Option C was the recommended next step at Phase 4.2 audit time. It was subsequently implemented and executed in Phase 4.2.2, confirming CASE A for the tested Windows 11 configuration.
 4. **No assertion was added to the sealed runtime harness.** An assertion on the
-   required ownership would fail today, and an assertion that recorded the current
-   ownership as expected would be exactly the kind of check §24.10 removed for the
-   mirrored case — a test that asserts the defect. The probe is the permanent
+   required ownership would fail today under synthetic CDP injection, and an assertion that
+   recorded the current ownership as expected would be exactly the kind of check §24.10 removed
+   for the mirrored case — a test that asserts the defect. The probe is the permanent
    artefact instead: it re-measures all five sweeps on every run and recomputes
    `overlapObserved` from the rows, so a Chromium or Playwright change that alters
    any of them is visible immediately rather than silently absorbed.
@@ -1605,19 +1622,19 @@ was read, copied or modified. No desktop input was injected.
    nothing in them, and adds one more.
 6. **Portability release blocker recorded (Phase 4.2 closeout).** See `docs/PHASE42_NATIVE_INPUT_EVIDENCE.md` §8 (`RELEASE BLOCKER — automatic-selection portability`). Native measurement demonstrated CASE A for the tested Windows 11 / Chromium / 4 px double-click configuration, but system-wide double-click rectangle configurability, different DPI metrics, and non-Windows platforms leave cross-platform automatic-selection portability as an open release blocker.
 
-### 25.12 Verification
+### 25.12 Historical Phase 4.2 verification (pre-native probe)
 
-`npm run verify` and `npm run test:runtime` were re-run after this work and are
-**unchanged**: the production sources, the tests and the sealed bundle are
-byte-identical to `58384d7`, because nothing outside `scripts/phase42-probe.mjs`,
-the evidence file and this document was written.
+> **Historical checkpoint at commit `58384d7` (2026-10-02):**
+> The verification results below reflect the initial Phase 4.2 synthetic probe baseline prior to the addition of the native input probe suite (`tests/phase421-probe-logic.spec.ts`, native probe scripts).
 
-| | value |
-| --- | --- |
-| `npm run verify` | PASS — 17 files / 372 tests, bundle checks 94/94, credential scan PASS |
-| `npm run test:runtime` | PASS — **169/169** checks, `ISOLATION CHECK: PASS` twice |
-| `git diff --check` | no whitespace errors |
-| production sources touched | **none** — `git status --short` lists only `docs/PHASE4_EVIDENCE.md`, `docs/evidence/phase42-probe-20261002.json` and `scripts/phase42-probe.mjs` |
+| Check | Historical Value (at `58384d7`) | Notes |
+| --- | --- | --- |
+| `npm run verify` | PASS — 17 files / 372 tests, bundle checks 94/94, credential scan PASS | Historical Phase 4.2 pre-native-probe count |
+| `npm run test:runtime` | PASS — **169/169** checks, `ISOLATION CHECK: PASS` twice | Deterministic acceptance harness |
+| `git diff --check` | no whitespace errors | Clean diff |
+| Production `src/` diff status | **unchanged** relative to `58384d7` | `git diff 58384d7 HEAD -- src/` is empty |
+
+Production `src/` remained strictly unchanged relative to `58384d7`. Note that while test infrastructure subsequently grew in Phase 4.2.2 with `tests/phase421-probe-logic.spec.ts` (bringing total unit tests from 372 to 386 across 18 test files), production sources in `src/` remain completely untouched.
 
 One failed attempt is recorded rather than smoothed over, because the failure was
 real and the fix matters. The first acceptance run after the probe reported
@@ -1639,15 +1656,38 @@ whole phase is about: a measurement that changes the state it measures is not a
 measurement. It was caught by the existing gate rather than by inspection, which
 is the gate working.
 
-### 25.13 Git
+### 25.13 Git (historical Phase 4.2 commit)
 
 | | value |
 | --- | --- |
 | `START_SHA` | `58384d737d913dc4a839131b9b23484725dbbb02` |
 | `58384d7` amended / rebased | no |
 | force push | not run |
-| push | **not run** — the brief gates `git push origin master` on PASS, and this phase is BLOCKED |
-| worktree | see the commit created for this phase below |
+| push | **not run** at `58384d7` — the brief gated `git push origin master` on PASS, and Phase 4.2 synthetic audit was BLOCKED |
+| worktree | clean at checkpoint |
+
+### 25.14 Current final Phase 4.2 state
+
+| Metric / Checkpoint | Value |
+| --- | --- |
+| Master baseline SHA (Phase 4.2.3 start) | `50d80ebc07761ccd9d85ebc6f5ce260883d23005` |
+| Native probe instrument repair commit | `6fded22302b0f6605d9d63ce48db36744416dd67` |
+| Native evidence recording commit | `5a64897cd6736fe73fac8b48e0d8d01e4dce499f` |
+| Provenance closeout commit | `50d80ebc07761ccd9d85ebc6f5ce260883d23005` |
+| Current `npm run verify` | PASS — 18 files / 386 tests, bundle static checks 94/94, credential scan PASS |
+| Current `npm run test:runtime` | PASS — 169/169 checks, `ISOLATION CHECK: PASS` twice |
+| Production `src/` diff relative to `58384d7` | **none** — `git diff 58384d7 HEAD -- src/` is empty (0 files, 0 lines changed) |
+| Native result scope | PASS for verified Windows configuration (Windows 11 Build 26220, Chromium 153, 150% DPI, 4 px double-click metrics, 500 ms double-click time). Native first-press overlap **NOT OBSERVED**. |
+| Portability release blocker | **OPEN RELEASE BLOCKER** (cross-platform / configurable double-click metrics unmeasured; tracked in `docs/PHASE42_NATIVE_INPUT_EVIDENCE.md` §8) |
+| Phase 5 UI development | **READY** |
+| Overall release | **NOT READY** (gated on portability release blocker resolution) |
+
+#### Conclusion Summary
+- **Native result:** PASS for the verified Windows configuration.
+- **Production-code change from Phase 4.2 audit:** None (`src/` remained unchanged).
+- **Automatic-selection portability:** OPEN RELEASE BLOCKER.
+- **Phase 5 UI development:** READY.
+- **Overall release:** NOT READY.
 
 ```text
 Production DSH environment modified during this work: NO
