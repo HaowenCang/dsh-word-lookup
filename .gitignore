@@ -9,6 +9,15 @@ node_modules/
 .tmp/
 verify-out/
 
+# Corpus cache and generated database artifacts (Phase 6)
+.cache/
+build/
+corpus/*.db
+corpus/*.db-journal
+corpus/*.db-wal
+corpus/*.db-shm
+corpus/*.csv
+
 # The Phase 3 fixture database is *generated*, not authored: every row in it is
 # a literal in `src/host/fixture.ts`, and `scripts/build-fixture-db.mjs`
 # reproduces it from those literals. The host also materialises it on first open,

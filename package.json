@@ -44,6 +44,11 @@
   "scripts": {
     "build": "tsdown && tsc -p tsconfig.build.json",
     "build:fixture": "node scripts/build-fixture-db.mjs --force",
+    "corpus:fetch": "node scripts/fetch-corpus.mjs",
+    "corpus:verify-source": "node scripts/verify-source.mjs",
+    "corpus:build": "node scripts/build-production-db.mjs",
+    "corpus:verify": "node scripts/verify-production-db.mjs",
+    "corpus:benchmark": "node scripts/benchmark-corpus.mjs",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
     "verify": "node scripts/verify.mjs",
