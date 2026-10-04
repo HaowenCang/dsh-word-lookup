@@ -110,10 +110,10 @@ if (this.store.isDismissed(gen)) {
 ```
 
 ### Measured Race Guarantees (Unit & Browser Verified):
-- **D1 (Close Before Settle - Success)**: User looks up word A -> dismisses card while loading -> response A succeeds -> card remains closed in `idle` state.
-- **D2 (Close Before Settle - Failure)**: User looks up word A -> dismisses card while loading -> response A returns 500 error -> card remains closed; no error toast appears.
-- **D3 (Rapid Superseding A -> B)**: User triggers word A -> triggers word B before A returns -> A returns late -> B settles -> card displays word B.
-- **D4 (Same Word Re-query After Dismiss)**: User looks up word A -> dismisses card -> looks up word A again -> new surface generation is allocated -> card displays word A normally.
+- **D1 (Close Before Settle - Success)**: User looks up word A -> dismisses card while loading -> response A succeeds -> card remains closed in `idle` state. Verified at both controller unit level and isolated browser integration level with deterministic deferred transport.
+- **D2 (Close Before Settle - Failure)**: User looks up word A -> dismisses card while loading -> response A returns 500 error -> card remains closed; no error banner appears. Verified at both controller unit level and isolated browser integration level with deterministic deferred transport.
+- **D3 (Rapid Superseding A -> B)**: User triggers word A -> dismisses A -> triggers word B -> B settles -> late A settles -> card displays word B. Verified at both controller unit level and isolated browser integration level with deterministic deferred transport.
+- **D4 (Same Word Re-query After Dismiss)**: User looks up word A -> dismisses card -> looks up word A again -> new surface generation is allocated -> card displays word A normally. Verified at both controller unit level and isolated browser integration level.
 
 ---
 
@@ -153,9 +153,9 @@ if (this.store.isDismissed(gen)) {
 
 ## 8. Adversarial Interaction Integrity
 
-### Card-Internal Gesture Safety (`CARD-INTERNAL-SELECTION`):
-- Selecting or double-clicking text inside the dictionary card produces **zero automatic lookup requests** (`deltaRequests = 0`).
-- The gesture classifier inspects the event path: any selection or click whose target is within `[data-dsh-word-lookup="card"]` is disqualified from conversation lookup triggers.
+### Card-Internal Gesture Safety (`CARD-INTERNAL-DBLCLICK`, `CARD-INTERNAL-DRAG`):
+- Selecting, double-clicking, or dragging text inside the dictionary card produces **zero automatic lookup requests** (`deltaRequests = 0`).
+- Selection inside the dictionary card is outside eligible conversation flow (the card is hosted in `shell.overlay` and does not carry `[data-chat-flow-kind]`). Therefore `describeEndpoint` reports `insideConversationFlow: false`, `readEligibleSelection` reports the selection ineligible, and the trigger gate refuses the automatic lookup (`reason: 'not-a-trigger-gesture'`).
 
 ### Outside Gesture Races:
 - **`RACE-OUTSIDE-DBLCLICK`**: While card A is displayed, double-clicking word B in the conversation dismisses card A and immediately opens card B.
@@ -179,13 +179,14 @@ Embedded CSS rules support dynamic theme switching without style recalculation l
   - Shadow: `0 8px 28px rgba(0, 0, 0, 0.12)`
 
 ### Visual QA Artifacts:
-Screenshots captured directly from the live isolated Chromium browser instance:
-- `verify-out/phase5-screenshots/normal-found.png`: Normal found entry with headword, phonetic, lemma relation, definitions, and examples.
-- `verify-out/phase5-screenshots/not-found-state.png`: Friendly not-found message.
-- `verify-out/phase5-screenshots/error-state.png`: Sanitized error message for 500 error probe.
-- `verify-out/phase5-screenshots/narrow-viewport.png`: 360px viewport showing clean clamping within screen bounds.
-- `verify-out/phase5-screenshots/long-content.png`: Long definition entry with internal vertical scroll and zero horizontal overflow.
-- `verify-out/phase5-screenshots/dark-mode.png` / `light-mode.png`: Theme contrast verification.
+Screenshots captured directly from the live isolated Chromium browser instance and committed under `docs/evidence/phase5-screenshots/`:
+- `docs/evidence/phase5-screenshots/normal-found.png`: Normal found entry with headword, phonetic, lemma relation, definitions, and examples.
+- `docs/evidence/phase5-screenshots/not-found.png`: Friendly not-found message.
+- `docs/evidence/phase5-screenshots/error.png`: Sanitized error message for 500 error probe.
+- `docs/evidence/phase5-screenshots/narrow.png`: 360px viewport showing clean clamping within screen bounds.
+- `docs/evidence/phase5-screenshots/long-content.png`: Long definition entry with internal vertical scroll and zero horizontal overflow.
+- `docs/evidence/phase5-screenshots/dark.png`: Dark mode theme contrast verification.
+- `docs/evidence/phase5-screenshots/light.png`: Light mode theme contrast verification.
 
 ---
 
@@ -210,30 +211,44 @@ Screenshots captured directly from the live isolated Chromium browser instance:
 
 ### 4. Phase 5 Browser Acceptance Test (`npm run test:acceptance`)
 - Script: `scripts/phase5-browser-acceptance.mjs` (on port `50992` with real Chromium)
-- Result: **24/24 checks passed**:
+- Machine-readable evidence: `docs/evidence/phase5-browser-acceptance-20261004.json`
+- Result: **37/37 checks passed (0 failed)**:
   - `UI01`: Manual shortcut lookup for `"derived"` renders canonical headword, phonetic, lemma relation, meanings, and examples.
   - `UI02`: Auto double-click on `"went"` renders headword `"go"` with matchedForm `"went → go"` and issues exactly 1 request.
   - `UI03`: Auto drag-selection on `"teeth"` renders headword `"tooth"` with matchedForm `"teeth → tooth"` and issues exactly 1 request.
-  - `UI04`: Unknown word renders friendly not-found state without error banner.
+  - `UI04`: Unknown word renders friendly not-found state without error banner or traces.
   - `UI05`: Transport error renders sanitized error message without leaking paths or internals.
   - `UI05-Recovery`: Normal lookup immediately recovers card from previous error.
   - `POS-TOP`: Selection near top places card below and respects margins.
   - `POS-BOTTOM`: Selection near bottom places card above and does not overlap composer input.
+  - `POS-LEFT`: Selection near left edge clamps card.left >= 12px within viewport margin.
+  - `POS-RIGHT`: Selection near right edge clamps card.right <= viewport.width - 12px.
+  - `POS-NULL-FALLBACK`: anchorRect === null triggers upper-center fallback within viewport bounds and clears composer.
   - `POS-MULTILINE`: Multiline selection geometry places card cleanly within margins.
   - `POS-NARROW`: Narrow viewport (360px) clamps card within margins without horizontal overflow.
-  - `DISMISS-BUTTON`: Clicking close button dismisses card.
+  - `POS-RESIZE-LIVE`: Shrinking viewport while card is already open re-clamps card within new viewport margins with 0 horizontal overflow.
+  - `DISMISS-BUTTON`: Clicking close button (accessible name "Close dictionary") dismisses card.
   - `DISMISS-ESCAPE`: Pressing Escape dismisses visible card.
-  - `DISMISS-OUTSIDE`: Clicking outside dismisses card without swallowing click on underlying element.
-  - `RACE-D1`: Request starts -> dismiss -> resolve success -> card remains closed.
-  - `RACE-D4`: Exact same query looked up after dismissal reopens surface normally.
+  - `DISMISS-OUTSIDE`: Clicking outside dismisses card without swallowing click on underlying element (no click shield).
+  - `SCROLL-POLICY-FIXED`: Card position is fixed in viewport; underlying conversation scroll changes while card stays stable and safe.
+  - `PASS-THROUGH-WHEEL`: Mouse wheel over conversation area outside card scrolls conversation without card overlay intercepting.
+  - `PASS-THROUGH-SELECTION`: Drag-selecting text in conversation outside card is not blocked by overlay and successfully establishes selection.
+  - `RACE-D1`: Request definitely observed in-flight -> dismiss -> release response -> card remains closed and idle.
+  - `RACE-D2`: Request definitely observed in-flight -> dismiss -> release 500 error -> card remains closed and idle without error banner.
+  - `RACE-D3`: A starts -> dismiss A -> B succeeds -> late A settles -> B remains visible, late A cannot overwrite B.
+  - `RACE-D4`: Exact same query looked up after dismissal reopens surface normally with new generation.
   - `RACE-OUTSIDE-DBLCLICK`: Double-clicking word B outside open card dismisses card A and displays word B.
   - `RACE-OUTSIDE-DRAG`: Drag-selecting word B outside open card dismisses card A and displays word B.
-  - `CARD-INTERNAL-SELECTION`: Text inside card is selectable, and internal double-click/drag produces 0 automatic requests.
-  - `CARD-COPY-SHORTCUT`: Ctrl+C copy event inside card is not swallowed or intercepted by the plugin.
-  - `FOCUS-INTEGRITY`: Appearance of dictionary card does not steal focus from active composer.
-  - `LONG-CONTENT-SCROLL`: Long entries render with internal scroll capability and 0 horizontal overflow.
-  - `THEME-DARK`: Dark theme renders elevated card contrast.
-  - `THEME-LIGHT`: Light theme applies high-contrast styling.
+  - `CARD-INTERNAL-DBLCLICK`: Real double-click on text inside card produces 0 automatic lookup requests.
+  - `CARD-INTERNAL-DRAG`: Real pointer drag over text inside card forms genuine selection and produces 0 automatic requests while card remains usable.
+  - `CARD-COPY-SHORTCUT`: Ctrl+C copy event inside card fires with received=true and defaultPrevented=false without plugin interception.
+  - `FOCUS-INTEGRITY`: Appearance of dictionary card does not steal focus from active composer or document.
+  - `LONG-CONTENT-SCROLL`: Long entries render with scrollHeight > clientHeight (vertical overflow), 0 horizontal overflow, and responsive scrollTop scroll.
+  - `CARD-WHEEL`: Mouse wheel inside card increments card.scrollTop without driving underlying conversation scroll.
+  - `THEME-DARK`: Dark theme renders elevated background and high-contrast foreground colors.
+  - `THEME-LIGHT`: Light theme computed background and foreground colors differ significantly from dark theme.
+  - `THEME-CONTRAST`: Computed WCAG contrast ratio for core text meets or exceeds standard 4.5:1 in both dark and light modes.
+  - `OVERLAY-SINGLETON`: Repeated open/dismiss cycles maintain exactly 1 occupant registration in shell.overlay without accumulation.
   - `ACCESSIBILITY`: Card provides accessible region role, label, h2 structure, and accessible close button.
 
 ---
