@@ -179,14 +179,17 @@ Embedded CSS rules support dynamic theme switching without style recalculation l
   - Shadow: `0 8px 28px rgba(0, 0, 0, 0.12)`
 
 ### Visual QA Artifacts:
-Screenshots captured directly from the live isolated Chromium browser instance and committed under `docs/evidence/phase5-screenshots/`:
-- `docs/evidence/phase5-screenshots/normal-found.png`: Normal found entry with headword, phonetic, lemma relation, definitions, and examples.
-- `docs/evidence/phase5-screenshots/not-found.png`: Friendly not-found message.
-- `docs/evidence/phase5-screenshots/error.png`: Sanitized error message for 500 error probe.
-- `docs/evidence/phase5-screenshots/narrow.png`: 360px viewport showing clean clamping within screen bounds.
-- `docs/evidence/phase5-screenshots/long-content.png`: Long definition entry with internal vertical scroll and zero horizontal overflow.
-- `docs/evidence/phase5-screenshots/dark.png`: Dark mode theme contrast verification.
-- `docs/evidence/phase5-screenshots/light.png`: Light mode theme contrast verification.
+Screenshots captured directly from the live isolated Chromium browser acceptance run (`TESTED_SHA: 6340426a1004c2b3265bf1e3539ff0ca5dd589a4`) and committed under `docs/evidence/phase5-screenshots/`:
+
+| Filename | Dimensions | SHA-256 | Visual Description |
+| --- | --- | --- | --- |
+| `normal-found.png` | 1400×900 | `acf04aacf1a6c2ff8407a4228e1ed6d5c79cae0f2e6c993fe65d9fd640d00b37` | Canonical hit for `"derived"` displaying headword, IPA phonetic, lemma relation tag (`derived → derive`), parts of speech, glosses, and bilingual examples. |
+| `not-found.png` | 1400×900 | `673540cb181b246e8f261e239014cac7eafd25e07760187aab1b78f74ff89a99` | Friendly not-found notice for `"unknowntoken"` without error banners or stack traces. |
+| `error.png` | 1400×900 | `b91e36d2b8100fc26f9ddb90e5d9397a85ecde8db050d65ae58cd82834f6ca80` | Sanitized error state for 500 error probe without leaking paths, routes, or auth tokens. |
+| `narrow.png` | 360×640 | `d040f0e22ad653142dc55829b2df387d4d3bd49e0eaa8b4156cba0fb635527db` | Narrow 360px mobile-width viewport demonstrating strict horizontal margin clamping (>= 12px) without overflow. |
+| `long-content.png` | 1400×900 | `7e3aad83b70eab7d4b5c346cf2a28f2d6fedd82403a03d92d6d6e0749e8c856b` | Multi-meaning, multi-example long dictionary entry (`conservation`) with active vertical scroll (`scrollHeight > clientHeight`) and 0 horizontal overflow. |
+| `dark.png` | 1400×900 | `ea2cb31bed2592b9c2b13baa02c53cf9ce29ea8824a03f39375e8668d01bc643` | Dark theme contrast validation showing elevated dark card (`rgb(28, 28, 33)`) and bright text (`rgb(242, 242, 247)`). |
+| `light.png` | 1400×900 | `b42b852e8bb90c4eeb7fb2322b3b82401c980ae9366cc20076dbbb64d993be22` | Light theme contrast validation showing clean white card (`rgb(255, 255, 255)`) and dark text (`rgb(24, 24, 28)`). |
 
 ---
 
