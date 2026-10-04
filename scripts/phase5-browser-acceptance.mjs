@@ -1421,6 +1421,18 @@ async function run() {
     )
 
     // --- Theme QA: Light and Dark Mode Computed Styles, Difference, and Contrast ---
+    // Look up "derive" so theme screenshots specifically present standard headword in dark & light themes
+    await selectWord('derive')
+    await page.keyboard.press('Control+Shift+L')
+    await page.waitForFunction(
+      () => {
+        const h = document.querySelector('[data-dsh-word-lookup="headword"]')
+        return h && h.textContent === 'derive'
+      },
+      undefined,
+      { timeout: 10_000 },
+    )
+
     // 1. Dark mode theme check
     await page.evaluate(() => {
       document.documentElement.setAttribute('data-theme', 'dark')
