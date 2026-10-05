@@ -1,8 +1,7 @@
 {
   "name": "dsh-word-lookup",
-  "version": "0.1.0-dev.0",
-  "private": true,
-  "description": "Low-interruption local English-Chinese dictionary plugin for DSH (Phase 1 foundation build).",
+  "version": "0.1.0",
+  "description": "Local English-Chinese dictionary plugin for DeepSeek Harness (DSH).",
   "type": "module",
   "license": "MIT",
   "engines": {
@@ -91,5 +90,25 @@
     "tsdown": "0.23.0",
     "typescript": "5.9.3",
     "vitest": "3.2.4"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HaowenCang/dsh-word-lookup.git"
+  },
+  "bugs": {
+    "url": "https://github.com/HaowenCang/dsh-word-lookup/issues"
+  },
+  "homepage": "https://github.com/HaowenCang/dsh-word-lookup#readme",
+  "keywords": [
+    "deepseek",
+    "dsh",
+    "dsh-plugin",
+    "dictionary",
+    "english-chinese",
+    "offline",
+    "sqlite"
+  ],
+  "publishConfig": {
+    "access": "public"
   }
 }
