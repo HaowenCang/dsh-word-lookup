@@ -6,26 +6,44 @@ nothing leaves your machine and no model is involved.
 
 ## Status
 
-**Early development.** The dictionary is a real local SQLite database, but it
-holds a small deterministic fixture rather than a production corpus. Read this
-before relying on anything below.
+**v0.1.0 release source.** The plugin is local-first and uses SQLite for dictionary lookup. The public package does not redistribute the full ECDICT corpus; production-corpus activation is an explicit local opt-in.
 
 | Area | State |
 | --- | --- |
 | Target client | DSH Web (`0.2.0-rc.2`) |
 | DSH baseline | `0.2.0-rc.2`, Web only — the desktop client is not a tested target |
-| Package version | `0.1.0-dev.0`, private, not published |
-| Manual shortcut lookup | works, verified in a real browser |
+| Package version | `0.1.0` |
+| Manual shortcut lookup | works; primary supported path |
 | Settings persistence | works, verified across a full restart |
 | Automatic lookup on double-click | works when `autoDoubleClick` is on (default off), verified in a real browser |
-| Automatic lookup on drag-select | works when `autoSelection` is on (default off), verified in a real browser |
-| Dictionary storage | local SQLite (`node:sqlite`), package-owned fixture database (default development/test mode) |
-| Dictionary data (ECDICT) | local ECDICT corpus supported via explicit `DSH_WORD_LOOKUP_DB_PATH` opt-in |
-| Dictionary card UI | minimal; shows headword, phonetic, POS, Chinese meaning, forms and examples |
+| Automatic lookup on drag-select | works when `autoSelection` is on (default off); portability outside the measured environment remains a known release limitation |
+| Dictionary storage | local SQLite (`node:sqlite`), package-owned deterministic fixture by default |
+| Dictionary data (ECDICT) | local ECDICT corpus supported via explicit `DSH_WORD_LOOKUP_DB_PATH` opt-in; full corpus is not bundled |
+| Dictionary card UI | headword, phonetic, POS, Chinese meaning, forms and examples |
 | Pointer devices | mouse only — automatic lookup is refused for pen, touch and an unidentifiable pointer |
 
+### Install
+
+```powershell
+dsh plugin --profile web add dsh-word-lookup@0.1.0
+dsh --profile web
+```
+
+The package intentionally does **not** include the full ECDICT corpus. Without `DSH_WORD_LOOKUP_DB_PATH`, the deterministic fixture dictionary is used. To use an already-built and provenance-compatible production database, set the environment variable before starting DSH:
+
+```powershell
+$env:DSH_WORD_LOOKUP_DB_PATH = "E:\\path\\to\\ecdict.db"
+dsh --profile web
+```
+
+If explicit production activation fails schema, metadata, hash, or integrity validation, the plugin fails closed and does not fall back to the fixture.
+
+### Known v0.1.0 limitation
+
+`autoSelection` remains opt-in and defaults to off. Its portability across unmeasured operating systems, display servers, DPI settings, and platform multi-click configurations is not yet established. The manual `Primary+Shift+L` path is unaffected and remains the primary supported interaction.
+
 The two automatic switches (`autoDoubleClick`, `autoSelection`) exist in the
-settings UI, default to **off**, and persist. Each one now drives exactly the
+settings UI, default to **off**, and persist. Each one drives exactly the
 gesture it names:
 
 ```text
