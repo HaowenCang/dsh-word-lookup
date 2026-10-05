@@ -1,6 +1,6 @@
 {
   "name": "dsh-word-lookup",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Local English-Chinese dictionary plugin for DeepSeek Harness (DSH).",
   "type": "module",
   "license": "MIT",
@@ -8,25 +8,25 @@
     "node": ">=22"
   },
   "main": "./lib/index.js",
-  "types": "./lib/types/index.d.ts",
   "exports": {
     ".": {
-      "types": "./lib/types/index.d.ts",
       "default": "./lib/index.js"
     },
     "./client": {
-      "types": "./lib/types/client/index.d.ts",
       "default": "./lib/client.js"
     },
     "./package.json": "./package.json"
   },
   "files": [
-    "lib",
+    "lib/index.js",
+    "lib/client.js",
     "cordis.patch.yml",
     "README.md",
+    "LICENSE",
     "corpus/ecdict.manifest.json"
   ],
   "dsh": {
+    "pluginType": "feature",
     "bundle": {
       "patch": "./cordis.patch.yml"
     },
@@ -38,6 +38,25 @@
         "@deepseek-ai/dsh-client-shortcuts",
         "@deepseek-ai/dsh-client-ui-settings",
         "@deepseek-ai/dsh-client-locale"
+      ]
+    },
+    "compatibility": {
+      "dsh": "0.2.0-rc.2",
+      "dshReleases": {
+        "0.2.0-rc.1": "unknown",
+        "0.2.0-rc.2": "compatible",
+        "0.2.1-alpha.1": "unknown"
+      },
+      "dshOperations": {
+        "0.2.0-rc.2": {
+          "install": "passed",
+          "start": "passed",
+          "uninstall": "passed",
+          "rollback": "passed"
+        }
+      },
+      "profiles": [
+        "web"
       ]
     }
   },
@@ -52,6 +71,8 @@
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
     "verify": "node scripts/verify.mjs",
+    "verify:store-contract": "node scripts/verify-store-contract.mjs",
+    "test:store-lifecycle": "node scripts/store-lifecycle-verify.mjs",
     "scan:credentials": "node scripts/scan-credentials.mjs",
     "iso:check": "node scripts/assert-isolated-env.mjs",
     "test-profile:create": "node scripts/create-test-profile.mjs",

@@ -6,13 +6,13 @@ nothing leaves your machine and no model is involved.
 
 ## Status
 
-**v0.1.0 release source.** The plugin is local-first and uses SQLite for dictionary lookup. The public package does not redistribute the full ECDICT corpus; production-corpus activation is an explicit local opt-in.
+**v0.1.1 Release Candidate.** The plugin is local-first and uses SQLite for dictionary lookup. The public package does not redistribute the full ECDICT corpus; production-corpus activation is an explicit local opt-in.
 
 | Area | State |
 | --- | --- |
 | Target client | DSH Web (`0.2.0-rc.2`) |
 | DSH baseline | `0.2.0-rc.2`, Web only — the desktop client is not a tested target |
-| Package version | `0.1.0` |
+| Package version | `0.1.1` |
 | Manual shortcut lookup | works; primary supported path |
 | Settings persistence | works, verified across a full restart |
 | Automatic lookup on double-click | works when `autoDoubleClick` is on (default off), verified in a real browser |
@@ -25,7 +25,7 @@ nothing leaves your machine and no model is involved.
 ### Install
 
 ```powershell
-dsh plugin --profile web add dsh-word-lookup@0.1.0
+dsh plugin --profile web add dsh-word-lookup@0.1.1
 dsh --profile web
 ```
 
@@ -198,6 +198,37 @@ npm run test-profile:cleanup -- --evidence-recorded
 Every runtime entry point asserts isolation first and exits non-zero otherwise.
 See [`docs/ISOLATION-TEST-PLAN.md`](docs/ISOLATION-TEST-PLAN.md) — that document
 is a standing engineering rule, not incident paperwork.
+
+## Permissions & Security Disclosure (DSH STORE Review)
+
+### Files
+- The plugin uses local SQLite (`node:sqlite`) strictly on the host side.
+- Fixture and local dictionary databases are read directly on the local machine.
+- Production ECDICT databases are opened via local filesystem paths (`DSH_WORD_LOOKUP_DB_PATH`).
+- No dictionary corpus, word lookups, or user queries are ever uploaded or written outside local cache/storage.
+- No files outside the plugin fixture and specified local database paths are accessed.
+
+### Network
+- The browser client only calls the DSH host's same-origin `/api/dsh-word-lookup` HTTP POST route.
+- No remote dictionary services.
+- No third-party translation APIs.
+- No LLM / model provider APIs or token consumption.
+- No external lookup requests or outbound network traffic whatsoever.
+
+### Environment & Credentials
+- `process.env.DSH_WORD_LOOKUP_DB_PATH` is read solely to determine the local filesystem path to an optional pre-built production dictionary database.
+- The static security scanner flags `process.env` as a credentials signal; however, no API keys, access tokens, account passwords, or personal credentials are ever read, stored, or transmitted.
+
+### Corpus Redistribution
+- Full ECDICT redistribution is **NOT included and NOT authorized** in this repository, npm packages, or GitHub Releases.
+- Only the deterministic 7-entry test fixture and metadata manifests (`corpus/ecdict.manifest.json`) are distributed.
+
+### Known Release Blocker: automatic-selection portability
+- **RELEASE BLOCKER — automatic-selection portability: OPEN**.
+- Automatic lookup on drag-selection is verified only in measured Windows/Chromium/DPI environments. Cross-platform timing, multi-click behaviors, and display server differences mean `autoSelection` remains an experimental opt-in feature.
+- `autoSelection` defaults to **OFF**.
+- `autoDoubleClick` defaults to **OFF**.
+- The primary and recommended method remains the manual keyboard shortcut (`Primary+Shift+L`).
 
 ## Repository layout
 

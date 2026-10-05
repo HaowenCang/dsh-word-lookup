@@ -360,7 +360,12 @@ check(
 // --- package.json addresses real files --------------------------------------
 const pkg = JSON.parse(read('package.json'))
 check('package.json name is the plugin id', pkg.name === PLUGIN_ID)
-const exportPaths = [pkg.exports['.'].default, pkg.exports['.'].types, pkg.exports['./client'].default, pkg.exports['./client'].types]
+const exportPaths = [
+  pkg.exports?.['.']?.default,
+  pkg.exports?.['.']?.types,
+  pkg.exports?.['./client']?.default,
+  pkg.exports?.['./client']?.types,
+].filter((path) => typeof path === 'string')
 check(
   'every exports path exists on disk',
   exportPaths.every((relative) => existsSync(join(ROOT, relative))),
@@ -369,7 +374,8 @@ check(
 const files = pkg.files ?? []
 check(
   'the published file list covers the build output',
-  files.includes('lib') && files.includes('cordis.patch.yml'),
+  (files.includes('lib') || (files.includes('lib/index.js') && files.includes('lib/client.js'))) &&
+    files.includes('cordis.patch.yml'),
   files.join(', '),
 )
 // `files` is a promise to whoever installs this package. Listing a path that
