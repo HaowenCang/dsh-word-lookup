@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "purpose": "DSH STORE issue 1306 remediation",
+  "testedCodeGitSha": "ded182ed1a615a2ca985495b75fe6696005f181c",
+  "packageVersion": "0.1.1",
+  "nodeVersion": "v24.13.0",
+  "dshVersion": "0.2.0-rc.2",
+  "storeContract": {
+    "repositoryMatch": true,
+    "licenseMatch": true,
+    "explicitFiles": true,
+    "dshCompatibilityDeclared": true,
+    "missingLocalModules": 0,
+    "lifecycleScripts": [],
+    "runtimeDependencies": []
+  },
+  "distribution": {
+    "tarball": "dsh-word-lookup-0.1.1.tgz",
+    "sha256": "e5617f8aaae3080c19732f3a19c15472ec0c0ffe133ab9019167112fbb0b50f5",
+    "size": 46104,
+    "unpackedSize": 146388,
+    "fileCount": 7,
+    "files": [
+      "LICENSE",
+      "README.md",
+      "cordis.patch.yml",
+      "corpus/ecdict.manifest.json",
+      "lib/client.js",
+      "lib/index.js",
+      "package.json"
+    ],
+    "fullCorpusIncluded": false
+  },
+  "compatibility": {
+    "0.2.0-rc.1": "unknown",
+    "0.2.0-rc.2": "compatible",
+    "0.2.1-alpha.1": "unknown"
+  },
+  "operations": {
+    "0.2.0-rc.2": {
+      "install": "passed",
+      "start": "passed",
+      "uninstall": "passed",
+      "rollback": "passed"
+    }
+  },
+  "permissions": {
+    "files": {
+      "status": "expected",
+      "reason": "local SQLite access"
+    },
+    "network": {
+      "status": "expected",
+      "reason": "same-origin DSH host lookup route only"
+    },
+    "credentials": {
+      "status": "expected-static-signal",
+      "reason": "DSH_WORD_LOOKUP_DB_PATH via process.env; no credential value is read"
+    },
+    "commands": false,
+    "protectedDsh": false,
+    "nativeArtifacts": false,
+    "dynamicCodeLoading": false
+  },
+  "isolation": {
+    "productionHomeTouched": false,
+    "productionProfileTouched": false,
+    "productionPortTouched": false,
+    "productionSessionTouched": false
+  },
+  "knownOpenBlockers": [
+    "automatic-selection portability"
+  ],
+  "redistribution": {
+    "fullCorpusAllowed": false
+  }
+}
