@@ -81,7 +81,8 @@ browser (client half)                          host (Node half)
                        + monotonic gesture identity
   gesture completes --> trigger gate --> maybe a lookup
   shortcut run -------> POST api/dsh-word-lookup ----> SQLite dictionary lookup
-                                                       (deterministic fixture)
+                                                       (fixture by default;
+                                                        ECDICT when explicitly activated)
                       <--------- structured result
   latest request wins <--------- card state
   shell.overlay <---- renders the card
@@ -101,8 +102,8 @@ browser (client half)                          host (Node half)
 
 The plugin operates with fail-closed dictionary loading semantics:
 
-- **Default Pre-release / Development Mode (Unset `DSH_WORD_LOOKUP_DB_PATH`)**:
-  When `DSH_WORD_LOOKUP_DB_PATH` is not set, the plugin initializes its package-owned deterministic test fixture database (`dsh-word-lookup-fixture`). This mode is explicitly intended for development, testing, and pre-release evaluation. It is NOT production-corpus activation.
+- **Default Fixture Mode (Unset `DSH_WORD_LOOKUP_DB_PATH`)**:
+  When `DSH_WORD_LOOKUP_DB_PATH` is not set, the plugin initializes its package-owned deterministic fixture database (`dsh-word-lookup-fixture`). This is the default public-package behavior and is intentionally distinct from production-corpus activation.
 - **Explicit Production Corpus Opt-In (`DSH_WORD_LOOKUP_DB_PATH`)**:
   Setting `DSH_WORD_LOOKUP_DB_PATH=<path-to-db>` explicitly requests production dictionary activation. The host loads the specified SQLite database in read-only mode and strictly verifies the production schema, indexes (`idx_forms_headword_raw`, `idx_examples_headword`), primary keys, and metadata (`corpus_name === 'ECDICT'`, `upstream_commit`, `source_sha256`, `schema_version`) against the pinned `corpus/ecdict.manifest.json`.
 - **Fail-Closed Guarantee (No Silent Fallback)**:
@@ -150,8 +151,7 @@ answers from it through prepared statements with bound parameters. The host open
 the database once per plugin lifecycle and closes it on unload, so repeated
 load/unload cycles cannot accumulate handles.
 
-The database path is **not a setting**. It is derived from the package's own
-location, so there is no `dictionaryPath` a reader could aim at an arbitrary file.
+The fixture database path is package-derived and is not user-configurable. Production-corpus activation is intentionally separate: an operator may provide a read-only compatible database path through the process environment variable `DSH_WORD_LOOKUP_DB_PATH`. There is no writable UI `dictionaryPath` setting.
 
 ```powershell
 npm run build:fixture   # rebuild fixtures/dictionary.fixture.db and validate it
