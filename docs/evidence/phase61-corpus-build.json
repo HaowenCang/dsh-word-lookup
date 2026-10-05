@@ -1,7 +1,7 @@
 {
   "phase": "Phase 6.1.1",
   "pipelineVersion": "phase6.1.1-remediated",
-  "testedGitSha": "98dec6111ae41afd9d7d2d1bdb753408fc2228cd",
+  "testedGitSha": "91f19ebd0b1b6ca874e1c94fe64b17bdcaeb8e83",
   "sourceArtifact": {
     "path": ".cache/corpus/ecdict.csv",
     "verifiedByteSize": 65933428,

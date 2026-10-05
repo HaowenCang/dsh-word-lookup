@@ -1,5 +1,5 @@
 {
-  "testedGitSha": "98dec6111ae41afd9d7d2d1bdb753408fc2228cd",
+  "testedGitSha": "91f19ebd0b1b6ca874e1c94fe64b17bdcaeb8e83",
   "upstream": {
     "repository": "https://github.com/skywind3000/ECDICT",
     "commit": "bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b",
@@ -65,9 +65,9 @@
   "dbBytes": 85889024,
   "integrityCheck": "ok",
   "performance": {
-    "durationMs": 6517,
-    "rowsPerSec": 118246,
-    "peakMemoryMb": 801
+    "durationMs": 6654,
+    "rowsPerSec": 115812,
+    "peakMemoryMb": 809
   },
   "posFieldObservation": {
     "totalDataRows": 770611,

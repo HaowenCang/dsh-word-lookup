@@ -1,7 +1,7 @@
 {
   "phase": "Phase 5.1",
-  "generatedAt": "2026-10-04T11:03:37.715Z",
-  "testedGitSha": "6340426a1004c2b3265bf1e3539ff0ca5dd589a4",
+  "generatedAt": "2026-10-05T08:34:01.665Z",
+  "testedGitSha": "91f19ebd0b1b6ca874e1c94fe64b17bdcaeb8e83",
   "branch": "master",
   "isolation": {
     "home": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-word-lookup-test\\home",
@@ -190,9 +190,9 @@
       "measured": {
         "cardRect": {
           "x": 340,
-          "y": 676,
+          "y": 533,
           "width": 360,
-          "height": 95,
+          "height": 238,
           "right": 700,
           "bottom": 771
         },
@@ -241,9 +241,9 @@
           "x": 1028,
           "y": 309,
           "width": 360,
-          "height": 238,
+          "height": 95,
           "right": 1388,
-          "bottom": 547
+          "bottom": 404
         },
         "viewport": {
           "width": 1400,
@@ -678,7 +678,7 @@
     {
       "filename": "narrow.png",
       "path": "docs/evidence/phase5-screenshots/narrow.png",
-      "sha256": "d040f0e22ad653142dc55829b2df387d4d3bd49e0eaa8b4156cba0fb635527db",
+      "sha256": "2bccffa444d2fb61a92dc2ec2c8bf90dca825e0cbfc1c3b5a310258ddb22ac38",
       "width": 360,
       "height": 640
     },

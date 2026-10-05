@@ -16,8 +16,8 @@ Phase 6.1.1 is an integrity and safety remediation phase dedicated to correcting
 |---|---|---|---|
 | **1. Source Binding & Verification Gate** | `corpus:verify` accepted missing source without refusal; only checked SQLite DB. | Strict tripartite verification (`source <-> manifest <-> database`). Refuses if source missing. `--metadata-only` option returns `PARTIAL — SOURCE BINDING NOT REVERIFIED` and never returns full PASS. Automated in `tests/corpus-verify.spec.ts`. | **FIXED** |
 | **2. Production Schema & Query Plan Contract** | Query plan allowed index scan (`SCAN forms USING INDEX sqlite_autoindex_forms_1`) because binary lookup used `WHERE headword = ?`. | Added required index `idx_forms_headword_raw ON forms (headword)`. Query plan verification strictly rejects any `SCAN`. Negative tests added for missing indexes and malformed table definitions in `tests/corpus-production.spec.ts`. | **FIXED** |
-| **3. Isolated Profile & Code Binding** | Real DSH runtime tests did not cryptographically prove that the isolated profile loaded current repository code. | `verifyIsolatedProfileBinding` verifies test profile `word-lookup-test`, junction target resolution to repo root, tested Git commit SHA, and SHA-256 digests of `lib/index.js` and `lib/client.js` matching loaded bundles. | **FIXED** |
-| **4. Network & AI Observation Authenticity** | Recorded `externalNetworkRequests: 0` without browser instrumentation; claimed `aiFallbackObserved: false` without runtime measurement. | Playwright `page.on('request')` intercepts all browser network traffic, asserting 0 external requests. AI safety is explicitly recorded as a static architectural invariant audit (`matchedAiDependencies: []`, `foundModelEndpoints: []`); host process network activity is marked `notMeasured`. | **FIXED** |
+| **3. Isolated Profile & Code Binding** | Real DSH runtime tests did not cryptographically prove that the isolated profile loaded current repository code. | `verifyIsolatedProfileBinding` verifies test profile `word-lookup-test`, junction target resolution to repo root, tested Git commit SHA, and profile-resolved bundle hashes (`profileResolvedHostBundleSha256`, `profileResolvedClientBundleSha256`) matching repository built bundles (`profileResolvedBundlesMatchRepository: true`). | **FIXED** |
+| **4. Network & AI Observation Authenticity** | Recorded `externalNetworkRequests: 0` without browser instrumentation; claimed `aiFallbackObserved: false` without runtime measurement. | Playwright `page.on('request')` intercepts all browser network traffic, asserting 0 external requests. AI safety is explicitly recorded as a static architectural invariant audit: static architecture scan found no configured AI SDK dependency or known model endpoint in the audited package/bundles (`matchedAiDependencies: []`, `foundModelEndpoints: []`); runtime AI observation is marked `notMeasured`; host process-wide network activity is marked `notMeasured`. | **FIXED** |
 | **5. Production Dictionary Benchmark** | Benchmark measured raw SQL queries on naked `node:sqlite` connection instead of product code; conflated startup open/validation with lookup. | Benchmark executes `openProductionDictionary()` -> `SqliteDictionary.lookup()`. Separately measures one-time DB open/validation latency (2.18 ms) and steady-state query latencies (median 47.5 µs, p95 82.3 µs across 6,000 queries). Emits `docs/evidence/phase611-corpus-benchmark.json`. | **FIXED** |
 | **6. Reproducible Build & Determinism** | Evidence was hand-assembled; BOM presence was ambiguous; determinism was not demonstrated via clean rebuild. | Executable script runs two full clean builds and asserts byte-for-byte logical and physical SHA-256 equality. Directly measures first 3 bytes of `ecdict.csv`: `bomActuallyPresent: false`, `bomStrippingRequired: false`. Proves fatal UTF-8 full-source decode. | **FIXED** |
 | **7. ECDICT POS Column Clarification** | Conflated observed empty `pos` column with ECDICT schema specification. | Clarified: "In the pinned ecdict.csv artifact used by this build, the dedicated `pos` column was measured empty for all 770,611 data rows. Many translation strings contain lexical POS-style prefixes such as n./v./adj.; this observation does not redefine ECDICT’s documented `pos` schema." | **FIXED** |
@@ -58,27 +58,27 @@ Phase 6.1.1 is an integrity and safety remediation phase dedicated to correcting
 
 ## 3. Query Plan Verification & Schema Contract
 
-To guarantee $O(\log N)$ lookup performance on all queries, query plan inspection (`EXPLAIN QUERY PLAN`) enforces binary and case-insensitive indexes:
+The verified lookup predicates use indexed SEARCH plans rather than full table/index SCAN plans for the production corpus. This prevents the known linear full-scan regression on the validated query paths:
 
 ```sql
--- 1. Exact entry lookup
-SELECT word, phonetic, definition, translation, pos FROM entries WHERE word = ? COLLATE NOCASE;
+-- 1. Exact entry lookup (using SqliteDictionary SQL statement)
+SELECT word, phonetic, definition_en, translation_zh, pos, exchange, frequency FROM entries WHERE word = ?;
 -- Execution Plan: SEARCH entries USING INDEX sqlite_autoindex_entries_1 (word=?)
 
--- 2. Morphological form lookup
-SELECT headword FROM forms WHERE form = ? COLLATE NOCASE;
+-- 2. Morphological form lookup (using SqliteDictionary SQL statement)
+SELECT headword FROM forms WHERE form = ?;
 -- Execution Plan: SEARCH forms USING INDEX sqlite_autoindex_forms_1 (form=?)
 
--- 3. Forms by headword (binary match)
+-- 3. Forms by headword (binary match) (using SqliteDictionary SQL statement)
 SELECT form, kind FROM forms WHERE headword = ? ORDER BY form COLLATE NOCASE;
 -- Execution Plan: SEARCH forms USING INDEX idx_forms_headword_raw (headword=?); USE TEMP B-TREE FOR ORDER BY
 
--- 4. Examples by headword
-SELECT sentence, translation FROM examples WHERE headword = ? COLLATE NOCASE ORDER BY id;
+-- 4. Examples by headword (using SqliteDictionary SQL statement)
+SELECT english, chinese, source, source_id, score FROM examples WHERE headword = ? ORDER BY score DESC, id ASC;
 -- Execution Plan: SEARCH examples USING INDEX idx_examples_headword (headword=?); USE TEMP B-TREE FOR ORDER BY
 ```
 
-Any query plan containing `SCAN` is rejected with `Error: Production index contract violation: query plan SCAN detected`.
+Any query plan containing `SCAN` is rejected with `Error: Query plan for "<name>" rejected: contains full table/index SCAN: "<detail>"`.
 
 ---
 
@@ -112,15 +112,18 @@ Tested against an isolated DSH Web instance (`word-lookup-test` profile on ephem
 
 - **Isolated Profile Binding**:
   - Tested Code Git SHA: `98dec6111ae41afd9d7d2d1bdb753408fc2228cd`
-  - Loaded Host Bundle SHA-256: `4e82542be45483ef414934feae8c2682edf48acc6ebbf3d731908245f1b67c7e`
-  - Loaded Client Bundle SHA-256: `0f1d730f02232f0920b14f136018a55eb86f552e7f828eeafc3543a673318c41`
+  - profileResolvedHostBundleSha256: `4e82542be45483ef414934feae8c2682edf48acc6ebbf3d731908245f1b67c7e`
+  - profileResolvedClientBundleSha256: `0f1d730f02232f0920b14f136018a55eb86f552e7f828eeafc3543a673318c41`
+  - profileResolvedBundlesMatchRepository: `true`
   - Profile junction points directly to current repository root.
 - **Browser Network Traffic**:
   - Intercepted requests via Playwright: `externalOriginRequestsObserved = 0`.
-  - Localhost / same-origin requests: 37.
+  - Localhost / same-origin requests: 35-37.
+  - Host process-wide network activity: `notMeasured`.
 - **AI Safety**:
-  - Evaluated as static architectural invariant: 0 AI/LLM SDK dependencies, 0 remote API calls.
-  - Runtime AI fallback: `notMeasured` (static invariant proves impossibility).
+  - Static architecture scan found no configured AI SDK dependency or known model endpoint in the audited package/bundles (`matchedAiDependencies: []`, `foundModelEndpoints: []`).
+  - Architectural invariant: 0 intentional AI dictionary fallback.
+  - Runtime AI observation: `notMeasured`.
 - **Probes**:
   - `wave function` -> HTTP 200, `source: "ecdict-local"`, translation: `[计] 波函数\n[化] 波函数`
   - `conservation` -> HTTP 200, `source: "ecdict-local"`, phonetic: `.kɒnsә'veiʃәn`

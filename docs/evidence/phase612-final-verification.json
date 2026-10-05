@@ -1,0 +1,440 @@
+{
+  "phase": "Phase 6.1.2",
+  "reportTitle": "Phase 6.1.2 Final Evidence Closure & Regression Matrix Verification",
+  "verificationTimestamp": "2026-10-05T08:34:12.087Z",
+  "testedCodeGitSha": "91f19ebd0b1b6ca874e1c94fe64b17bdcaeb8e83",
+  "sourceArtifact": {
+    "path": ".cache/corpus/ecdict.csv",
+    "verifiedByteSize": 65933428,
+    "verifiedSha256": "1a6947e04785db63613a92e14903cdae7954f7e84860b10e68e5c7cbb3f9c3cf",
+    "declaredManifestSha256": "1a6947e04785db63613a92e14903cdae7954f7e84860b10e68e5c7cbb3f9c3cf",
+    "bomActuallyPresent": false,
+    "bomStrippingRequired": false,
+    "fatalUtf8DecodeResult": "fatal UTF-8 decoder completed the entire verified source without error",
+    "headerColumnsCount": 13,
+    "exactObservedHeader": [
+      "word",
+      "phonetic",
+      "definition",
+      "translation",
+      "pos",
+      "collins",
+      "oxford",
+      "tag",
+      "bnc",
+      "frq",
+      "exchange",
+      "detail",
+      "audio"
+    ]
+  },
+  "manifestArtifact": {
+    "path": "corpus/ecdict.manifest.json",
+    "manifestFileSha256": "03cba27d42cb43551d7b51fa12e4a07a869c5d4b65ac07f4fa3d105d9c944044",
+    "manifestByteSize": 566,
+    "sourceCommit": "bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b",
+    "schemaVersion": 1
+  },
+  "databaseArtifact": {
+    "path": "build/corpus/ecdict.db",
+    "byteSize": 85889024,
+    "physicalFileSha256": "8aee00720cf7e1f19df9a515e541c4463abc816c34e95155129396361b32d37d",
+    "logicalDataSha256": "591e53bdd8e3d227fd92c21ce2cfe7d375fffcd90f97a9f6a64f7d26e7c78bd9",
+    "pragmaIntegrityCheck": "ok",
+    "tableCounts": {
+      "entries": 770611,
+      "forms": 57689,
+      "examples": 0
+    },
+    "unambiguousFormsInserted": 57689,
+    "ambiguousFormsExcluded": 463,
+    "posColumnObservation": "In the pinned ecdict.csv artifact used by this build, the dedicated `pos` column was measured empty for all 770,611 data rows. Many translation strings contain lexical POS-style prefixes such as n./v./adj.; this observation does not redefine ECDICT’s documented `pos` schema."
+  },
+  "buildDeterminism": {
+    "logicalDeterminismIdentical": true,
+    "fileDeterminismIdentical": true,
+    "run1LogicalSha256": "591e53bdd8e3d227fd92c21ce2cfe7d375fffcd90f97a9f6a64f7d26e7c78bd9",
+    "run2LogicalSha256": "591e53bdd8e3d227fd92c21ce2cfe7d375fffcd90f97a9f6a64f7d26e7c78bd9",
+    "run1FileSha256": "8aee00720cf7e1f19df9a515e541c4463abc816c34e95155129396361b32d37d",
+    "run2FileSha256": "8aee00720cf7e1f19df9a515e541c4463abc816c34e95155129396361b32d37d",
+    "entryCountIdentical": true,
+    "formCountIdentical": true,
+    "integrityCheckBothRuns": "ok"
+  },
+  "benchmarkSummary": {
+    "benchmarkTarget": "SqliteDictionary.lookup via openProductionDictionary()",
+    "startupDatabaseOpenValidationMs": 2.01,
+    "totalQueriesExecuted": 6000,
+    "iterationsPerWord": 200,
+    "overallSteadyStateLatencyUs": {
+      "minUs": 25.5,
+      "medianUs": 49.7,
+      "p95Us": 81,
+      "maxUs": 3650.1
+    },
+    "categories": {
+      "commonWord": {
+        "sampleCount": 1000,
+        "minUs": 44.6,
+        "medianUs": 53.7,
+        "p95Us": 84.5,
+        "maxUs": 2373.4
+      },
+      "rareWord": {
+        "sampleCount": 800,
+        "minUs": 43.2,
+        "medianUs": 49.3,
+        "p95Us": 84.2,
+        "maxUs": 3071
+      },
+      "mixedCase": {
+        "sampleCount": 1000,
+        "minUs": 43.1,
+        "medianUs": 51.8,
+        "p95Us": 78.8,
+        "maxUs": 2787.1
+      },
+      "form": {
+        "sampleCount": 800,
+        "minUs": 43.1,
+        "medianUs": 49,
+        "p95Us": 83.1,
+        "maxUs": 3650.1
+      },
+      "irregularForm": {
+        "sampleCount": 800,
+        "minUs": 42.9,
+        "medianUs": 51,
+        "p95Us": 92.5,
+        "maxUs": 3316.6
+      },
+      "phrase": {
+        "sampleCount": 600,
+        "minUs": 42.7,
+        "medianUs": 49.8,
+        "p95Us": 79.4,
+        "maxUs": 168.9
+      },
+      "unknown": {
+        "sampleCount": 400,
+        "minUs": 26,
+        "medianUs": 29.7,
+        "p95Us": 50.8,
+        "maxUs": 122
+      },
+      "longUnknown": {
+        "sampleCount": 600,
+        "minUs": 25.5,
+        "medianUs": 28.8,
+        "p95Us": 51.1,
+        "maxUs": 174.4
+      }
+    },
+    "evidenceFile": "docs/evidence/phase611-corpus-benchmark.json"
+  },
+  "runtimeCorpusAcceptance": {
+    "profile": "word-lookup-test",
+    "profileResolvedHostBundleSha256": "4e82542be45483ef414934feae8c2682edf48acc6ebbf3d731908245f1b67c7e",
+    "profileResolvedClientBundleSha256": "0f1d730f02232f0920b14f136018a55eb86f552e7f828eeafc3543a673318c41",
+    "profileResolvedBundlesMatchRepository": true,
+    "resolvedPluginPathMatchesRepo": true,
+    "dictionarySourceObserved": "ecdict-local",
+    "fixtureFallbackObserved": false,
+    "cr1Probes": {
+      "wave function": {
+        "status": 200,
+        "found": true,
+        "source": "ecdict-local",
+        "headword": "wave function",
+        "translationSample": "[计] 波函数\\n[化] 波函数"
+      },
+      "conservation": {
+        "status": 200,
+        "found": true,
+        "source": "ecdict-local",
+        "headword": "conservation"
+      },
+      "neutrino": {
+        "status": 200,
+        "found": true,
+        "source": "ecdict-local",
+        "headword": "neutrino",
+        "translationSample": "n. 中微子\\n[化] 中微子; 微中子",
+        "absentFromFixture": true
+      },
+      "quarks": {
+        "status": 200,
+        "found": true,
+        "source": "ecdict-local",
+        "headword": "quarks",
+        "absentFromFixture": true
+      }
+    },
+    "negativeGates": {
+      "CR2_missingDbRefusal": true,
+      "CR3_wrongSourceShaRefusal": true,
+      "CR4_wrongUpstreamCommitRefusal": true,
+      "CR5_corruptedDbRefusal": true
+    },
+    "allChecksPassed": true,
+    "evidenceFile": "docs/evidence/phase611-corpus-runtime.json"
+  },
+  "browserAcceptanceSummary": {
+    "totalChecks": 37,
+    "passedChecks": 37,
+    "failedChecks": 0,
+    "allPassed": true,
+    "evidenceFile": "docs/evidence/phase5-browser-acceptance-20261004.json"
+  },
+  "npmPackResult": {
+    "packageName": "dsh-word-lookup",
+    "version": "0.1.0-dev.0",
+    "packageSize": "81.1 kB",
+    "unpackedSize": "262.6 kB",
+    "totalFiles": 30,
+    "packedFiles": [
+      "README.md",
+      "cordis.patch.yml",
+      "corpus/ecdict.manifest.json",
+      "lib/client.js",
+      "lib/index.js",
+      "lib/types/client/card.d.ts",
+      "lib/types/client/contracts.d.ts",
+      "lib/types/client/gesture.d.ts",
+      "lib/types/client/index.d.ts",
+      "lib/types/client/lifecycle.d.ts",
+      "lib/types/client/lookup.d.ts",
+      "lib/types/client/position.d.ts",
+      "lib/types/client/selection.d.ts",
+      "lib/types/client/store.d.ts",
+      "lib/types/client/transport.d.ts",
+      "lib/types/client/trigger.d.ts",
+      "lib/types/host/config.d.ts",
+      "lib/types/host/corpus-db.d.ts",
+      "lib/types/host/csv-parser.d.ts",
+      "lib/types/host/dictionary.d.ts",
+      "lib/types/host/exchange-parser.d.ts",
+      "lib/types/host/fixture-db.d.ts",
+      "lib/types/host/fixture.d.ts",
+      "lib/types/host/lookup.d.ts",
+      "lib/types/host/route.d.ts",
+      "lib/types/host/sqlite-dictionary.d.ts",
+      "lib/types/index.d.ts",
+      "lib/types/shared/protocol.d.ts",
+      "lib/types/shared/text.d.ts",
+      "package.json"
+    ],
+    "corpusArtifactsIncluded": false,
+    "status": "PASS"
+  },
+  "distributionAudit": {
+    "trackedCorpusArtifactsFound": [],
+    "trackedCorpusArtifactCount": 0,
+    "packedCorpusArtifactsFound": [],
+    "packedCorpusArtifactCount": 0,
+    "fullCorpusRedistributionAllowed": false,
+    "distributionGateStatus": "REFUSED — internal/local only; full corpus redistribution prohibited"
+  },
+  "productionEnvironmentSafety": {
+    "isolationCheck": "PASS",
+    "scratchHome": "%TEMP%\\dsh-word-lookup-test\\home",
+    "profile": "word-lookup-test",
+    "portsUsed": "isolated high ports (50991+)",
+    "productionPort19387Untouched": true,
+    "productionProfileUntouched": true,
+    "browserExternalNetworkRequestsObserved": 0,
+    "hostProcessWideNetworkActivity": "notMeasured",
+    "aiSafetyObservation": "notMeasured",
+    "aiSafetyStaticScan": "Static architecture scan found no configured AI SDK dependency or known model endpoint in the audited package/bundles."
+  },
+  "automaticSelectionPortabilityBlocker": {
+    "state": "OPEN",
+    "blockerTitle": "RELEASE BLOCKER — automatic-selection portability",
+    "description": "Automatic text selection gesture portability across platforms and display servers remains tracked and open for Phase 7.",
+    "phase7Ready": false
+  },
+  "fullRegressionCommandMatrix": [
+    {
+      "command": "npm test",
+      "exitCode": 0,
+      "passed": true,
+      "durationMs": 5343,
+      "totals": {
+        "testFiles": 27,
+        "testFilesPassed": 27,
+        "testFilesFailed": 0,
+        "testsPassed": 468,
+        "testsFailed": 0,
+        "testsSkipped": 0,
+        "totalTests": 468
+      }
+    },
+    {
+      "command": "npm run verify",
+      "exitCode": 0,
+      "passed": true,
+      "durationMs": 10626,
+      "totals": {
+        "status": "PASS",
+        "stepsPassed": 6,
+        "totalSteps": 6,
+        "steps": [
+          {
+            "status": "PASS",
+            "name": "fixture",
+            "durationSeconds": 0.5
+          },
+          {
+            "status": "PASS",
+            "name": "typecheck",
+            "durationSeconds": 1.7
+          },
+          {
+            "status": "PASS",
+            "name": "test",
+            "durationSeconds": 6.4
+          },
+          {
+            "status": "PASS",
+            "name": "build",
+            "durationSeconds": 1.5
+          },
+          {
+            "status": "PASS",
+            "name": "bundle-static-checks",
+            "durationSeconds": 0
+          },
+          {
+            "status": "PASS",
+            "name": "credential-scan",
+            "durationSeconds": 0.2
+          }
+        ]
+      }
+    },
+    {
+      "command": "npm run corpus:verify-source",
+      "exitCode": 0,
+      "passed": true,
+      "durationMs": 662,
+      "totals": {
+        "sourceFile": ".cache/corpus/ecdict.csv",
+        "actualSourceByteSize": 65933428,
+        "actualSourceSha256": "1a6947e04785db63613a92e14903cdae7954f7e84860b10e68e5c7cbb3f9c3cf",
+        "manifestSourceByteSize": 65933428,
+        "manifestSourceSha256": "1a6947e04785db63613a92e14903cdae7954f7e84860b10e68e5c7cbb3f9c3cf",
+        "bomActuallyPresent": false,
+        "bomStrippingRequired": false,
+        "fatalUtf8DecodeResult": "fatal UTF-8 decoder completed the entire verified source without error",
+        "columnCount": 13
+      }
+    },
+    {
+      "command": "npm run corpus:build",
+      "exitCode": 0,
+      "passed": true,
+      "durationMs": 14928,
+      "totals": {
+        "validEntriesInserted": 770611,
+        "unambiguousFormsInserted": 57689,
+        "ambiguousFormsExcluded": 463,
+        "nullPosFieldCount": 770611,
+        "databaseFileBytes": 85889024,
+        "databaseFileSha256": "8aee00720cf7e1f19df9a515e541c4463abc816c34e95155129396361b32d37d",
+        "databaseLogicalSha256": "591e53bdd8e3d227fd92c21ce2cfe7d375fffcd90f97a9f6a64f7d26e7c78bd9",
+        "pragmaIntegrityCheck": "ok",
+        "logicalDeterminismIdentical": true,
+        "fileDeterminismIdentical": true
+      }
+    },
+    {
+      "command": "npm run corpus:verify",
+      "exitCode": 0,
+      "passed": true,
+      "durationMs": 2604,
+      "totals": {
+        "status": "PASS",
+        "tripartiteBindingVerified": true,
+        "queryPlanViolations": 0,
+        "probesPassed": 11
+      }
+    },
+    {
+      "command": "npm run corpus:benchmark",
+      "exitCode": 0,
+      "passed": true,
+      "durationMs": 822,
+      "totals": {
+        "databaseOpenValidationMs": 2.01,
+        "totalQueriesExecuted": 6000,
+        "iterationsPerWord": 200,
+        "overallLatencyUs": {
+          "minUs": 25.5,
+          "medianUs": 49.7,
+          "p95Us": 81,
+          "maxUs": 3650.1
+        },
+        "categoryCount": 8
+      }
+    },
+    {
+      "command": "npm run test:runtime",
+      "exitCode": 0,
+      "passed": true,
+      "durationMs": 326567,
+      "totals": {
+        "checksPassed": 169,
+        "checksFailed": 0,
+        "totalChecks": 169,
+        "failedCheckIds": [],
+        "status": "PASS"
+      }
+    },
+    {
+      "command": "npm run test:corpus-runtime",
+      "exitCode": 0,
+      "passed": true,
+      "durationMs": 33115,
+      "totals": {
+        "checksPassed": 13,
+        "checksFailed": 0,
+        "totalChecks": 13,
+        "allChecksPassed": true,
+        "profileBindingVerified": true,
+        "cr1ProbesCount": 4,
+        "negativeGatesCount": 4,
+        "browserExternalOriginRequestsObserved": 0,
+        "hostProcessWideNetworkActivity": "notMeasured",
+        "aiRuntimeObservation": "notMeasured"
+      }
+    },
+    {
+      "command": "npm run test:acceptance",
+      "exitCode": 0,
+      "passed": true,
+      "durationMs": 22249,
+      "totals": {
+        "passed": 37,
+        "failed": 0,
+        "total": 37,
+        "failedIds": []
+      }
+    },
+    {
+      "command": "npm pack --dry-run",
+      "exitCode": 0,
+      "passed": true,
+      "durationMs": 849,
+      "totals": {
+        "packageName": "dsh-word-lookup",
+        "version": "0.1.0-dev.0",
+        "packageSize": "81.1 kB",
+        "unpackedSize": "262.6 kB",
+        "totalFiles": 30,
+        "packedFilesCount": 30
+      }
+    }
+  ],
+  "allMatrixCommandsPassed": true,
+  "finalPhaseVerdict": "PASS"
+}

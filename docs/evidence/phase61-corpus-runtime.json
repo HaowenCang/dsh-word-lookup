@@ -1,7 +1,10 @@
 {
-  "testedCodeGitSha": "98dec6111ae41afd9d7d2d1bdb753408fc2228cd",
+  "testedCodeGitSha": "91f19ebd0b1b6ca874e1c94fe64b17bdcaeb8e83",
   "testedHostBundleSha256": "4e82542be45483ef414934feae8c2682edf48acc6ebbf3d731908245f1b67c7e",
   "testedClientBundleSha256": "0f1d730f02232f0920b14f136018a55eb86f552e7f828eeafc3543a673318c41",
+  "profileResolvedHostBundleSha256": "4e82542be45483ef414934feae8c2682edf48acc6ebbf3d731908245f1b67c7e",
+  "profileResolvedClientBundleSha256": "0f1d730f02232f0920b14f136018a55eb86f552e7f828eeafc3543a673318c41",
+  "profileResolvedBundlesMatchRepository": true,
   "resolvedPluginPath": "E:\\Projects\\DSHarness\\dsh-word-lookup",
   "profileBinding": {
     "profile": "word-lookup-test",
@@ -9,8 +12,9 @@
     "bundleRegisteredInProfilePackageJson": true,
     "linkDependencyVerified": true,
     "resolvedPluginMatchesRepoRoot": true,
-    "hostBundleSha256MatchesLoaded": true,
-    "clientBundleSha256MatchesLoaded": true
+    "profileResolvedHostBundleSha256": "4e82542be45483ef414934feae8c2682edf48acc6ebbf3d731908245f1b67c7e",
+    "profileResolvedClientBundleSha256": "0f1d730f02232f0920b14f136018a55eb86f552e7f828eeafc3543a673318c41",
+    "profileResolvedBundlesMatchRepository": true
   },
   "manifest": {
     "sourceName": "ECDICT",
@@ -30,7 +34,7 @@
       "instrumentation": "playwright-request-interception",
       "externalOriginRequestsObserved": 0,
       "externalOriginRequests": [],
-      "localhostSameOriginRequestsObserved": 37
+      "localhostSameOriginRequestsObserved": 36
     },
     "hostProcessWideNetworkActivity": "notMeasured"
   },
@@ -38,7 +42,7 @@
     "runtimeObservation": "notMeasured",
     "staticArchitectureInvariant": {
       "passed": true,
-      "statement": "0 AI fallback mechanisms in host or client code; dictionary resolves strictly against local SQLite",
+      "statement": "Static architecture scan found no configured AI SDK dependency or known model endpoint in the audited package/bundles.",
       "matchedAiDependencies": [],
       "foundModelEndpoints": []
     }
