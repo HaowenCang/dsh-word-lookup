@@ -1,0 +1,718 @@
+{
+  "phase": "Phase 6R.1",
+  "generatedAt": "2026-10-05T14:51:35.637Z",
+  "testedCodeGitSha": "68d896098087044343c93834d2ebe53e50e67677",
+  "testedGitSha": "68d896098087044343c93834d2ebe53e50e67677",
+  "branch": "master",
+  "profile": "word-lookup-test",
+  "port": 50992,
+  "dshVersion": "0.2.0-rc.2",
+  "isolation": {
+    "home": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-word-lookup-test\\home",
+    "profile": "word-lookup-test",
+    "port": 50992,
+    "isolationBanner": "ISOLATION CHECK: PASS"
+  },
+  "environment": {
+    "DSH": "0.2.0-rc.2",
+    "Node": "v24.13.0",
+    "Chromium": "153.0.8010.12",
+    "Playwright": "1.63.0",
+    "viewport": {
+      "width": 1400,
+      "height": 900
+    }
+  },
+  "passed": 37,
+  "failed": 0,
+  "total": 37,
+  "failedIds": [],
+  "checks": [
+    {
+      "id": "UI01",
+      "description": "manual shortcut lookup for \"derived\" renders canonical headword, phonetic, lemma relation, meanings, and examples",
+      "passed": true,
+      "detail": "headword=derive lemma=derived → derive meanings=3 examples=2",
+      "measured": {
+        "present": true,
+        "state": "ready",
+        "uiState": "found",
+        "headword": "derive",
+        "phonetic": "/dɪˈraɪv/",
+        "lemma": "derived → derive",
+        "glosses": [
+          "导出",
+          "；派生",
+          "；源自"
+        ],
+        "examples": [
+          "The result must derive from the boundary conditions alone.该结果只能由边界条件导出。",
+          "This identity derives from Gauss’s law.这一恒等式源自高斯定律。"
+        ],
+        "rect": {
+          "x": 362,
+          "y": 155,
+          "width": 360,
+          "height": 263,
+          "right": 722,
+          "bottom": 418
+        },
+        "text": "\n.dsh-wl-card {\n  --wl-bg: #1c1c21;\n  --wl-fg: #f2f2f7;\n  --wl-fg-muted: #9898a6;\n  --wl-border: rgba(255, 255, 255, 0.14);\n  --wl-tag-bg: rgba(255, 255, 255, 0.08);\n  --wl-tag-fg: #d0d0dc;\n  --wl-example-bg: rgba(255, 255, 255, 0.04);\n  --wl-close-hover: rgba(255, 255, 255, 0.12);\n  --wl-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);\n}\n@media (prefers-color-scheme: light) {\n  .dsh-wl-card {\n    --wl-bg: #ffffff;\n    --wl-fg: #18181c;\n    --wl-fg-muted: #626270;\n    --wl-border: rgba(0, 0, 0, 0.12);\n    --wl-tag-bg: rgba(0, 0, 0, 0.06);\n    --wl-tag-fg: #454552;\n    --wl-example-bg: rgba(0, 0, 0, 0.03);\n    --wl-close-hover: rgba(0, 0, 0, 0.08);\n    --wl-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);\n  }\n}\n:root[data-theme=\"light\"] .dsh-wl-card,\n.light .dsh-wl-card {\n  --wl-bg: #ffffff;\n  --wl-fg: #18181c;\n  --wl-fg-muted: #626270;\n  --wl-border: rgba(0, 0, 0, 0.12);\n  --wl-tag-bg: rgba(0, 0, 0, 0.06);\n  --wl-tag-fg: #454552;\n  --wl-example-bg: rgba(0, 0, 0, 0.03);\n  --wl-close-hover: rgba(0, 0, 0, 0.08);\n  --wl-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);\n}\n:root[data-theme=\"dark\"] .dsh-wl-card,\n.dark .dsh-wl-card {\n  --wl-bg: #1c1c21;\n  --wl-fg: #f2f2f7;\n  --wl-fg-muted: #9898a6;\n  --wl-border: rgba(255, 255, 255, 0.14);\n  --wl-tag-bg: rgba(255, 255, 255, 0.08);\n  --wl-tag-fg: #d0d0dc;\n  --wl-example-bg: rgba(255, 255, 255, 0.04);\n  --wl-close-hover: rgba(255, 255, 255, 0.12);\n  --wl-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);\n}\nderive/dɪˈraɪv/×derived → deriveverb导出；派生；源自 obtain something from a specified source; originate inderived · derives · derivingThe result must derive from the boundary conditions alone.该结果只能由边界条件导出。This identity derives from Gauss’s law.这一恒等式源自高斯定律。",
+        "role": "region",
+        "ariaLabel": "Dictionary lookup",
+        "closeLabel": "Close dictionary"
+      }
+    },
+    {
+      "id": "UI02",
+      "description": "auto double-click on \"went\" renders headword \"go\" with matchedForm \"went → go\" and issues exactly 1 request",
+      "passed": true,
+      "detail": "requests=1 headword=go lemma=went → go",
+      "measured": {
+        "requests": 1,
+        "headword": "go",
+        "lemma": "went → go"
+      }
+    },
+    {
+      "id": "UI03",
+      "description": "auto drag-selection on \"teeth\" renders headword \"tooth\" with matchedForm \"teeth → tooth\" and issues exactly 1 request",
+      "passed": true,
+      "detail": "requests=1 headword=tooth lemma=teeth → tooth",
+      "measured": {
+        "requests": 1,
+        "headword": "tooth",
+        "lemma": "teeth → tooth"
+      }
+    },
+    {
+      "id": "UI04",
+      "description": "unknown word renders friendly not-found state without error banner or traces",
+      "passed": true,
+      "detail": "uiState=not-found text=\"\n.dsh-wl-card {\n  --wl-bg: #1c1c21;\n  --wl-fg: #f2f2f7;\n  --wl-fg-muted: #9898a6;\n  --wl-border: rgba(255, 255, 255, 0.14);\n  --wl-tag-bg: rgba(255, 255, 255, 0.08);\n  --wl-tag-fg: #d0d0dc;\n  --wl-example-bg: rgba(255, 255, 255, 0.04);\n  --wl-close-hover: rgba(255, 255, 255, 0.12);\n  --wl-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);\n}\n@media (prefers-color-scheme: light) {\n  .dsh-wl-card {\n    --wl-bg: #ffffff;\n    --wl-fg: #18181c;\n    --wl-fg-muted: #626270;\n    --wl-border: rgba(0, 0, 0, 0.12);\n    --wl-tag-bg: rgba(0, 0, 0, 0.06);\n    --wl-tag-fg: #454552;\n    --wl-example-bg: rgba(0, 0, 0, 0.03);\n    --wl-close-hover: rgba(0, 0, 0, 0.08);\n    --wl-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);\n  }\n}\n:root[data-theme=\"light\"] .dsh-wl-card,\n.light .dsh-wl-card {\n  --wl-bg: #ffffff;\n  --wl-fg: #18181c;\n  --wl-fg-muted: #626270;\n  --wl-border: rgba(0, 0, 0, 0.12);\n  --wl-tag-bg: rgba(0, 0, 0, 0.06);\n  --wl-tag-fg: #454552;\n  --wl-example-bg: rgba(0, 0, 0, 0.03);\n  --wl-close-hover: rgba(0, 0, 0, 0.08);\n  --wl-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);\n}\n:root[data-theme=\"dark\"] .dsh-wl-card,\n.dark .dsh-wl-card {\n  --wl-bg: #1c1c21;\n  --wl-fg: #f2f2f7;\n  --wl-fg-muted: #9898a6;\n  --wl-border: rgba(255, 255, 255, 0.14);\n  --wl-tag-bg: rgba(255, 255, 255, 0.08);\n  --wl-tag-fg: #d0d0dc;\n  --wl-example-bg: rgba(255, 255, 255, 0.04);\n  --wl-close-hover: rgba(255, 255, 255, 0.12);\n  --wl-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);\n}\nunknowntoken×no entry for \"unknowntoken\"\"",
+      "measured": {
+        "present": true,
+        "state": "ready",
+        "uiState": "not-found",
+        "headword": null,
+        "phonetic": null,
+        "lemma": null,
+        "glosses": [],
+        "examples": [],
+        "rect": {
+          "x": 962,
+          "y": 485,
+          "width": 360,
+          "height": 90,
+          "right": 1322,
+          "bottom": 575
+        },
+        "text": "\n.dsh-wl-card {\n  --wl-bg: #1c1c21;\n  --wl-fg: #f2f2f7;\n  --wl-fg-muted: #9898a6;\n  --wl-border: rgba(255, 255, 255, 0.14);\n  --wl-tag-bg: rgba(255, 255, 255, 0.08);\n  --wl-tag-fg: #d0d0dc;\n  --wl-example-bg: rgba(255, 255, 255, 0.04);\n  --wl-close-hover: rgba(255, 255, 255, 0.12);\n  --wl-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);\n}\n@media (prefers-color-scheme: light) {\n  .dsh-wl-card {\n    --wl-bg: #ffffff;\n    --wl-fg: #18181c;\n    --wl-fg-muted: #626270;\n    --wl-border: rgba(0, 0, 0, 0.12);\n    --wl-tag-bg: rgba(0, 0, 0, 0.06);\n    --wl-tag-fg: #454552;\n    --wl-example-bg: rgba(0, 0, 0, 0.03);\n    --wl-close-hover: rgba(0, 0, 0, 0.08);\n    --wl-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);\n  }\n}\n:root[data-theme=\"light\"] .dsh-wl-card,\n.light .dsh-wl-card {\n  --wl-bg: #ffffff;\n  --wl-fg: #18181c;\n  --wl-fg-muted: #626270;\n  --wl-border: rgba(0, 0, 0, 0.12);\n  --wl-tag-bg: rgba(0, 0, 0, 0.06);\n  --wl-tag-fg: #454552;\n  --wl-example-bg: rgba(0, 0, 0, 0.03);\n  --wl-close-hover: rgba(0, 0, 0, 0.08);\n  --wl-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);\n}\n:root[data-theme=\"dark\"] .dsh-wl-card,\n.dark .dsh-wl-card {\n  --wl-bg: #1c1c21;\n  --wl-fg: #f2f2f7;\n  --wl-fg-muted: #9898a6;\n  --wl-border: rgba(255, 255, 255, 0.14);\n  --wl-tag-bg: rgba(255, 255, 255, 0.08);\n  --wl-tag-fg: #d0d0dc;\n  --wl-example-bg: rgba(255, 255, 255, 0.04);\n  --wl-close-hover: rgba(255, 255, 255, 0.12);\n  --wl-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);\n}\nunknowntoken×no entry for \"unknowntoken\"",
+        "role": "region",
+        "ariaLabel": "Dictionary lookup",
+        "closeLabel": "Close dictionary"
+      }
+    },
+    {
+      "id": "UI05",
+      "description": "transport error renders sanitized error message without leaking paths or internals",
+      "passed": true,
+      "detail": "uiState=error text=\"\n.dsh-wl-card {\n  --wl-bg: #1c1c21;\n  --wl-fg: #f2f2f7;\n  --wl-fg-muted: #9898a6;\n  --wl-border: rgba(255, 255, 255, 0.14);\n  --wl-tag-bg: rgba(255, 255, 255, 0.08);\n  --wl-tag-fg: #d0d0dc;\n  --wl-example-bg: rgba(255, 255, 255, 0.04);\n  --wl-close-hover: rgba(255, 255, 255, 0.12);\n  --wl-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);\n}\n@media (prefers-color-scheme: light) {\n  .dsh-wl-card {\n    --wl-bg: #ffffff;\n    --wl-fg: #18181c;\n    --wl-fg-muted: #626270;\n    --wl-border: rgba(0, 0, 0, 0.12);\n    --wl-tag-bg: rgba(0, 0, 0, 0.06);\n    --wl-tag-fg: #454552;\n    --wl-example-bg: rgba(0, 0, 0, 0.03);\n    --wl-close-hover: rgba(0, 0, 0, 0.08);\n    --wl-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);\n  }\n}\n:root[data-theme=\"light\"] .dsh-wl-card,\n.light .dsh-wl-card {\n  --wl-bg: #ffffff;\n  --wl-fg: #18181c;\n  --wl-fg-muted: #626270;\n  --wl-border: rgba(0, 0, 0, 0.12);\n  --wl-tag-bg: rgba(0, 0, 0, 0.06);\n  --wl-tag-fg: #454552;\n  --wl-example-bg: rgba(0, 0, 0, 0.03);\n  --wl-close-hover: rgba(0, 0, 0, 0.08);\n  --wl-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);\n}\n:root[data-theme=\"dark\"] .dsh-wl-card,\n.dark .dsh-wl-card {\n  --wl-bg: #1c1c21;\n  --wl-fg: #f2f2f7;\n  --wl-fg-muted: #9898a6;\n  --wl-border: rgba(255, 255, 255, 0.14);\n  --wl-tag-bg: rgba(255, 255, 255, 0.08);\n  --wl-tag-fg: #d0d0dc;\n  --wl-example-bg: rgba(255, 255, 255, 0.04);\n  --wl-close-hover: rgba(255, 255, 255, 0.12);\n  --wl-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);\n}\nerror-probe×Request refused (500)\"",
+      "measured": {
+        "present": true,
+        "state": "ready",
+        "uiState": "error",
+        "headword": null,
+        "phonetic": null,
+        "lemma": null,
+        "glosses": [],
+        "examples": [],
+        "rect": {
+          "x": 520,
+          "y": 60,
+          "width": 360,
+          "height": 90,
+          "right": 880,
+          "bottom": 150
+        },
+        "text": "\n.dsh-wl-card {\n  --wl-bg: #1c1c21;\n  --wl-fg: #f2f2f7;\n  --wl-fg-muted: #9898a6;\n  --wl-border: rgba(255, 255, 255, 0.14);\n  --wl-tag-bg: rgba(255, 255, 255, 0.08);\n  --wl-tag-fg: #d0d0dc;\n  --wl-example-bg: rgba(255, 255, 255, 0.04);\n  --wl-close-hover: rgba(255, 255, 255, 0.12);\n  --wl-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);\n}\n@media (prefers-color-scheme: light) {\n  .dsh-wl-card {\n    --wl-bg: #ffffff;\n    --wl-fg: #18181c;\n    --wl-fg-muted: #626270;\n    --wl-border: rgba(0, 0, 0, 0.12);\n    --wl-tag-bg: rgba(0, 0, 0, 0.06);\n    --wl-tag-fg: #454552;\n    --wl-example-bg: rgba(0, 0, 0, 0.03);\n    --wl-close-hover: rgba(0, 0, 0, 0.08);\n    --wl-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);\n  }\n}\n:root[data-theme=\"light\"] .dsh-wl-card,\n.light .dsh-wl-card {\n  --wl-bg: #ffffff;\n  --wl-fg: #18181c;\n  --wl-fg-muted: #626270;\n  --wl-border: rgba(0, 0, 0, 0.12);\n  --wl-tag-bg: rgba(0, 0, 0, 0.06);\n  --wl-tag-fg: #454552;\n  --wl-example-bg: rgba(0, 0, 0, 0.03);\n  --wl-close-hover: rgba(0, 0, 0, 0.08);\n  --wl-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);\n}\n:root[data-theme=\"dark\"] .dsh-wl-card,\n.dark .dsh-wl-card {\n  --wl-bg: #1c1c21;\n  --wl-fg: #f2f2f7;\n  --wl-fg-muted: #9898a6;\n  --wl-border: rgba(255, 255, 255, 0.14);\n  --wl-tag-bg: rgba(255, 255, 255, 0.08);\n  --wl-tag-fg: #d0d0dc;\n  --wl-example-bg: rgba(255, 255, 255, 0.04);\n  --wl-close-hover: rgba(255, 255, 255, 0.12);\n  --wl-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);\n}\nerror-probe×Request refused (500)",
+        "role": "region",
+        "ariaLabel": "Dictionary lookup",
+        "closeLabel": "Close dictionary"
+      }
+    },
+    {
+      "id": "UI05-Recovery",
+      "description": "normal lookup immediately recovers card from previous error",
+      "passed": true,
+      "detail": "recovered headword=derive",
+      "measured": {
+        "present": true,
+        "state": "ready",
+        "uiState": "found",
+        "headword": "derive",
+        "phonetic": "/dɪˈraɪv/",
+        "lemma": null,
+        "glosses": [
+          "导出",
+          "；派生",
+          "；源自"
+        ],
+        "examples": [
+          "The result must derive from the boundary conditions alone.该结果只能由边界条件导出。",
+          "This identity derives from Gauss’s law.这一恒等式源自高斯定律。"
+        ],
+        "rect": {
+          "x": 112,
+          "y": 155,
+          "width": 360,
+          "height": 238,
+          "right": 472,
+          "bottom": 393
+        },
+        "text": "\n.dsh-wl-card {\n  --wl-bg: #1c1c21;\n  --wl-fg: #f2f2f7;\n  --wl-fg-muted: #9898a6;\n  --wl-border: rgba(255, 255, 255, 0.14);\n  --wl-tag-bg: rgba(255, 255, 255, 0.08);\n  --wl-tag-fg: #d0d0dc;\n  --wl-example-bg: rgba(255, 255, 255, 0.04);\n  --wl-close-hover: rgba(255, 255, 255, 0.12);\n  --wl-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);\n}\n@media (prefers-color-scheme: light) {\n  .dsh-wl-card {\n    --wl-bg: #ffffff;\n    --wl-fg: #18181c;\n    --wl-fg-muted: #626270;\n    --wl-border: rgba(0, 0, 0, 0.12);\n    --wl-tag-bg: rgba(0, 0, 0, 0.06);\n    --wl-tag-fg: #454552;\n    --wl-example-bg: rgba(0, 0, 0, 0.03);\n    --wl-close-hover: rgba(0, 0, 0, 0.08);\n    --wl-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);\n  }\n}\n:root[data-theme=\"light\"] .dsh-wl-card,\n.light .dsh-wl-card {\n  --wl-bg: #ffffff;\n  --wl-fg: #18181c;\n  --wl-fg-muted: #626270;\n  --wl-border: rgba(0, 0, 0, 0.12);\n  --wl-tag-bg: rgba(0, 0, 0, 0.06);\n  --wl-tag-fg: #454552;\n  --wl-example-bg: rgba(0, 0, 0, 0.03);\n  --wl-close-hover: rgba(0, 0, 0, 0.08);\n  --wl-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);\n}\n:root[data-theme=\"dark\"] .dsh-wl-card,\n.dark .dsh-wl-card {\n  --wl-bg: #1c1c21;\n  --wl-fg: #f2f2f7;\n  --wl-fg-muted: #9898a6;\n  --wl-border: rgba(255, 255, 255, 0.14);\n  --wl-tag-bg: rgba(255, 255, 255, 0.08);\n  --wl-tag-fg: #d0d0dc;\n  --wl-example-bg: rgba(255, 255, 255, 0.04);\n  --wl-close-hover: rgba(255, 255, 255, 0.12);\n  --wl-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);\n}\nderive/dɪˈraɪv/×verb导出；派生；源自 obtain something from a specified source; originate inderived · derives · derivingThe result must derive from the boundary conditions alone.该结果只能由边界条件导出。This identity derives from Gauss’s law.这一恒等式源自高斯定律。",
+        "role": "region",
+        "ariaLabel": "Dictionary lookup",
+        "closeLabel": "Close dictionary"
+      }
+    },
+    {
+      "id": "POS-TOP",
+      "description": "selection near top places card below and respects top/left margins",
+      "passed": true,
+      "detail": "card.y=44 card.bottom=139",
+      "measured": {
+        "x": 340,
+        "y": 44,
+        "width": 360,
+        "height": 95,
+        "right": 700,
+        "bottom": 139
+      }
+    },
+    {
+      "id": "POS-BOTTOM",
+      "description": "selection near bottom places card above and does not overlap composer input",
+      "passed": true,
+      "detail": "card.bottom=771 composer.y=814",
+      "measured": {
+        "cardRect": {
+          "x": 340,
+          "y": 533,
+          "width": 360,
+          "height": 238,
+          "right": 700,
+          "bottom": 771
+        },
+        "composerY": 814
+      }
+    },
+    {
+      "id": "POS-LEFT",
+      "description": "selection near left edge clamps card.left >= 12px within viewport margin",
+      "passed": true,
+      "detail": "anchor.x=4 card.x=12 card.right=372",
+      "measured": {
+        "anchorRect": {
+          "x": 4,
+          "y": 280,
+          "width": 43.265625,
+          "height": 21
+        },
+        "cardRect": {
+          "x": 12,
+          "y": 309,
+          "width": 360,
+          "height": 95,
+          "right": 372,
+          "bottom": 404
+        },
+        "viewport": {
+          "width": 1400,
+          "height": 900
+        }
+      }
+    },
+    {
+      "id": "POS-RIGHT",
+      "description": "selection near right edge clamps card.right <= viewport.width - 12px",
+      "passed": true,
+      "detail": "anchor.x=1352.734375 card.right=1388 card.x=1028",
+      "measured": {
+        "anchorRect": {
+          "x": 1352.734375,
+          "y": 280,
+          "width": 43.265625,
+          "height": 21
+        },
+        "cardRect": {
+          "x": 1028,
+          "y": 309,
+          "width": 360,
+          "height": 95,
+          "right": 1388,
+          "bottom": 404
+        },
+        "viewport": {
+          "width": 1400,
+          "height": 900
+        }
+      }
+    },
+    {
+      "id": "POS-NULL-FALLBACK",
+      "description": "anchorRect === null triggers upper-center fallback within viewport bounds and clears composer",
+      "passed": true,
+      "detail": "actual.x=520 expectedCenter.x=520 card.y=60",
+      "measured": {
+        "cardRect": {
+          "x": 520,
+          "y": 60,
+          "width": 360,
+          "height": 238,
+          "right": 880,
+          "bottom": 298
+        },
+        "expectedCenterX": 520
+      }
+    },
+    {
+      "id": "POS-MULTILINE",
+      "description": "multiline selection geometry places card cleanly within margins",
+      "passed": true,
+      "detail": "rect={\"x\":38,\"y\":275,\"width\":360,\"height\":134,\"right\":398,\"bottom\":409}",
+      "measured": {
+        "x": 38,
+        "y": 275,
+        "width": 360,
+        "height": 134,
+        "right": 398,
+        "bottom": 409
+      }
+    },
+    {
+      "id": "POS-NARROW",
+      "description": "narrow viewport (360px) clamps card within viewport margins without horizontal overflow",
+      "passed": true,
+      "detail": "x=12 right=348 width=336",
+      "measured": {
+        "x": 12,
+        "y": 155,
+        "width": 336,
+        "height": 95,
+        "right": 348,
+        "bottom": 250
+      }
+    },
+    {
+      "id": "POS-RESIZE-LIVE",
+      "description": "shrinking viewport while card is already open re-clamps card within new viewport margins with 0 horizontal overflow",
+      "passed": true,
+      "detail": "wideRect={\"x\":112,\"y\":155,\"width\":360,\"height\":238,\"right\":472,\"bottom\":393} narrowRect={\"x\":48,\"y\":155,\"width\":360,\"height\":238,\"right\":408,\"bottom\":393}",
+      "measured": {
+        "before": {
+          "x": 112,
+          "y": 155,
+          "width": 360,
+          "height": 238,
+          "right": 472,
+          "bottom": 393
+        },
+        "after": {
+          "x": 48,
+          "y": 155,
+          "width": 360,
+          "height": 238,
+          "right": 408,
+          "bottom": 393
+        },
+        "hasHorizontalOverflow": false
+      }
+    },
+    {
+      "id": "DISMISS-BUTTON",
+      "description": "clicking close button (accessible name \"Close dictionary\") dismisses card",
+      "passed": true,
+      "detail": "card dismissed"
+    },
+    {
+      "id": "DISMISS-ESCAPE",
+      "description": "pressing Escape dismisses visible card",
+      "passed": true,
+      "detail": "card dismissed via Escape"
+    },
+    {
+      "id": "DISMISS-OUTSIDE",
+      "description": "clicking outside dismisses card without swallowing click on underlying element (no click shield)",
+      "passed": true,
+      "detail": "composerClicked=true",
+      "measured": {
+        "composerClicked": true
+      }
+    },
+    {
+      "id": "SCROLL-POLICY-FIXED",
+      "description": "card position is fixed in viewport; underlying conversation scroll changes while card stays stable and safe",
+      "passed": true,
+      "detail": "card.y before=155 after=155 container.scrollTop=50",
+      "measured": {
+        "beforeY": 155,
+        "afterY": 155,
+        "containerScrolled": 50
+      }
+    },
+    {
+      "id": "PASS-THROUGH-WHEEL",
+      "description": "mouse wheel over conversation area outside card scrolls conversation without card overlay intercepting",
+      "passed": true,
+      "detail": "scrollTop initial=50 after=73",
+      "measured": {
+        "initial": 50,
+        "after": 73
+      }
+    },
+    {
+      "id": "PASS-THROUGH-SELECTION",
+      "description": "drag-selecting text in conversation outside card is not blocked by overlay and successfully establishes selection",
+      "passed": true,
+      "detail": "selectedText=\"he continuous wav\"",
+      "measured": {
+        "selectedText": "he continuous wav"
+      }
+    },
+    {
+      "id": "RACE-D1",
+      "description": "D1: request definitely observed in-flight -> dismiss -> release response -> card remains closed and idle",
+      "passed": true,
+      "detail": "seenInFlight=true cardStatus=idle",
+      "measured": {
+        "seenInFlight": true,
+        "cardStatus": "idle"
+      }
+    },
+    {
+      "id": "RACE-D2",
+      "description": "D2: request definitely observed in-flight -> dismiss -> release 500 error -> card remains closed and idle without error banner",
+      "passed": true,
+      "detail": "seenInFlight=true cardStatus=idle",
+      "measured": {
+        "seenInFlight": true,
+        "cardStatus": "idle"
+      }
+    },
+    {
+      "id": "RACE-D3",
+      "description": "D3: A starts -> dismiss A -> B succeeds -> late A settles -> B remains visible, late A cannot overwrite B",
+      "passed": true,
+      "detail": "headword=go gen=23",
+      "measured": {
+        "headword": "go",
+        "generation": 23
+      }
+    },
+    {
+      "id": "RACE-D4",
+      "description": "D4: exact same query looked up after dismissal reopens surface normally with new generation",
+      "passed": true,
+      "detail": "headword=derive",
+      "measured": {
+        "present": true,
+        "state": "ready",
+        "uiState": "found",
+        "headword": "derive",
+        "phonetic": "/dɪˈraɪv/",
+        "lemma": null,
+        "glosses": [
+          "导出",
+          "；派生",
+          "；源自"
+        ],
+        "examples": [
+          "The result must derive from the boundary conditions alone.该结果只能由边界条件导出。",
+          "This identity derives from Gauss’s law.这一恒等式源自高斯定律。"
+        ],
+        "rect": {
+          "x": 112,
+          "y": 155,
+          "width": 360,
+          "height": 238,
+          "right": 472,
+          "bottom": 393
+        },
+        "text": "\n.dsh-wl-card {\n  --wl-bg: #1c1c21;\n  --wl-fg: #f2f2f7;\n  --wl-fg-muted: #9898a6;\n  --wl-border: rgba(255, 255, 255, 0.14);\n  --wl-tag-bg: rgba(255, 255, 255, 0.08);\n  --wl-tag-fg: #d0d0dc;\n  --wl-example-bg: rgba(255, 255, 255, 0.04);\n  --wl-close-hover: rgba(255, 255, 255, 0.12);\n  --wl-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);\n}\n@media (prefers-color-scheme: light) {\n  .dsh-wl-card {\n    --wl-bg: #ffffff;\n    --wl-fg: #18181c;\n    --wl-fg-muted: #626270;\n    --wl-border: rgba(0, 0, 0, 0.12);\n    --wl-tag-bg: rgba(0, 0, 0, 0.06);\n    --wl-tag-fg: #454552;\n    --wl-example-bg: rgba(0, 0, 0, 0.03);\n    --wl-close-hover: rgba(0, 0, 0, 0.08);\n    --wl-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);\n  }\n}\n:root[data-theme=\"light\"] .dsh-wl-card,\n.light .dsh-wl-card {\n  --wl-bg: #ffffff;\n  --wl-fg: #18181c;\n  --wl-fg-muted: #626270;\n  --wl-border: rgba(0, 0, 0, 0.12);\n  --wl-tag-bg: rgba(0, 0, 0, 0.06);\n  --wl-tag-fg: #454552;\n  --wl-example-bg: rgba(0, 0, 0, 0.03);\n  --wl-close-hover: rgba(0, 0, 0, 0.08);\n  --wl-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);\n}\n:root[data-theme=\"dark\"] .dsh-wl-card,\n.dark .dsh-wl-card {\n  --wl-bg: #1c1c21;\n  --wl-fg: #f2f2f7;\n  --wl-fg-muted: #9898a6;\n  --wl-border: rgba(255, 255, 255, 0.14);\n  --wl-tag-bg: rgba(255, 255, 255, 0.08);\n  --wl-tag-fg: #d0d0dc;\n  --wl-example-bg: rgba(255, 255, 255, 0.04);\n  --wl-close-hover: rgba(255, 255, 255, 0.12);\n  --wl-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);\n}\nderive/dɪˈraɪv/×verb导出；派生；源自 obtain something from a specified source; originate inderived · derives · derivingThe result must derive from the boundary conditions alone.该结果只能由边界条件导出。This identity derives from Gauss’s law.这一恒等式源自高斯定律。",
+        "role": "region",
+        "ariaLabel": "Dictionary lookup",
+        "closeLabel": "Close dictionary"
+      }
+    },
+    {
+      "id": "RACE-OUTSIDE-DBLCLICK",
+      "description": "double-clicking word B outside open card dismisses card A and displays word B",
+      "passed": true,
+      "detail": "go",
+      "measured": {
+        "present": true,
+        "state": "ready",
+        "uiState": "found",
+        "headword": "go",
+        "phonetic": "/ɡəʊ/",
+        "lemma": "went → go",
+        "glosses": [
+          "去",
+          "；走",
+          "；进行"
+        ],
+        "examples": [
+          "The measurement went the other way.测量结果朝相反方向变化了。"
+        ],
+        "rect": {
+          "x": 612,
+          "y": 155,
+          "width": 360,
+          "height": 211,
+          "right": 972,
+          "bottom": 366
+        },
+        "text": "\n.dsh-wl-card {\n  --wl-bg: #1c1c21;\n  --wl-fg: #f2f2f7;\n  --wl-fg-muted: #9898a6;\n  --wl-border: rgba(255, 255, 255, 0.14);\n  --wl-tag-bg: rgba(255, 255, 255, 0.08);\n  --wl-tag-fg: #d0d0dc;\n  --wl-example-bg: rgba(255, 255, 255, 0.04);\n  --wl-close-hover: rgba(255, 255, 255, 0.12);\n  --wl-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);\n}\n@media (prefers-color-scheme: light) {\n  .dsh-wl-card {\n    --wl-bg: #ffffff;\n    --wl-fg: #18181c;\n    --wl-fg-muted: #626270;\n    --wl-border: rgba(0, 0, 0, 0.12);\n    --wl-tag-bg: rgba(0, 0, 0, 0.06);\n    --wl-tag-fg: #454552;\n    --wl-example-bg: rgba(0, 0, 0, 0.03);\n    --wl-close-hover: rgba(0, 0, 0, 0.08);\n    --wl-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);\n  }\n}\n:root[data-theme=\"light\"] .dsh-wl-card,\n.light .dsh-wl-card {\n  --wl-bg: #ffffff;\n  --wl-fg: #18181c;\n  --wl-fg-muted: #626270;\n  --wl-border: rgba(0, 0, 0, 0.12);\n  --wl-tag-bg: rgba(0, 0, 0, 0.06);\n  --wl-tag-fg: #454552;\n  --wl-example-bg: rgba(0, 0, 0, 0.03);\n  --wl-close-hover: rgba(0, 0, 0, 0.08);\n  --wl-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);\n}\n:root[data-theme=\"dark\"] .dsh-wl-card,\n.dark .dsh-wl-card {\n  --wl-bg: #1c1c21;\n  --wl-fg: #f2f2f7;\n  --wl-fg-muted: #9898a6;\n  --wl-border: rgba(255, 255, 255, 0.14);\n  --wl-tag-bg: rgba(255, 255, 255, 0.08);\n  --wl-tag-fg: #d0d0dc;\n  --wl-example-bg: rgba(255, 255, 255, 0.04);\n  --wl-close-hover: rgba(255, 255, 255, 0.12);\n  --wl-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);\n}\ngo/ɡəʊ/×went → goverb去；走；进行 move or travel from one place to anothergoes · going · gone · wentThe measurement went the other way.测量结果朝相反方向变化了。",
+        "role": "region",
+        "ariaLabel": "Dictionary lookup",
+        "closeLabel": "Close dictionary"
+      }
+    },
+    {
+      "id": "RACE-OUTSIDE-DRAG",
+      "description": "drag-selecting word B outside open card dismisses card A and displays word B",
+      "passed": true,
+      "detail": "tooth",
+      "measured": {
+        "present": true,
+        "state": "ready",
+        "uiState": "found",
+        "headword": "tooth",
+        "phonetic": "/tuːθ/",
+        "lemma": "teeth → tooth",
+        "glosses": [
+          "牙齿",
+          "；齿"
+        ],
+        "examples": [
+          "Each tooth has a crown and one or more roots.每颗牙齿都有一个牙冠和一条或多条牙根。",
+          "A chipped tooth can usually be repaired.缺损的牙齿通常可以修复。"
+        ],
+        "rect": {
+          "x": 962,
+          "y": 155,
+          "width": 360,
+          "height": 263,
+          "right": 1322,
+          "bottom": 418
+        },
+        "text": "\n.dsh-wl-card {\n  --wl-bg: #1c1c21;\n  --wl-fg: #f2f2f7;\n  --wl-fg-muted: #9898a6;\n  --wl-border: rgba(255, 255, 255, 0.14);\n  --wl-tag-bg: rgba(255, 255, 255, 0.08);\n  --wl-tag-fg: #d0d0dc;\n  --wl-example-bg: rgba(255, 255, 255, 0.04);\n  --wl-close-hover: rgba(255, 255, 255, 0.12);\n  --wl-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);\n}\n@media (prefers-color-scheme: light) {\n  .dsh-wl-card {\n    --wl-bg: #ffffff;\n    --wl-fg: #18181c;\n    --wl-fg-muted: #626270;\n    --wl-border: rgba(0, 0, 0, 0.12);\n    --wl-tag-bg: rgba(0, 0, 0, 0.06);\n    --wl-tag-fg: #454552;\n    --wl-example-bg: rgba(0, 0, 0, 0.03);\n    --wl-close-hover: rgba(0, 0, 0, 0.08);\n    --wl-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);\n  }\n}\n:root[data-theme=\"light\"] .dsh-wl-card,\n.light .dsh-wl-card {\n  --wl-bg: #ffffff;\n  --wl-fg: #18181c;\n  --wl-fg-muted: #626270;\n  --wl-border: rgba(0, 0, 0, 0.12);\n  --wl-tag-bg: rgba(0, 0, 0, 0.06);\n  --wl-tag-fg: #454552;\n  --wl-example-bg: rgba(0, 0, 0, 0.03);\n  --wl-close-hover: rgba(0, 0, 0, 0.08);\n  --wl-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);\n}\n:root[data-theme=\"dark\"] .dsh-wl-card,\n.dark .dsh-wl-card {\n  --wl-bg: #1c1c21;\n  --wl-fg: #f2f2f7;\n  --wl-fg-muted: #9898a6;\n  --wl-border: rgba(255, 255, 255, 0.14);\n  --wl-tag-bg: rgba(255, 255, 255, 0.08);\n  --wl-tag-fg: #d0d0dc;\n  --wl-example-bg: rgba(255, 255, 255, 0.04);\n  --wl-close-hover: rgba(255, 255, 255, 0.12);\n  --wl-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);\n}\ntooth/tuːθ/×teeth → toothnoun牙齿；齿 each of a set of hard structures set in the jawsteethEach tooth has a crown and one or more roots.每颗牙齿都有一个牙冠和一条或多条牙根。A chipped tooth can usually be repaired.缺损的牙齿通常可以修复。",
+        "role": "region",
+        "ariaLabel": "Dictionary lookup",
+        "closeLabel": "Close dictionary"
+      }
+    },
+    {
+      "id": "CARD-INTERNAL-DBLCLICK",
+      "description": "real double-click on text inside card produces 0 automatic lookup requests",
+      "passed": true,
+      "detail": "initialLookups=28 lookupsAfter=28 delta=0",
+      "measured": {
+        "initialLookups": 28,
+        "lookupsAfter": 28,
+        "delta": 0
+      }
+    },
+    {
+      "id": "CARD-INTERNAL-DRAG",
+      "description": "real pointer drag over text inside card forms genuine selection and produces 0 automatic requests while card remains usable",
+      "passed": true,
+      "detail": "selectedText=\"he result must de\" deltaRequests=0 cardStillUsable=true",
+      "measured": {
+        "selectedText": "he result must de",
+        "delta": 0,
+        "cardStillUsable": true
+      }
+    },
+    {
+      "id": "CARD-COPY-SHORTCUT",
+      "description": "Ctrl+C copy event inside card fires with received=true and defaultPrevented=false without plugin interception",
+      "passed": true,
+      "detail": "received=true prevented=false text=\"he result must de\"",
+      "measured": {
+        "received": true,
+        "prevented": false,
+        "selectedText": "he result must de"
+      }
+    },
+    {
+      "id": "FOCUS-INTEGRITY",
+      "description": "appearance of dictionary card does NOT steal focus from active composer or document",
+      "passed": true,
+      "detail": "before=composer after=composer",
+      "measured": {
+        "before": "composer",
+        "after": "composer"
+      }
+    },
+    {
+      "id": "LONG-CONTENT-SCROLL",
+      "description": "long entries render with scrollHeight > clientHeight (vertical overflow), 0 horizontal overflow, and responsive scrollTop scroll",
+      "passed": true,
+      "detail": "scrollHeight=510 clientHeight=438 scrollTop=72 horizOverflow=false",
+      "measured": {
+        "scrollHeight": 510,
+        "clientHeight": 438,
+        "hasVerticalOverflow": true,
+        "scrollWidth": 358,
+        "clientWidth": 358,
+        "hasHorizontalOverflow": false,
+        "actualScrollTop": 72
+      }
+    },
+    {
+      "id": "CARD-WHEEL",
+      "description": "mouse wheel inside card increments card.scrollTop without driving underlying conversation scroll",
+      "passed": true,
+      "detail": "cardScrollAfter=72 convScrollBefore=73 convScrollAfter=73",
+      "measured": {
+        "cardScrollAfterWheel": 72,
+        "convScrollBeforeCardWheel": 73,
+        "convScrollAfterCardWheel": 73
+      }
+    },
+    {
+      "id": "THEME-DARK",
+      "description": "dark theme renders elevated background and high-contrast foreground colors",
+      "passed": true,
+      "detail": "bg=rgb(28, 28, 33) fg=rgb(242, 242, 247) border=rgba(255, 255, 255, 0.14)",
+      "measured": {
+        "background": "rgb(28, 28, 33)",
+        "color": "rgb(242, 242, 247)",
+        "border": "rgba(255, 255, 255, 0.14)",
+        "headwordColor": "rgb(242, 242, 247)",
+        "glossColor": "rgb(242, 242, 247)"
+      }
+    },
+    {
+      "id": "THEME-LIGHT",
+      "description": "light theme computed background and foreground colors differ significantly from dark theme",
+      "passed": true,
+      "detail": "lightBg=rgb(255, 255, 255) lightFg=rgb(24, 24, 28) differ=true",
+      "measured": {
+        "darkStyles": {
+          "background": "rgb(28, 28, 33)",
+          "color": "rgb(242, 242, 247)",
+          "border": "rgba(255, 255, 255, 0.14)",
+          "headwordColor": "rgb(242, 242, 247)",
+          "glossColor": "rgb(242, 242, 247)"
+        },
+        "lightStyles": {
+          "background": "rgb(255, 255, 255)",
+          "color": "rgb(24, 24, 28)",
+          "border": "rgba(0, 0, 0, 0.12)",
+          "headwordColor": "rgb(24, 24, 28)",
+          "glossColor": "rgb(24, 24, 28)"
+        },
+        "themesDiffer": true
+      }
+    },
+    {
+      "id": "THEME-CONTRAST",
+      "description": "computed WCAG contrast ratio for core text meets or exceeds standard 4.5:1 in both dark and light modes",
+      "passed": true,
+      "detail": "darkBody=15.21:1 darkHeadword=15.21:1 lightBody=17.7:1 lightHeadword=17.7:1",
+      "measured": {
+        "darkBodyContrast": 15.21,
+        "darkHeadwordContrast": 15.21,
+        "lightBodyContrast": 17.7,
+        "lightHeadwordContrast": 17.7,
+        "threshold": 4.5
+      }
+    },
+    {
+      "id": "OVERLAY-SINGLETON",
+      "description": "repeated open/dismiss cycles maintain exactly 1 occupant registration in shell.overlay without accumulation",
+      "passed": true,
+      "detail": "registrationCount=1",
+      "measured": {
+        "entryId": "dsh-word-lookup:card",
+        "order": 900,
+        "declarationSeen": true,
+        "registrationCount": 1
+      }
+    },
+    {
+      "id": "ACCESSIBILITY",
+      "description": "card provides accessible region role, label, h2 structure, and accessible close button",
+      "passed": true,
+      "detail": "{\"role\":\"region\",\"ariaLabel\":\"Dictionary lookup\",\"closeAriaLabel\":\"Close dictionary\",\"hasHeading\":true}",
+      "measured": {
+        "role": "region",
+        "ariaLabel": "Dictionary lookup",
+        "closeAriaLabel": "Close dictionary",
+        "hasHeading": true
+      }
+    }
+  ],
+  "summary": {
+    "passed": 37,
+    "total": 37,
+    "failedIds": []
+  },
+  "screenshots": [
+    {
+      "filename": "normal-found.png",
+      "path": "docs/evidence/store1306-v011-screenshots/normal-found.png",
+      "sha256": "acf04aacf1a6c2ff8407a4228e1ed6d5c79cae0f2e6c993fe65d9fd640d00b37",
+      "width": 1400,
+      "height": 900
+    },
+    {
+      "filename": "not-found.png",
+      "path": "docs/evidence/store1306-v011-screenshots/not-found.png",
+      "sha256": "673540cb181b246e8f261e239014cac7eafd25e07760187aab1b78f74ff89a99",
+      "width": 1400,
+      "height": 900
+    },
+    {
+      "filename": "error.png",
+      "path": "docs/evidence/store1306-v011-screenshots/error.png",
+      "sha256": "b91e36d2b8100fc26f9ddb90e5d9397a85ecde8db050d65ae58cd82834f6ca80",
+      "width": 1400,
+      "height": 900
+    },
+    {
+      "filename": "narrow.png",
+      "path": "docs/evidence/store1306-v011-screenshots/narrow.png",
+      "sha256": "ae2fdc75c981c92206c06eeda8dcdaf5b048b68af63df92c4afbaa56e0ffae2a",
+      "width": 360,
+      "height": 640
+    },
+    {
+      "filename": "long-content.png",
+      "path": "docs/evidence/store1306-v011-screenshots/long-content.png",
+      "sha256": "7e3aad83b70eab7d4b5c346cf2a28f2d6fedd82403a03d92d6d6e0749e8c856b",
+      "width": 1400,
+      "height": 900
+    },
+    {
+      "filename": "dark.png",
+      "path": "docs/evidence/store1306-v011-screenshots/dark.png",
+      "sha256": "ea2cb31bed2592b9c2b13baa02c53cf9ce29ea8824a03f39375e8668d01bc643",
+      "width": 1400,
+      "height": 900
+    },
+    {
+      "filename": "light.png",
+      "path": "docs/evidence/store1306-v011-screenshots/light.png",
+      "sha256": "b42b852e8bb90c4eeb7fb2322b3b82401c980ae9366cc20076dbbb64d993be22",
+      "width": 1400,
+      "height": 900
+    }
+  ],
+  "consoleErrors": [],
+  "pageErrors": [],
+  "productionSafety": "Production DSH environment untouched. All tests executed against isolated test profile and ephemeral port. Synthetic conversation probes only. Zero credentials or user tokens logged."
+}

@@ -1,0 +1,57 @@
+{
+  "phase": "Phase 6.1.1",
+  "testedGitSha": "68d896098087044343c93834d2ebe53e50e67677",
+  "sourceVerification": {
+    "sourceFile": ".cache/corpus/ecdict.csv",
+    "actualSourceByteSize": 65933428,
+    "actualSourceSha256": "1a6947e04785db63613a92e14903cdae7954f7e84860b10e68e5c7cbb3f9c3cf",
+    "manifestByteSize": 566,
+    "manifestFileSha256": "03cba27d42cb43551d7b51fa12e4a07a869c5d4b65ac07f4fa3d105d9c944044",
+    "manifestSourceByteSize": 65933428,
+    "manifestSourceSha256": "1a6947e04785db63613a92e14903cdae7954f7e84860b10e68e5c7cbb3f9c3cf",
+    "sizeMatch": true,
+    "sha256Match": true,
+    "exactObservedHeader": [
+      "word",
+      "phonetic",
+      "definition",
+      "translation",
+      "pos",
+      "collins",
+      "oxford",
+      "tag",
+      "bnc",
+      "frq",
+      "exchange",
+      "detail",
+      "audio"
+    ],
+    "bomActuallyPresent": false,
+    "bomStrippingRequired": false,
+    "fatalUtf8DecodeResult": "fatal UTF-8 decoder completed the entire verified source without error"
+  },
+  "headerValidation": {
+    "status": "PASS",
+    "columnCount": 13,
+    "columns": [
+      "word",
+      "phonetic",
+      "definition",
+      "translation",
+      "pos",
+      "collins",
+      "oxford",
+      "tag",
+      "bnc",
+      "frq",
+      "exchange",
+      "detail",
+      "audio"
+    ]
+  },
+  "provenanceGateEnforcement": {
+    "verifiedBeforeDbCreation": true,
+    "verifiedBeforeFileRemoval": true,
+    "existingDbUntouchedOnMismatch": true
+  }
+}

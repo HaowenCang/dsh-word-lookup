@@ -1,0 +1,96 @@
+{
+  "testedCodeGitSha": "68d896098087044343c93834d2ebe53e50e67677",
+  "testedHostBundleSha256": "4e82542be45483ef414934feae8c2682edf48acc6ebbf3d731908245f1b67c7e",
+  "testedClientBundleSha256": "0f1d730f02232f0920b14f136018a55eb86f552e7f828eeafc3543a673318c41",
+  "profileResolvedHostBundleSha256": "4e82542be45483ef414934feae8c2682edf48acc6ebbf3d731908245f1b67c7e",
+  "profileResolvedClientBundleSha256": "0f1d730f02232f0920b14f136018a55eb86f552e7f828eeafc3543a673318c41",
+  "profileResolvedBundlesMatchRepository": true,
+  "resolvedPluginPath": "E:\\Projects\\DSHarness\\dsh-word-lookup",
+  "profileBinding": {
+    "profile": "word-lookup-test",
+    "profileDir": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-word-lookup-test\\home\\profiles\\word-lookup-test",
+    "bundleRegisteredInProfilePackageJson": true,
+    "linkDependencyVerified": true,
+    "resolvedPluginMatchesRepoRoot": true,
+    "profileResolvedHostBundleSha256": "4e82542be45483ef414934feae8c2682edf48acc6ebbf3d731908245f1b67c7e",
+    "profileResolvedClientBundleSha256": "0f1d730f02232f0920b14f136018a55eb86f552e7f828eeafc3543a673318c41",
+    "profileResolvedBundlesMatchRepository": true
+  },
+  "manifest": {
+    "sourceName": "ECDICT",
+    "sourceCommit": "bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b",
+    "sourceSha256": "1a6947e04785db63613a92e14903cdae7954f7e84860b10e68e5c7cbb3f9c3cf",
+    "sourceByteSize": 65933428
+  },
+  "isolation": {
+    "check": "PASS",
+    "home": "<TEST_ROOT>/home",
+    "profile": "word-lookup-test",
+    "portsUsed": "isolated high ports",
+    "productionEnvironmentUntouched": true
+  },
+  "networkObservation": {
+    "browserVisible": {
+      "instrumentation": "playwright-request-interception",
+      "externalOriginRequestsObserved": 0,
+      "externalOriginRequests": [],
+      "localhostSameOriginRequestsObserved": 35
+    },
+    "hostProcessWideNetworkActivity": "notMeasured"
+  },
+  "aiSafety": {
+    "runtimeObservation": "notMeasured",
+    "staticArchitectureInvariant": {
+      "passed": true,
+      "statement": "Static architecture scan found no configured AI SDK dependency or known model endpoint in the audited package/bundles.",
+      "matchedAiDependencies": [],
+      "foundModelEndpoints": []
+    }
+  },
+  "runtimeVerification": {
+    "dictionarySourceObserved": "ecdict-local",
+    "fixtureFallbackObserved": false
+  },
+  "cr1Probes": {
+    "wave function": {
+      "status": 200,
+      "found": true,
+      "source": "ecdict-local",
+      "headword": "wave function",
+      "translationSample": "[计] 波函数\\n[化] 波函数"
+    },
+    "conservation": {
+      "status": 200,
+      "found": true,
+      "source": "ecdict-local",
+      "headword": "conservation"
+    },
+    "neutrino": {
+      "status": 200,
+      "found": true,
+      "source": "ecdict-local",
+      "headword": "neutrino",
+      "translationSample": "n. 中微子\\n[化] 中微子; 微中子",
+      "absentFromFixture": true
+    },
+    "quarks": {
+      "status": 200,
+      "found": true,
+      "source": "ecdict-local",
+      "headword": "quarks",
+      "absentFromFixture": true
+    }
+  },
+  "negativeGates": {
+    "CR2_missingDbRefusal": true,
+    "CR3_wrongSourceShaRefusal": true,
+    "CR4_wrongUpstreamCommitRefusal": true,
+    "CR5_corruptedDbRefusal": true
+  },
+  "allChecksPassed": true,
+  "productionSafety": {
+    "networkAccessAllowed": false,
+    "fullCorpusTrackedInGit": false,
+    "productionDshModified": false
+  }
+}

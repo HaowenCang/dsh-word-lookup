@@ -1,0 +1,420 @@
+{
+  "phase": "6R.1",
+  "reportTitle": "Phase 6R.1 Evidence & Release Integrity Closure Verification",
+  "testedCodeGitSha": "68d896098087044343c93834d2ebe53e50e67677",
+  "verificationTimestamp": "2026-10-05T14:52:37.301Z",
+  "releaseMetadata": {
+    "packageJsonVersion": "0.1.1",
+    "packageLockVersion": "0.1.1",
+    "packageLockRootVersion": "0.1.1"
+  },
+  "tarball": {
+    "filename": "dsh-word-lookup-0.1.1.tgz",
+    "packageName": "dsh-word-lookup",
+    "version": "0.1.1",
+    "sha256": "9001396d4001f4a03914e46809f4d0f6c0cf0125e15bcde3a834c26cb9a737c7",
+    "size": 46121,
+    "unpackedSize": 146456,
+    "fileCount": 7,
+    "files": [
+      "LICENSE",
+      "README.md",
+      "cordis.patch.yml",
+      "corpus/ecdict.manifest.json",
+      "lib/client.js",
+      "lib/index.js",
+      "package.json"
+    ]
+  },
+  "storeContract": {
+    "allPassed": true,
+    "missingLocalModules": 0,
+    "forbiddenCorpusArtifacts": [],
+    "signals": {
+      "files": true,
+      "network": true,
+      "commands": false,
+      "credentials": true,
+      "protectedDsh": false,
+      "native": false,
+      "dynamic": false
+    }
+  },
+  "lifecycle": {
+    "testedCodeGitSha": "68d896098087044343c93834d2ebe53e50e67677",
+    "candidateTarballSha256": "9001396d4001f4a03914e46809f4d0f6c0cf0125e15bcde3a834c26cb9a737c7",
+    "selectedPort": 50993,
+    "finalIsolationCheckPassed": true,
+    "install": {
+      "passed": true,
+      "details": {
+        "tarballFilename": "dsh-word-lookup-0.1.1.tgz",
+        "tarball": "E:\\Projects\\DSHarness\\dsh-word-lookup\\dsh-word-lookup-0.1.1.tgz",
+        "sha256": "9001396d4001f4a03914e46809f4d0f6c0cf0125e15bcde3a834c26cb9a737c7",
+        "installedPath": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-word-lookup-test\\home\\profiles\\word-lookup-test\\node_modules\\dsh-word-lookup",
+        "isSymbolicLinkOrJunction": false,
+        "notRepoRoot": true,
+        "version": "0.1.1",
+        "bundleListedOnce": true,
+        "cordisPatchPresent": true,
+        "runtimeBundlesExist": true
+      }
+    },
+    "start": {
+      "passed": true,
+      "details": {
+        "unauthenticatedFenceStatus": 401,
+        "hostRouteStatus": 200,
+        "fixtureLookupResult": "derive",
+        "clientBundleLoaded": true,
+        "cardRendered": true,
+        "renderedHeadword": "derive"
+      }
+    },
+    "uninstall": {
+      "passed": true,
+      "details": {
+        "packageDirectoryRemoved": true,
+        "routeAbsent404": true,
+        "clientModuleAbsent": true
+      }
+    },
+    "rollback": {
+      "passed": true,
+      "details": {
+        "targetTarball": "dsh-word-lookup-0.1.0.tgz",
+        "verifiedSha256": "22d3cdffd9f73790adebb707cf36a258453a4813db981d19d9d5cffb249458cc",
+        "sha256Match": true,
+        "hostRouteOk": true,
+        "clientLoaded": true,
+        "cardVisible": true,
+        "renderedHeadword": "derive"
+      }
+    }
+  },
+  "commandMatrix": [
+    {
+      "command": "npm test",
+      "exitCode": 0,
+      "durationMs": 5335,
+      "passed": true,
+      "totals": {
+        "testFiles": 27,
+        "testFilesPassed": 27,
+        "testFilesFailed": 0,
+        "testsPassed": 468,
+        "testsFailed": 0,
+        "testsSkipped": 0,
+        "totalTests": 468
+      }
+    },
+    {
+      "command": "npm run typecheck",
+      "exitCode": 0,
+      "durationMs": 1791,
+      "passed": true,
+      "totals": {
+        "status": "PASS",
+        "errors": 0
+      }
+    },
+    {
+      "command": "npm run verify",
+      "exitCode": 0,
+      "durationMs": 13176,
+      "passed": true,
+      "totals": {
+        "status": "PASS",
+        "stepsPassed": 6,
+        "totalSteps": 6,
+        "steps": [
+          {
+            "status": "PASS",
+            "name": "fixture",
+            "durationSeconds": 3.8
+          },
+          {
+            "status": "PASS",
+            "name": "typecheck",
+            "durationSeconds": 1.7
+          },
+          {
+            "status": "PASS",
+            "name": "test",
+            "durationSeconds": 5.4
+          },
+          {
+            "status": "PASS",
+            "name": "build",
+            "durationSeconds": 1.5
+          },
+          {
+            "status": "PASS",
+            "name": "bundle-static-checks",
+            "durationSeconds": 0
+          },
+          {
+            "status": "PASS",
+            "name": "credential-scan",
+            "durationSeconds": 0.2
+          }
+        ]
+      }
+    },
+    {
+      "command": "npm run verify:store-contract",
+      "exitCode": 0,
+      "durationMs": 753,
+      "passed": true,
+      "totals": {
+        "allPassed": true,
+        "checksTotal": 25,
+        "checksPassed": 25,
+        "missingLocalModules": 0
+      }
+    },
+    {
+      "command": "npm pack --dry-run",
+      "exitCode": 0,
+      "durationMs": 652,
+      "passed": true,
+      "totals": {
+        "packageName": "dsh-word-lookup",
+        "version": "0.1.1",
+        "packageSize": 46121,
+        "unpackedSize": 146456,
+        "entryCount": 7,
+        "files": [
+          "LICENSE",
+          "README.md",
+          "cordis.patch.yml",
+          "corpus/ecdict.manifest.json",
+          "lib/client.js",
+          "lib/index.js",
+          "package.json"
+        ]
+      }
+    },
+    {
+      "command": "npm pack",
+      "exitCode": 0,
+      "durationMs": 657,
+      "passed": true,
+      "totals": {
+        "tarball": "dsh-word-lookup-0.1.1.tgz",
+        "size": 46121,
+        "sha256": "9001396d4001f4a03914e46809f4d0f6c0cf0125e15bcde3a834c26cb9a737c7",
+        "fileCount": 7
+      }
+    },
+    {
+      "command": "npm run test:store-lifecycle",
+      "exitCode": 0,
+      "durationMs": 19512,
+      "passed": true,
+      "totals": {
+        "allPassed": true,
+        "selectedPort": 50993,
+        "install": true,
+        "start": true,
+        "uninstall": true,
+        "rollback": true
+      }
+    },
+    {
+      "command": "npm run test:runtime",
+      "exitCode": 0,
+      "durationMs": 325800,
+      "passed": true,
+      "totals": {
+        "status": "PASS",
+        "checksPassed": 169,
+        "checksFailed": 0,
+        "totalChecks": 169
+      }
+    },
+    {
+      "command": "npm run test:acceptance",
+      "exitCode": 0,
+      "durationMs": 22149,
+      "passed": true,
+      "totals": {
+        "passed": 37,
+        "total": 37,
+        "failed": 0
+      }
+    },
+    {
+      "command": "npm run corpus:verify-source",
+      "exitCode": 0,
+      "durationMs": 355,
+      "passed": true,
+      "totals": {
+        "status": "PASS",
+        "sizeMatch": true,
+        "sha256Match": true
+      }
+    },
+    {
+      "command": "npm run corpus:build",
+      "exitCode": 0,
+      "durationMs": 14366,
+      "passed": true,
+      "totals": {
+        "status": "PASS",
+        "determinism": "PASS",
+        "entries": 770611,
+        "forms": 57689
+      }
+    },
+    {
+      "command": "npm run corpus:verify",
+      "exitCode": 0,
+      "durationMs": 2778,
+      "passed": true,
+      "totals": {
+        "status": "PASS"
+      }
+    },
+    {
+      "command": "npm run corpus:benchmark",
+      "exitCode": 0,
+      "durationMs": 554,
+      "passed": true,
+      "totals": {
+        "status": "PASS",
+        "startupValidationMs": 1.97,
+        "overallMedianUs": 51.4,
+        "overallP95Us": 87
+      }
+    },
+    {
+      "command": "npm run test:corpus-runtime",
+      "exitCode": 0,
+      "durationMs": 33710,
+      "passed": true,
+      "totals": {
+        "allChecksPassed": true,
+        "cr1ProbesCount": 4
+      }
+    }
+  ],
+  "browserAcceptance": {
+    "evidenceFile": "docs/evidence/store1306-v011-browser-acceptance.json",
+    "testedCodeGitSha": "68d896098087044343c93834d2ebe53e50e67677",
+    "dshVersion": "0.2.0-rc.2",
+    "profile": "word-lookup-test",
+    "port": 50992,
+    "passed": 37,
+    "failed": 0,
+    "total": 37,
+    "failedIds": []
+  },
+  "runtimeAcceptance": {
+    "evidenceFile": "docs/evidence/store1306-v011-runtime.json",
+    "testedCodeGitSha": "68d896098087044343c93834d2ebe53e50e67677",
+    "status": "PASS",
+    "checksPassed": 169,
+    "checksFailed": 0,
+    "totalChecks": 169,
+    "failedCheckIds": [],
+    "profile": "word-lookup-test",
+    "port": 50991,
+    "dshVersion": "0.2.0-rc.2"
+  },
+  "corpusRuntimeAcceptance": {
+    "evidenceFile": "docs/evidence/store1306-v011-corpus-runtime.json",
+    "testedCodeGitSha": "68d896098087044343c93834d2ebe53e50e67677",
+    "profileResolvedBundlesMatchRepository": true,
+    "resolvedPluginMatchesRepoRoot": true,
+    "dictionarySourceObserved": "ecdict-local",
+    "fixtureFallbackObserved": false,
+    "cr1Probes": {
+      "wave function": {
+        "status": 200,
+        "found": true,
+        "source": "ecdict-local",
+        "headword": "wave function",
+        "translationSample": "[计] 波函数\\n[化] 波函数"
+      },
+      "conservation": {
+        "status": 200,
+        "found": true,
+        "source": "ecdict-local",
+        "headword": "conservation"
+      },
+      "neutrino": {
+        "status": 200,
+        "found": true,
+        "source": "ecdict-local",
+        "headword": "neutrino",
+        "translationSample": "n. 中微子\\n[化] 中微子; 微中子",
+        "absentFromFixture": true
+      },
+      "quarks": {
+        "status": 200,
+        "found": true,
+        "source": "ecdict-local",
+        "headword": "quarks",
+        "absentFromFixture": true
+      }
+    },
+    "negativeGates": {
+      "CR2_missingDbRefusal": true,
+      "CR3_wrongSourceShaRefusal": true,
+      "CR4_wrongUpstreamCommitRefusal": true,
+      "CR5_corruptedDbRefusal": true
+    },
+    "externalBrowserRequestsObserved": 0,
+    "hostProcessWideNetworkActivity": "notMeasured",
+    "aiSafetyObservation": "notMeasured"
+  },
+  "corpusArtifactsProvenance": {
+    "evidenceFile": "docs/evidence/store1306-v011-source-verification.json",
+    "buildEvidenceFile": "docs/evidence/store1306-v011-corpus-build.json",
+    "benchmarkEvidenceFile": "docs/evidence/store1306-v011-corpus-benchmark.json",
+    "manifest": {
+      "path": "corpus/ecdict.manifest.json",
+      "sourceName": "ECDICT",
+      "sourceCommit": "bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b",
+      "sourceSha256": "1a6947e04785db63613a92e14903cdae7954f7e84860b10e68e5c7cbb3f9c3cf",
+      "sourceByteSize": 65933428,
+      "schemaVersion": 1
+    },
+    "verifiedSource": {
+      "path": ".cache/corpus/ecdict.csv",
+      "actualSha256": "1a6947e04785db63613a92e14903cdae7954f7e84860b10e68e5c7cbb3f9c3cf",
+      "actualByteSize": 65933428,
+      "matchesManifest": true
+    },
+    "builtDatabase": {
+      "path": "build/corpus/ecdict.db",
+      "byteSize": 85889024,
+      "sha256": "8aee00720cf7e1f19df9a515e541c4463abc816c34e95155129396361b32d37d",
+      "entries": 770611,
+      "forms": 57689,
+      "determinismIdentical": true
+    },
+    "benchmark": {
+      "databaseOpenValidationMs": 1.97,
+      "overallMedianUs": 51.4,
+      "overallP95Us": 87
+    }
+  },
+  "isolation": {
+    "productionDshHomeTouched": false,
+    "productionProfileTouched": false,
+    "productionPortTouched": false,
+    "productionSessionTouched": false,
+    "unknownProcessKilled": false
+  },
+  "releaseActions": {
+    "npmPublishPerformed": false,
+    "gitTagCreated": false,
+    "githubReleaseCreated": false
+  },
+  "openBlockers": [
+    "automatic-selection portability"
+  ],
+  "fullCorpusRedistributionAuthorized": false
+}
