@@ -28,7 +28,7 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url))
 const CANONICAL_REPO = 'https://github.com/HaowenCang/dsh-word-lookup'
 const REQUIRED_DSH_VERSION = '0.2.0-rc.2'
 const FORBIDDEN_SCRIPTS = ['preinstall', 'install', 'postinstall', 'prepare']
-const FORBIDDEN_CORPUS_EXTENSIONS = /\.(?:db|sqlite|sqlite3|csv|zip|7z|gz|tar)$/i
+const FORBIDDEN_CORPUS_EXTENSIONS = /\.(?:db|sqlite|sqlite3|csv|zip|7z|gz|tgz|tar)$/i
 
 // --- Store scanner regexes --------------------------------------------------
 const moduleImport = (names) => new RegExp(
@@ -261,6 +261,30 @@ export function runStoreContractCheck() {
   const repoRaw = typeof pkg.repository === 'string' ? pkg.repository : pkg.repository?.url ?? ''
   const canonicalRepo = repoRaw.replace(/^git\+/, '').replace(/\.git$/, '')
   addCheck('Repository identity matches canonical GitHub URL', canonicalRepo === CANONICAL_REPO, `Got: ${canonicalRepo}, Expected: ${CANONICAL_REPO}`)
+
+  // 1b. Release metadata & Lockfile consistency
+  const lockPath = join(ROOT, 'package-lock.json')
+  const lockExists = existsSync(lockPath)
+  addCheck('package-lock.json exists in repository root', lockExists)
+  if (lockExists) {
+    try {
+      const lock = JSON.parse(readFileSync(lockPath, 'utf8'))
+      const lockVersionMatches = lock.version === pkg.version
+      addCheck(
+        'Package-lock top-level version matches package.json',
+        lockVersionMatches,
+        `package.json: ${pkg.version}, package-lock.json: ${lock.version}`,
+      )
+      const lockRootVersionMatches = lock.packages?.['']?.version === pkg.version
+      addCheck(
+        'Package-lock packages[""] version matches package.json',
+        lockRootVersionMatches,
+        `package.json: ${pkg.version}, packages[""].version: ${lock.packages?.['']?.version}`,
+      )
+    } catch (err) {
+      addCheck('package-lock.json is valid JSON', false, String(err))
+    }
+  }
 
   // 2. License
   const licenseDeclared = pkg.license === 'MIT'

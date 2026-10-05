@@ -28,7 +28,7 @@
  * distinguish "not measured" from "measured and false".
  */
 
-import { spawn } from 'node:child_process'
+import { execSync, spawn } from 'node:child_process'
 
 import { assertIsolatedDshEnvironment, buildIsolatedEnv, ISOLATION_BANNER } from './assert-isolated-env.mjs'
 import { redactTokens } from './redact.mjs'
@@ -3203,6 +3203,19 @@ async function main() {
   const failed = results.filter((result) => !result.ok)
   report.summary = { total: results.length, passed: results.length - failed.length, failed: failed.map((result) => result.id) }
   report.status = failed.length === 0 ? 'PASS' : 'FAIL'
+
+  let testedCodeGitSha = 'UNKNOWN'
+  try {
+    testedCodeGitSha = execSync('git rev-parse HEAD', { cwd: REPO_ROOT, encoding: 'utf8' }).trim()
+  } catch {}
+  report.testedCodeGitSha = testedCodeGitSha
+  report.checksPassed = results.length - failed.length
+  report.checksFailed = failed.length
+  report.totalChecks = results.length
+  report.failedCheckIds = failed.map((result) => result.id)
+  report.profile = PROFILE
+  report.port = PORT
+  report.dshVersion = dshVersion
 
   mkdirSync(resolve(OUT_PATH, '..'), { recursive: true })
   // The launch token is a process credential: the URL it travels in mints the

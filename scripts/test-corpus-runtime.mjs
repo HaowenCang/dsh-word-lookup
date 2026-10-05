@@ -827,9 +827,16 @@ async function run() {
     },
   }
 
-  writeFileSync(EVIDENCE_FILE_611, JSON.stringify(evidenceDoc, null, 2) + '\n', 'utf8')
-  writeFileSync(EVIDENCE_FILE_61, JSON.stringify(evidenceDoc, null, 2) + '\n', 'utf8')
-  console.log(`Saved machine-readable evidence to:\n  ${EVIDENCE_FILE_611}\n  ${EVIDENCE_FILE_61}`)
+  if (args.out) {
+    const outPath = resolve(args.out)
+    mkdirSync(dirname(outPath), { recursive: true })
+    writeFileSync(outPath, JSON.stringify(evidenceDoc, null, 2) + '\n', 'utf8')
+    console.log(`Saved machine-readable evidence to:\n  ${outPath}`)
+  } else {
+    writeFileSync(EVIDENCE_FILE_611, JSON.stringify(evidenceDoc, null, 2) + '\n', 'utf8')
+    writeFileSync(EVIDENCE_FILE_61, JSON.stringify(evidenceDoc, null, 2) + '\n', 'utf8')
+    console.log(`Saved machine-readable evidence to:\n  ${EVIDENCE_FILE_611}\n  ${EVIDENCE_FILE_61}`)
+  }
 
   if (failed.length > 0) {
     process.exit(1)

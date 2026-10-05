@@ -26,8 +26,8 @@
 
 import { execSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { DatabaseSync } from 'node:sqlite'
 
@@ -50,7 +50,7 @@ const SAMPLES = {
   longUnknown: ['a'.repeat(64), 'b'.repeat(100), 'unusuallylongtoken'.repeat(5)],
 }
 
-export async function runBenchmark(iterations = 200) {
+export async function runBenchmark(iterations = 200, options = {}) {
   if (!existsSync(DB_PATH)) {
     throw new Error(`Production database not found at ${DB_PATH}; run "npm run corpus:build" first`)
   }
@@ -166,15 +166,39 @@ export async function runBenchmark(iterations = 200) {
     },
   }
 
-  writeFileSync(EVIDENCE_FILE_611, JSON.stringify(summary, null, 2) + '\n', 'utf8')
-  writeFileSync(EVIDENCE_FILE_6, JSON.stringify(summary, null, 2) + '\n', 'utf8')
-
-  console.log(`Saved benchmark evidence to: ${EVIDENCE_FILE_611}`)
+  if (options.out) {
+    const outPath = resolve(options.out)
+    mkdirSync(dirname(outPath), { recursive: true })
+    writeFileSync(outPath, JSON.stringify(summary, null, 2) + '\n', 'utf8')
+    console.log(`Saved benchmark evidence to: ${outPath}`)
+  } else {
+    writeFileSync(EVIDENCE_FILE_611, JSON.stringify(summary, null, 2) + '\n', 'utf8')
+    writeFileSync(EVIDENCE_FILE_6, JSON.stringify(summary, null, 2) + '\n', 'utf8')
+    console.log(`Saved benchmark evidence to: ${EVIDENCE_FILE_611}`)
+  }
   return summary
 }
 
+function parseArgs(argv) {
+  const options = {}
+  for (let index = 0; index < argv.length; index += 1) {
+    const token = argv[index]
+    if (!token.startsWith('--')) continue
+    const value = argv[index + 1]
+    if (value === undefined || value.startsWith('--')) {
+      options[token.slice(2)] = 'true'
+    } else {
+      options[token.slice(2)] = value
+      index += 1
+    }
+  }
+  return options
+}
+
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  runBenchmark().catch((err) => {
+  const options = parseArgs(process.argv.slice(2))
+  const iters = options.iterations ? Number(options.iterations) : 200
+  runBenchmark(iters, options).catch((err) => {
     console.error('benchmark-corpus failed:', err)
     process.exit(1)
   })

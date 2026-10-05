@@ -32,7 +32,7 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import {
@@ -196,18 +196,42 @@ export async function verifySourceArtifact(options = {}) {
   }
 
   if (writeEvidence) {
-    mkdirSync(EVIDENCE_DIR, { recursive: true })
-    writeFileSync(EVIDENCE_FILE_611, JSON.stringify(evidenceDoc, null, 2) + '\n', 'utf8')
-    writeFileSync(EVIDENCE_FILE_61, JSON.stringify(evidenceDoc, null, 2) + '\n', 'utf8')
-    console.log(`Saved source verification evidence to:\n  ${EVIDENCE_FILE_611}\n  ${EVIDENCE_FILE_61}`)
+    if (options.out) {
+      const outPath = resolve(options.out)
+      mkdirSync(dirname(outPath), { recursive: true })
+      writeFileSync(outPath, JSON.stringify(evidenceDoc, null, 2) + '\n', 'utf8')
+      console.log(`Saved source verification evidence to:\n  ${outPath}`)
+    } else {
+      mkdirSync(EVIDENCE_DIR, { recursive: true })
+      writeFileSync(EVIDENCE_FILE_611, JSON.stringify(evidenceDoc, null, 2) + '\n', 'utf8')
+      writeFileSync(EVIDENCE_FILE_61, JSON.stringify(evidenceDoc, null, 2) + '\n', 'utf8')
+      console.log(`Saved source verification evidence to:\n  ${EVIDENCE_FILE_611}\n  ${EVIDENCE_FILE_61}`)
+    }
   }
 
   console.log('verify-source: ALL SOURCE CHECKS PASSED.')
   return evidenceDoc
 }
 
+function parseArgs(argv) {
+  const options = {}
+  for (let index = 0; index < argv.length; index += 1) {
+    const token = argv[index]
+    if (!token.startsWith('--')) continue
+    const value = argv[index + 1]
+    if (value === undefined || value.startsWith('--')) {
+      options[token.slice(2)] = 'true'
+    } else {
+      options[token.slice(2)] = value
+      index += 1
+    }
+  }
+  return options
+}
+
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  verifySourceArtifact().catch((err) => {
+  const options = parseArgs(process.argv.slice(2))
+  verifySourceArtifact(options).catch((err) => {
     console.error('verify-source failed:', err.message)
     process.exit(1)
   })

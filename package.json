@@ -83,6 +83,7 @@
     "test:native-input": "node scripts/phase421-native-input-probe.mjs",
     "test:native-input:preflight": "node scripts/phase421-native-input-probe.mjs --preflight",
     "phase612:verify": "node scripts/phase612-final-verify.mjs",
+    "store1306:verify": "node scripts/store1306-final-verify.mjs",
     "profile:install": "node scripts/profile-install.mjs install",
     "profile:uninstall": "node scripts/profile-install.mjs uninstall"
   },

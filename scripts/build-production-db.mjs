@@ -26,7 +26,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { createHash } from 'node:crypto'
 import { execSync } from 'node:child_process'
 import { createReadStream, existsSync, mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { StreamingCsvParser } from '../src/host/csv-parser.ts'
@@ -671,38 +671,62 @@ export async function buildProductionWithDeterminism(options = {}) {
     },
   }
 
-  writeFileSync(
-    join(evidenceDir, 'phase611-corpus-build.json'),
-    JSON.stringify(determinismEvidenceDoc, null, 2) + '\n',
-    'utf8',
-  )
-  writeFileSync(
-    join(evidenceDir, 'phase61-corpus-build.json'),
-    JSON.stringify(determinismEvidenceDoc, null, 2) + '\n',
-    'utf8',
-  )
-  writeFileSync(
-    join(evidenceDir, 'phase6-corpus-build.json'),
-    JSON.stringify(run1Result.corpusBuild, null, 2) + '\n',
-    'utf8',
-  )
-  writeFileSync(
-    join(evidenceDir, 'phase6-corpus-quality.json'),
-    JSON.stringify(run1Result.corpusQuality, null, 2) + '\n',
-    'utf8',
-  )
-  writeFileSync(
-    join(evidenceDir, 'phase6-form-collisions.json'),
-    JSON.stringify(run1Result.collisions, null, 2) + '\n',
-    'utf8',
-  )
+  if (options.out) {
+    const outPath = resolve(options.out)
+    mkdirSync(dirname(outPath), { recursive: true })
+    writeFileSync(outPath, JSON.stringify(determinismEvidenceDoc, null, 2) + '\n', 'utf8')
+    console.log(`Saved build & determinism evidence to:\n  ${outPath}`)
+  } else {
+    writeFileSync(
+      join(evidenceDir, 'phase611-corpus-build.json'),
+      JSON.stringify(determinismEvidenceDoc, null, 2) + '\n',
+      'utf8',
+    )
+    writeFileSync(
+      join(evidenceDir, 'phase61-corpus-build.json'),
+      JSON.stringify(determinismEvidenceDoc, null, 2) + '\n',
+      'utf8',
+    )
+    writeFileSync(
+      join(evidenceDir, 'phase6-corpus-build.json'),
+      JSON.stringify(run1Result.corpusBuild, null, 2) + '\n',
+      'utf8',
+    )
+    writeFileSync(
+      join(evidenceDir, 'phase6-corpus-quality.json'),
+      JSON.stringify(run1Result.corpusQuality, null, 2) + '\n',
+      'utf8',
+    )
+    writeFileSync(
+      join(evidenceDir, 'phase6-form-collisions.json'),
+      JSON.stringify(run1Result.collisions, null, 2) + '\n',
+      'utf8',
+    )
 
-  console.log(`Saved build & determinism evidence to:\n  docs/evidence/phase611-corpus-build.json\n  docs/evidence/phase61-corpus-build.json`)
+    console.log(`Saved build & determinism evidence to:\n  docs/evidence/phase611-corpus-build.json\n  docs/evidence/phase61-corpus-build.json`)
+  }
   return determinismEvidenceDoc
 }
 
+function parseArgs(argv) {
+  const options = {}
+  for (let index = 0; index < argv.length; index += 1) {
+    const token = argv[index]
+    if (!token.startsWith('--')) continue
+    const value = argv[index + 1]
+    if (value === undefined || value.startsWith('--')) {
+      options[token.slice(2)] = 'true'
+    } else {
+      options[token.slice(2)] = value
+      index += 1
+    }
+  }
+  return options
+}
+
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  buildProductionWithDeterminism().catch((err) => {
+  const options = parseArgs(process.argv.slice(2))
+  buildProductionWithDeterminism(options).catch((err) => {
     console.error('build-production-db failed:', err)
     process.exit(1)
   })

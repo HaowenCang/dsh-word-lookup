@@ -30,7 +30,7 @@
 import { execSync, spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
 
@@ -144,7 +144,9 @@ async function dismissDialogs(page) {
 }
 
 const EVIDENCE_DIR = join(REPO_ROOT, 'docs', 'evidence')
-const SCREENSHOT_DIR = join(EVIDENCE_DIR, 'phase5-screenshots')
+const SCREENSHOT_DIR = options['screenshot-dir']
+  ? resolve(options['screenshot-dir'])
+  : (options.out ? join(EVIDENCE_DIR, 'store1306-v011-screenshots') : join(EVIDENCE_DIR, 'phase5-screenshots'))
 mkdirSync(SCREENSHOT_DIR, { recursive: true })
 
 const ANSI = /\x1B\[[0-?]*[ -/]*[@-~]/g
@@ -1607,9 +1609,10 @@ async function run() {
     const fullPath = join(SCREENSHOT_DIR, filename)
     if (existsSync(fullPath)) {
       const info = inspectPng(fullPath)
+      const relPath = relative(REPO_ROOT, fullPath).replace(/\\/g, '/')
       screenshotMetadata.push({
         filename,
-        path: `docs/evidence/phase5-screenshots/${filename}`,
+        path: relPath,
         sha256: info.sha256,
         width: info.width,
         height: info.height,
@@ -1618,12 +1621,16 @@ async function run() {
   }
 
   // Generate machine-readable JSON evidence
-  const jsonReportPath = join(EVIDENCE_DIR, 'phase5-browser-acceptance-20261004.json')
+  const jsonReportPath = options.out ? resolve(options.out) : join(EVIDENCE_DIR, 'phase5-browser-acceptance-20261004.json')
   const jsonReport = {
-    phase: 'Phase 5.1',
+    phase: options.out ? 'Phase 6R.1' : 'Phase 5.1',
     generatedAt: new Date().toISOString(),
+    testedCodeGitSha: testedGitSha,
     testedGitSha,
     branch,
+    profile: verified.profile,
+    port: verified.port,
+    dshVersion,
     isolation: {
       home: verified.home,
       profile: verified.profile,
@@ -1637,6 +1644,10 @@ async function run() {
       Playwright: '1.63.0',
       viewport: { width: 1400, height: 900 },
     },
+    passed: passedCount,
+    failed: results.length - passedCount,
+    total: results.length,
+    failedIds: results.filter((r) => !r.passed).map((r) => r.id),
     checks: results.map((r) => ({
       id: r.id,
       description: r.description,
@@ -1656,6 +1667,7 @@ async function run() {
       'Production DSH environment untouched. All tests executed against isolated test profile and ephemeral port. Synthetic conversation probes only. Zero credentials or user tokens logged.',
   }
 
+  mkdirSync(dirname(jsonReportPath), { recursive: true })
   writeFileSync(jsonReportPath, JSON.stringify(jsonReport, null, 2), 'utf-8')
   console.log(`\nMachine-readable evidence saved to: ${jsonReportPath}`)
 

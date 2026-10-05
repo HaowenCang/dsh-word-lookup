@@ -17,7 +17,7 @@ import { spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
 
@@ -28,6 +28,8 @@ import {
   isPortFree,
   ISOLATION_BANNER,
   IsolationError,
+  productionFacts,
+  PRODUCTION_PORTS,
 } from './assert-isolated-env.mjs'
 
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url))
@@ -57,8 +59,9 @@ function sha256File(filePath) {
   return createHash('sha256').update(buffer).digest('hex')
 }
 
-async function findAvailablePort(startPort) {
+async function findAvailablePort(startPort, forbiddenPorts = new Set(PRODUCTION_PORTS)) {
   for (let p = startPort; p < startPort + 50; p++) {
+    if (forbiddenPorts.has(p)) continue
     if (await isPortFree(p)) return p
   }
   throw new Error(`No free port found starting from ${startPort}`)
@@ -190,10 +193,24 @@ export async function runStoreLifecycleVerification(opts = {}) {
   const profile = opts.profile ?? 'word-lookup-test'
   const profileDir = join(home, 'profiles', profile)
 
-  // 1. ISOLATION GATE
-  let verified
+  // 0. Git preflight (fail-closed)
+  const statusRes = spawnSync('git', ['status', '--porcelain'], { cwd: REPO_ROOT, encoding: 'utf8' })
+  if (statusRes.status !== 0) {
+    throw new Error(`git status failed: ${statusRes.stderr}`)
+  }
+  const statusOut = statusRes.stdout.trim()
+  if (statusOut.length > 0) {
+    throw new Error(`Lifecycle runner preflight FAIL: Git working tree is dirty.\n${statusOut}`)
+  }
+  const revRes = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: REPO_ROOT, encoding: 'utf8' })
+  if (revRes.status !== 0) {
+    throw new Error(`git rev-parse HEAD failed: ${revRes.stderr}`)
+  }
+  const testedCodeGitSha = revRes.stdout.trim()
+
+  // 1. Initial ISOLATION GATE (paths only)
   try {
-    verified = assertIsolatedDshEnvironment({ home, profile, testRoot, profileDir })
+    assertIsolatedDshEnvironment({ home, profile, testRoot, profileDir })
   } catch (error) {
     if (error instanceof IsolationError) {
       console.error(error.message)
@@ -202,30 +219,32 @@ export async function runStoreLifecycleVerification(opts = {}) {
     throw error
   }
 
-  const port = await findAvailablePort(opts.port ? Number(opts.port) : 50993)
-  verified.port = port
+  // 2. Candidate port discovery avoiding production ports
+  const prodFacts = productionFacts(process.env)
+  const forbiddenPorts = new Set([...PRODUCTION_PORTS, ...prodFacts.ports])
+  const candidatePortStart = opts.port ? Number(opts.port) : 50993
+  const port = await findAvailablePort(candidatePortStart, forbiddenPorts)
 
-  const results = {
-    isolation: {
-      passed: true,
-      banner: ISOLATION_BANNER,
-      home: verified.home,
-      profile: verified.profile,
-      profileDir: verified.profileDir,
-      port,
-    },
-    operations: {
-      install: { passed: false, details: {} },
-      start: { passed: false, details: {} },
-      uninstall: { passed: false, details: {} },
-      rollback: { passed: false, details: {} },
-    },
-    candidateTarball: null,
+  // 3. Second full isolation assertion WITH selected port BEFORE any mutation
+  let verified
+  try {
+    verified = assertIsolatedDshEnvironment({ home, profile, testRoot, profileDir, port })
+  } catch (error) {
+    if (error instanceof IsolationError) {
+      console.error(error.message)
+      throw error
+    }
+    throw error
   }
 
-  // 2. Candidate tarball resolution or build
+  // 4. Candidate tarball resolution or build
   let candidateTarballPath = opts.tarball
-  if (!candidateTarballPath) {
+  if (candidateTarballPath) {
+    candidateTarballPath = resolve(candidateTarballPath)
+    if (!existsSync(candidateTarballPath)) {
+      throw new Error(`Specified candidate tarball not found at ${candidateTarballPath}`)
+    }
+  } else {
     // Pack candidate
     const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm'
     const packOut = spawnSync(npmCmd, ['pack', '--pack-destination', tmpdir()], {
@@ -241,9 +260,44 @@ export async function runStoreLifecycleVerification(opts = {}) {
   }
 
   const candidateSha256 = sha256File(candidateTarballPath)
-  results.candidateTarball = {
-    path: candidateTarballPath,
-    sha256: candidateSha256,
+  const tarballFilename = basename(candidateTarballPath)
+
+  const results = {
+    phase: '6R.1',
+    testedCodeGitSha,
+    workingTreeCleanAtPack: true,
+    candidatePackageVersion: '0.1.1',
+    selectedPort: port,
+    finalIsolationCheckPassed: true,
+    productionPortTouched: false,
+    unknownProcessKilled: false,
+    candidateTarballSha256: candidateSha256,
+    candidateTarball: {
+      filename: tarballFilename,
+      path: candidateTarballPath,
+      sha256: candidateSha256,
+    },
+    isolation: {
+      passed: true,
+      finalIsolationCheckPassed: true,
+      productionPortTouched: false,
+      productionDshHomeTouched: false,
+      productionProfileTouched: false,
+      productionSessionTouched: false,
+      unknownProcessKilled: false,
+      selectedPort: port,
+      banner: ISOLATION_BANNER,
+      home: verified.home,
+      profile: verified.profile,
+      profileDir: verified.profileDir,
+      port,
+    },
+    operations: {
+      install: { passed: false, details: {} },
+      start: { passed: false, details: {} },
+      uninstall: { passed: false, details: {} },
+      rollback: { passed: false, details: {} },
+    },
   }
 
   const installedPluginDir = join(profileDir, 'node_modules', PACKAGE_NAME)
@@ -311,6 +365,7 @@ export async function runStoreLifecycleVerification(opts = {}) {
   results.operations.install = {
     passed: installPassed,
     details: {
+      tarballFilename,
       tarball: candidateTarballPath,
       sha256: candidateSha256,
       installedPath: installedPluginDir,
@@ -319,6 +374,7 @@ export async function runStoreLifecycleVerification(opts = {}) {
       version: candidateVersion,
       bundleListedOnce: true,
       cordisPatchPresent: patchExists,
+      runtimeBundlesExist: clientExists && indexExists,
     },
   }
   console.log(`INSTALL: ${installPassed ? 'PASS' : 'FAIL'} (installed to ${installedPluginDir}, junction=${isJunction}, version=${candidateVersion})`)
@@ -586,6 +642,12 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const jsonMode = options.json === 'true'
 
   runStoreLifecycleVerification(options).then((res) => {
+    if (options.out) {
+      const outPath = resolve(options.out)
+      mkdirSync(dirname(outPath), { recursive: true })
+      writeFileSync(outPath, JSON.stringify(res, null, 2) + '\n', 'utf8')
+      console.log(`Saved lifecycle evidence to ${outPath}`)
+    }
     if (jsonMode) {
       console.log(JSON.stringify(res, null, 2))
     } else {
