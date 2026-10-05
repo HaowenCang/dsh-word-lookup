@@ -148,14 +148,14 @@ function verifyIsolatedProfileBinding(verified, options = {}) {
 
   const hashFile = (p) => createHash('sha256').update(readFileSync(p)).digest('hex')
   const testedHostBundleSha256 = hashFile(repoHostBundle)
-  const loadedHostBundleSha256 = hashFile(profileHostBundle)
-  if (testedHostBundleSha256 !== loadedHostBundleSha256) {
+  const profileResolvedHostBundleSha256 = hashFile(profileHostBundle)
+  if (testedHostBundleSha256 !== profileResolvedHostBundleSha256) {
     throw new Error(`Host bundle mismatch between repo and profile node_modules`)
   }
 
   const testedClientBundleSha256 = hashFile(repoClientBundle)
-  const loadedClientBundleSha256 = hashFile(profileClientBundle)
-  if (testedClientBundleSha256 !== loadedClientBundleSha256) {
+  const profileResolvedClientBundleSha256 = hashFile(profileClientBundle)
+  if (testedClientBundleSha256 !== profileResolvedClientBundleSha256) {
     throw new Error(`Client bundle mismatch between repo and profile node_modules`)
   }
 
@@ -163,6 +163,9 @@ function verifyIsolatedProfileBinding(verified, options = {}) {
     testedCodeGitSha,
     testedHostBundleSha256,
     testedClientBundleSha256,
+    profileResolvedHostBundleSha256,
+    profileResolvedClientBundleSha256,
+    profileResolvedBundlesMatchRepository: true,
     resolvedPluginPath,
     profileName: verified.profile,
     profileDir: verified.profileDir,
@@ -196,7 +199,8 @@ function staticAiSafetyCheck() {
       passed: matchedAiDeps.length === 0 && foundEndpoints.length === 0,
       matchedAiDependencies: matchedAiDeps,
       foundModelEndpoints: foundEndpoints,
-      statement: '0 AI fallback mechanisms in host or client code; dictionary resolves strictly against local SQLite',
+      statement:
+        'Static architecture scan found no configured AI SDK dependency or known model endpoint in the audited package/bundles.',
     },
   }
 }
@@ -354,9 +358,9 @@ async function run() {
     profileBinding = verifyIsolatedProfileBinding(verified)
     record(
       'ISO-PROFILE-BINDING',
-      'isolated profile bundle, link, and loaded code hashes verified against current repository',
+      'isolated profile bundle, link, and profile-resolved bundle hashes verified against repository',
       true,
-      `testedGitSha=${profileBinding.testedCodeGitSha} hostSha=${profileBinding.testedHostBundleSha256.slice(0, 12)} clientSha=${profileBinding.testedClientBundleSha256.slice(0, 12)}`,
+      `testedGitSha=${profileBinding.testedCodeGitSha} hostSha=${profileBinding.profileResolvedHostBundleSha256.slice(0, 12)} clientSha=${profileBinding.profileResolvedClientBundleSha256.slice(0, 12)}`,
     )
   } catch (err) {
     record('ISO-PROFILE-BINDING', 'profile binding check failed', false, err.message)
@@ -368,7 +372,7 @@ async function run() {
   const aiSafety = staticAiSafetyCheck()
   record(
     'STATIC-AI-INVARIANT',
-    'static bundle & dependency audit proves 0 AI fallback and 0 model endpoints',
+    'static architecture scan found no configured AI SDK dependency or known model endpoint',
     aiSafety.staticVerification.passed,
     aiSafety.staticVerification.statement,
   )
@@ -383,6 +387,9 @@ async function run() {
     testedGitSha: profileBinding.testedCodeGitSha,
     testedHostBundleSha256: profileBinding.testedHostBundleSha256,
     testedClientBundleSha256: profileBinding.testedClientBundleSha256,
+    profileResolvedHostBundleSha256: profileBinding.profileResolvedHostBundleSha256,
+    profileResolvedClientBundleSha256: profileBinding.profileResolvedClientBundleSha256,
+    profileResolvedBundlesMatchRepository: profileBinding.profileResolvedBundlesMatchRepository,
     resolvedPluginPath: profileBinding.resolvedPluginPath,
     manifest: {
       sourceName: manifest.sourceName,
@@ -732,6 +739,9 @@ async function run() {
     testedCodeGitSha: testState.testedGitSha,
     testedHostBundleSha256: testState.testedHostBundleSha256,
     testedClientBundleSha256: testState.testedClientBundleSha256,
+    profileResolvedHostBundleSha256: testState.profileResolvedHostBundleSha256,
+    profileResolvedClientBundleSha256: testState.profileResolvedClientBundleSha256,
+    profileResolvedBundlesMatchRepository: testState.profileResolvedBundlesMatchRepository,
     resolvedPluginPath: testState.resolvedPluginPath,
     profileBinding: {
       profile: profileBinding.profileName,
@@ -739,8 +749,9 @@ async function run() {
       bundleRegisteredInProfilePackageJson: true,
       linkDependencyVerified: true,
       resolvedPluginMatchesRepoRoot: true,
-      hostBundleSha256MatchesLoaded: true,
-      clientBundleSha256MatchesLoaded: true,
+      profileResolvedHostBundleSha256: profileBinding.profileResolvedHostBundleSha256,
+      profileResolvedClientBundleSha256: profileBinding.profileResolvedClientBundleSha256,
+      profileResolvedBundlesMatchRepository: true,
     },
     manifest: testState.manifest,
     isolation: {
