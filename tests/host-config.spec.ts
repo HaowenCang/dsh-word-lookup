@@ -138,6 +138,19 @@ describe('readSwitch', () => {
     current = true
     expect(readSwitch(config, 'autoDoubleClick')).toBe(true)
   })
+
+  it('enforces compile-time type contract: boolean switch fields only', () => {
+    const config = Config({})
+    // Valid boolean switch fields
+    expect(readSwitch(config, 'autoDoubleClick')).toBe(false)
+    expect(readSwitch(config, 'autoSelection')).toBe(false)
+
+    // @ts-expect-error dictionaryMode is not a boolean switch
+    readSwitch(config, 'dictionaryMode')
+
+    // @ts-expect-error customDictionaryPath is not a boolean switch
+    readSwitch(config, 'customDictionaryPath')
+  })
 })
 
 describe('readDictionaryMode', () => {

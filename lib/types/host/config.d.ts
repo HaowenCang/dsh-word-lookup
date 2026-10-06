@@ -128,7 +128,7 @@ export type HostSwitchField = 'autoDoubleClick' | 'autoSelection';
  * @param field - the boolean switch field to read.
  * @returns the current boolean value, or `false` when the configuration is absent.
  */
-export declare function readSwitch(config: HostConfig | undefined, field: HostSwitchField | HostConfigField): boolean;
+export declare function readSwitch(config: HostConfig | undefined, field: HostSwitchField): boolean;
 /**
  * Read the current live dictionary mode from volatile configuration.
  *

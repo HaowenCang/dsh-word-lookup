@@ -117,7 +117,7 @@ export type HostSwitchField = 'autoDoubleClick' | 'autoSelection'
  * @param field - the boolean switch field to read.
  * @returns the current boolean value, or `false` when the configuration is absent.
  */
-export function readSwitch(config: HostConfig | undefined, field: HostSwitchField | HostConfigField): boolean {
+export function readSwitch(config: HostConfig | undefined, field: HostSwitchField): boolean {
   const value = config?.[field]
   return value === undefined ? false : value.get() === true
 }
