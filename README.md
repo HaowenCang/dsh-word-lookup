@@ -6,37 +6,45 @@ nothing leaves your machine and no model is involved.
 
 ## Status
 
-**v0.1.1 Release Candidate.** The plugin is local-first and uses SQLite for dictionary lookup. The public package does not redistribute the full ECDICT corpus; production-corpus activation is an explicit local opt-in.
+**Current development target: v0.2.0 — unreleased.**
+The latest published release is **v0.1.0**.
+
+The plugin is local-first and uses SQLite for dictionary lookup. The public package does not redistribute the full ECDICT corpus. In Phase 7A.1, the host runtime defaults to and executes against the deterministic offline fixture database while establishing the v0.2.0 Host Config model.
 
 | Area | State |
 | --- | --- |
 | Target client | DSH Web (`0.2.0-rc.2`) |
 | DSH baseline | `0.2.0-rc.2`, Web only — the desktop client is not a tested target |
-| Package version | `0.1.1` |
-| Manual shortcut lookup | works; primary supported path |
-| Settings persistence | works, verified across a full restart |
+| Development version | `0.2.0` (unreleased) |
+| Latest published release | `0.1.0` |
+| Manual shortcut lookup | works; primary supported path (`Primary+Shift+L`) |
+| Settings persistence | works, verified across full restart |
 | Automatic lookup on double-click | works when `autoDoubleClick` is on (default off), verified in a real browser |
 | Automatic lookup on drag-select | works when `autoSelection` is on (default off); portability outside the measured environment remains a known release limitation |
-| Dictionary storage | local SQLite (`node:sqlite`), package-owned deterministic fixture by default |
-| Dictionary data (ECDICT) | local ECDICT corpus supported via explicit `DSH_WORD_LOOKUP_DB_PATH` opt-in; full corpus is not bundled |
+| Dictionary storage | local SQLite (`node:sqlite`), package-owned deterministic fixture in Phase 7A.1 |
+| Dictionary configuration | Host Config model (`dictionaryMode`, `customDictionaryPath`, `autoDoubleClick`, `autoSelection`) |
 | Dictionary card UI | headword, phonetic, POS, Chinese meaning, forms and examples |
 | Pointer devices | mouse only — automatic lookup is refused for pen, touch and an unidentifiable pointer |
 
-### Install
+### Installation
+
+#### Published Release (v0.1.0)
+
+To install the latest published release in DSH Web:
 
 ```powershell
-dsh plugin --profile web add dsh-word-lookup@0.1.1
+dsh plugin --profile web add dsh-word-lookup@0.1.0
 dsh --profile web
 ```
 
-The package intentionally does **not** include the full ECDICT corpus. Without `DSH_WORD_LOOKUP_DB_PATH`, the deterministic fixture dictionary is used. To use an already-built and provenance-compatible production database, set the environment variable before starting DSH:
+#### Development Version (v0.2.0)
+
+The v0.2.0 version is an active development branch and is not published to npm. To test or develop locally, link the local checkout to an isolated profile:
 
 ```powershell
-$env:DSH_WORD_LOOKUP_DB_PATH = "E:\\path\\to\\ecdict.db"
-dsh --profile web
+npm run test-profile:create
+npm run test:runtime
 ```
-
-If explicit production activation fails schema, metadata, hash, or integrity validation, the plugin fails closed and does not fall back to the fixture.
 
 ### Known v0.1.0 limitation
 
@@ -81,8 +89,7 @@ browser (client half)                          host (Node half)
                        + monotonic gesture identity
   gesture completes --> trigger gate --> maybe a lookup
   shortcut run -------> POST api/dsh-word-lookup ----> SQLite dictionary lookup
-                                                       (fixture by default;
-                                                        ECDICT when explicitly activated)
+                                                       (deterministic fixture in Phase 7A.1)
                       <--------- structured result
   latest request wins <--------- card state
   shell.overlay <---- renders the card
@@ -98,20 +105,16 @@ browser (client half)                          host (Node half)
   settings use DSH's own configuration form so the switches persist with the
   profile.
 
-### Dictionary Storage & Runtime Activation Semantics
+### Dictionary Storage & Configuration
 
-The plugin operates with fail-closed dictionary loading semantics:
+The v0.2.0 architecture establishes an in-app configuration contract (`dictionaryMode`, `customDictionaryPath`, `autoDoubleClick`, `autoSelection`).
 
-- **Default Fixture Mode (Unset `DSH_WORD_LOOKUP_DB_PATH`)**:
-  When `DSH_WORD_LOOKUP_DB_PATH` is not set, the plugin initializes its package-owned deterministic fixture database (`dsh-word-lookup-fixture`). This is the default public-package behavior and is intentionally distinct from production-corpus activation.
-- **Explicit Production Corpus Opt-In (`DSH_WORD_LOOKUP_DB_PATH`)**:
-  Setting `DSH_WORD_LOOKUP_DB_PATH=<path-to-db>` explicitly requests production dictionary activation. The host loads the specified SQLite database in read-only mode and strictly verifies the production schema, indexes (`idx_forms_headword_raw`, `idx_examples_headword`), primary keys, and metadata (`corpus_name === 'ECDICT'`, `upstream_commit`, `source_sha256`, `schema_version`) against the pinned `corpus/ecdict.manifest.json`.
-- **Fail-Closed Guarantee (No Silent Fallback)**:
-  If production activation is requested via `DSH_WORD_LOOKUP_DB_PATH` and the database is missing, corrupted, or fails metadata/schema verification:
-  - The plugin refuses activation with a controlled `DictionaryUnavailableError`.
-  - The lookup route is NOT registered (answering HTTP 404).
-  - No silent fallback to fixture database occurs.
-  - No fallback to AI/remote dictionary occurs.
+- **Deterministic Fixture Mode (Default)**:
+  The plugin initializes its package-owned deterministic fixture database (`dsh-word-lookup-fixture`). In Phase 7A.1, this remains the active runtime dictionary while subsequent phases establish managed ECDICT storage, downloader, and custom SQLite activation.
+- **Zero Legacy Environment Variables**:
+  Legacy environment variable database activation has been completely removed. Host startup and dictionary resolution no longer inspect any process environment variables.
+- **Fail-Closed Guarantee**:
+  If a dictionary cannot be opened or initialized, the plugin fails closed with a controlled error rather than falling back to remote APIs or token-consuming AI models.
 
 ### When a lookup happens
 
@@ -151,7 +154,7 @@ answers from it through prepared statements with bound parameters. The host open
 the database once per plugin lifecycle and closes it on unload, so repeated
 load/unload cycles cannot accumulate handles.
 
-The fixture database path is package-derived and is not user-configurable. Production-corpus activation is intentionally separate: an operator may provide a read-only compatible database path through the process environment variable `DSH_WORD_LOOKUP_DB_PATH`. There is no writable UI `dictionaryPath` setting.
+The fixture database path is package-derived. There is no manual environment variable configuration.
 
 ```powershell
 npm run build:fixture   # rebuild fixtures/dictionary.fixture.db and validate it
@@ -203,10 +206,9 @@ is a standing engineering rule, not incident paperwork.
 
 ### Files
 - The plugin uses local SQLite (`node:sqlite`) strictly on the host side.
-- Fixture and local dictionary databases are read directly on the local machine.
-- Production ECDICT databases are opened via local filesystem paths (`DSH_WORD_LOOKUP_DB_PATH`).
+- Fixture databases are read directly on the local machine in read-only mode.
 - No dictionary corpus, word lookups, or user queries are ever uploaded or written outside local cache/storage.
-- No files outside the plugin fixture and specified local database paths are accessed.
+- No files outside package-owned data are accessed.
 
 ### Network
 - The browser client only calls the DSH host's same-origin `/api/dsh-word-lookup` HTTP POST route.
@@ -216,8 +218,9 @@ is a standing engineering rule, not incident paperwork.
 - No external lookup requests or outbound network traffic whatsoever.
 
 ### Environment & Credentials
-- `process.env.DSH_WORD_LOOKUP_DB_PATH` is read solely to determine the local filesystem path to an optional pre-built production dictionary database.
-- The static security scanner flags `process.env` as a credentials signal; however, no API keys, access tokens, account passwords, or personal credentials are ever read, stored, or transmitted.
+- Zero environment variables are read by the active runtime.
+- The `credentials` permission signal is `false`.
+- No API keys, access tokens, account passwords, or personal credentials are read, stored, or transmitted.
 
 ### Corpus Redistribution
 - Full ECDICT redistribution is **NOT included and NOT authorized** in this repository, npm packages, or GitHub Releases.
@@ -235,7 +238,7 @@ is a standing engineering rule, not incident paperwork.
 ```text
 src/
   index.ts              host half: Config schema, dictionary lifecycle, the route
-  host/                 request handling, the SQLite dictionary, fixture data, route path
+  host/                 request handling, the SQLite dictionary, fixture data, route path, config model
   shared/               types and text normalization shared by both halves
   client/
     index.tsx           browser runtime: overlay, command, settings, listeners

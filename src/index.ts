@@ -42,17 +42,21 @@ import type {} from '@deepseek-ai/dsh-client-connection'
 
 import { Config, type HostConfig } from './host/config.js'
 import {
-  CORPUS_PATH_ENV,
   openProductionDictionary,
   resolveProductionDatabasePath,
 } from './host/corpus-db.js'
+import { DictionaryUnavailableError } from './host/dictionary.js'
 import { openFixtureDictionary } from './host/fixture-db.js'
 import { createLookupHandler } from './host/lookup.js'
 import { LOOKUP_PATH } from './host/route.js'
 
 export { Config }
 export type { HostConfig }
-export { openProductionDictionary, resolveProductionDatabasePath, CORPUS_PATH_ENV }
+export {
+  openProductionDictionary,
+  resolveProductionDatabasePath,
+  DictionaryUnavailableError,
+}
 
 /** Package name; equals the Loader entry id and the settings namespace. */
 export const name = 'dsh-word-lookup'
@@ -73,11 +77,7 @@ export const inject: readonly string[] = ['connection']
  */
 export function apply(ctx: Context, config: HostConfig): void {
   ctx.effect(() => {
-    const explicitProductionPath = process.env[CORPUS_PATH_ENV]?.trim()
-    const dictionary =
-      explicitProductionPath && explicitProductionPath.length > 0
-        ? openProductionDictionary({ path: explicitProductionPath })
-        : openFixtureDictionary()
+    const dictionary = openFixtureDictionary()
 
     let disposeRoute: (() => Promise<void>) | undefined
     try {

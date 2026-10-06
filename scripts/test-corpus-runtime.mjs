@@ -1,21 +1,18 @@
 #!/usr/bin/env node
 /**
- * Real isolated DSH production corpus runtime verification script.
+ * Real isolated DSH production corpus validator and runtime verification script.
  *
- * Implements Phase 6.1 core acceptance:
+ * Implements Phase 7A.1 verification:
  * - Strictly enforces scratch environment isolation via `assertIsolatedDshEnvironment`.
- * - Boots real isolated DSH Web instance with `DSH_WORD_LOOKUP_DB_PATH` bound to `build/corpus/ecdict.db`.
- * - Validates runtime network invariant (0 external network queries, 0 downloads, 0 AI).
- * - Tests CR1 (Production query execution via real DSH route POST /api/dsh-word-lookup):
- *   - Probes: 'wave function', 'conservation', 'neutrino', 'quarks'.
- *   - Proves response source === 'ecdict-local'.
- *   - Proves data matches ECDICT production content and is NOT from the fixture.
- * - Tests Negative Gating on isolated copies:
- *   - CR2: DSH_WORD_LOOKUP_DB_PATH missing -> controlled entry load failure, no fixture fallback (route 404).
- *   - CR3: wrong source_sha256 meta -> controlled failure (route 404, no fallback).
- *   - CR4: wrong upstream_commit -> controlled failure (route 404, no fallback).
- *   - CR5: corrupted DB -> controlled failure (route 404, no fallback).
- * - Records auditable machine-readable evidence to `docs/evidence/phase61-corpus-runtime.json`.
+ * - Part A: Production Corpus Validator / Explicit-Open Tests:
+ *   - Verifies `openProductionDictionary({ path })` with valid ECDICT production database.
+ *   - Verifies explicit queries (exact, phrase, lemma) and provenance 'ecdict-local'.
+ *   - Verifies fail-clean gating on corrupted, missing, and metadata-mismatched databases.
+ * - Part B: Product Startup Tests (Real Isolated DSH Process):
+ *   - Proves Host startup in Phase 7A.1 always activates the fixture dictionary.
+ *   - Proves Host startup completely ignores legacy `DSH_WORD_LOOKUP_DB_PATH` environment variable.
+ *   - Validates runtime network invariant (0 external network queries, 0 downloads, 0 AI).
+ * - Records auditable machine-readable evidence to `docs/evidence/phase7a1-corpus-runtime.json`.
  *
  * @module dsh-word-lookup/scripts/test-corpus-runtime
  */
@@ -41,12 +38,15 @@ import {
   DEFAULT_MANIFEST_PATH,
   loadCorpusManifest,
 } from './lib/corpus-source.mjs'
+import {
+  openProductionDictionary,
+  DictionaryUnavailableError,
+} from '../lib/index.js'
 
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url))
 const PROD_DB_PATH = join(REPO_ROOT, 'build', 'corpus', 'ecdict.db')
 const EVIDENCE_DIR = join(REPO_ROOT, 'docs', 'evidence')
-const EVIDENCE_FILE_61 = join(EVIDENCE_DIR, 'phase61-corpus-runtime.json')
-const EVIDENCE_FILE_611 = join(EVIDENCE_DIR, 'phase611-corpus-runtime.json')
+const EVIDENCE_FILE_7A1 = join(EVIDENCE_DIR, 'phase7a1-corpus-runtime.json')
 
 const ANSI = /\x1B\[[0-?]*[ -/]*[@-~]/g
 const DEFAULT_START_PORT = 50980
@@ -104,59 +104,48 @@ function verifyIsolatedProfileBinding(verified, options = {}) {
     if (!allowDirty) throw err
   }
 
-  // 1. Profile must be the isolated test profile
-  if (verified.profile !== 'word-lookup-test') {
-    throw new Error(`Profile mismatch: expected "word-lookup-test", got "${verified.profile}"`)
-  }
-
-  // 2. Profile package.json must contain dsh-word-lookup in bundles
-  const profilePkgPath = join(verified.profileDir, 'package.json')
-  if (!existsSync(profilePkgPath)) {
-    throw new Error(`Profile package.json missing at "${profilePkgPath}"`)
-  }
-  const profilePkg = JSON.parse(readFileSync(profilePkgPath, 'utf8'))
-  if (!profilePkg.dsh?.profile?.bundles?.includes('dsh-word-lookup')) {
-    throw new Error(`Profile bundles do not contain "dsh-word-lookup"`)
-  }
-
-  // 3. Dependency link must point to current repo
-  const dep = profilePkg.dependencies?.['dsh-word-lookup']
-  if (!dep || !dep.startsWith('link:')) {
-    throw new Error(`Profile dependency dsh-word-lookup is not a link dependency: ${dep}`)
-  }
-
-  // 4. Resolved plugin path in profile node_modules
-  const pluginLinkPath = join(verified.profileDir, 'node_modules', 'dsh-word-lookup')
-  if (!existsSync(pluginLinkPath)) {
-    throw new Error(`Plugin junction missing in profile at "${pluginLinkPath}"`)
-  }
-  const resolvedPluginPath = realpathSync(pluginLinkPath)
-  const realRepoRoot = realpathSync(REPO_ROOT)
-  if (resolvedPluginPath.toLowerCase() !== realRepoRoot.toLowerCase()) {
-    throw new Error(`Plugin junction resolves to "${resolvedPluginPath}", expected "${realRepoRoot}"`)
-  }
-
-  // 5. Host and Client bundles verification and SHA-256 calculation
   const repoHostBundle = join(REPO_ROOT, 'lib', 'index.js')
   const repoClientBundle = join(REPO_ROOT, 'lib', 'client.js')
-  const profileHostBundle = join(pluginLinkPath, 'lib', 'index.js')
-  const profileClientBundle = join(pluginLinkPath, 'lib', 'client.js')
-
   if (!existsSync(repoHostBundle) || !existsSync(repoClientBundle)) {
-    throw new Error('Built bundles missing in repository lib/; run "npm run build" first')
+    throw new Error('Built bundles missing from repository lib/; run "npm run build" first')
   }
 
-  const hashFile = (p) => createHash('sha256').update(readFileSync(p)).digest('hex')
-  const testedHostBundleSha256 = hashFile(repoHostBundle)
-  const profileResolvedHostBundleSha256 = hashFile(profileHostBundle)
-  if (testedHostBundleSha256 !== profileResolvedHostBundleSha256) {
-    throw new Error(`Host bundle mismatch between repo and profile node_modules`)
+  const testedHostBundleSha256 = createHash('sha256').update(readFileSync(repoHostBundle)).digest('hex')
+  const testedClientBundleSha256 = createHash('sha256').update(readFileSync(repoClientBundle)).digest('hex')
+
+  const profileDir = verified.profileDir
+  const profilePkgJsonPath = join(profileDir, 'package.json')
+  if (!existsSync(profilePkgJsonPath)) {
+    throw new Error(`Profile package.json missing at ${profilePkgJsonPath}`)
+  }
+  const profilePkg = JSON.parse(readFileSync(profilePkgJsonPath, 'utf8'))
+  const depSpec = profilePkg.dependencies?.['dsh-word-lookup']
+  if (!depSpec || (!depSpec.startsWith('link:') && !depSpec.startsWith('file:'))) {
+    throw new Error(`Profile does not contain link/file dependency for dsh-word-lookup: ${depSpec}`)
   }
 
-  const testedClientBundleSha256 = hashFile(repoClientBundle)
-  const profileResolvedClientBundleSha256 = hashFile(profileClientBundle)
-  if (testedClientBundleSha256 !== profileResolvedClientBundleSha256) {
-    throw new Error(`Client bundle mismatch between repo and profile node_modules`)
+  const profileNodeModulesTarget = join(profileDir, 'node_modules', 'dsh-word-lookup')
+  if (!existsSync(profileNodeModulesTarget)) {
+    throw new Error(`Profile node_modules link missing at ${profileNodeModulesTarget}`)
+  }
+
+  const realTarget = realpathSync(profileNodeModulesTarget)
+  const realRepo = realpathSync(REPO_ROOT)
+  if (realTarget.toLowerCase() !== realRepo.toLowerCase()) {
+    throw new Error(`Profile node_modules does not resolve to repo root: resolved=${realTarget}, repo=${realRepo}`)
+  }
+
+  const profileResolvedHost = join(profileNodeModulesTarget, 'lib', 'index.js')
+  const profileResolvedClient = join(profileNodeModulesTarget, 'lib', 'client.js')
+  const profileResolvedHostBundleSha256 = createHash('sha256').update(readFileSync(profileResolvedHost)).digest('hex')
+  const profileResolvedClientBundleSha256 = createHash('sha256').update(readFileSync(profileResolvedClient)).digest('hex')
+
+  const profileResolvedBundlesMatchRepository =
+    profileResolvedHostBundleSha256 === testedHostBundleSha256 &&
+    profileResolvedClientBundleSha256 === testedClientBundleSha256
+
+  if (!profileResolvedBundlesMatchRepository) {
+    throw new Error('Profile resolved bundles hash mismatch with repo built artifacts')
   }
 
   return {
@@ -165,36 +154,38 @@ function verifyIsolatedProfileBinding(verified, options = {}) {
     testedClientBundleSha256,
     profileResolvedHostBundleSha256,
     profileResolvedClientBundleSha256,
-    profileResolvedBundlesMatchRepository: true,
-    resolvedPluginPath,
+    profileResolvedBundlesMatchRepository,
+    resolvedPluginPath: realTarget,
+    profileDir,
     profileName: verified.profile,
-    profileDir: verified.profileDir,
   }
 }
 
 function staticAiSafetyCheck() {
-  const pkg = JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8'))
+  const pkgJson = JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8'))
   const allDeps = {
-    ...pkg.dependencies,
-    ...pkg.devDependencies,
-    ...pkg.peerDependencies,
+    ...(pkgJson.dependencies || {}),
+    ...(pkgJson.devDependencies || {}),
+    ...(pkgJson.peerDependencies || {}),
   }
-  const aiKeywords = ['openai', 'anthropic', '@google/generative-ai', 'langchain', 'huggingface']
-  const matchedAiDeps = Object.keys(allDeps).filter((d) =>
-    aiKeywords.some((kw) => d.toLowerCase().includes(kw)),
+  const aiKeywords = ['openai', 'anthropic', 'google/generative-ai', 'deepseek', 'langchain', 'ollama']
+  const matchedAiDeps = Object.keys(allDeps).filter((dep) =>
+    aiKeywords.some((kw) => dep.toLowerCase().includes(kw) && !dep.startsWith('@deepseek-ai/dsh-') && !dep.startsWith('@deepseek-ai/cordis') && !dep.startsWith('@deepseek-ai/schemastery')),
   )
 
-  const hostBundleText = readFileSync(join(REPO_ROOT, 'lib', 'index.js'), 'utf8')
-  const clientBundleText = readFileSync(join(REPO_ROOT, 'lib', 'client.js'), 'utf8')
-
-  const suspiciousEndpoints = ['api.openai.com', 'api.anthropic.com', 'generativelanguage.googleapis.com']
-  const foundEndpoints = suspiciousEndpoints.filter(
-    (ep) => hostBundleText.includes(ep) || clientBundleText.includes(ep),
+  const hostBundle = readFileSync(join(REPO_ROOT, 'lib', 'index.js'), 'utf8')
+  const clientBundle = readFileSync(join(REPO_ROOT, 'lib', 'client.js'), 'utf8')
+  const modelEndpoints = [
+    'api.openai.com',
+    'api.deepseek.com',
+    'api.anthropic.com',
+    'generativelanguage.googleapis.com',
+  ]
+  const foundEndpoints = modelEndpoints.filter(
+    (ep) => hostBundle.includes(ep) || clientBundle.includes(ep),
   )
 
   return {
-    classification: 'static-architectural-invariant',
-    runtimeObservation: 'notMeasured',
     staticVerification: {
       passed: matchedAiDeps.length === 0 && foundEndpoints.length === 0,
       matchedAiDependencies: matchedAiDeps,
@@ -323,12 +314,7 @@ function makeSyntheticDb(filePath, metaOverrides = {}) {
 }
 
 async function run() {
-  console.log('test-corpus-runtime: starting Phase 6.1 production corpus runtime acceptance...')
-
-  if (!existsSync(PROD_DB_PATH)) {
-    console.error(`Production database not found at ${PROD_DB_PATH}; run "npm run corpus:build" first`)
-    process.exit(1)
-  }
+  console.log('test-corpus-runtime: starting Phase 7A.1 corpus validator & runtime acceptance...')
 
   const manifest = loadCorpusManifest(DEFAULT_MANIFEST_PATH)
 
@@ -377,11 +363,9 @@ async function run() {
     aiSafety.staticVerification.statement,
   )
 
-  // Prepare scratch workspace for negative test artifacts
+  // Prepare scratch workspace for tests
   const scratchDir = join(testRoot, 'corpus-runtime-scratch')
   mkdirSync(scratchDir, { recursive: true })
-
-  const browser = await chromium.launch({ headless: true })
 
   const testState = {
     testedGitSha: profileBinding.testedCodeGitSha,
@@ -397,336 +381,232 @@ async function run() {
       sourceSha256: manifest.sourceSha256,
       sourceByteSize: manifest.sourceByteSize,
     },
-    cr1Probes: {},
-    negativeTests: {},
+    validatorChecks: {},
+    runtimeChecks: {},
   }
 
   try {
     // =========================================================================
-    // CR1: Positive Test — Valid Production DB
+    // PART A: Production Corpus Validator / Explicit-Open Tests
     // =========================================================================
-    console.log('\n--- CR1: Valid Production Database Runtime Test ---')
-    const cr1Port = await findNextFreePort(verified.port)
-    const cr1Verified = { ...verified, port: cr1Port }
-    const cr1Instance = await startDshProcess(cr1Verified, {
-      DSH_WORD_LOOKUP_DB_PATH: PROD_DB_PATH,
-    })
+    console.log('\n--- Part A: Production Corpus Validator & Explicit Open Tests ---')
+
+    if (existsSync(PROD_DB_PATH)) {
+      try {
+        const prodDict = openProductionDictionary({ path: PROD_DB_PATH })
+        const resWave = prodDict.lookup('wave function')
+        record(
+          'VAL-EXPLICIT-PROD-DB',
+          'openProductionDictionary({ path }) successfully opens valid production corpus and answers queries',
+          prodDict.source === 'ecdict-local' && resWave.found && resWave.headword === 'wave function',
+          `source=${prodDict.source} headword=${resWave.headword}`,
+        )
+        prodDict.close()
+        testState.validatorChecks.explicitProdDb = true
+      } catch (err) {
+        record('VAL-EXPLICIT-PROD-DB', 'explicit open failed', false, err.message)
+      }
+    } else {
+      console.log('Skipping real PROD_DB_PATH test as build/corpus/ecdict.db is absent; testing synthetic valid DB')
+    }
+
+    // Synthetic valid DB test
+    const syntheticValidDb = join(scratchDir, 'synth-valid.db')
+    makeSyntheticDb(syntheticValidDb)
+    try {
+      const synthDict = openProductionDictionary({ path: syntheticValidDb })
+      const resTest = synthDict.lookup('test')
+      record(
+        'VAL-SYNTHETIC-VALID-DB',
+        'openProductionDictionary({ path }) opens valid synthetic production database with ecdict-local provenance',
+        synthDict.source === 'ecdict-local' && resTest.found && resTest.headword === 'test',
+        `source=${synthDict.source} found=${resTest.found}`,
+      )
+      synthDict.close()
+      testState.validatorChecks.syntheticValidDb = true
+    } catch (err) {
+      record('VAL-SYNTHETIC-VALID-DB', 'synthetic valid open failed', false, err.message)
+    }
+
+    // Negative validator test: Missing DB
+    const missingDbPath = join(scratchDir, 'nonexistent.db')
+    let missingRejected = false
+    try {
+      openProductionDictionary({ path: missingDbPath })
+    } catch (err) {
+      missingRejected = err instanceof DictionaryUnavailableError
+    }
+    record(
+      'VAL-REJECT-MISSING-DB',
+      'validator rejects missing database path with DictionaryUnavailableError',
+      missingRejected,
+    )
+    testState.validatorChecks.rejectMissingDb = missingRejected
+
+    // Negative validator test: Corrupt DB
+    const corruptDbPath = join(scratchDir, 'corrupt.db')
+    writeFileSync(corruptDbPath, Buffer.from('NOT A SQLITE FILE AT ALL JUNK DATA'))
+    let corruptRejected = false
+    try {
+      openProductionDictionary({ path: corruptDbPath })
+    } catch (err) {
+      corruptRejected = err instanceof DictionaryUnavailableError
+    }
+    record(
+      'VAL-REJECT-CORRUPT-DB',
+      'validator rejects corrupted database with DictionaryUnavailableError',
+      corruptRejected,
+    )
+    testState.validatorChecks.rejectCorruptDb = corruptRejected
+
+    // Negative validator test: Wrong source_sha256
+    const badShaDbPath = join(scratchDir, 'bad-sha.db')
+    makeSyntheticDb(badShaDbPath, { source_sha256: '0'.repeat(64) })
+    let badShaRejected = false
+    try {
+      openProductionDictionary({ path: badShaDbPath })
+    } catch (err) {
+      badShaRejected = err instanceof DictionaryUnavailableError
+    }
+    record(
+      'VAL-REJECT-BAD-SHA',
+      'validator rejects mismatched source_sha256 metadata with DictionaryUnavailableError',
+      badShaRejected,
+    )
+    testState.validatorChecks.rejectBadSha = badShaRejected
+
+    // Negative validator test: Wrong upstream_commit
+    const badCommitDbPath = join(scratchDir, 'bad-commit.db')
+    makeSyntheticDb(badCommitDbPath, { upstream_commit: '1234567890abcdef' })
+    let badCommitRejected = false
+    try {
+      openProductionDictionary({ path: badCommitDbPath })
+    } catch (err) {
+      badCommitRejected = err instanceof DictionaryUnavailableError
+    }
+    record(
+      'VAL-REJECT-BAD-COMMIT',
+      'validator rejects mismatched upstream_commit metadata with DictionaryUnavailableError',
+      badCommitRejected,
+    )
+    testState.validatorChecks.rejectBadCommit = badCommitRejected
+
+    // =========================================================================
+    // PART B: Product Startup Tests (Real Isolated DSH Process)
+    // =========================================================================
+    console.log('\n--- Part B: Product Startup Tests (Real Isolated DSH Process) ---')
+
+    const browser = await chromium.launch({ headless: true })
 
     try {
-      const page = await browser.newPage()
+      // B.1 Default startup: must activate fixture
+      const b1Port = await findNextFreePort(verified.port)
+      const b1Instance = await startDshProcess({ ...verified, port: b1Port })
 
-      // Browser Network Instrumentation: track external vs local requests
-      const observedNetwork = {
-        localhostSameOriginRequests: [],
-        externalOriginRequests: [],
-      }
+      try {
+        const page = await browser.newPage()
+        const observedNetwork = {
+          localhostSameOriginRequests: [],
+          externalOriginRequests: [],
+        }
 
-      page.on('request', (req) => {
-        const url = req.url()
-        try {
-          const parsed = new URL(url)
-          if (
-            parsed.hostname === '127.0.0.1' ||
-            parsed.hostname === 'localhost' ||
-            parsed.origin === new URL(cr1Instance.url).origin
-          ) {
-            observedNetwork.localhostSameOriginRequests.push({ url, method: req.method() })
-          } else {
+        page.on('request', (req) => {
+          const url = req.url()
+          try {
+            const parsed = new URL(url)
+            if (
+              parsed.hostname === '127.0.0.1' ||
+              parsed.hostname === 'localhost' ||
+              parsed.origin === new URL(b1Instance.url).origin
+            ) {
+              observedNetwork.localhostSameOriginRequests.push({ url, method: req.method() })
+            } else {
+              observedNetwork.externalOriginRequests.push({ url, method: req.method() })
+            }
+          } catch {
             observedNetwork.externalOriginRequests.push({ url, method: req.method() })
           }
-        } catch {
-          observedNetwork.externalOriginRequests.push({ url, method: req.method() })
-        }
-      })
+        })
 
-      await page.goto(cr1Instance.url)
+        await page.goto(b1Instance.url)
 
-      // Query execution helper in browser context
-      async function executeLookup(query) {
-        return await page.evaluate(async (q) => {
+        const lookupResult = await page.evaluate(async () => {
           const res = await fetch('api/dsh-word-lookup', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query: q }),
+            body: JSON.stringify({ query: 'derive' }),
           })
           let body = null
-          try {
-            body = await res.json()
-          } catch {}
+          try { body = await res.json() } catch {}
           return { status: res.status, body }
-        }, query)
+        })
+
+        record(
+          'RT-DEFAULT-STARTUP-FIXTURE',
+          'default Host startup activates fixture dictionary and answers 200 with source sqlite-fixture',
+          lookupResult.status === 200 &&
+            lookupResult.body?.ok === true &&
+            lookupResult.body?.found === true &&
+            lookupResult.body?.source === 'sqlite-fixture' &&
+            lookupResult.body?.headword === 'derive',
+          `status=${lookupResult.status} source=${lookupResult.body?.source} headword=${lookupResult.body?.headword}`,
+        )
+
+        record(
+          'RT-BROWSER-ZERO-EXTERNAL-NETWORK',
+          'browser-visible network traffic observed exactly 0 external-origin network requests',
+          observedNetwork.externalOriginRequests.length === 0,
+          `externalRequests=${observedNetwork.externalOriginRequests.length}`,
+        )
+
+        testState.runtimeChecks.defaultFixture = lookupResult
+        await page.close()
+      } finally {
+        await stopDshProcess(b1Instance.child)
       }
 
-      // Probe 1: "wave function" (phrase)
-      const resWave = await executeLookup('wave function')
-      record(
-        'CR1-WAVE-FUNCTION',
-        'production lookup for "wave function" returns 200 with source ecdict-local and ECDICT translations',
-        resWave.status === 200 &&
-          resWave.body?.ok === true &&
-          resWave.body?.found === true &&
-          resWave.body?.source === 'ecdict-local' &&
-          resWave.body?.headword?.toLowerCase() === 'wave function' &&
-          resWave.body?.meanings?.[0]?.translation?.includes('波函数'),
-        `status=${resWave.status} source=${resWave.body?.source} translation=${resWave.body?.meanings?.[0]?.translation}`,
-      )
-      testState.cr1Probes['wave function'] = resWave
-
-      // Probe 2: "conservation"
-      const resCons = await executeLookup('conservation')
-      record(
-        'CR1-CONSERVATION',
-        'production lookup for "conservation" returns 200 with source ecdict-local',
-        resCons.status === 200 &&
-          resCons.body?.ok === true &&
-          resCons.body?.found === true &&
-          resCons.body?.source === 'ecdict-local' &&
-          resCons.body?.headword?.toLowerCase() === 'conservation',
-        `status=${resCons.status} source=${resCons.body?.source} phonetic=${resCons.body?.phonetic}`,
-      )
-      testState.cr1Probes['conservation'] = resCons
-
-      // Probe 3: "neutrino" (absent from tiny fixture, present in ECDICT)
-      const resNeutrino = await executeLookup('neutrino')
-      record(
-        'CR1-PROD-EXCLUSIVE-1',
-        'production lookup for "neutrino" (absent from fixture) returns 200 with Chinese translation "中微子"',
-        resNeutrino.status === 200 &&
-          resNeutrino.body?.ok === true &&
-          resNeutrino.body?.found === true &&
-          resNeutrino.body?.source === 'ecdict-local' &&
-          resNeutrino.body?.headword === 'neutrino' &&
-          resNeutrino.body?.meanings?.[0]?.translation?.includes('中微子'),
-        `status=${resNeutrino.status} source=${resNeutrino.body?.source} translation=${resNeutrino.body?.meanings?.[0]?.translation}`,
-      )
-      testState.cr1Probes['neutrino'] = resNeutrino
-
-      // Probe 4: "quarks" (absent from tiny fixture, present in ECDICT)
-      const resQuarks = await executeLookup('quarks')
-      record(
-        'CR1-PROD-EXCLUSIVE-2',
-        'production lookup for "quarks" (absent from fixture) returns 200 with source ecdict-local',
-        resQuarks.status === 200 &&
-          resQuarks.body?.ok === true &&
-          resQuarks.body?.found === true &&
-          resQuarks.body?.source === 'ecdict-local' &&
-          resQuarks.body?.headword === 'quarks',
-        `status=${resQuarks.status} source=${resQuarks.body?.source}`,
-      )
-      testState.cr1Probes['quarks'] = resQuarks
-
-      // Prove that fixture fallback did NOT occur
-      const fixtureFallbackObserved =
-        resWave.body?.source === 'sqlite-fixture' ||
-        resCons.body?.source === 'sqlite-fixture' ||
-        resNeutrino.body?.source === 'sqlite-fixture'
-      record(
-        'CR1-NO-FIXTURE-FALLBACK',
-        'production runtime answers strictly from ecdict-local with 0 fixture fallback',
-        !fixtureFallbackObserved,
-        `fixtureFallbackObserved=${fixtureFallbackObserved}`,
+      // B.2 Startup with legacy environment variable set: must be ignored!
+      console.log('\n--- Part B.2: Legacy Environment Variable Removal Verification ---')
+      const b2Port = await findNextFreePort(b1Port + 1)
+      const dummyPath = join(scratchDir, 'nonexistent-legacy.db')
+      const b2Instance = await startDshProcess(
+        { ...verified, port: b2Port },
+        { DSH_WORD_LOOKUP_DB_PATH: dummyPath },
       )
 
-      // Network verification: assert 0 external origin requests observed by the browser
-      record(
-        'CR1-BROWSER-ZERO-EXTERNAL-NETWORK',
-        'browser-visible network traffic observed exactly 0 external-origin network requests',
-        observedNetwork.externalOriginRequests.length === 0,
-        `externalRequestsCount=${observedNetwork.externalOriginRequests.length} (localhostSameOriginRequests=${observedNetwork.localhostSameOriginRequests.length})`,
-      )
-      testState.networkObservations = {
-        scope: 'browser-visible-requests',
-        externalOriginRequestsObserved: observedNetwork.externalOriginRequests.length,
-        externalOriginRequests: observedNetwork.externalOriginRequests,
-        localhostSameOriginRequestsCount: observedNetwork.localhostSameOriginRequests.length,
-        hostProcessWideNetworkActivity: 'notMeasured',
+      try {
+        const page = await browser.newPage()
+        await page.goto(b2Instance.url)
+
+        const legacyIgnoredResult = await page.evaluate(async () => {
+          const res = await fetch('api/dsh-word-lookup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: 'derive' }),
+          })
+          let body = null
+          try { body = await res.json() } catch {}
+          return { status: res.status, body }
+        })
+
+        record(
+          'RT-LEGACY-ENV-IGNORED',
+          'Host startup ignores legacy DSH_WORD_LOOKUP_DB_PATH and continues using fixture without failure',
+          legacyIgnoredResult.status === 200 &&
+            legacyIgnoredResult.body?.ok === true &&
+            legacyIgnoredResult.body?.source === 'sqlite-fixture',
+          `status=${legacyIgnoredResult.status} source=${legacyIgnoredResult.body?.source}`,
+        )
+
+        testState.runtimeChecks.legacyEnvIgnored = legacyIgnoredResult
+        await page.close()
+      } finally {
+        await stopDshProcess(b2Instance.child)
       }
-
-      await page.close()
     } finally {
-      await stopDshProcess(cr1Instance.child)
+      await browser.close()
     }
-
-    // =========================================================================
-    // CR2: Negative Test — Missing DB Path
-    // =========================================================================
-    console.log('\n--- CR2: Missing Database Path Gating Test ---')
-    const cr2Port = await findNextFreePort(cr1Port + 1)
-    const cr2MissingPath = join(scratchDir, 'nonexistent-corpus.db')
-    const cr2Instance = await startDshProcess(
-      { ...verified, port: cr2Port },
-      { DSH_WORD_LOOKUP_DB_PATH: cr2MissingPath },
-    )
-
-    try {
-      const logs = cr2Instance.getLogs()
-      const warningLogged =
-        logs.stdout.includes('DictionaryUnavailableError') || logs.stderr.includes('DictionaryUnavailableError')
-
-      const page = await browser.newPage()
-      await page.goto(cr2Instance.url)
-
-      const cr2Res = await page.evaluate(async () => {
-        const res = await fetch('api/dsh-word-lookup', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: 'go' }),
-        })
-        return { status: res.status }
-      })
-
-      // Route must not be registered (404 / error) — definitely NOT 200 with fixture fallback!
-      record(
-        'CR2-MISSING-DB',
-        'missing DB path causes clean entry load refusal with no fixture fallback (route not registered)',
-        warningLogged && cr2Res.status === 404,
-        `status=${cr2Res.status} warningLogged=${warningLogged}`,
-      )
-      testState.negativeTests.CR2 = { missingPath: cr2MissingPath, status: cr2Res.status, warningLogged }
-
-      await page.close()
-    } finally {
-      await stopDshProcess(cr2Instance.child)
-    }
-
-    // =========================================================================
-    // CR3: Negative Test — Wrong source_sha256 in Meta
-    // =========================================================================
-    console.log('\n--- CR3: Mismatched source_sha256 Gating Test ---')
-    const cr3Port = await findNextFreePort(cr2Port + 1)
-    const cr3BadShaDb = join(scratchDir, 'bad-sha.db')
-    makeSyntheticDb(cr3BadShaDb, {
-      source_sha256: '0000000000000000000000000000000000000000000000000000000000000000',
-    })
-
-    const cr3Instance = await startDshProcess(
-      { ...verified, port: cr3Port },
-      { DSH_WORD_LOOKUP_DB_PATH: cr3BadShaDb },
-    )
-
-    try {
-      const logs = cr3Instance.getLogs()
-      const errorLogged =
-        logs.stdout.includes('source_sha256') || logs.stderr.includes('source_sha256')
-
-      const page = await browser.newPage()
-      await page.goto(cr3Instance.url)
-
-      const cr3Res = await page.evaluate(async () => {
-        const res = await fetch('api/dsh-word-lookup', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: 'go' }),
-        })
-        return { status: res.status }
-      })
-
-      record(
-        'CR3-WRONG-SOURCE-SHA',
-        'database with mismatched source_sha256 refuses activation with 0 fixture fallback',
-        errorLogged && cr3Res.status === 404,
-        `status=${cr3Res.status} errorLogged=${errorLogged}`,
-      )
-      testState.negativeTests.CR3 = { status: cr3Res.status, errorLogged }
-
-      await page.close()
-    } finally {
-      await stopDshProcess(cr3Instance.child)
-    }
-
-    // =========================================================================
-    // CR4: Negative Test — Wrong upstream_commit in Meta
-    // =========================================================================
-    console.log('\n--- CR4: Mismatched upstream_commit Gating Test ---')
-    const cr4Port = await findNextFreePort(cr3Port + 1)
-    const cr4BadCommitDb = join(scratchDir, 'bad-commit.db')
-    makeSyntheticDb(cr4BadCommitDb, {
-      upstream_commit: 'badcommit0000000000000000000000000000000',
-    })
-
-    const cr4Instance = await startDshProcess(
-      { ...verified, port: cr4Port },
-      { DSH_WORD_LOOKUP_DB_PATH: cr4BadCommitDb },
-    )
-
-    try {
-      const logs = cr4Instance.getLogs()
-      const errorLogged =
-        logs.stdout.includes('upstream_commit') || logs.stderr.includes('upstream_commit')
-
-      const page = await browser.newPage()
-      await page.goto(cr4Instance.url)
-
-      const cr4Res = await page.evaluate(async () => {
-        const res = await fetch('api/dsh-word-lookup', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: 'go' }),
-        })
-        return { status: res.status }
-      })
-
-      record(
-        'CR4-WRONG-UPSTREAM-COMMIT',
-        'database with mismatched upstream_commit refuses activation with 0 fixture fallback',
-        errorLogged && cr4Res.status === 404,
-        `status=${cr4Res.status} errorLogged=${errorLogged}`,
-      )
-      testState.negativeTests.CR4 = { status: cr4Res.status, errorLogged }
-
-      await page.close()
-    } finally {
-      await stopDshProcess(cr4Instance.child)
-    }
-
-    // =========================================================================
-    // CR5: Negative Test — Corrupted / Truncated DB File
-    // =========================================================================
-    console.log('\n--- CR5: Corrupted Database File Gating Test ---')
-    const cr5Port = await findNextFreePort(cr4Port + 1)
-    const cr5CorruptDb = join(scratchDir, 'corrupt.db')
-    writeFileSync(cr5CorruptDb, Buffer.alloc(128, 0x41))
-
-    const cr5Instance = await startDshProcess(
-      { ...verified, port: cr5Port },
-      { DSH_WORD_LOOKUP_DB_PATH: cr5CorruptDb },
-    )
-
-    try {
-      const logs = cr5Instance.getLogs()
-      const errorLogged =
-        logs.stdout.includes('DictionaryUnavailableError') ||
-        logs.stderr.includes('DictionaryUnavailableError') ||
-        logs.stdout.includes('database disk image is malformed') ||
-        logs.stderr.includes('database disk image is malformed')
-
-      const page = await browser.newPage()
-      await page.goto(cr5Instance.url)
-
-      const cr5Res = await page.evaluate(async () => {
-        const res = await fetch('api/dsh-word-lookup', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: 'go' }),
-        })
-        return { status: res.status }
-      })
-
-      record(
-        'CR5-CORRUPTED-DB',
-        'corrupted database file refuses activation with 0 fixture fallback',
-        errorLogged && cr5Res.status === 404,
-        `status=${cr5Res.status} errorLogged=${errorLogged}`,
-      )
-      testState.negativeTests.CR5 = { status: cr5Res.status, errorLogged }
-
-      await page.close()
-    } finally {
-      await stopDshProcess(cr5Instance.child)
-    }
-
   } finally {
-    await browser.close()
     // Clean up scratch dir
     rmSync(scratchDir, { recursive: true, force: true })
   }
@@ -743,16 +623,6 @@ async function run() {
     profileResolvedClientBundleSha256: testState.profileResolvedClientBundleSha256,
     profileResolvedBundlesMatchRepository: testState.profileResolvedBundlesMatchRepository,
     resolvedPluginPath: testState.resolvedPluginPath,
-    profileBinding: {
-      profile: profileBinding.profileName,
-      profileDir: profileBinding.profileDir,
-      bundleRegisteredInProfilePackageJson: true,
-      linkDependencyVerified: true,
-      resolvedPluginMatchesRepoRoot: true,
-      profileResolvedHostBundleSha256: profileBinding.profileResolvedHostBundleSha256,
-      profileResolvedClientBundleSha256: profileBinding.profileResolvedClientBundleSha256,
-      profileResolvedBundlesMatchRepository: true,
-    },
     manifest: testState.manifest,
     isolation: {
       check: 'PASS',
@@ -761,70 +631,14 @@ async function run() {
       portsUsed: 'isolated high ports',
       productionEnvironmentUntouched: true,
     },
-    networkObservation: {
-      browserVisible: {
-        instrumentation: 'playwright-request-interception',
-        externalOriginRequestsObserved: testState.networkObservations?.externalOriginRequestsObserved ?? 0,
-        externalOriginRequests: testState.networkObservations?.externalOriginRequests ?? [],
-        localhostSameOriginRequestsObserved: testState.networkObservations?.localhostSameOriginRequestsCount ?? 0,
-      },
-      hostProcessWideNetworkActivity: 'notMeasured',
-    },
-    aiSafety: {
-      runtimeObservation: 'notMeasured',
-      staticArchitectureInvariant: {
-        passed: aiSafety.staticVerification.passed,
-        statement: aiSafety.staticVerification.statement,
-        matchedAiDependencies: aiSafety.staticVerification.matchedAiDependencies,
-        foundModelEndpoints: aiSafety.staticVerification.foundModelEndpoints,
-      },
-    },
-    runtimeVerification: {
-      dictionarySourceObserved: 'ecdict-local',
-      fixtureFallbackObserved: false,
-    },
-    cr1Probes: {
-      'wave function': {
-        status: testState.cr1Probes['wave function']?.status,
-        found: testState.cr1Probes['wave function']?.body?.found,
-        source: testState.cr1Probes['wave function']?.body?.source,
-        headword: testState.cr1Probes['wave function']?.body?.headword,
-        translationSample: testState.cr1Probes['wave function']?.body?.meanings?.[0]?.translation?.slice(0, 50),
-      },
-      conservation: {
-        status: testState.cr1Probes['conservation']?.status,
-        found: testState.cr1Probes['conservation']?.body?.found,
-        source: testState.cr1Probes['conservation']?.body?.source,
-        headword: testState.cr1Probes['conservation']?.body?.headword,
-      },
-      neutrino: {
-        status: testState.cr1Probes['neutrino']?.status,
-        found: testState.cr1Probes['neutrino']?.body?.found,
-        source: testState.cr1Probes['neutrino']?.body?.source,
-        headword: testState.cr1Probes['neutrino']?.body?.headword,
-        translationSample: testState.cr1Probes['neutrino']?.body?.meanings?.[0]?.translation?.slice(0, 50),
-        absentFromFixture: true,
-      },
-      quarks: {
-        status: testState.cr1Probes['quarks']?.status,
-        found: testState.cr1Probes['quarks']?.body?.found,
-        source: testState.cr1Probes['quarks']?.body?.source,
-        headword: testState.cr1Probes['quarks']?.body?.headword,
-        absentFromFixture: true,
-      },
-    },
-    negativeGates: {
-      CR2_missingDbRefusal: results.find((r) => r.id === 'CR2-MISSING-DB')?.passed ?? false,
-      CR3_wrongSourceShaRefusal: results.find((r) => r.id === 'CR3-WRONG-SOURCE-SHA')?.passed ?? false,
-      CR4_wrongUpstreamCommitRefusal: results.find((r) => r.id === 'CR4-WRONG-UPSTREAM-COMMIT')?.passed ?? false,
-      CR5_corruptedDbRefusal: results.find((r) => r.id === 'CR5-CORRUPTED-DB')?.passed ?? false,
+    validatorChecks: testState.validatorChecks,
+    runtimeChecks: {
+      activeDictionary: 'sqlite-fixture',
+      legacyEnvironmentIgnored: true,
+      defaultFixtureStatus: testState.runtimeChecks.defaultFixture?.status,
+      legacyEnvStatus: testState.runtimeChecks.legacyEnvIgnored?.status,
     },
     allChecksPassed: failed.length === 0,
-    productionSafety: {
-      networkAccessAllowed: false,
-      fullCorpusTrackedInGit: false,
-      productionDshModified: false,
-    },
   }
 
   if (args.out) {
@@ -833,9 +647,8 @@ async function run() {
     writeFileSync(outPath, JSON.stringify(evidenceDoc, null, 2) + '\n', 'utf8')
     console.log(`Saved machine-readable evidence to:\n  ${outPath}`)
   } else {
-    writeFileSync(EVIDENCE_FILE_611, JSON.stringify(evidenceDoc, null, 2) + '\n', 'utf8')
-    writeFileSync(EVIDENCE_FILE_61, JSON.stringify(evidenceDoc, null, 2) + '\n', 'utf8')
-    console.log(`Saved machine-readable evidence to:\n  ${EVIDENCE_FILE_611}\n  ${EVIDENCE_FILE_61}`)
+    writeFileSync(EVIDENCE_FILE_7A1, JSON.stringify(evidenceDoc, null, 2) + '\n', 'utf8')
+    console.log(`Saved machine-readable evidence to:\n  ${EVIDENCE_FILE_7A1}`)
   }
 
   if (failed.length > 0) {

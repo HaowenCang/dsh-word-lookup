@@ -12,7 +12,7 @@
  *   - No lifecycle scripts (preinstall, install, postinstall, prepare)
  *   - No runtime dependencies
  *   - Full corpus exclusion (*.db, *.sqlite, *.csv, etc.)
- *   - Permission classification (files, network, credentials as expected; commands,
+ *   - Permission classification (files, network as expected; credentials, commands,
  *     protectedDsh, native, dynamic absent)
  *
  * Usage:
@@ -404,6 +404,7 @@ export function runStoreContractCheck() {
   addCheck('Distributable module closure (missingLocalModules == 0)', missingLocalModules.length === 0, missingLocalModules.join('; '))
 
   // 9. Permissions gating
+  addCheck('Permission credentials is ABSENT', !cumulativeSignals.credentials)
   addCheck('Permission commands is ABSENT', !cumulativeSignals.commands)
   addCheck('Permission protectedDsh is ABSENT', !cumulativeSignals.protectedDsh)
   addCheck('Native artifacts are ABSENT', !cumulativeSignals.native)
@@ -412,7 +413,6 @@ export function runStoreContractCheck() {
   // Expected signals
   addCheck('Permission files signal is PRESENT (expected SQLite capability)', cumulativeSignals.files)
   addCheck('Permission network signal is PRESENT (expected same-origin host route)', cumulativeSignals.network)
-  addCheck('Permission credentials signal is PRESENT (expected static process.env signal)', cumulativeSignals.credentials)
 
   const allPassed = checks.every((c) => c.passed)
 
@@ -450,7 +450,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     console.log('\n--- Permission Signals ---')
     console.log(`files:       ${result.signals.files ? 'EXPECTED (SQLite/local file access)' : 'FALSE'}`)
     console.log(`network:     ${result.signals.network ? 'EXPECTED (same-origin /api/dsh-word-lookup)' : 'FALSE'}`)
-    console.log(`credentials: ${result.signals.credentials ? 'EXPECTED_STATIC_SIGNAL (process.env DB path)' : 'FALSE'}`)
+    console.log(`credentials: ${result.signals.credentials ? 'PRESENT (FAIL)' : 'ABSENT (zero process.env / secrets)'}`)
     console.log(`commands:    ${result.signals.commands ? 'PRESENT (FAIL)' : 'ABSENT'}`)
     console.log(`protected:   ${result.signals.protectedDsh ? 'PRESENT (FAIL)' : 'ABSENT'}`)
     console.log(`native:      ${result.signals.native ? 'PRESENT (FAIL)' : 'ABSENT'}`)

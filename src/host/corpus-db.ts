@@ -1,8 +1,8 @@
 /**
  * Production corpus database resolution, metadata validation, and opening.
  *
- * Implements Phase 6.1 production corpus loading with strict guarantees:
- * - Deterministic path resolution via explicit `options.path` or `DSH_WORD_LOOKUP_DB_PATH`.
+ * Implements production corpus loading and validation with strict guarantees:
+ * - Deterministic path resolution via explicit `options.path` or default package corpus path.
  * - Validates production metadata against package-owned `corpus/ecdict.manifest.json`:
  *   - `schema_version` matches pinned schema version.
  *   - `corpus_name` === 'ECDICT'.
@@ -32,9 +32,6 @@ export const CORPUS_DIRECTORY = join('build', 'corpus')
 
 /** Default file name of the production corpus database. */
 export const CORPUS_FILE_NAME = 'ecdict.db'
-
-/** Environment variable name allowing path override in isolated test environments. */
-export const CORPUS_PATH_ENV = 'DSH_WORD_LOOKUP_DB_PATH'
 
 /** Relative path to the package-owned manifest. */
 export const MANIFEST_RELATIVE_PATH = join('corpus', 'ecdict.manifest.json')
@@ -89,8 +86,7 @@ export function loadRuntimeCorpusManifest(fromUrl?: string): CorpusManifestData 
  *
  * Precedence:
  * 1. Explicit `options.path`
- * 2. Process environment variable `DSH_WORD_LOOKUP_DB_PATH`
- * 3. Default `<package root>/build/corpus/ecdict.db`
+ * 2. Default `<package root>/build/corpus/ecdict.db`
  *
  * @param options - path resolution options.
  * @returns absolute resolved path.
@@ -98,11 +94,6 @@ export function loadRuntimeCorpusManifest(fromUrl?: string): CorpusManifestData 
 export function resolveProductionDatabasePath(options: OpenProductionDictionaryOptions = {}): string {
   if (options.path) {
     return options.path
-  }
-
-  const envPath = process.env[CORPUS_PATH_ENV]
-  if (envPath && envPath.trim().length > 0) {
-    return envPath.trim()
   }
 
   const root = findPackageRoot(options.fromUrl ?? import.meta.url)

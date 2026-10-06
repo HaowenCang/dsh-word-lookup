@@ -286,6 +286,8 @@ describe('POST /api/dsh-word-lookup — live configuration echo', () => {
     // next request through the same handler sees it.
     let autoSelection = false
     const mutable = {
+      dictionaryMode: { get: () => 'fixture' as const },
+      customDictionaryPath: { get: () => '' },
       autoDoubleClick: { get: () => false },
       autoSelection: { get: () => autoSelection },
     }

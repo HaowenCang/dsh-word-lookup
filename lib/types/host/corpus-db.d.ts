@@ -1,8 +1,8 @@
 /**
  * Production corpus database resolution, metadata validation, and opening.
  *
- * Implements Phase 6.1 production corpus loading with strict guarantees:
- * - Deterministic path resolution via explicit `options.path` or `DSH_WORD_LOOKUP_DB_PATH`.
+ * Implements production corpus loading and validation with strict guarantees:
+ * - Deterministic path resolution via explicit `options.path` or default package corpus path.
  * - Validates production metadata against package-owned `corpus/ecdict.manifest.json`:
  *   - `schema_version` matches pinned schema version.
  *   - `corpus_name` === 'ECDICT'.
@@ -23,8 +23,6 @@ import { type SqliteDictionary } from './sqlite-dictionary.js';
 export declare const CORPUS_DIRECTORY: string;
 /** Default file name of the production corpus database. */
 export declare const CORPUS_FILE_NAME = "ecdict.db";
-/** Environment variable name allowing path override in isolated test environments. */
-export declare const CORPUS_PATH_ENV = "DSH_WORD_LOOKUP_DB_PATH";
 /** Relative path to the package-owned manifest. */
 export declare const MANIFEST_RELATIVE_PATH: string;
 export interface CorpusManifestData {
@@ -53,8 +51,7 @@ export declare function loadRuntimeCorpusManifest(fromUrl?: string): CorpusManif
  *
  * Precedence:
  * 1. Explicit `options.path`
- * 2. Process environment variable `DSH_WORD_LOOKUP_DB_PATH`
- * 3. Default `<package root>/build/corpus/ecdict.db`
+ * 2. Default `<package root>/build/corpus/ecdict.db`
  *
  * @param options - path resolution options.
  * @returns absolute resolved path.
