@@ -65,23 +65,29 @@ function runStep(name, cmd, args) {
 
     child.on('error', (err) => reject(err))
 
-    child.on('close', (code) => {
+    child.on('close', (code, signal) => {
       const durationMs = Date.now() - startTime
-      const exitCode = code ?? 0
-      const passed = exitCode === 0
-      if (!passed) {
-        reject(new Error(`Command "${name}" (${cmd} ${args.join(' ')}) failed with exit code ${exitCode}`))
-      } else {
-        resolve({
-          name,
-          command: `${cmd} ${args.join(' ')}`,
-          exitCode,
-          passed,
-          durationMs,
-          stdout,
-          stderr,
-        })
+      if (signal) {
+        reject(new Error(`Command "${name}" (${cmd} ${args.join(' ')}) terminated by signal ${signal}`))
+        return
       }
+      if (typeof code !== 'number') {
+        reject(new Error(`Command "${name}" (${cmd} ${args.join(' ')}) terminated abnormally with null/undefined exit code (signal: ${signal})`))
+        return
+      }
+      if (code !== 0) {
+        reject(new Error(`Command "${name}" (${cmd} ${args.join(' ')}) failed with exit code ${code}`))
+        return
+      }
+      resolve({
+        name,
+        command: `${cmd} ${args.join(' ')}`,
+        exitCode: code,
+        passed: true,
+        durationMs,
+        stdout,
+        stderr,
+      })
     })
   })
 }

@@ -263,14 +263,12 @@ export async function runStoreLifecycleVerification(opts = {}) {
   const tarballFilename = basename(candidateTarballPath)
 
   const results = {
-    phase: '6R.1',
+    phase: '6R.1a',
     testedCodeGitSha,
     workingTreeCleanAtPack: true,
     candidatePackageVersion: '0.1.1',
     selectedPort: port,
     finalIsolationCheckPassed: true,
-    productionPortTouched: false,
-    unknownProcessKilled: false,
     candidateTarballSha256: candidateSha256,
     candidateTarball: {
       filename: tarballFilename,
@@ -280,17 +278,20 @@ export async function runStoreLifecycleVerification(opts = {}) {
     isolation: {
       passed: true,
       finalIsolationCheckPassed: true,
-      productionPortTouched: false,
-      productionDshHomeTouched: false,
-      productionProfileTouched: false,
-      productionSessionTouched: false,
-      unknownProcessKilled: false,
+      mechanism: 'assertIsolatedDshEnvironment preflight path and port assertions',
       selectedPort: port,
       banner: ISOLATION_BANNER,
       home: verified.home,
       profile: verified.profile,
       profileDir: verified.profileDir,
       port,
+      assertedByHarnessInvariant: {
+        productionPortTouched: false,
+        productionDshHomeTouched: false,
+        productionProfileTouched: false,
+        productionSessionTouched: false,
+        unknownProcessKilled: false,
+      },
     },
     operations: {
       install: { passed: false, details: {} },

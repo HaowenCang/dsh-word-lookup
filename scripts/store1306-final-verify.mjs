@@ -84,23 +84,30 @@ function runStep(name, cmd, args, { env = process.env } = {}) {
 
     child.on('error', (err) => reject(err))
 
-    child.on('close', (code) => {
+    child.on('close', (code, signal) => {
       const durationMs = Date.now() - startTime
-      const exitCode = code ?? 0
-      const passed = exitCode === 0
-      if (!passed) {
-        reject(new Error(`Command "${name}" (${cmd} ${args.join(' ')}) failed with exit code ${exitCode}`))
-      } else {
-        resolve({
-          name,
-          command: `${cmd} ${args.join(' ')}`,
-          exitCode,
-          passed,
-          durationMs,
-          stdout,
-          stderr,
-        })
+      if (signal) {
+        reject(new Error(`Command "${name}" (${cmd} ${args.join(' ')}) terminated by signal ${signal}`))
+        return
       }
+      if (typeof code !== 'number') {
+        reject(new Error(`Command "${name}" (${cmd} ${args.join(' ')}) terminated abnormally with null/undefined exit code (signal: ${signal})`))
+        return
+      }
+      if (code !== 0) {
+        reject(new Error(`Command "${name}" (${cmd} ${args.join(' ')}) failed with exit code ${code}`))
+        return
+      }
+      resolve({
+        name,
+        command: `${cmd} ${args.join(' ')}`,
+        exitCode: code,
+        signal: null,
+        passed: true,
+        durationMs,
+        stdout,
+        stderr,
+      })
     })
   })
 }
@@ -110,17 +117,33 @@ function parseVitest(rawStdout) {
   const fileMatch = stdout.match(/Test Files\s+(?:(\d+)\s+failed\s*\|?\s*)?(?:(\d+)\s+passed)?\s*\((\d+)\)/)
   const testMatch = stdout.match(/Tests\s+(?:(\d+)\s+failed\s*\|?\s*)?(?:(\d+)\s+passed)?(?:\s*\|\s*(\d+)\s+skipped)?\s*\((\d+)\)/)
 
-  const testFilesFailed = fileMatch && fileMatch[1] ? parseInt(fileMatch[1], 10) : 0
-  const testFilesPassed = fileMatch && fileMatch[2] ? parseInt(fileMatch[2], 10) : (fileMatch && fileMatch[3] ? parseInt(fileMatch[3], 10) : null)
-  const totalTestFiles = fileMatch && fileMatch[3] ? parseInt(fileMatch[3], 10) : null
+  if (!fileMatch || !testMatch) {
+    throw new Error(`Failed to parse Vitest summary metrics from stdout:\n${stdout.slice(-1000)}`)
+  }
 
-  const testsFailed = testMatch && testMatch[1] ? parseInt(testMatch[1], 10) : 0
-  const testsPassed = testMatch && testMatch[2] ? parseInt(testMatch[2], 10) : (testMatch && testMatch[4] ? parseInt(testMatch[4], 10) : null)
-  const testsSkipped = testMatch && testMatch[3] ? parseInt(testMatch[3], 10) : 0
-  const totalTests = testMatch && testMatch[4] ? parseInt(testMatch[4], 10) : null
+  const testFilesFailed = fileMatch[1] ? parseInt(fileMatch[1], 10) : 0
+  const totalTestFiles = fileMatch[3] ? parseInt(fileMatch[3], 10) : NaN
+  const testFilesPassed = fileMatch[2] ? parseInt(fileMatch[2], 10) : (testFilesFailed === 0 ? totalTestFiles : totalTestFiles - testFilesFailed)
 
-  if (testsPassed === null || totalTests === null) {
-    return 'notMeasured'
+  const testsFailed = testMatch[1] ? parseInt(testMatch[1], 10) : 0
+  const testsSkipped = testMatch[3] ? parseInt(testMatch[3], 10) : 0
+  const totalTests = testMatch[4] ? parseInt(testMatch[4], 10) : NaN
+  const testsPassed = testMatch[2] ? parseInt(testMatch[2], 10) : (testsFailed === 0 && testsSkipped === 0 ? totalTests : totalTests - testsFailed - testsSkipped)
+
+  if (
+    Number.isNaN(totalTestFiles) ||
+    Number.isNaN(testFilesPassed) ||
+    Number.isNaN(testFilesFailed) ||
+    Number.isNaN(totalTests) ||
+    Number.isNaN(testsPassed) ||
+    Number.isNaN(testsFailed) ||
+    Number.isNaN(testsSkipped)
+  ) {
+    throw new Error('Vitest output parsed with missing or NaN numerical metrics')
+  }
+
+  if (testFilesFailed !== 0 || testsFailed !== 0) {
+    throw new Error(`Vitest test failures observed: ${testFilesFailed} files failed, ${testsFailed} tests failed`)
   }
 
   return {
@@ -147,31 +170,44 @@ function parseVerifySummary(rawStdout) {
     })
   }
   if (steps.length === 0) {
-    return 'notMeasured'
+    throw new Error('Failed to parse verify summary steps from stdout')
   }
+  const isOverallPass = stdout.includes('verify: PASS')
+  const stepsPassed = steps.filter((s) => s.status === 'PASS').length
+  const totalSteps = steps.length
+  const allStepsPassed = steps.every((s) => s.status === 'PASS')
+
+  if (!isOverallPass || !allStepsPassed || stepsPassed !== totalSteps) {
+    throw new Error(`npm run verify failed: overallPass=${isOverallPass}, stepsPassed=${stepsPassed}/${totalSteps}`)
+  }
+
   return {
-    status: stdout.includes('verify: PASS') ? 'PASS' : 'FAIL',
-    stepsPassed: steps.filter((s) => s.status === 'PASS').length,
-    totalSteps: steps.length,
+    status: 'PASS',
+    stepsPassed,
+    totalSteps,
     steps,
   }
 }
 
 function parseNpmPackDryRun(rawOutput) {
   const stdout = stripAnsi(rawOutput).trim()
+  let metaList
   try {
-    const metaList = JSON.parse(stdout)
-    const meta = metaList[0]
-    return {
-      packageName: meta.name,
-      version: meta.version,
-      packageSize: meta.size,
-      unpackedSize: meta.unpackedSize,
-      entryCount: meta.entryCount,
-      files: meta.files.map((f) => f.path),
-    }
-  } catch {
-    return 'notMeasured'
+    metaList = JSON.parse(stdout)
+  } catch (err) {
+    throw new Error(`Failed to parse npm pack --dry-run JSON output: ${err.message}`)
+  }
+  const meta = Array.isArray(metaList) ? metaList[0] : null
+  if (!meta || !meta.name || !meta.version || !Array.isArray(meta.files)) {
+    throw new Error('npm pack --dry-run JSON missing expected metadata fields (name, version, files)')
+  }
+  return {
+    packageName: meta.name,
+    version: meta.version,
+    packageSize: meta.size,
+    unpackedSize: meta.unpackedSize,
+    entryCount: meta.entryCount ?? meta.files.length,
+    files: meta.files.map((f) => f.path).sort(),
   }
 }
 
@@ -260,6 +296,9 @@ async function main() {
   if (!contractData.allPassed) {
     throw new Error('verify:store-contract failed one or more assertions')
   }
+  if (!Array.isArray(contractData.missingLocalModules) || contractData.missingLocalModules.length !== 0) {
+    throw new Error(`verify:store-contract missingLocalModules must be 0, got: ${JSON.stringify(contractData.missingLocalModules)}`)
+  }
   commandMatrix.push({
     command: 'npm run verify:store-contract',
     exitCode: contractRes.exitCode,
@@ -311,13 +350,31 @@ async function main() {
     throw new Error(`CRITICAL VIOLATION: Forbidden corpus artifact in tarball:\n${forbiddenInTarball.join('\n')}`)
   }
 
+  // Cross-check npm pack --dry-run against actual candidate tarball (Requirement 5)
+  if (packDryMeta.packageName !== pkg.name) {
+    throw new Error(`pack dry-run packageName mismatch: expected ${pkg.name}, got ${packDryMeta.packageName}`)
+  }
+  if (packDryMeta.version !== pkg.version) {
+    throw new Error(`pack dry-run version mismatch: expected ${pkg.version}, got ${packDryMeta.version}`)
+  }
+  if (packDryMeta.files.length !== tarFiles.length) {
+    throw new Error(`pack dry-run fileCount mismatch: dry-run had ${packDryMeta.files.length}, tarball has ${tarFiles.length}`)
+  }
+  const dryFilesSorted = [...packDryMeta.files].sort()
+  const tarFilesSorted = [...tarFiles].sort()
+  for (let i = 0; i < tarFilesSorted.length; i++) {
+    if (dryFilesSorted[i] !== tarFilesSorted[i]) {
+      throw new Error(`pack dry-run file mismatch at index ${i}: dry-run=${dryFilesSorted[i]}, tarball=${tarFilesSorted[i]}`)
+    }
+  }
+
   const tarballIdentity = {
     filename: tarballFilename,
     packageName: pkg.name,
     version: pkg.version,
     sha256: tarballSha256,
     size: tarballStat.size,
-    unpackedSize: typeof packDryMeta === 'object' ? packDryMeta.unpackedSize : 'notMeasured',
+    unpackedSize: packDryMeta.unpackedSize,
     fileCount: tarFiles.length,
     files: tarFiles,
   }
@@ -349,6 +406,12 @@ async function main() {
     throw new Error(`Lifecycle evidence file not found at ${lifecycleEvidencePath}`)
   }
   const lifecycleEvidence = JSON.parse(readFileSync(lifecycleEvidencePath, 'utf8'))
+  if (lifecycleEvidence.testedCodeGitSha !== testedCodeGitSha) {
+    throw new Error(`Lifecycle testedCodeGitSha mismatch: expected ${testedCodeGitSha}, got ${lifecycleEvidence.testedCodeGitSha}`)
+  }
+  if (lifecycleEvidence.candidateTarballSha256 !== tarballSha256) {
+    throw new Error(`Lifecycle candidateTarballSha256 mismatch: expected ${tarballSha256}, got ${lifecycleEvidence.candidateTarballSha256}`)
+  }
   if (!lifecycleEvidence.allPassed) {
     throw new Error('Store lifecycle verification failed one or more operations')
   }
@@ -381,9 +444,30 @@ async function main() {
     throw new Error(`Runtime evidence file not found at ${runtimeEvidencePath}`)
   }
   const runtimeEvidence = JSON.parse(readFileSync(runtimeEvidencePath, 'utf8'))
+  if (runtimeEvidence.testedCodeGitSha !== testedCodeGitSha) {
+    throw new Error(`Runtime testedCodeGitSha mismatch: expected ${testedCodeGitSha}, got ${runtimeEvidence.testedCodeGitSha}`)
+  }
   if (runtimeEvidence.status !== 'PASS') {
     throw new Error(`Runtime acceptance test failed with status: ${runtimeEvidence.status}`)
   }
+
+  const runtimeChecksPassed = typeof runtimeEvidence.checksPassed === 'number'
+    ? runtimeEvidence.checksPassed
+    : (typeof runtimeEvidence.summary?.passed === 'number' ? runtimeEvidence.summary.passed : null)
+  const runtimeChecksFailed = typeof runtimeEvidence.checksFailed === 'number'
+    ? runtimeEvidence.checksFailed
+    : (Array.isArray(runtimeEvidence.summary?.failed) ? runtimeEvidence.summary.failed.length : null)
+  const runtimeTotalChecks = typeof runtimeEvidence.totalChecks === 'number'
+    ? runtimeEvidence.totalChecks
+    : (typeof runtimeEvidence.summary?.total === 'number' ? runtimeEvidence.summary.total : null)
+
+  if (runtimeChecksPassed === null || runtimeChecksFailed === null || runtimeTotalChecks === null) {
+    throw new Error(`Runtime acceptance metrics missing or unparseable: passed=${runtimeChecksPassed}, failed=${runtimeChecksFailed}, total=${runtimeTotalChecks}`)
+  }
+  if (runtimeChecksFailed !== 0 || runtimeChecksPassed !== runtimeTotalChecks) {
+    throw new Error(`Runtime acceptance checks failed or inconsistent: failed=${runtimeChecksFailed}, passed=${runtimeChecksPassed}/${runtimeTotalChecks}`)
+  }
+
   commandMatrix.push({
     command: 'npm run test:runtime',
     exitCode: runtimeRes.exitCode,
@@ -391,9 +475,9 @@ async function main() {
     passed: runtimeRes.passed,
     totals: {
       status: runtimeEvidence.status,
-      checksPassed: runtimeEvidence.checksPassed ?? runtimeEvidence.summary?.passed,
-      checksFailed: runtimeEvidence.checksFailed ?? runtimeEvidence.summary?.failed?.length ?? 0,
-      totalChecks: runtimeEvidence.totalChecks ?? runtimeEvidence.summary?.total,
+      checksPassed: runtimeChecksPassed,
+      checksFailed: runtimeChecksFailed,
+      totalChecks: runtimeTotalChecks,
     },
   })
 
@@ -408,8 +492,18 @@ async function main() {
     throw new Error(`Browser acceptance evidence file not found at ${browserEvidencePath}`)
   }
   const browserEvidence = JSON.parse(readFileSync(browserEvidencePath, 'utf8'))
-  if (browserEvidence.summary.passed !== browserEvidence.summary.total) {
-    throw new Error(`Browser acceptance failed: ${browserEvidence.summary.passed}/${browserEvidence.summary.total} passed`)
+  const browserTestedSha = browserEvidence.testedCodeGitSha ?? browserEvidence.testedGitSha
+  if (browserTestedSha !== testedCodeGitSha) {
+    throw new Error(`Browser acceptance testedCodeGitSha mismatch: expected ${testedCodeGitSha}, got ${browserTestedSha}`)
+  }
+  if (
+    typeof browserEvidence.summary?.passed !== 'number' ||
+    typeof browserEvidence.summary?.total !== 'number' ||
+    !Array.isArray(browserEvidence.summary?.failedIds) ||
+    browserEvidence.summary.failedIds.length !== 0 ||
+    browserEvidence.summary.passed !== browserEvidence.summary.total
+  ) {
+    throw new Error(`Browser acceptance failed: ${browserEvidence.summary?.passed}/${browserEvidence.summary?.total} passed, failedIds=${JSON.stringify(browserEvidence.summary?.failedIds)}`)
   }
   commandMatrix.push({
     command: 'npm run test:acceptance',
@@ -506,8 +600,23 @@ async function main() {
     throw new Error(`Corpus runtime evidence file not found at ${corpusRuntimeEvidencePath}`)
   }
   const corpusRuntimeEvidence = JSON.parse(readFileSync(corpusRuntimeEvidencePath, 'utf8'))
-  if (!corpusRuntimeEvidence.allChecksPassed) {
+  if (corpusRuntimeEvidence.testedCodeGitSha !== testedCodeGitSha) {
+    throw new Error(`Corpus runtime testedCodeGitSha mismatch: expected ${testedCodeGitSha}, got ${corpusRuntimeEvidence.testedCodeGitSha}`)
+  }
+  if (corpusRuntimeEvidence.allChecksPassed !== true) {
     throw new Error('Corpus runtime acceptance failed one or more checks')
+  }
+  if (corpusRuntimeEvidence.profileResolvedBundlesMatchRepository !== true) {
+    throw new Error('Corpus runtime profileResolvedBundlesMatchRepository is not true')
+  }
+  if (corpusRuntimeEvidence.profileBinding?.resolvedPluginMatchesRepoRoot !== true) {
+    throw new Error(`Corpus runtime profileBinding.resolvedPluginMatchesRepoRoot is not true (got: ${corpusRuntimeEvidence.profileBinding?.resolvedPluginMatchesRepoRoot})`)
+  }
+  if (corpusRuntimeEvidence.runtimeVerification?.dictionarySourceObserved !== 'ecdict-local') {
+    throw new Error(`Corpus runtime dictionarySourceObserved is not "ecdict-local" (got: ${corpusRuntimeEvidence.runtimeVerification?.dictionarySourceObserved})`)
+  }
+  if (corpusRuntimeEvidence.runtimeVerification?.fixtureFallbackObserved !== false) {
+    throw new Error(`Corpus runtime fixtureFallbackObserved is not false (got: ${corpusRuntimeEvidence.runtimeVerification?.fixtureFallbackObserved})`)
   }
   commandMatrix.push({
     command: 'npm run test:corpus-runtime',
@@ -546,8 +655,8 @@ async function main() {
 
   // 20. Build Authoritative Final Verification Document
   const finalEvidence = {
-    phase: '6R.1',
-    reportTitle: 'Phase 6R.1 Evidence & Release Integrity Closure Verification',
+    phase: '6R.1a',
+    reportTitle: 'Phase 6R.1a Verifier Fail-Closed Closure Verification',
     testedCodeGitSha,
     verificationTimestamp: new Date().toISOString(),
 
@@ -581,10 +690,10 @@ async function main() {
 
     browserAcceptance: {
       evidenceFile: 'docs/evidence/store1306-v011-browser-acceptance.json',
-      testedCodeGitSha: browserEvidence.testedCodeGitSha ?? browserEvidence.testedGitSha,
-      dshVersion: browserEvidence.dshVersion ?? browserEvidence.environment?.DSH,
-      profile: browserEvidence.profile ?? browserEvidence.isolation?.profile,
-      port: browserEvidence.port ?? browserEvidence.isolation?.port,
+      testedCodeGitSha: browserTestedSha,
+      dshVersion: browserEvidence.dshVersion ?? browserEvidence.environment?.DSH ?? 'notMeasured',
+      profile: browserEvidence.profile ?? browserEvidence.isolation?.profile ?? 'notMeasured',
+      port: browserEvidence.port ?? browserEvidence.isolation?.port ?? 'notMeasured',
       passed: browserEvidence.summary.passed,
       failed: browserEvidence.summary.failedIds.length,
       total: browserEvidence.summary.total,
@@ -595,25 +704,29 @@ async function main() {
       evidenceFile: 'docs/evidence/store1306-v011-runtime.json',
       testedCodeGitSha: runtimeEvidence.testedCodeGitSha,
       status: runtimeEvidence.status,
-      checksPassed: runtimeEvidence.checksPassed ?? runtimeEvidence.summary?.passed,
-      checksFailed: runtimeEvidence.checksFailed ?? runtimeEvidence.summary?.failed?.length ?? 0,
-      totalChecks: runtimeEvidence.totalChecks ?? runtimeEvidence.summary?.total,
-      failedCheckIds: runtimeEvidence.failedCheckIds ?? runtimeEvidence.summary?.failed ?? [],
-      profile: runtimeEvidence.profile ?? runtimeEvidence.environment?.profile,
-      port: runtimeEvidence.port ?? runtimeEvidence.environment?.port,
-      dshVersion: runtimeEvidence.dshVersion ?? runtimeEvidence.environment?.dshVersion,
+      checksPassed: runtimeChecksPassed,
+      checksFailed: runtimeChecksFailed,
+      totalChecks: runtimeTotalChecks,
+      failedCheckIds: Array.isArray(runtimeEvidence.failedCheckIds)
+        ? runtimeEvidence.failedCheckIds
+        : (Array.isArray(runtimeEvidence.summary?.failed) ? runtimeEvidence.summary.failed : []),
+      profile: runtimeEvidence.profile ?? runtimeEvidence.environment?.profile ?? 'notMeasured',
+      port: runtimeEvidence.port ?? runtimeEvidence.environment?.port ?? 'notMeasured',
+      dshVersion: runtimeEvidence.dshVersion ?? runtimeEvidence.environment?.dshVersion ?? 'notMeasured',
     },
 
     corpusRuntimeAcceptance: {
       evidenceFile: 'docs/evidence/store1306-v011-corpus-runtime.json',
       testedCodeGitSha: corpusRuntimeEvidence.testedCodeGitSha,
       profileResolvedBundlesMatchRepository: corpusRuntimeEvidence.profileResolvedBundlesMatchRepository,
-      resolvedPluginMatchesRepoRoot: corpusRuntimeEvidence.profileBinding?.resolvedPluginMatchesRepoRoot ?? true,
-      dictionarySourceObserved: 'ecdict-local',
-      fixtureFallbackObserved: false,
+      resolvedPluginMatchesRepoRoot: corpusRuntimeEvidence.profileBinding.resolvedPluginMatchesRepoRoot,
+      dictionarySourceObserved: corpusRuntimeEvidence.runtimeVerification.dictionarySourceObserved,
+      fixtureFallbackObserved: corpusRuntimeEvidence.runtimeVerification.fixtureFallbackObserved,
       cr1Probes: corpusRuntimeEvidence.cr1Probes,
       negativeGates: corpusRuntimeEvidence.negativeGates,
-      externalBrowserRequestsObserved: corpusRuntimeEvidence.networkObservation?.browserVisible?.externalOriginRequestsObserved ?? 0,
+      externalBrowserRequestsObserved: typeof corpusRuntimeEvidence.networkObservation?.browserVisible?.externalOriginRequestsObserved === 'number'
+        ? corpusRuntimeEvidence.networkObservation.browserVisible.externalOriginRequestsObserved
+        : 'notMeasured',
       hostProcessWideNetworkActivity: corpusRuntimeEvidence.networkObservation?.hostProcessWideNetworkActivity ?? 'notMeasured',
       aiSafetyObservation: corpusRuntimeEvidence.aiSafety?.runtimeObservation ?? 'notMeasured',
     },
@@ -652,17 +765,31 @@ async function main() {
     },
 
     isolation: {
-      productionDshHomeTouched: false,
-      productionProfileTouched: false,
-      productionPortTouched: false,
-      productionSessionTouched: false,
-      unknownProcessKilled: false,
+      mechanism: 'assertIsolatedDshEnvironment preflight path and port assertions',
+      preflightIsolationCheckPassed: lifecycleEvidence.finalIsolationCheckPassed === true,
+      selectedPort: lifecycleEvidence.selectedPort,
+      assertedByHarnessInvariant: {
+        productionDshHomeTouched: false,
+        productionProfileTouched: false,
+        productionPortTouched: false,
+        productionSessionTouched: false,
+        unknownProcessKilled: false,
+      },
     },
 
     releaseActions: {
-      npmPublishPerformed: false,
-      gitTagCreated: false,
-      githubReleaseCreated: false,
+      notPerformedByThisRunner: {
+        npmPublishPerformed: false,
+        gitTagCreated: false,
+        githubReleaseCreated: false,
+      },
+      localGitTagObserved: {
+        v011TagPresent: execSync('git tag -l v0.1.1', { cwd: ROOT, encoding: 'utf8' }).trim().length > 0,
+      },
+      verifiedByIndependentAudit: {
+        npmRegistryPublished: 'pendingIndependentAudit',
+        gitTagAndGithubRelease: 'pendingIndependentAudit',
+      },
     },
 
     openBlockers: [
