@@ -38,9 +38,10 @@ import type { Context } from '@deepseek-ai/cordis';
 import { Config, type HostConfig } from './host/config.js';
 import { openProductionDictionary, resolveProductionDatabasePath } from './host/corpus-db.js';
 import { DictionaryUnavailableError } from './host/dictionary.js';
+import { DictionaryManager, type DictionaryActivation, type DictionaryActivationResult, type DictionaryManagerSnapshot } from './host/dictionary-manager.js';
 export { Config };
 export type { HostConfig };
-export { openProductionDictionary, resolveProductionDatabasePath, DictionaryUnavailableError, };
+export { openProductionDictionary, resolveProductionDatabasePath, DictionaryUnavailableError, DictionaryManager, type DictionaryActivation, type DictionaryActivationResult, type DictionaryManagerSnapshot, };
 /** Package name; equals the Loader entry id and the settings namespace. */
 export declare const name = "dsh-word-lookup";
 /** Host services required before this entry activates. */

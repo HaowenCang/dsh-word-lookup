@@ -9,7 +9,7 @@ nothing leaves your machine and no model is involved.
 **Current development target: v0.2.0 — unreleased.**
 The latest published release is **v0.1.0**.
 
-The plugin is local-first and uses SQLite for dictionary lookup. The public package does not redistribute the full ECDICT corpus. In Phase 7A.1, the host runtime defaults to and executes against the deterministic offline fixture database while establishing the v0.2.0 Host Config model.
+The plugin is local-first and uses SQLite for dictionary lookup. The public package does not redistribute the full ECDICT corpus. In Phase 7A.2, the host runtime establishes `DictionaryManager` for atomic hot switching while still starting on the deterministic offline fixture database.
 
 | Area | State |
 | --- | --- |
@@ -88,8 +88,8 @@ browser (client half)                          host (Node half)
   pointer/dblclick -> local gesture state only
                        + monotonic gesture identity
   gesture completes --> trigger gate --> maybe a lookup
-  shortcut run -------> POST api/dsh-word-lookup ----> SQLite dictionary lookup
-                                                       (deterministic fixture in Phase 7A.1)
+  shortcut run -------> POST api/dsh-word-lookup ----> DictionaryManager
+                                                         -> active Dictionary (fixture on startup)
                       <--------- structured result
   latest request wins <--------- card state
   shell.overlay <---- renders the card
@@ -105,12 +105,18 @@ browser (client half)                          host (Node half)
   settings use DSH's own configuration form so the switches persist with the
   profile.
 
-### Dictionary Storage & Configuration
+### Dictionary Storage & Lifecycle
 
-The v0.2.0 architecture establishes an in-app configuration contract (`dictionaryMode`, `customDictionaryPath`, `autoDoubleClick`, `autoSelection`).
+The v0.2.0 architecture routes dictionary lookups through `DictionaryManager`:
 
-- **Deterministic Fixture Mode (Default)**:
-  The plugin initializes its package-owned deterministic fixture database (`dsh-word-lookup-fixture`). In Phase 7A.1, this remains the active runtime dictionary while subsequent phases establish managed ECDICT storage, downloader, and custom SQLite activation.
+```text
+lookup route → DictionaryManager → active Dictionary
+```
+
+- **DictionaryManager Lifecycle & Hot Switching**:
+  The route maintains a stable reference to `DictionaryManager`, which implements the `Dictionary` interface. Candidate dictionaries are opened and validated prior to atomic active reference replacement.
+- **Deterministic Fixture Mode Startup**:
+  In Phase 7A.2, the host runtime continues to start strictly on the built-in deterministic fixture database (`sqlite-fixture`). Subsequent phases will establish managed ECDICT filesystem storage, downloading, and UI-driven switching.
 - **Zero Legacy Environment Variables**:
   Legacy environment variable database activation has been completely removed. Host startup and dictionary resolution no longer inspect any process environment variables.
 - **Fail-Closed Guarantee**:

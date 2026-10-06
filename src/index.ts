@@ -46,6 +46,12 @@ import {
   resolveProductionDatabasePath,
 } from './host/corpus-db.js'
 import { DictionaryUnavailableError } from './host/dictionary.js'
+import {
+  DictionaryManager,
+  type DictionaryActivation,
+  type DictionaryActivationResult,
+  type DictionaryManagerSnapshot,
+} from './host/dictionary-manager.js'
 import { openFixtureDictionary } from './host/fixture-db.js'
 import { createLookupHandler } from './host/lookup.js'
 import { LOOKUP_PATH } from './host/route.js'
@@ -56,6 +62,10 @@ export {
   openProductionDictionary,
   resolveProductionDatabasePath,
   DictionaryUnavailableError,
+  DictionaryManager,
+  type DictionaryActivation,
+  type DictionaryActivationResult,
+  type DictionaryManagerSnapshot,
 }
 
 /** Package name; equals the Loader entry id and the settings namespace. */
@@ -77,7 +87,12 @@ export const inject: readonly string[] = ['connection']
  */
 export function apply(ctx: Context, config: HostConfig): void {
   ctx.effect(() => {
-    const dictionary = openFixtureDictionary()
+    const fixture = openFixtureDictionary()
+    const manager = new DictionaryManager({
+      mode: 'fixture',
+      identity: 'fixture',
+      dictionary: fixture,
+    })
 
     let disposeRoute: (() => Promise<void>) | undefined
     try {
@@ -85,11 +100,11 @@ export function apply(ctx: Context, config: HostConfig): void {
         path: LOOKUP_PATH,
         methods: ['POST'],
         requestBody: 'buffered',
-        fetch: createLookupHandler(config, dictionary),
+        fetch: createLookupHandler(config, manager),
       })
     } catch (error) {
       // The route never registered, so nothing else will release the handle.
-      dictionary.close()
+      manager.close()
       throw error
     }
 
@@ -97,7 +112,7 @@ export function apply(ctx: Context, config: HostConfig): void {
       try {
         await disposeRoute?.()
       } finally {
-        dictionary.close()
+        manager.close()
       }
     }
   }, 'dsh-word-lookup: local sqlite dictionary and exact fetch route')
