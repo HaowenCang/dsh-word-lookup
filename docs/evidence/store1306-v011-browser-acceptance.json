@@ -1,8 +1,8 @@
 {
   "phase": "Phase 6R.1",
-  "generatedAt": "2026-10-05T14:51:35.637Z",
-  "testedCodeGitSha": "68d896098087044343c93834d2ebe53e50e67677",
-  "testedGitSha": "68d896098087044343c93834d2ebe53e50e67677",
+  "generatedAt": "2026-10-06T05:55:01.245Z",
+  "testedCodeGitSha": "138ac116e1438d6a72425aac12d5418b834d6287",
+  "testedGitSha": "138ac116e1438d6a72425aac12d5418b834d6287",
   "branch": "master",
   "profile": "word-lookup-test",
   "port": 50992,
@@ -198,9 +198,9 @@
       "measured": {
         "cardRect": {
           "x": 340,
-          "y": 533,
+          "y": 676,
           "width": 360,
-          "height": 238,
+          "height": 95,
           "right": 700,
           "bottom": 771
         },
@@ -280,14 +280,14 @@
       "id": "POS-MULTILINE",
       "description": "multiline selection geometry places card cleanly within margins",
       "passed": true,
-      "detail": "rect={\"x\":38,\"y\":275,\"width\":360,\"height\":134,\"right\":398,\"bottom\":409}",
+      "detail": "rect={\"x\":38,\"y\":275,\"width\":360,\"height\":118,\"right\":398,\"bottom\":393}",
       "measured": {
         "x": 38,
         "y": 275,
         "width": 360,
-        "height": 134,
+        "height": 118,
         "right": 398,
-        "bottom": 409
+        "bottom": 393
       }
     },
     {
@@ -686,7 +686,7 @@
     {
       "filename": "narrow.png",
       "path": "docs/evidence/store1306-v011-screenshots/narrow.png",
-      "sha256": "ae2fdc75c981c92206c06eeda8dcdaf5b048b68af63df92c4afbaa56e0ffae2a",
+      "sha256": "d040f0e22ad653142dc55829b2df387d4d3bd49e0eaa8b4156cba0fb635527db",
       "width": 360,
       "height": 640
     },

@@ -1,8 +1,8 @@
 {
-  "phase": "6R.1",
-  "reportTitle": "Phase 6R.1 Evidence & Release Integrity Closure Verification",
-  "testedCodeGitSha": "68d896098087044343c93834d2ebe53e50e67677",
-  "verificationTimestamp": "2026-10-05T14:52:37.301Z",
+  "phase": "6R.1a",
+  "reportTitle": "Phase 6R.1a Verifier Fail-Closed Closure Verification",
+  "testedCodeGitSha": "138ac116e1438d6a72425aac12d5418b834d6287",
+  "verificationTimestamp": "2026-10-06T05:55:59.880Z",
   "releaseMetadata": {
     "packageJsonVersion": "0.1.1",
     "packageLockVersion": "0.1.1",
@@ -41,7 +41,7 @@
     }
   },
   "lifecycle": {
-    "testedCodeGitSha": "68d896098087044343c93834d2ebe53e50e67677",
+    "testedCodeGitSha": "138ac116e1438d6a72425aac12d5418b834d6287",
     "candidateTarballSha256": "9001396d4001f4a03914e46809f4d0f6c0cf0125e15bcde3a834c26cb9a737c7",
     "selectedPort": 50993,
     "finalIsolationCheckPassed": true,
@@ -96,7 +96,7 @@
     {
       "command": "npm test",
       "exitCode": 0,
-      "durationMs": 5335,
+      "durationMs": 16688,
       "passed": true,
       "totals": {
         "testFiles": 27,
@@ -111,7 +111,7 @@
     {
       "command": "npm run typecheck",
       "exitCode": 0,
-      "durationMs": 1791,
+      "durationMs": 16041,
       "passed": true,
       "totals": {
         "status": "PASS",
@@ -121,7 +121,7 @@
     {
       "command": "npm run verify",
       "exitCode": 0,
-      "durationMs": 13176,
+      "durationMs": 17109,
       "passed": true,
       "totals": {
         "status": "PASS",
@@ -131,32 +131,32 @@
           {
             "status": "PASS",
             "name": "fixture",
-            "durationSeconds": 3.8
+            "durationSeconds": 1
           },
           {
             "status": "PASS",
             "name": "typecheck",
-            "durationSeconds": 1.7
+            "durationSeconds": 1.6
           },
           {
             "status": "PASS",
             "name": "test",
-            "durationSeconds": 5.4
+            "durationSeconds": 5
           },
           {
             "status": "PASS",
             "name": "build",
-            "durationSeconds": 1.5
+            "durationSeconds": 5.8
           },
           {
             "status": "PASS",
             "name": "bundle-static-checks",
-            "durationSeconds": 0
+            "durationSeconds": 0.1
           },
           {
             "status": "PASS",
             "name": "credential-scan",
-            "durationSeconds": 0.2
+            "durationSeconds": 3.2
           }
         ]
       }
@@ -164,7 +164,7 @@
     {
       "command": "npm run verify:store-contract",
       "exitCode": 0,
-      "durationMs": 753,
+      "durationMs": 27573,
       "passed": true,
       "totals": {
         "allPassed": true,
@@ -176,7 +176,7 @@
     {
       "command": "npm pack --dry-run",
       "exitCode": 0,
-      "durationMs": 652,
+      "durationMs": 690,
       "passed": true,
       "totals": {
         "packageName": "dsh-word-lookup",
@@ -198,7 +198,7 @@
     {
       "command": "npm pack",
       "exitCode": 0,
-      "durationMs": 657,
+      "durationMs": 627,
       "passed": true,
       "totals": {
         "tarball": "dsh-word-lookup-0.1.1.tgz",
@@ -210,7 +210,7 @@
     {
       "command": "npm run test:store-lifecycle",
       "exitCode": 0,
-      "durationMs": 19512,
+      "durationMs": 71288,
       "passed": true,
       "totals": {
         "allPassed": true,
@@ -224,7 +224,7 @@
     {
       "command": "npm run test:runtime",
       "exitCode": 0,
-      "durationMs": 325800,
+      "durationMs": 321540,
       "passed": true,
       "totals": {
         "status": "PASS",
@@ -236,7 +236,7 @@
     {
       "command": "npm run test:acceptance",
       "exitCode": 0,
-      "durationMs": 22149,
+      "durationMs": 21549,
       "passed": true,
       "totals": {
         "passed": 37,
@@ -247,7 +247,7 @@
     {
       "command": "npm run corpus:verify-source",
       "exitCode": 0,
-      "durationMs": 355,
+      "durationMs": 373,
       "passed": true,
       "totals": {
         "status": "PASS",
@@ -258,7 +258,7 @@
     {
       "command": "npm run corpus:build",
       "exitCode": 0,
-      "durationMs": 14366,
+      "durationMs": 13422,
       "passed": true,
       "totals": {
         "status": "PASS",
@@ -270,7 +270,7 @@
     {
       "command": "npm run corpus:verify",
       "exitCode": 0,
-      "durationMs": 2778,
+      "durationMs": 2568,
       "passed": true,
       "totals": {
         "status": "PASS"
@@ -279,19 +279,19 @@
     {
       "command": "npm run corpus:benchmark",
       "exitCode": 0,
-      "durationMs": 554,
+      "durationMs": 490,
       "passed": true,
       "totals": {
         "status": "PASS",
         "startupValidationMs": 1.97,
-        "overallMedianUs": 51.4,
-        "overallP95Us": 87
+        "overallMedianUs": 44.2,
+        "overallP95Us": 75.2
       }
     },
     {
       "command": "npm run test:corpus-runtime",
       "exitCode": 0,
-      "durationMs": 33710,
+      "durationMs": 31797,
       "passed": true,
       "totals": {
         "allChecksPassed": true,
@@ -301,7 +301,7 @@
   ],
   "browserAcceptance": {
     "evidenceFile": "docs/evidence/store1306-v011-browser-acceptance.json",
-    "testedCodeGitSha": "68d896098087044343c93834d2ebe53e50e67677",
+    "testedCodeGitSha": "138ac116e1438d6a72425aac12d5418b834d6287",
     "dshVersion": "0.2.0-rc.2",
     "profile": "word-lookup-test",
     "port": 50992,
@@ -312,7 +312,7 @@
   },
   "runtimeAcceptance": {
     "evidenceFile": "docs/evidence/store1306-v011-runtime.json",
-    "testedCodeGitSha": "68d896098087044343c93834d2ebe53e50e67677",
+    "testedCodeGitSha": "138ac116e1438d6a72425aac12d5418b834d6287",
     "status": "PASS",
     "checksPassed": 169,
     "checksFailed": 0,
@@ -324,7 +324,7 @@
   },
   "corpusRuntimeAcceptance": {
     "evidenceFile": "docs/evidence/store1306-v011-corpus-runtime.json",
-    "testedCodeGitSha": "68d896098087044343c93834d2ebe53e50e67677",
+    "testedCodeGitSha": "138ac116e1438d6a72425aac12d5418b834d6287",
     "profileResolvedBundlesMatchRepository": true,
     "resolvedPluginMatchesRepoRoot": true,
     "dictionarySourceObserved": "ecdict-local",
@@ -397,21 +397,35 @@
     },
     "benchmark": {
       "databaseOpenValidationMs": 1.97,
-      "overallMedianUs": 51.4,
-      "overallP95Us": 87
+      "overallMedianUs": 44.2,
+      "overallP95Us": 75.2
     }
   },
   "isolation": {
-    "productionDshHomeTouched": false,
-    "productionProfileTouched": false,
-    "productionPortTouched": false,
-    "productionSessionTouched": false,
-    "unknownProcessKilled": false
+    "mechanism": "assertIsolatedDshEnvironment preflight path and port assertions",
+    "preflightIsolationCheckPassed": true,
+    "selectedPort": 50993,
+    "assertedByHarnessInvariant": {
+      "productionDshHomeTouched": false,
+      "productionProfileTouched": false,
+      "productionPortTouched": false,
+      "productionSessionTouched": false,
+      "unknownProcessKilled": false
+    }
   },
   "releaseActions": {
-    "npmPublishPerformed": false,
-    "gitTagCreated": false,
-    "githubReleaseCreated": false
+    "notPerformedByThisRunner": {
+      "npmPublishPerformed": false,
+      "gitTagCreated": false,
+      "githubReleaseCreated": false
+    },
+    "localGitTagObserved": {
+      "v011TagPresent": false
+    },
+    "verifiedByIndependentAudit": {
+      "npmRegistryPublished": "pendingIndependentAudit",
+      "gitTagAndGithubRelease": "pendingIndependentAudit"
+    }
   },
   "openBlockers": [
     "automatic-selection portability"

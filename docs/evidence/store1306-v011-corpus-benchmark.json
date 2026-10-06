@@ -1,6 +1,6 @@
 {
   "benchmarkTarget": "SqliteDictionary.lookup via openProductionDictionary()",
-  "testedCodeGitSha": "68d896098087044343c93834d2ebe53e50e67677",
+  "testedCodeGitSha": "138ac116e1438d6a72425aac12d5418b834d6287",
   "testedHostBundleSha256": "4e82542be45483ef414934feae8c2682edf48acc6ebbf3d731908245f1b67c7e",
   "database": {
     "path": "build/corpus/ecdict.db",
@@ -20,67 +20,67 @@
     "iterationsPerWord": 200,
     "totalQueriesExecuted": 6000,
     "overall": {
-      "minUs": 24.6,
-      "medianUs": 51.4,
-      "p95Us": 87,
-      "maxUs": 3918.8
+      "minUs": 22.9,
+      "medianUs": 44.2,
+      "p95Us": 75.2,
+      "maxUs": 3172.2
     },
     "categories": {
       "commonWord": {
         "sampleCount": 1000,
-        "minUs": 46.1,
-        "medianUs": 57.6,
-        "p95Us": 92.9,
-        "maxUs": 2679.9
+        "minUs": 42,
+        "medianUs": 47.8,
+        "p95Us": 84.2,
+        "maxUs": 2729
       },
       "rareWord": {
         "sampleCount": 800,
-        "minUs": 44.5,
-        "medianUs": 51.3,
-        "p95Us": 99.9,
-        "maxUs": 3182.4
+        "minUs": 40.1,
+        "medianUs": 43.6,
+        "p95Us": 78.8,
+        "maxUs": 3172.2
       },
       "mixedCase": {
         "sampleCount": 1000,
-        "minUs": 43.5,
-        "medianUs": 53.6,
-        "p95Us": 88.1,
-        "maxUs": 3087.8
+        "minUs": 39.6,
+        "medianUs": 45.7,
+        "p95Us": 76.5,
+        "maxUs": 2490.4
       },
       "form": {
         "sampleCount": 800,
-        "minUs": 43,
-        "medianUs": 51.7,
-        "p95Us": 95.6,
-        "maxUs": 3086.2
+        "minUs": 41.1,
+        "medianUs": 43.6,
+        "p95Us": 77.9,
+        "maxUs": 2511.6
       },
       "irregularForm": {
         "sampleCount": 800,
-        "minUs": 42.1,
-        "medianUs": 50.2,
-        "p95Us": 84.4,
-        "maxUs": 3529.4
+        "minUs": 40.4,
+        "medianUs": 44.9,
+        "p95Us": 71.5,
+        "maxUs": 2649.3
       },
       "phrase": {
         "sampleCount": 600,
-        "minUs": 46.4,
-        "medianUs": 50.1,
-        "p95Us": 85.5,
-        "maxUs": 249.6
+        "minUs": 39.4,
+        "medianUs": 43.1,
+        "p95Us": 81,
+        "maxUs": 206.1
       },
       "unknown": {
         "sampleCount": 400,
-        "minUs": 25.7,
-        "medianUs": 29,
-        "p95Us": 55.5,
-        "maxUs": 3918.8
+        "minUs": 23.1,
+        "medianUs": 25.6,
+        "p95Us": 44.7,
+        "maxUs": 167.2
       },
       "longUnknown": {
         "sampleCount": 600,
-        "minUs": 24.6,
-        "medianUs": 27.3,
-        "p95Us": 50.3,
-        "maxUs": 134.1
+        "minUs": 22.9,
+        "medianUs": 25.2,
+        "p95Us": 43.8,
+        "maxUs": 68.4
       }
     }
   }

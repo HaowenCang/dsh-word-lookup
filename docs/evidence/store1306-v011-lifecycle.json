@@ -1,12 +1,10 @@
 {
-  "phase": "6R.1",
-  "testedCodeGitSha": "68d896098087044343c93834d2ebe53e50e67677",
+  "phase": "6R.1a",
+  "testedCodeGitSha": "138ac116e1438d6a72425aac12d5418b834d6287",
   "workingTreeCleanAtPack": true,
   "candidatePackageVersion": "0.1.1",
   "selectedPort": 50993,
   "finalIsolationCheckPassed": true,
-  "productionPortTouched": false,
-  "unknownProcessKilled": false,
   "candidateTarballSha256": "9001396d4001f4a03914e46809f4d0f6c0cf0125e15bcde3a834c26cb9a737c7",
   "candidateTarball": {
     "filename": "dsh-word-lookup-0.1.1.tgz",
@@ -16,17 +14,20 @@
   "isolation": {
     "passed": true,
     "finalIsolationCheckPassed": true,
-    "productionPortTouched": false,
-    "productionDshHomeTouched": false,
-    "productionProfileTouched": false,
-    "productionSessionTouched": false,
-    "unknownProcessKilled": false,
+    "mechanism": "assertIsolatedDshEnvironment preflight path and port assertions",
     "selectedPort": 50993,
     "banner": "ISOLATION CHECK: PASS",
     "home": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-word-lookup-test\\home",
     "profile": "word-lookup-test",
     "profileDir": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-word-lookup-test\\home\\profiles\\word-lookup-test",
-    "port": 50993
+    "port": 50993,
+    "assertedByHarnessInvariant": {
+      "productionPortTouched": false,
+      "productionDshHomeTouched": false,
+      "productionProfileTouched": false,
+      "productionSessionTouched": false,
+      "unknownProcessKilled": false
+    }
   },
   "operations": {
     "install": {
