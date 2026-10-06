@@ -1,0 +1,167 @@
+{
+  "phase": "Phase 7A.2",
+  "reportTitle": "Phase 7A.2 DictionaryManager & Atomic Hot Switching Verification Evidence",
+  "generatedAt": "2026-10-06T13:42:00.000Z",
+  "baselineGitSha": "e90b49b2d55c162bd34db29c582c72236cf863f7",
+  "testedCodeGitSha": "13952552806e3b9a318a60fff82cfefa7693d0a8",
+  "status": "PASS",
+  "package": {
+    "name": "dsh-word-lookup",
+    "version": "0.2.0",
+    "status": "unreleased",
+    "runtimeDependencies": 0,
+    "missingLocalModules": 0
+  },
+  "bundleHashes": {
+    "host": {
+      "path": "lib/index.js",
+      "sha256": "106ed8e36a76383ecaca1f0c6e9540128f45167a6d22abeb7bba2f8df19cf003"
+    },
+    "client": {
+      "path": "lib/client.js",
+      "sha256": "0f1d730f02232f0920b14f136018a55eb86f552e7f828eeafc3543a673318c41"
+    }
+  },
+  "managerContract": {
+    "implementsDictionary": true,
+    "initialGeneration": 1,
+    "activeMode": "fixture",
+    "source": "sqlite-fixture",
+    "identity": "fixture",
+    "lifecycle": "ready",
+    "ownership": "Exclusive handle ownership transferred to DictionaryManager upon constructor/activation; caller must not close active dictionary externally",
+    "noDirectHandleExposure": true,
+    "immutableSnapshot": true
+  },
+  "activation": {
+    "candidatePreparedBeforeSwap": true,
+    "activeReferenceSwap": "atomic in-memory reference replacement",
+    "generationIncrement": true,
+    "oldCloseAfterCommit": true,
+    "candidateFailureLeavesActiveUntouched": true,
+    "retirementFailureBehavior": "non-rollback; new candidate remains active, generation advances, error recorded and observable in snapshot"
+  },
+  "retirementCloseFailure": {
+    "swapCommitted": true,
+    "newDictionaryActive": true,
+    "generationAdvanced": true,
+    "errorObservable": true,
+    "rollbackOccurred": false
+  },
+  "hotSwapRoute": {
+    "sameHandlerInstance": true,
+    "before": {
+      "source": "sqlite-fixture",
+      "status": 200,
+      "found": true
+    },
+    "afterActivation": {
+      "source": "ecdict-local",
+      "status": 200,
+      "found": true
+    },
+    "routeRecreationRequired": false
+  },
+  "noActiveGap": {
+    "candidateValidatedBeforeSwap": true,
+    "oldReferenceRetainedUntilCommit": true,
+    "newReferenceAssignedBeforeOldClose": true,
+    "failedCandidateLeavesOldReferenceUntouched": true,
+    "stateTransitionProof": "atomic single-threaded JavaScript assignment with no intermediate unassigned or null active slot"
+  },
+  "hostLifecycle": {
+    "startupDefault": "fixture-only (DictionaryManager with fixture dictionary)",
+    "configModeIgnoredOnStartup": true,
+    "cleanUnloadDisposer": true,
+    "registrationConflictSafety": true
+  },
+  "storeSignals": {
+    "files": true,
+    "network": true,
+    "credentials": false,
+    "commands": false,
+    "protectedDsh": false,
+    "native": false,
+    "dynamic": false
+  },
+  "tests": {
+    "initialState": "PASS (generation=1, mode=fixture, source=sqlite-fixture, lifecycle=ready)",
+    "initialLookup": "PASS (lookup delegates to initial dictionary exactly once)",
+    "successfulSwap": "PASS (A active -> activate B -> B active, generation 2, A.close called once, B remains open)",
+    "repeatedSwap": "PASS (A -> B -> C sequential activations with exact single retirement per candidate)",
+    "failedPreparation": "PASS (external candidate open failure leaves active manager reference and generation untouched)",
+    "invalidModeSource": "PASS (rejected mode/source mismatch closes rejected candidate and preserves active reference)",
+    "activationAfterClose": "PASS (rejected with DictionaryUnavailableError and closes candidate immediately)",
+    "idempotentClose": "PASS (manager.close() idempotent, closes active dictionary exactly once)",
+    "retirementCloseFailure": "PASS (old close throw preserves committed new candidate, advances generation, records error, no rollback)",
+    "stableHandlerSwitch": "PASS (createLookupHandler called once; serves sqlite-fixture before swap and ecdict-local after swap)",
+    "handlerAfterManagerClose": "PASS (lookup through handler after manager close returns controlled 500 dictionary-unavailable)"
+  },
+  "validation": {
+    "typecheck": {
+      "passed": true,
+      "command": "npm run typecheck"
+    },
+    "unitTests": {
+      "passed": true,
+      "total": 503,
+      "testFiles": 29,
+      "command": "npm test"
+    },
+    "build": {
+      "passed": true,
+      "command": "npm run build"
+    },
+    "verify": {
+      "passed": true,
+      "steps": 6,
+      "command": "npm run verify"
+    },
+    "storeContract": {
+      "passed": true,
+      "command": "npm run verify:store-contract"
+    },
+    "bundleChecks": {
+      "passed": true,
+      "total": 94,
+      "passedCount": 94,
+      "command": "node scripts/check-bundle.mjs"
+    },
+    "credentialScan": {
+      "passed": true,
+      "filesScanned": 429,
+      "candidates": 4,
+      "leaks": 0,
+      "command": "node scripts/scan-credentials.mjs"
+    },
+    "isolatedRuntime": {
+      "passed": true,
+      "total": 169,
+      "command": "npm run test:runtime"
+    },
+    "corpusRuntime": {
+      "passed": true,
+      "total": 12,
+      "command": "npm run test:corpus-runtime"
+    },
+    "browserAcceptance": {
+      "passed": true,
+      "total": 37,
+      "command": "npm run test:acceptance"
+    }
+  },
+  "standingBlockers": {
+    "automaticSelectionPortability": "RELEASE BLOCKER — automatic-selection portability: OPEN",
+    "homePathsDependency": "CONDITIONAL — home-paths dependency resolution (Phase 7A.3)",
+    "importerResponsiveness": "PENDING — importer responsiveness benchmark (Phase 7A.5)"
+  },
+  "phaseBoundaryAudit": {
+    "managedStorageLayout": "NOT IMPLEMENTED (Phase 7A.3)",
+    "dshHomeResolution": "NOT IMPLEMENTED (Phase 7A.3)",
+    "ecdictDownloader": "NOT IMPLEMENTED (Phase 7A.4)",
+    "streamingCsvImporter": "NOT IMPLEMENTED (Phase 7A.5)",
+    "managementRestRoutes": "NOT IMPLEMENTED (Phase 7A.6)",
+    "dictionarySettingsUi": "NOT IMPLEMENTED (Phase 7A.7)",
+    "customDictionaryPathActivation": "NOT IMPLEMENTED (Phase 7A.8)"
+  }
+}
