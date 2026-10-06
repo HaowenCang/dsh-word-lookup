@@ -23,6 +23,7 @@ import {
 import {
   DictionaryManager,
   type DictionaryActivation,
+  type DictionaryManagerSnapshot,
 } from '../src/host/dictionary-manager.js'
 import { createLookupHandler } from '../src/host/lookup.js'
 import { openSqliteDictionary } from '../src/host/sqlite-dictionary.js'
@@ -112,11 +113,20 @@ describe('DictionaryManager — Initial State & Construction', () => {
       lifecycle: 'ready',
       generation: 1,
       activeMode: 'fixture',
-      mode: 'fixture',
       identity: 'built-in-fixture',
       source: 'sqlite-fixture',
       lastRetirementError: null,
     })
+    expect('mode' in snapshot).toBe(false)
+    expect((snapshot as unknown as Record<string, unknown>).mode).toBeUndefined()
+    // @ts-expect-error mode was removed from DictionaryManagerSnapshot in Phase 7A.2R
+    void snapshot.mode
+
+    // Type-level assertion: DictionaryManagerSnapshot must not contain 'mode'
+    type HasMode<T> = 'mode' extends keyof T ? true : false
+    const _snapshotHasNoMode: HasMode<DictionaryManagerSnapshot> = false
+    expect(_snapshotHasNoMode).toBe(false)
+
     expect(manager.source).toBe('sqlite-fixture')
 
     manager.close()
@@ -515,6 +525,169 @@ describe('DictionaryManager — Failure Semantics & Protection Against Handle Le
 
     manager.close()
     expect(spyC.closeCalls).toBe(1)
+  })
+})
+
+describe('DictionaryManager — Active Handle Aliasing Invariants', () => {
+  it('rejects activation reusing currently active handle with valid descriptor and leaves active open', () => {
+    const spyA = createSpyDictionary('sqlite-fixture', {
+      hello: makeHit('hello'),
+    })
+    const manager = new DictionaryManager({
+      mode: 'fixture',
+      identity: 'fixture-initial',
+      dictionary: spyA.dictionary,
+    })
+
+    expect(() => {
+      manager.activate({
+        mode: 'fixture',
+        identity: 'fixture-again',
+        dictionary: spyA.dictionary,
+      })
+    }).toThrow(TypeError)
+
+    expect(() => {
+      manager.activate({
+        mode: 'fixture',
+        identity: 'fixture-again',
+        dictionary: spyA.dictionary,
+      })
+    }).toThrow(/DictionaryActivation cannot reuse the currently active dictionary handle/)
+
+    // A is NOT closed
+    expect(spyA.closeCalls).toBe(0)
+
+    // Manager state and generation are completely unchanged
+    const snap = manager.snapshot()
+    expect(snap.generation).toBe(1)
+    expect(snap.identity).toBe('fixture-initial')
+    expect(snap.source).toBe('sqlite-fixture')
+    expect(snap.activeMode).toBe('fixture')
+    expect(snap.lifecycle).toBe('ready')
+
+    // Lookup through A continues to work
+    const res = manager.lookup('hello')
+    expect(res.found).toBe(true)
+    if (res.found) expect(res.headword).toBe('hello')
+
+    // Final manager close closes A exactly once
+    manager.close()
+    expect(spyA.closeCalls).toBe(1)
+  })
+
+  it('rejects activation reusing currently active handle with invalid mode-source and does not close active via rejection cleanup', () => {
+    const spyA = createSpyDictionary('sqlite-fixture', {
+      word: makeHit('word'),
+    })
+    const manager = new DictionaryManager({
+      mode: 'fixture',
+      identity: 'fixture-initial',
+      dictionary: spyA.dictionary,
+    })
+
+    // Passing spyA (sqlite-fixture) with managed-ecdict would trigger mode/source mismatch
+    // if descriptor validation ran first, which would close candidate (closing active!).
+    // Alias guard MUST reject before descriptor validation cleanup.
+    expect(() => {
+      manager.activate({
+        mode: 'managed-ecdict',
+        identity: 'invalid-pair',
+        dictionary: spyA.dictionary,
+      })
+    }).toThrow(TypeError)
+
+    expect(() => {
+      manager.activate({
+        mode: 'managed-ecdict',
+        identity: 'invalid-pair',
+        dictionary: spyA.dictionary,
+      })
+    }).toThrow(/DictionaryActivation cannot reuse the currently active dictionary handle/)
+
+    // Crucial check: spyA was NOT closed by rejection cleanup
+    expect(spyA.closeCalls).toBe(0)
+
+    // State remains ready, generation unchanged
+    const snap = manager.snapshot()
+    expect(snap.generation).toBe(1)
+    expect(snap.activeMode).toBe('fixture')
+    expect(snap.identity).toBe('fixture-initial')
+    expect(snap.source).toBe('sqlite-fixture')
+    expect(snap.lifecycle).toBe('ready')
+
+    // Active lookup still works
+    const res = manager.lookup('word')
+    expect(res.found).toBe(true)
+    if (res.found) expect(res.headword).toBe('word')
+
+    // Final manager close closes spyA exactly once
+    manager.close()
+    expect(spyA.closeCalls).toBe(1)
+  })
+
+  it('rejects activation reusing currently active handle with empty or blank identity and does not close active', () => {
+    const spyA = createSpyDictionary('sqlite-fixture', {
+      query1: makeHit('query1'),
+    })
+    const manager = new DictionaryManager({
+      mode: 'fixture',
+      identity: 'fixture-initial',
+      dictionary: spyA.dictionary,
+    })
+
+    // Empty string identity
+    expect(() => {
+      manager.activate({
+        mode: 'fixture',
+        identity: '',
+        dictionary: spyA.dictionary,
+      })
+    }).toThrow(TypeError)
+
+    expect(() => {
+      manager.activate({
+        mode: 'fixture',
+        identity: '',
+        dictionary: spyA.dictionary,
+      })
+    }).toThrow(/DictionaryActivation cannot reuse the currently active dictionary handle/)
+
+    // spyA was NOT closed
+    expect(spyA.closeCalls).toBe(0)
+    expect(manager.snapshot().generation).toBe(1)
+    expect(manager.snapshot().lifecycle).toBe('ready')
+
+    // Whitespace string identity
+    expect(() => {
+      manager.activate({
+        mode: 'fixture',
+        identity: '   ',
+        dictionary: spyA.dictionary,
+      })
+    }).toThrow(TypeError)
+
+    expect(() => {
+      manager.activate({
+        mode: 'fixture',
+        identity: '   ',
+        dictionary: spyA.dictionary,
+      })
+    }).toThrow(/DictionaryActivation cannot reuse the currently active dictionary handle/)
+
+    // spyA still NOT closed
+    expect(spyA.closeCalls).toBe(0)
+    expect(manager.snapshot().generation).toBe(1)
+    expect(manager.snapshot().lifecycle).toBe('ready')
+
+    // Lookup still works
+    const res = manager.lookup('query1')
+    expect(res.found).toBe(true)
+    if (res.found) expect(res.headword).toBe('query1')
+
+    // Final manager close closes spyA exactly once
+    manager.close()
+    expect(spyA.closeCalls).toBe(1)
   })
 })
 

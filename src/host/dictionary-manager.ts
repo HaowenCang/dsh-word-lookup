@@ -19,6 +19,9 @@
  *   the retired dictionary is closed; no intermediate "no active dictionary" gap.
  * - Enforces fail-closed semantics: rejections do not mutate active state, and
  *   rejected candidate dictionaries are closed to prevent handle leaks.
+ * - Enforces ownership invariants: reusing the currently active dictionary handle
+ *   as an activation candidate is rejected as an ownership violation without
+ *   closing the active dictionary or mutating manager state.
  * - Safely handles retirement close errors without rolling back committed state,
  *   preserving diagnostic error observability.
  *
@@ -78,8 +81,6 @@ export interface DictionaryManagerSnapshot {
   readonly generation: number
   /** Active dictionary operational mode. */
   readonly activeMode: DictionaryMode
-  /** Alias for activeMode for backwards/interop compatibility. */
-  readonly mode: DictionaryMode
   /** Identifier of the active dictionary. */
   readonly identity: string
   /** Source provenance of the active dictionary. */
@@ -197,11 +198,24 @@ export class DictionaryManager implements Dictionary {
   /**
    * Atomically activate a new dictionary candidate.
    *
+   * Candidate ownership contract:
+   * - Distinct candidate:
+   *   Ownership transfers to manager on activate() invocation.
+   * - Aliased currently-active candidate:
+   *   Rejected as an ownership violation (TypeError);
+   *   remains manager-owned; must not be closed by rejection cleanup.
+   *
    * Requirements:
    * - Candidate dictionary must already be opened and validated prior to calling `activate()`.
+   * - If the manager is already closed, candidate is closed immediately and
+   *   `DictionaryUnavailableError` is thrown.
+   * - A candidate whose dictionary is identical to the currently active dictionary
+   *   handle (`candidate.dictionary === this.#active.dictionary`) is rejected as an
+   *   ownership violation before descriptor validation. The active handle is NOT closed,
+   *   state and generation remain unchanged.
    * - Validates mode/source consistency and identity before mutating active state.
-   * - Consumes ownership of candidate dictionary: on rejection or if manager is closed,
-   *   the candidate is closed immediately to prevent handle leaks.
+   * - On descriptor validation failure, distinct candidate is closed immediately
+   *   to prevent handle leaks, leaving active state untouched.
    * - The new active reference commits before the retired dictionary is closed.
    * - If closing the retired dictionary throws, the new active dictionary remains committed,
    *   generation remains advanced, and the retirement failure is observable without rollback.
@@ -209,6 +223,8 @@ export class DictionaryManager implements Dictionary {
    * @param candidate - candidate activation descriptor.
    * @returns structured activation result with generation and retirement status.
    * @throws {DictionaryUnavailableError} if manager is already closed.
+   * @throws {TypeError} if candidate reuses the currently active dictionary handle,
+   *   or if candidate descriptor is invalid.
    */
   activate(candidate: DictionaryActivation): DictionaryActivationResult {
     if (this.#closed) {
@@ -218,6 +234,10 @@ export class DictionaryManager implements Dictionary {
         // swallow close error
       }
       throw new DictionaryUnavailableError('cannot activate dictionary: manager is closed')
+    }
+
+    if (candidate && typeof candidate === 'object' && candidate.dictionary === this.#active.dictionary) {
+      throw new TypeError('DictionaryActivation cannot reuse the currently active dictionary handle')
     }
 
     let validated: { mode: DictionaryMode; identity: string; dictionary: Dictionary }
@@ -266,7 +286,6 @@ export class DictionaryManager implements Dictionary {
       lifecycle: this.#closed ? 'closed' : 'ready',
       generation: this.#generation,
       activeMode: this.#active.mode,
-      mode: this.#active.mode,
       identity: this.#active.identity,
       source: this.#active.dictionary.source,
       lastRetirementError: this.#lastRetirementError,
