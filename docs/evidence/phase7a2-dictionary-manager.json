@@ -1,9 +1,10 @@
 {
   "phase": "Phase 7A.2",
+  "remediation": "Phase 7A.2R",
   "reportTitle": "Phase 7A.2 DictionaryManager & Atomic Hot Switching Verification Evidence",
-  "generatedAt": "2026-10-06T13:42:00.000Z",
-  "baselineGitSha": "e90b49b2d55c162bd34db29c582c72236cf863f7",
-  "testedCodeGitSha": "13952552806e3b9a318a60fff82cfefa7693d0a8",
+  "generatedAt": "2026-10-06T14:26:00.000Z",
+  "baselineGitSha": "95ddb6843eb7ea73f1781523e657cdb5c722d188",
+  "testedCodeGitSha": "beeec8eaa5fe7cb46652b5d264c0109db36fb0a6",
   "status": "PASS",
   "package": {
     "name": "dsh-word-lookup",
@@ -15,7 +16,7 @@
   "bundleHashes": {
     "host": {
       "path": "lib/index.js",
-      "sha256": "106ed8e36a76383ecaca1f0c6e9540128f45167a6d22abeb7bba2f8df19cf003"
+      "sha256": "21a721ebb253ad0dfcdec8968f27998ae80d439b05834a40c8bf18bd20442584"
     },
     "client": {
       "path": "lib/client.js",
@@ -29,9 +30,21 @@
     "source": "sqlite-fixture",
     "identity": "fixture",
     "lifecycle": "ready",
-    "ownership": "Exclusive handle ownership transferred to DictionaryManager upon constructor/activation; caller must not close active dictionary externally",
+    "ownership": "Exclusive handle ownership transferred to DictionaryManager upon constructor/distinct candidate activation; reusing active handle rejected without close",
     "noDirectHandleExposure": true,
     "immutableSnapshot": true
+  },
+  "activeHandleAliasing": {
+    "sameHandleValidDescriptorRejected": true,
+    "sameHandleInvalidDescriptorDoesNotCloseActive": true,
+    "sameHandleEmptyIdentityDoesNotCloseActive": true,
+    "activeRemainsUsable": true,
+    "generationUnchanged": true,
+    "closeOccursOnlyOnFinalManagerClose": true
+  },
+  "snapshotContract": {
+    "activeMode": true,
+    "legacyAmbiguousModeAlias": false
   },
   "activation": {
     "candidatePreparedBeforeSwap": true,
@@ -95,7 +108,11 @@
     "idempotentClose": "PASS (manager.close() idempotent, closes active dictionary exactly once)",
     "retirementCloseFailure": "PASS (old close throw preserves committed new candidate, advances generation, records error, no rollback)",
     "stableHandlerSwitch": "PASS (createLookupHandler called once; serves sqlite-fixture before swap and ecdict-local after swap)",
-    "handlerAfterManagerClose": "PASS (lookup through handler after manager close returns controlled 500 dictionary-unavailable)"
+    "handlerAfterManagerClose": "PASS (lookup through handler after manager close returns controlled 500 dictionary-unavailable)",
+    "activeHandleAliasingValid": "PASS (same handle + valid descriptor rejected with TypeError, handle remains open, generation unchanged, active lookup succeeds)",
+    "activeHandleAliasingInvalidMode": "PASS (same handle + invalid mode/source rejected before validation cleanup, handle not closed, manager remains ready)",
+    "activeHandleAliasingEmptyIdentity": "PASS (same handle + empty/blank identity rejected before validation cleanup, handle not closed, manager remains ready)",
+    "snapshotContract": "PASS (snapshot carries activeMode, ambiguous mode alias removed at runtime and compile-time)"
   },
   "validation": {
     "typecheck": {
@@ -104,7 +121,7 @@
     },
     "unitTests": {
       "passed": true,
-      "total": 503,
+      "total": 506,
       "testFiles": 29,
       "command": "npm test"
     },
@@ -129,7 +146,7 @@
     },
     "credentialScan": {
       "passed": true,
-      "filesScanned": 429,
+      "filesScanned": 430,
       "candidates": 4,
       "leaks": 0,
       "command": "node scripts/scan-credentials.mjs"
