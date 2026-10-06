@@ -1,0 +1,37 @@
+{
+  "testedCodeGitSha": "39077f4b41e68e5d6591aafdedf4711ec7aeaf26",
+  "testedHostBundleSha256": "5021df99e4cabfd5a98221be04016935c506e977584e44d4023097d2b536d36e",
+  "testedClientBundleSha256": "0f1d730f02232f0920b14f136018a55eb86f552e7f828eeafc3543a673318c41",
+  "profileResolvedHostBundleSha256": "5021df99e4cabfd5a98221be04016935c506e977584e44d4023097d2b536d36e",
+  "profileResolvedClientBundleSha256": "0f1d730f02232f0920b14f136018a55eb86f552e7f828eeafc3543a673318c41",
+  "profileResolvedBundlesMatchRepository": true,
+  "resolvedPluginPath": "E:\\Projects\\DSHarness\\dsh-word-lookup",
+  "manifest": {
+    "sourceName": "ECDICT",
+    "sourceCommit": "bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b",
+    "sourceSha256": "1a6947e04785db63613a92e14903cdae7954f7e84860b10e68e5c7cbb3f9c3cf",
+    "sourceByteSize": 65933428
+  },
+  "isolation": {
+    "check": "PASS",
+    "home": "<TEST_ROOT>/home",
+    "profile": "word-lookup-test",
+    "portsUsed": "isolated high ports",
+    "productionEnvironmentUntouched": true
+  },
+  "validatorChecks": {
+    "explicitProdDb": true,
+    "syntheticValidDb": true,
+    "rejectMissingDb": true,
+    "rejectCorruptDb": true,
+    "rejectBadSha": true,
+    "rejectBadCommit": true
+  },
+  "runtimeChecks": {
+    "activeDictionary": "sqlite-fixture",
+    "legacyEnvironmentIgnored": true,
+    "defaultFixtureStatus": 200,
+    "legacyEnvStatus": 200
+  },
+  "allChecksPassed": true
+}

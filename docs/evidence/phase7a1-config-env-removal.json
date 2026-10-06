@@ -1,0 +1,233 @@
+{
+  "phase": "Phase 7A.1",
+  "reportTitle": "Phase 7A.1 v0.2.0 Config Model & Environment-Path Removal Verification Evidence",
+  "generatedAt": "2026-10-06T12:15:00.000Z",
+  "testedCodeGitSha": "39077f4b41e68e5d6591aafdedf4711ec7aeaf26",
+  "package": {
+    "name": "dsh-word-lookup",
+    "version": "0.2.0",
+    "status": "unreleased",
+    "packageJsonVersion": "0.2.0",
+    "packageLockVersion": "0.2.0",
+    "packageLockPackagesVersion": "0.2.0"
+  },
+  "bundleHashes": {
+    "host": {
+      "path": "lib/index.js",
+      "sha256": "5021df99e4cabfd5a98221be04016935c506e977584e44d4023097d2b536d36e"
+    },
+    "client": {
+      "path": "lib/client.js",
+      "sha256": "0f1d730f02232f0920b14f136018a55eb86f552e7f828eeafc3543a673318c41"
+    }
+  },
+  "configModel": {
+    "schemaVersion": "v0.2.0",
+    "fields": [
+      {
+        "key": "dictionaryMode",
+        "type": "union",
+        "options": ["fixture", "managed-ecdict", "custom"],
+        "default": "fixture",
+        "volatile": true,
+        "description": "Dictionary data source (fixture test dictionary, managed ECDICT corpus, or custom SQLite file)"
+      },
+      {
+        "key": "customDictionaryPath",
+        "type": "string",
+        "default": "",
+        "volatile": true,
+        "description": "Path to custom SQLite dictionary file on the host filesystem"
+      },
+      {
+        "key": "autoDoubleClick",
+        "type": "boolean",
+        "default": false,
+        "volatile": true,
+        "description": "Automatically look up English words on double-click gesture"
+      },
+      {
+        "key": "autoSelection",
+        "type": "boolean",
+        "default": false,
+        "volatile": true,
+        "description": "Automatically look up English words on mouse drag selection gesture"
+      }
+    ],
+    "typedReaders": [
+      "readSwitch",
+      "readDictionaryMode",
+      "readCustomDictionaryPath"
+    ],
+    "schemasteryContract": {
+      "schemasteryVersion": "~3.18.4",
+      "dshRc2FormIntegration": "Independent top-level Schema.volatile() projections matching volatileForm requirements in DSH rc.2",
+      "invalidValuesFallBackToDefault": true
+    }
+  },
+  "environmentRemovalAudit": {
+    "activeSourceOccurrences": {
+      "DSH_WORD_LOOKUP_DB_PATH": 0,
+      "CORPUS_PATH_ENV": 0,
+      "process.env": 0
+    },
+    "activeBundleOccurrences": {
+      "DSH_WORD_LOOKUP_DB_PATH": 0,
+      "CORPUS_PATH_ENV": 0,
+      "process.env": 0
+    },
+    "runtimeExports": {
+      "CORPUS_PATH_ENV": "REMOVED"
+    },
+    "runtimeHostStartup": {
+      "defaultActivation": "sqlite-fixture",
+      "legacyEnvIgnored": true,
+      "unhandledExceptionsWithEnvSet": 0
+    }
+  },
+  "storeContractAudit": {
+    "script": "scripts/verify-store-contract.mjs",
+    "status": "PASS",
+    "permissionSignals": {
+      "credentials": {
+        "status": "ABSENT",
+        "allowed": false,
+        "detected": false,
+        "reason": "Elimination of process.env access drops store scanner signal to credentials: false"
+      },
+      "files": {
+        "status": "PRESENT",
+        "allowed": true,
+        "detected": true,
+        "reason": "Expected local SQLite dictionary access"
+      },
+      "network": {
+        "status": "PRESENT",
+        "allowed": true,
+        "detected": true,
+        "reason": "Expected same-origin /api/dsh-word-lookup route"
+      },
+      "commands": {
+        "status": "ABSENT",
+        "allowed": false,
+        "detected": false
+      },
+      "protectedDsh": {
+        "status": "ABSENT",
+        "allowed": false,
+        "detected": false
+      },
+      "native": {
+        "status": "ABSENT",
+        "allowed": false,
+        "detected": false
+      },
+      "dynamic": {
+        "status": "ABSENT",
+        "allowed": false,
+        "detected": false
+      }
+    },
+    "packaging": {
+      "dryRunSuccess": true,
+      "missingLocalModules": 0,
+      "publishedFiles": [
+        "LICENSE",
+        "README.md",
+        "cordis.patch.yml",
+        "corpus/ecdict.manifest.json",
+        "lib/client.js",
+        "lib/index.js",
+        "package.json"
+      ]
+    }
+  },
+  "testSuiteExecution": {
+    "typecheck": {
+      "command": "npm run typecheck",
+      "passed": true,
+      "errorCount": 0
+    },
+    "unitTests": {
+      "command": "npm test",
+      "passed": true,
+      "testFilesPassed": 28,
+      "testsPassed": 481,
+      "testsFailed": 0
+    },
+    "bundleVerification": {
+      "command": "node scripts/check-bundle.mjs",
+      "passed": true,
+      "checksPassed": 94,
+      "checksTotal": 94
+    },
+    "credentialScanner": {
+      "command": "node scripts/scan-credentials.mjs",
+      "passed": true,
+      "filesScanned": 423,
+      "leaksFound": 0
+    },
+    "isolatedIntegration": {
+      "command": "npm run test:runtime",
+      "passed": true,
+      "checksPassed": 169,
+      "checksTotal": 169,
+      "environment": {
+        "profile": "word-lookup-test",
+        "port": 50991,
+        "productionUntouched": true
+      }
+    },
+    "corpusRuntimeValidator": {
+      "command": "npm run test:corpus-runtime",
+      "passed": true,
+      "checksPassed": 12,
+      "checksTotal": 12,
+      "evidenceFile": "docs/evidence/phase7a1-corpus-runtime.json"
+    },
+    "browserAcceptance": {
+      "command": "npm run test:acceptance",
+      "passed": true,
+      "checksPassed": 37,
+      "checksTotal": 37,
+      "evidenceFile": "docs/evidence/phase5-browser-acceptance-20261004.json"
+    }
+  },
+  "historicalOccurrenceAudit": {
+    "DSH_WORD_LOOKUP_DB_PATH": {
+      "activeProductCode": 0,
+      "activeTests": 0,
+      "negativeAssertions": 2,
+      "historicalDocumentation": 10,
+      "classification": "Completely eliminated from active code and positive test paths; retained only in historical documentation, 0.1.0 changelog, and negative tests proving env variable is ignored."
+    },
+    "CORPUS_PATH_ENV": {
+      "activeProductCode": 0,
+      "activeTests": 0,
+      "negativeAssertions": 2,
+      "historicalDocumentation": 7,
+      "classification": "Completely removed from product exports and source; retained only in historical capability probe documentation and negative export assertions."
+    },
+    "process.env": {
+      "activeProductCode": 0,
+      "activeBundles": 0,
+      "testHarnessScripts": "Present in isolated test runner scripts for CLI parameters and child process spawning",
+      "classification": "Zero active runtime occurrences. Eliminates DSH Store credentials scanner signal."
+    }
+  },
+  "standingBlockers": {
+    "automaticSelectionPortability": {
+      "status": "OPEN",
+      "description": "Cross-platform auto-selection gesture variability (Linux/Wayland selection mechanics)"
+    },
+    "homePathsDependencyResolution": {
+      "status": "CONDITIONAL",
+      "description": "Deferred to Phase 7A.3 when managed dictionary downloads and local cache directories require DSH home resolution without process.env leakage"
+    },
+    "importerResponsivenessBenchmark": {
+      "status": "PENDING",
+      "description": "Corpus decompression, indexing, and SQLite ingestion benchmark on lower-power target machines"
+    }
+  },
+  "overallStatus": "PASS"
+}
