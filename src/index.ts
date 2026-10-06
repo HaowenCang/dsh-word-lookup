@@ -54,6 +54,21 @@ import {
 } from './host/dictionary-manager.js'
 import { openFixtureDictionary } from './host/fixture-db.js'
 import { createLookupHandler } from './host/lookup.js'
+import {
+  ensureManagedStorageDirectories,
+  managedDatabaseFileName,
+  managedDatabasePath,
+  readActiveMetadata,
+  removeStaleTemporaryArtifacts,
+  resolveDshHomeFromContext,
+  resolveManagedStoragePaths,
+  validateActiveMetadata,
+  writeActiveMetadataAtomically,
+  type ActiveMetadata,
+  type ActiveMetadataSource,
+  type ManagedStoragePaths,
+  type ResolveManagedStorageOptions,
+} from './host/managed-storage.js'
 import { LOOKUP_PATH } from './host/route.js'
 
 export { Config }
@@ -66,6 +81,19 @@ export {
   type DictionaryActivation,
   type DictionaryActivationResult,
   type DictionaryManagerSnapshot,
+  ensureManagedStorageDirectories,
+  managedDatabaseFileName,
+  managedDatabasePath,
+  readActiveMetadata,
+  removeStaleTemporaryArtifacts,
+  resolveDshHomeFromContext,
+  resolveManagedStoragePaths,
+  validateActiveMetadata,
+  writeActiveMetadataAtomically,
+  type ActiveMetadata,
+  type ActiveMetadataSource,
+  type ManagedStoragePaths,
+  type ResolveManagedStorageOptions,
 }
 
 /** Package name; equals the Loader entry id and the settings namespace. */

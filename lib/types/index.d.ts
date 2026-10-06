@@ -39,9 +39,10 @@ import { Config, type HostConfig } from './host/config.js';
 import { openProductionDictionary, resolveProductionDatabasePath } from './host/corpus-db.js';
 import { DictionaryUnavailableError } from './host/dictionary.js';
 import { DictionaryManager, type DictionaryActivation, type DictionaryActivationResult, type DictionaryManagerSnapshot } from './host/dictionary-manager.js';
+import { ensureManagedStorageDirectories, managedDatabaseFileName, managedDatabasePath, readActiveMetadata, removeStaleTemporaryArtifacts, resolveDshHomeFromContext, resolveManagedStoragePaths, validateActiveMetadata, writeActiveMetadataAtomically, type ActiveMetadata, type ActiveMetadataSource, type ManagedStoragePaths, type ResolveManagedStorageOptions } from './host/managed-storage.js';
 export { Config };
 export type { HostConfig };
-export { openProductionDictionary, resolveProductionDatabasePath, DictionaryUnavailableError, DictionaryManager, type DictionaryActivation, type DictionaryActivationResult, type DictionaryManagerSnapshot, };
+export { openProductionDictionary, resolveProductionDatabasePath, DictionaryUnavailableError, DictionaryManager, type DictionaryActivation, type DictionaryActivationResult, type DictionaryManagerSnapshot, ensureManagedStorageDirectories, managedDatabaseFileName, managedDatabasePath, readActiveMetadata, removeStaleTemporaryArtifacts, resolveDshHomeFromContext, resolveManagedStoragePaths, validateActiveMetadata, writeActiveMetadataAtomically, type ActiveMetadata, type ActiveMetadataSource, type ManagedStoragePaths, type ResolveManagedStorageOptions, };
 /** Package name; equals the Loader entry id and the settings namespace. */
 export declare const name = "dsh-word-lookup";
 /** Host services required before this entry activates. */
