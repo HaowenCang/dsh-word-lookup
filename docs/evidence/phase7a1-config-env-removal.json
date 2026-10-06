@@ -1,8 +1,9 @@
 {
   "phase": "Phase 7A.1",
   "reportTitle": "Phase 7A.1 v0.2.0 Config Model & Environment-Path Removal Verification Evidence",
-  "generatedAt": "2026-10-06T12:15:00.000Z",
-  "testedCodeGitSha": "39077f4b41e68e5d6591aafdedf4711ec7aeaf26",
+  "generatedAt": "2026-10-06T12:45:00.000Z",
+  "baselineGitSha": "a5ed05ce6edf284daddce35e29553495dbbcddf4",
+  "testedCodeGitSha": "0a5be0090aab85352870c3846ee7896563642046",
   "package": {
     "name": "dsh-word-lookup",
     "version": "0.2.0",
@@ -62,7 +63,9 @@
     "schemasteryContract": {
       "schemasteryVersion": "~3.18.4",
       "dshRc2FormIntegration": "Independent top-level Schema.volatile() projections matching volatileForm requirements in DSH rc.2",
-      "invalidValuesFallBackToDefault": true
+      "invalidValuesRejected": true,
+      "invalidDictionaryModeBehavior": "throws schema validation error",
+      "missingValuesFallBackToDefault": true
     }
   },
   "environmentRemovalAudit": {
@@ -152,8 +155,48 @@
       "command": "npm test",
       "passed": true,
       "testFilesPassed": 28,
-      "testsPassed": 481,
+      "testsPassed": 482,
       "testsFailed": 0
+    },
+    "build": {
+      "command": "npm run build",
+      "passed": true,
+      "artifactsEmitted": [
+        "lib/index.js",
+        "lib/client.js",
+        "lib/types/index.d.ts",
+        "lib/types/client/index.d.ts",
+        "lib/types/host/config.d.ts"
+      ],
+      "hostBundleSize": "52.20 kB",
+      "clientBundleSize": "73.67 kB"
+    },
+    "verify": {
+      "command": "npm run verify",
+      "passed": true,
+      "stagesPassed": [
+        "fixture",
+        "typecheck",
+        "test",
+        "build",
+        "bundle-static-checks",
+        "credential-scan"
+      ]
+    },
+    "storeContract": {
+      "command": "npm run verify:store-contract",
+      "passed": true,
+      "permissions": {
+        "files": true,
+        "network": true,
+        "credentials": false,
+        "commands": false,
+        "protectedDsh": false,
+        "native": false,
+        "dynamic": false
+      },
+      "runtimeDependencies": 0,
+      "missingLocalModules": 0
     },
     "bundleVerification": {
       "command": "node scripts/check-bundle.mjs",
@@ -164,7 +207,7 @@
     "credentialScanner": {
       "command": "node scripts/scan-credentials.mjs",
       "passed": true,
-      "filesScanned": 423,
+      "filesScanned": 426,
       "leaksFound": 0
     },
     "isolatedIntegration": {
@@ -226,7 +269,7 @@
     },
     "importerResponsivenessBenchmark": {
       "status": "PENDING",
-      "description": "Corpus decompression, indexing, and SQLite ingestion benchmark on lower-power target machines"
+      "description": "Corpus decompression, indexing, and SQLite ingestion benchmark on lower-power target machines (scheduled for Phase 7A.5)"
     }
   },
   "overallStatus": "PASS"
