@@ -1,0 +1,392 @@
+{
+  "phase": "7A.0",
+  "status": "PASS",
+  "baselineGitSha": "ac23ab741c78b6ca52261568a99c1a5662c7697e",
+  "dshTag": "dsh-v0.2.0-rc.2",
+  "dshResolvedSha": "639ed015397290b3745d163aafe02ffee4aa3f84",
+  "probeTimestamp": "2026-10-06T09:21:52.671Z",
+  "settingsSection": {
+    "slotName": "settings.section",
+    "slotKind": "list",
+    "slotScope": "root",
+    "sectionId": "word-lookup",
+    "declaredBy": "packages/client/ui-settings/src/client/contract/slots.ts",
+    "supportsArbitraryThirdPartySectionId": true,
+    "whileServedSupported": true,
+    "whileServedExplanation": "ctx.configForms.whileServed([\"dsh-word-lookup\"], (served) => ctx.slots.inject(\"settings.section\", ...)) automatically registers the section when the host serves the dsh-word-lookup namespace and tears it down when unserved.",
+    "uiDesign": "Dedicated standalone section with icon, title, description, and card groups styled with DSH CSS variables (--dsw-alias-*)."
+  },
+  "configForms": {
+    "serviceName": "configForms",
+    "methods": [
+      "get(namespace)",
+      "whileServed(namespaces, register)"
+    ],
+    "controllerMethods": [
+      "getSnapshot()",
+      "set(field, value)",
+      "unset(field)",
+      "mutate(ops, expectedRevision)",
+      "subscribe(listener)"
+    ],
+    "transport": "RemoteSettings.mutate over WebSocket/multiplexer; describe mirror updated via settings/document-updated",
+    "targetNamespace": "dsh-word-lookup",
+    "managedFields": [
+      "dictionaryMode",
+      "customDictionaryPath",
+      "autoDoubleClick",
+      "autoSelection"
+    ],
+    "dictionaryModeContract": [
+      "fixture",
+      "managed-ecdict",
+      "custom"
+    ],
+    "shortcutExcludedFromConfig": true,
+    "shortcutExcludedReason": "Shortcuts are device-local preferences managed authoritatively by DSH ctx.shortcuts; duplicating them in Host Config would create dual source-of-truth split-brain."
+  },
+  "shortcuts": {
+    "commandId": "wordLookup.lookupSelection",
+    "describeBindingSignature": "describeBinding(binding: ShortcutBinding | null): { binding: NormalizedBinding | null; keys: readonly string[]; issue: BindingIssue | null; conflicts: readonly ShortcutCommandId[] }",
+    "shortcutKeysProps": "{ keys: readonly string[]; variant?: 'plain' | 'tooltip'; className?: string | undefined } (packages/client/ui-primitives/src/ShortcutKeys.tsx)",
+    "persistence": "window.localStorage['dsh.keybindings.v1'] via webShortcutStorage / ShortcutPersistence; duplicating into Host Config cordis.yml is strictly forbidden",
+    "windowsWebDefault": "Primary+Shift+L (SUPPORTED)",
+    "macosWebDefault": "Primary+Shift+L (SUPPORTED)",
+    "linuxWebDefault": "unbound by default in v0.2.0 (UNSUPPORTED in rc.2 isWebBindingAllowed for Web Linux; returns issue: unsupported-browser)",
+    "webPlatformSupport": {
+      "windows": {
+        "supported": true,
+        "presentation": "Ctrl+Shift+L"
+      },
+      "macos": {
+        "supported": true,
+        "presentation": "⇧⌘L"
+      },
+      "linux": {
+        "supported": false,
+        "presentation": "CtrlShiftL",
+        "issue": "unsupported-browser"
+      }
+    },
+    "unbinding": "ctx.shortcuts.edit({ type: 'set', id: 'wordLookup.lookupSelection', binding: null }, revision)",
+    "reset": "ctx.shortcuts.edit({ type: 'reset', id: 'wordLookup.lookupSelection' }, revision)",
+    "conflictDetection": "candidate binding -> ctx.shortcuts.describeBinding(candidate) -> inspect issue -> inspect conflicts -> remove/ignore target command's own id where appropriate (conflicts.filter(id => id !== targetId)) -> revision-aware edit",
+    "recordingContract": {
+      "serviceMethod": "recording(true/false) suppresses native menu accelerators while recording; returns Promise; rejected if Desktop cannot acknowledge; cleanup must call recording(false)",
+      "keyboardCaptureRequirements": [
+        "capture-phase keydown/keyup listeners (document.addEventListener with useCapture=true)",
+        "focus ownership via focusWithoutRing(recorderRef.current) and activeElement verification",
+        "preventDefault and stopPropagation on handled keystrokes",
+        "repeat suppression (ignore event.repeat)",
+        "IME/composition protection via observeComposition(document).guards(event) and compositionstart blur/reset",
+        "AltGraph protection (event.getModifierState(\"AltGraph\"))",
+        "dead-key handling (event.key === \"Dead\" latch and reset)",
+        "Escape cancellation without modifiers closes recorder",
+        "invalid binding handling via describeBinding issue/throw",
+        "conflict handling filtering target command own id",
+        "revision stale handling (stale warning when revision !== config.revision)",
+        "write failure retention (retry draft retained on edit failure)",
+        "cleanup calls recording(false) on unmount"
+      ],
+      "authoritativeSource": "packages/client/ui-shortcuts/src/client/Editor.tsx"
+    },
+    "conflictDetectionEvidence": {
+      "conflictsReported": [
+        "wordLookup.lookupSelection"
+      ]
+    },
+    "resetEffective": {
+      "code": "KeyL",
+      "modifiers": [
+        "control",
+        "shift"
+      ]
+    },
+    "unbindEffective": null,
+    "reusableEditorComponentExported": false,
+    "reusableEditorComponentFinding": "ShortcutEditor is internal to @deepseek-ai/dsh-client-ui-shortcuts and not publicly exported. Third-party plugins must construct a dedicated inline recorder component using ctx.shortcuts.describeBinding, ctx.shortcuts.edit, ctx.shortcuts.recording(true/false) and UI primitives (ShortcutKeys, observeComposition, focusWithoutRing)."
+  },
+  "dictionaryModeContract": [
+    "fixture",
+    "managed-ecdict",
+    "custom"
+  ],
+  "managedStorage": {
+    "versionedDatabase": "$DSH_HOME/storages/dsh-word-lookup/ecdict-<source-identity>.sqlite3 and active metadata/provenance",
+    "activationStrategy": "build new versioned DB -> validate fully -> open new handle -> atomic DictionaryManager reference swap -> close previous handle -> update active metadata atomically -> optional old-version cleanup (Windows-safe file locking prevention)",
+    "avoidFixedFileLocking": true,
+    "storageDirectory": "$DSH_HOME/storages/dsh-word-lookup/",
+    "cacheDirectory": "$DSH_HOME/cache/dsh-word-lookup/sources/"
+  },
+  "homePaths": {
+    "packageName": "@deepseek-ai/dsh-home-paths",
+    "version": "0.2.0-rc.2",
+    "exports": [
+      "canonicalizeWatchPath",
+      "defaultDshHome",
+      "expandHomePath",
+      "resolveDshHome",
+      "dshHomePath",
+      "dshCachePath",
+      "dshHomeDisplay"
+    ],
+    "status": "CONDITIONAL",
+    "conditionExplanation": "DSH Store zero-dependency policy strictly forbids runtime dependencies in package.json. Third-party package cannot declare @deepseek-ai/dsh-home-paths as a runtime dependency. Whether DSH loader resolves bare specifier @deepseek-ai/dsh-home-paths at runtime or whether bundling via devDependencies satisfies module closure without AST scanner violations requires empirical verification in Phase 7A.3 before implementation.",
+    "verificationRequiredBeforePhase7A3": [
+      "Verify whether Cordis host runtime / DSH loader provides @deepseek-ai/dsh-home-paths to 3rd-party plugins",
+      "Verify whether bundling @deepseek-ai/dsh-home-paths into lib/index.js as devDependency passes verify-store-contract.mjs",
+      "If neither, implement zero-dependency pure-Node home path resolver adhering to DSH precedence rules (explicit -> $DSH_HOME -> ~/.dsh)"
+    ]
+  },
+  "filesystemPicker": {
+    "webAvailable": false,
+    "reason": "In DSH Web, browsers enforce security sandboxing forbidding direct filesystem path acquisition via standard file input. DSH internal DirectoryPicker is scoped to workspace roots and not exported as a generic file picker.",
+    "approvedContract": "Phase 7A.8 uses a validated text path input for customDictionaryPath with real-time Host validation via POST /api/dsh-word-lookup/dictionary/verify. No hidden file input hacks or Electron private APIs."
+  },
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/api/dsh-word-lookup/dictionary/status",
+      "purpose": "Query current dictionary mode, active DB metadata, install state, progress"
+    },
+    {
+      "method": "POST",
+      "path": "/api/dsh-word-lookup/dictionary/install",
+      "purpose": "Start download and build of managed ECDICT"
+    },
+    {
+      "method": "POST",
+      "path": "/api/dsh-word-lookup/dictionary/cancel",
+      "purpose": "Cancel in-flight download or build"
+    },
+    {
+      "method": "POST",
+      "path": "/api/dsh-word-lookup/dictionary/remove",
+      "purpose": "Remove managed ECDICT database file and switch to fixture"
+    },
+    {
+      "method": "POST",
+      "path": "/api/dsh-word-lookup/dictionary/verify",
+      "purpose": "Verify integrity of active or custom database"
+    }
+  ],
+  "storeSignals": {
+    "currentRun": {
+      "files": true,
+      "network": true,
+      "commands": false,
+      "credentials": true,
+      "protectedDsh": false,
+      "native": false,
+      "dynamic": false
+    },
+    "currentCredentialsSignalReason": "process.env[CORPUS_PATH_ENV] in src/host/corpus-db.ts / lib/index.js",
+    "simulatedSignalsWithoutEnv": {
+      "credentialsSignalEliminated": true,
+      "filesSignalPresent": true,
+      "commandsSignalAbsent": true,
+      "protectedDshAbsent": true
+    },
+    "targetSignalsPhase7A": {
+      "files": true,
+      "network": true,
+      "commands": false,
+      "credentials": false,
+      "protectedDsh": false,
+      "native": false,
+      "dynamic": false
+    }
+  },
+  "ecdict": {
+    "upstreamRepository": "https://github.com/skywind3000/ECDICT",
+    "commit": "bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b",
+    "csvUrl": "https://raw.githubusercontent.com/skywind3000/ECDICT/bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b/ecdict.csv",
+    "csvHttpHeadStatus": 200,
+    "sourceSize": 65933428,
+    "expectedByteSize": 65933428,
+    "byteSizeMatches": true,
+    "sourceSha256": "1a6947e04785db63613a92e14903cdae7954f7e84860b10e68e5c7cbb3f9c3cf",
+    "licenseEvidence": {
+      "type": "MIT",
+      "url": "https://raw.githubusercontent.com/skywind3000/ECDICT/bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b/LICENSE",
+      "sha256": "f8552dd246f61a4e064569eae6194a01c6b3d63b03bf27c6ca863593c549ed0f",
+      "expectedLicenseSha256": "f8552dd246f61a4e064569eae6194a01c6b3d63b03bf27c6ca863593c549ed0f",
+      "licenseMatches": true
+    }
+  },
+  "isolation": {
+    "guardScript": "scripts/assert-isolated-env.mjs",
+    "status": "PASS",
+    "testHome": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-word-lookup-test\\home",
+    "testProfile": "word-lookup-test",
+    "testPort": 54321,
+    "productionProfileForbidden": [
+      "web",
+      "desktop"
+    ],
+    "productionPortsForbidden": [
+      19387,
+      50001
+    ]
+  },
+  "openQuestions": [
+    {
+      "id": "OPEN_BLOCKER_AUTOMATIC_SELECTION_PORTABILITY",
+      "status": "OPEN",
+      "description": "Standing release blocker: automatic selection gesture timing remains strictly quarantined and portable only across tested browser environments."
+    },
+    {
+      "id": "CONDITIONAL_HOME_PATHS_DEPENDENCY",
+      "status": "CONDITIONAL",
+      "description": "Mechanism for safe consumption of @deepseek-ai/dsh-home-paths under Store zero-runtime-dependencies policy requires verification in Phase 7A.3 (loader resolution vs devDependency bundling vs pure-Node fallback)."
+    },
+    {
+      "id": "IMPORTER_BATCH_SIZE_MEASUREMENT",
+      "status": "PENDING_BENCHMARK",
+      "description": "DatabaseSync streaming batch size and setImmediate yield cadence must be tuned via real measurement in Phase 7A.5 against progress API responsiveness."
+    }
+  ],
+  "repoBaseline": {
+    "currentBranch": "master",
+    "headSha": "ac23ab741c78b6ca52261568a99c1a5662c7697e",
+    "expectedSha": "ac23ab741c78b6ca52261568a99c1a5662c7697e",
+    "matchesExpectedCheckpoint": true,
+    "worktreeClean": false,
+    "statusOutput": "?? docs/evidence/phase7a0-capability-probe.json\n?? docs/phase7a0-capability-probe.md\n?? evidence/\n?? scripts/probe-phase7a0.mjs",
+    "remoteUrl": "https://github.com/HaowenCang/dsh-word-lookup.git",
+    "remoteHead": "ac23ab741c78b6ca52261568a99c1a5662c7697e",
+    "inSyncWithRemote": true,
+    "packageVersion": "0.1.1",
+    "packageLockVersion": "0.1.1",
+    "lockfileVersion": 3
+  },
+  "dshSourceAuthority": {
+    "sourcePath": "E:\\Projects\\DSHarness\\dsh-v0.2.0-rc.2-source",
+    "sourceExists": true,
+    "expectedTagCommit": "639ed015397290b3745d163aafe02ffee4aa3f84",
+    "resolvedHead": "639ed015397290b3745d163aafe02ffee4aa3f84",
+    "matchesExpectedTag": true,
+    "tag": "dsh-v0.2.0-rc.2"
+  },
+  "envRemovalImpact": {
+    "inventory": [
+      {
+        "file": "src/host/corpus-db.ts",
+        "lines": [
+          37,
+          92,
+          103
+        ],
+        "symbol": "CORPUS_PATH_ENV"
+      },
+      {
+        "file": "src/index.ts",
+        "lines": [
+          45,
+          55,
+          76
+        ],
+        "symbol": "CORPUS_PATH_ENV"
+      },
+      {
+        "file": "scripts/test-corpus-runtime.mjs",
+        "lines": [
+          7,
+          14,
+          412,
+          558,
+          604,
+          649,
+          692
+        ],
+        "symbol": "DSH_WORD_LOOKUP_DB_PATH"
+      },
+      {
+        "file": "README.md",
+        "lines": [
+          21,
+          32,
+          35,
+          105,
+          107,
+          108,
+          110,
+          154,
+          207,
+          219
+        ],
+        "symbol": "DSH_WORD_LOOKUP_DB_PATH"
+      },
+      {
+        "file": "CHANGELOG.md",
+        "line": 16,
+        "symbol": "DSH_WORD_LOOKUP_DB_PATH"
+      }
+    ],
+    "externalUsersAffected": 0,
+    "approvedDecision": "Complete removal in Phase 7A.1 with zero backwards compatibility shims"
+  },
+  "managementRouteArchitecture": {
+    "existingRoute": "POST /api/dsh-word-lookup",
+    "routes": [
+      {
+        "method": "GET",
+        "path": "/api/dsh-word-lookup/dictionary/status",
+        "purpose": "Query current dictionary mode, active DB metadata, install state, progress"
+      },
+      {
+        "method": "POST",
+        "path": "/api/dsh-word-lookup/dictionary/install",
+        "purpose": "Start download and build of managed ECDICT"
+      },
+      {
+        "method": "POST",
+        "path": "/api/dsh-word-lookup/dictionary/cancel",
+        "purpose": "Cancel in-flight download or build"
+      },
+      {
+        "method": "POST",
+        "path": "/api/dsh-word-lookup/dictionary/remove",
+        "purpose": "Remove managed ECDICT database file and switch to fixture"
+      },
+      {
+        "method": "POST",
+        "path": "/api/dsh-word-lookup/dictionary/verify",
+        "purpose": "Verify integrity of active or custom database"
+      }
+    ],
+    "securityModel": "All routes registered through ctx.connection.fetch.register(); protected by HostConnectionService CSRF/Origin/session fencing.",
+    "hotSwapMechanism": "DictionaryManager maintains active Dictionary reference. Candidate DB opened read-only -> metadata/schema verified -> atomic reference swap -> previous handle closed. Zero restart required."
+  },
+  "downloaderImporterFindings": {
+    "downloader": {
+      "module": "src/host/downloader.ts",
+      "runtimePrimitives": "Node global fetch with ReadableStream body, node:crypto createHash, node:fs createWriteStream",
+      "abortSignalSupported": true,
+      "streamingByteCounter": true,
+      "streamHasher": "sha256 computed on the fly",
+      "tempFileStrategy": "Stream into ecdict.csv.part; atomically rename on SHA-256 and size match; delete on mismatch or abort",
+      "prohibitedPrimitives": [
+        "child_process",
+        "curl",
+        "PowerShell",
+        "Python",
+        "eval"
+      ]
+    },
+    "importer": {
+      "module": "src/host/importer.ts",
+      "runtimePrimitives": "StreamingCsvParser, ExchangeCollector, DatabaseSync from node:sqlite",
+      "feasibility": "Streaming importer is feasible using pure Node primitives",
+      "batchingDesign": "Batch transactions + periodic event-loop yield is design direction; exact batch size not yet determined; DatabaseSync within each synchronous batch may still block",
+      "measurementRequirement": "Phase 7A.5 must determine batch size and yield cadence through empirical measurement; acceptance must measure progress API responsiveness and event-loop latency",
+      "deterministicIndexes": [
+        "idx_forms_headword_raw",
+        "idx_examples_headword"
+      ],
+      "metadataInjection": "PRAGMA integrity_check + metadata table population",
+      "memoryProfile": "Streaming parser keeps max 1 chunk in memory; zero entire-file RAM buffering"
+    }
+  },
+  "readyForPhase7A1": true
+}
