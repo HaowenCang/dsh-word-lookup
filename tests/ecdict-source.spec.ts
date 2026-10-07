@@ -11,6 +11,7 @@ import {
   MAX_MANIFEST_BYTE_SIZE,
   descriptorToActiveMetadataSource,
   loadPinnedEcdictSourceDescriptor,
+  loadPinnedEcdictSourceDescriptorForTesting,
   resolvePackagedManifestPath,
   validateEcdictManifest,
 } from '../src/host/ecdict-source.js'
@@ -177,7 +178,7 @@ describe('ECDICT source manifest and descriptor', () => {
 
   it('throws descriptive error if explicit manifest file does not exist', () => {
     const nonExistent = join(tmpdir(), `nonexistent-manifest-${randomUUID()}.json`)
-    expect(() => loadPinnedEcdictSourceDescriptor({ manifestPath: nonExistent })).toThrow(
+    expect(() => loadPinnedEcdictSourceDescriptorForTesting({ manifestPath: nonExistent })).toThrow(
       /Failed to read ECDICT manifest/,
     )
   })
@@ -186,7 +187,7 @@ describe('ECDICT source manifest and descriptor', () => {
     const tempFile = join(tmpdir(), `malformed-manifest-${randomUUID()}.json`)
     writeFileSync(tempFile, 'not-json-content', 'utf8')
     try {
-      expect(() => loadPinnedEcdictSourceDescriptor({ manifestPath: tempFile })).toThrow(
+      expect(() => loadPinnedEcdictSourceDescriptorForTesting({ manifestPath: tempFile })).toThrow(
         /Malformed ECDICT manifest JSON/,
       )
     } finally {

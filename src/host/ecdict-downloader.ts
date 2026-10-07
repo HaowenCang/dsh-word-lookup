@@ -40,6 +40,16 @@ import type { ManagedStoragePaths } from './managed-storage.js'
 /** Maximum permitted redirects before failing closed. */
 export const MAX_REDIRECTS = 3
 
+/** Authoritative exact expected byte size of the packaged pinned ECDICT corpus (65,933,428 bytes). */
+export const EXPECTED_SOURCE_BYTES = 65_933_428
+
+/**
+ * Independent hard security ceiling on any streamed source bytes (80 MiB = 83,886,080 bytes).
+ * Enforced unconditionally chunk-by-chunk during network retrieval to prevent resource exhaustion
+ * and runaway/infinite streams, completely independent of expected integrity byte size.
+ */
+export const MAX_STREAMED_SOURCE_BYTES = 80 * 1024 * 1024
+
 /** Allowed HTTP redirect status codes. */
 const REDIRECT_STATUS_CODES = new Set([301, 302, 303, 307, 308])
 
@@ -108,15 +118,27 @@ export interface EcdictDownloadResult {
 }
 
 /**
- * Options for {@link downloadPinnedEcdict}.
+ * Options for production-facing {@link downloadPinnedEcdict}.
+ *
+ * Production callers can only provide cancellation signals and progress observers.
+ * Production callers cannot override source URL, commit, hash, byte size, fetch, or UUID generation.
  */
 export interface DownloadPinnedEcdictOptions {
   /** Cancellation signal. */
   readonly signal?: AbortSignal
   /** Optional observer callback for download progress. */
   readonly onProgress?: EcdictDownloadProgressCallback
-  /** Optional explicit source descriptor (defaults to packaged manifest pin). */
-  readonly descriptor?: EcdictSourceDescriptor
+}
+
+/**
+ * @internal Test-only seams for exercising streaming verification, failure modes, and edge cases.
+ * Strictly forbidden from package root exports and production callers.
+ */
+export interface DownloadPinnedEcdictInternalOptions {
+  /** Cancellation signal. */
+  readonly signal?: AbortSignal
+  /** Optional observer callback for download progress. */
+  readonly onProgress?: EcdictDownloadProgressCallback
   /** @internal Test-only seam to override fetch implementation. */
   readonly fetch?: typeof globalThis.fetch
   /** @internal Test-only seam to override UUID factory. */
@@ -172,6 +194,52 @@ function notifyProgress(
 }
 
 /**
+ * Detect whether a URL contains embedded userinfo (username, password-only, or username:password).
+ *
+ * Implements strict protocol validation per RFC 3986 §3.2 and §3.2.1:
+ * Checks standard WHATWG URL `username` property, and verifies whether the authority
+ * component (between scheme and path/query/fragment) contains the userinfo delimiter `@`.
+ *
+ * @param url - parsed URL object.
+ * @returns true if userinfo is present, false otherwise.
+ */
+export function hasEmbeddedUserInfo(url: URL): boolean {
+  if (url.username !== '') {
+    return true
+  }
+  // RFC 3986 §3.2 & §3.2.1 authority inspection for userinfo delimiter '@'
+  const prefix = `${url.protocol}//`
+  if (!url.href.startsWith(prefix)) {
+    return true
+  }
+  const authorityAndRest = url.href.slice(prefix.length)
+  const authorityEnd = authorityAndRest.search(/[/?#]/)
+  const authority = authorityEnd === -1 ? authorityAndRest : authorityAndRest.slice(0, authorityEnd)
+  return authority.includes('@')
+}
+
+/**
+ * Strict Content-Length header parser.
+ *
+ * Rejects non-digits (e.g. "123garbage"), negative numbers, non-integers,
+ * and unsafe integers. Returns null if header is not present.
+ */
+export function parseContentLengthHeader(headerValue: string | null): number | null {
+  if (headerValue === null) {
+    return null
+  }
+  const trimmed = headerValue.trim()
+  if (!/^\d+$/.test(trimmed)) {
+    throw new Error(`Invalid Content-Length header value: "${headerValue}"`)
+  }
+  const parsed = Number(trimmed)
+  if (!Number.isSafeInteger(parsed) || parsed < 0) {
+    throw new Error(`Content-Length value out of safe integer range: "${headerValue}"`)
+  }
+  return parsed
+}
+
+/**
  * Strict URL security validation:
  * - Must be https:
  * - Hostname must be in allowed list (`raw.githubusercontent.com`)
@@ -194,7 +262,7 @@ function validateTargetUrl(urlStr: string): URL {
     throw new Error(`Forbidden hostname "${urlObj.hostname}": only allowed hosts (${[...ALLOWED_HOSTNAMES].join(', ')}) are permitted`)
   }
 
-  if (urlObj.username !== '' || (urlObj as unknown as Record<string, string>)['pass' + 'word'] !== '') {
+  if (hasEmbeddedUserInfo(urlObj)) {
     throw new Error('URL must not contain embedded user credentials')
   }
 
@@ -353,36 +421,80 @@ async function fetchWithRedirectPolicy(
 }
 
 /**
- * Download and verify the authoritative pinned ECDICT corpus into managed cache storage.
+ * Download and verify the authoritative packaged pinned ECDICT corpus into managed cache storage.
  *
- * Sequence:
- * 1. Concurrency check: fails immediately if destination is already active in this process.
- * 2. Directory check: ensures `<home>/cache/dsh-word-lookup/sources` exists.
- * 3. Pre-flight cache verification: if `ecdict.csv` already exists and matches exact size,
- *    SHA-256, and fatal UTF-8, returns immediately with `reused: true` (zero network calls).
- * 4. Partial file preparation: opens unique `ecdict.csv.<uuid>.part` with exclusive `'wx'` flag.
- * 5. Secure network fetch: fetches canonical URL with manual redirects (<= 3) and HTTPS validation.
- * 6. Streaming verification: reads chunks, writes to `.part` disk handle with partial-write loops,
- *    updates SHA-256, validates fatal UTF-8, and strictly enforces byte ceiling.
- * 7. Verification completion: syncs and closes `.part` file handle.
- * 8. Atomic publication: renames `.part` to `ecdict.csv`.
- * 9. Concurrency convergence: if rename fails, verifies whether another concurrent process published
- *    valid final cache before throwing.
+ * Production entrypoint:
+ * - Automatically loads and strictly validates packaged `corpus/ecdict.manifest.json`.
+ * - Constructs canonical source descriptor bound to authoritative commit and SHA-256.
+ * - Downloads exclusively that canonical source.
+ * - Production callers cannot override source URL, commit, hash, byte size, fetch, or UUID generation.
  *
  * @param paths - resolved managed storage paths.
- * @param options - optional signal, progress observer, descriptor, and test seams.
+ * @param options - optional cancellation signal and progress observer.
  * @returns frozen {@link EcdictDownloadResult}.
  */
 export async function downloadPinnedEcdict(
   paths: ManagedStoragePaths,
   options?: DownloadPinnedEcdictOptions,
 ): Promise<EcdictDownloadResult> {
+  const descriptor = loadPinnedEcdictSourceDescriptor()
+  return downloadPinnedEcdictInternal(paths, descriptor, {
+    signal: options?.signal,
+    onProgress: options?.onProgress,
+  })
+}
+
+/**
+ * @internal Test-only internal core downloader accepting arbitrary descriptors and test seams.
+ * Strictly forbidden from package root exports (src/index.ts).
+ *
+ * Sequence:
+ * 1. Pre-network security ceiling check: fails immediately if descriptor sourceByteSize > 80 MiB.
+ * 2. Concurrency check: fails immediately if destination is already active in this process.
+ * 3. Directory check: ensures `<home>/cache/dsh-word-lookup/sources` exists.
+ * 4. Pre-flight cache verification: if `ecdict.csv` already exists and matches exact size,
+ *    SHA-256, and fatal UTF-8, returns immediately with `reused: true` (zero network calls).
+ * 5. Partial file preparation: opens unique `ecdict.csv.<uuid>.part` with exclusive `'wx'` flag.
+ * 6. Secure network fetch: fetches canonical URL with manual redirects (<= 3) and HTTPS validation.
+ * 7. Content-Length check: parses strictly and rejects if exceeding ceiling or expected size.
+ * 8. Streaming verification: reads chunks, enforces independent ceiling + exact size,
+ *    writes to `.part` disk handle with partial-write loops, updates SHA-256, validates fatal UTF-8.
+ * 9. Publication linearization: checks abort at multiple gates prior to rename publication.
+ * 10. Verification completion: syncs and closes `.part` file handle.
+ * 11. Atomic publication commit: renames `.part` to `ecdict.csv`.
+ * 12. Concurrency convergence: if rename fails, verifies whether another concurrent process published
+ *    valid final cache before throwing.
+ *
+ * @param paths - resolved managed storage paths.
+ * @param descriptor - source descriptor to download.
+ * @param options - optional signal, progress observer, and test seams.
+ * @returns frozen {@link EcdictDownloadResult}.
+ */
+export async function downloadPinnedEcdictInternal(
+  paths: ManagedStoragePaths,
+  descriptor: EcdictSourceDescriptor,
+  options?: DownloadPinnedEcdictInternalOptions,
+): Promise<EcdictDownloadResult> {
   const signal = options?.signal
   if (signal?.aborted) {
     throw createAbortError(signal.reason)
   }
 
-  const descriptor = options?.descriptor ?? loadPinnedEcdictSourceDescriptor()
+  if (
+    typeof descriptor.sourceByteSize !== 'number' ||
+    !Number.isSafeInteger(descriptor.sourceByteSize) ||
+    descriptor.sourceByteSize <= 0
+  ) {
+    throw new TypeError(`Invalid descriptor sourceByteSize: must be a positive safe integer`)
+  }
+
+  // Pre-network security ceiling check: descriptor over absolute ceiling rejected pre-network
+  if (descriptor.sourceByteSize > MAX_STREAMED_SOURCE_BYTES) {
+    throw new Error(
+      `Descriptor sourceByteSize ${descriptor.sourceByteSize} exceeds maximum allowed ceiling of ${MAX_STREAMED_SOURCE_BYTES} bytes (80 MiB)`,
+    )
+  }
+
   const finalCachePath = resolve(join(paths.sourceCacheDirectory, 'ecdict.csv'))
 
   // 1. Same-process concurrency guard
@@ -458,12 +570,20 @@ export async function downloadPinnedEcdict(
       // Early Content-Length check if present
       const clHeader = response.headers.get('content-length')
       if (clHeader !== null) {
-        const declaredLength = Number.parseInt(clHeader, 10)
-        if (Number.isSafeInteger(declaredLength) && declaredLength > descriptor.sourceByteSize) {
-          await response.body.cancel().catch(() => {})
-          throw new Error(
-            `Content-Length ${declaredLength} exceeds authoritative corpus size ${descriptor.sourceByteSize}`,
-          )
+        const declaredLength = parseContentLengthHeader(clHeader)
+        if (declaredLength !== null) {
+          if (declaredLength > MAX_STREAMED_SOURCE_BYTES) {
+            await response.body.cancel().catch(() => {})
+            throw new Error(
+              `Content-Length ${declaredLength} exceeds maximum allowed ceiling of ${MAX_STREAMED_SOURCE_BYTES} bytes (80 MiB)`,
+            )
+          }
+          if (declaredLength > descriptor.sourceByteSize) {
+            await response.body.cancel().catch(() => {})
+            throw new Error(
+              `Content-Length ${declaredLength} exceeds authoritative corpus size ${descriptor.sourceByteSize}`,
+            )
+          }
         }
       }
 
@@ -492,6 +612,16 @@ export async function downloadPinnedEcdict(
         if (!value || value.byteLength === 0) continue
 
         bytesReceived += value.byteLength
+
+        // 1. Independent hard security ceiling check
+        if (bytesReceived > MAX_STREAMED_SOURCE_BYTES) {
+          await reader.cancel().catch(() => {})
+          throw new Error(
+            `Streamed bytes ${bytesReceived} exceeded absolute security ceiling of ${MAX_STREAMED_SOURCE_BYTES} bytes (80 MiB)`,
+          )
+        }
+
+        // 2. Exact expected byte integrity check
         if (bytesReceived > descriptor.sourceByteSize) {
           await reader.cancel().catch(() => {})
           throw new Error(
@@ -524,6 +654,11 @@ export async function downloadPinnedEcdict(
         }
       }
 
+      // Publication Gate 1: After EOF (stream fully read)
+      if (signal?.aborted) {
+        throw createAbortError(signal.reason)
+      }
+
       if (bytesReceived !== descriptor.sourceByteSize) {
         throw new Error(
           `Truncated download: expected exactly ${descriptor.sourceByteSize} bytes, received ${bytesReceived}`,
@@ -536,6 +671,11 @@ export async function downloadPinnedEcdict(
         totalBytes: descriptor.sourceByteSize,
       })
 
+      // Publication Gate 2: Immediately after notifying 'verifying' phase
+      if (signal?.aborted) {
+        throw createAbortError(signal.reason)
+      }
+
       // Fatal UTF-8 final sequence flush
       utf8Decoder.decode()
 
@@ -547,12 +687,28 @@ export async function downloadPinnedEcdict(
         )
       }
 
+      // Publication Gate 3: After verification stage / before sync
+      if (signal?.aborted) {
+        throw createAbortError(signal.reason)
+      }
+
       // Explicit flush and close before rename publish
       await fileHandle.sync()
+
+      // Publication Gate 4: After sync / before close
+      if (signal?.aborted) {
+        throw createAbortError(signal.reason)
+      }
+
       await fileHandle.close()
       fileHandleClosed = true
 
-      // 7. Atomic publication via same-directory rename
+      // Publication Gate 5: After sync+close / immediately before rename publication
+      if (signal?.aborted) {
+        throw createAbortError(signal.reason)
+      }
+
+      // 7. Atomic publication via same-directory rename commit
       try {
         await rename(partPath, finalCachePath)
         downloadCompletedSuccessfully = true

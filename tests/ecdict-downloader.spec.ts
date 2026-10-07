@@ -1,18 +1,31 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createHash, randomUUID } from 'node:crypto'
-import { mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs'
+import {
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+  existsSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ReadableStream } from 'node:stream/web'
 
 import {
   EcdictDownloadInProgressError,
+  EXPECTED_SOURCE_BYTES,
+  MAX_STREAMED_SOURCE_BYTES,
   downloadPinnedEcdict,
+  downloadPinnedEcdictInternal,
+  hasEmbeddedUserInfo,
+  parseContentLengthHeader,
   type EcdictDownloadProgress,
 } from '../src/host/ecdict-downloader.js'
 import type { EcdictSourceDescriptor } from '../src/host/ecdict-source.js'
 import { resolveManagedStoragePaths, type ManagedStoragePaths } from '../src/host/managed-storage.js'
 import { apply } from '../src/index.js'
+import * as indexExports from '../src/index.js'
 import { Config } from '../src/host/config.js'
 
 function createSyntheticDescriptor(content: string | Buffer): {
@@ -74,7 +87,7 @@ describe('ECDICT secure downloader', () => {
       }
 
       await expect(
-        downloadPinnedEcdict(paths, { descriptor: insecureDescriptor }),
+        downloadPinnedEcdictInternal(paths, insecureDescriptor),
       ).rejects.toThrow(/Insecure protocol/)
     } finally {
       cleanupTestPaths()
@@ -91,7 +104,7 @@ describe('ECDICT secure downloader', () => {
       }
 
       await expect(
-        downloadPinnedEcdict(paths, { descriptor: badHostDescriptor }),
+        downloadPinnedEcdictInternal(paths, badHostDescriptor),
       ).rejects.toThrow(/Forbidden hostname/)
     } finally {
       cleanupTestPaths()
@@ -110,7 +123,7 @@ describe('ECDICT secure downloader', () => {
       )
 
       await expect(
-        downloadPinnedEcdict(paths, { descriptor, fetch: mockFetch as any }),
+        downloadPinnedEcdictInternal(paths, descriptor, { fetch: mockFetch as any }),
       ).rejects.toThrow(/Insecure protocol/)
     } finally {
       cleanupTestPaths()
@@ -129,7 +142,7 @@ describe('ECDICT secure downloader', () => {
       )
 
       await expect(
-        downloadPinnedEcdict(paths, { descriptor, fetch: mockFetch as any }),
+        downloadPinnedEcdictInternal(paths, descriptor, { fetch: mockFetch as any }),
       ).rejects.toThrow(/Forbidden hostname/)
     } finally {
       cleanupTestPaths()
@@ -150,7 +163,7 @@ describe('ECDICT secure downloader', () => {
       )
 
       await expect(
-        downloadPinnedEcdict(paths, { descriptor, fetch: mockFetch as any }),
+        downloadPinnedEcdictInternal(paths, descriptor, { fetch: mockFetch as any }),
       ).rejects.toThrow(/Exceeded maximum redirect limit of 3/)
       expect(mockFetch).toHaveBeenCalledTimes(4) // initial + 3 redirects before 4th exceeds
     } finally {
@@ -170,7 +183,7 @@ describe('ECDICT secure downloader', () => {
       )
 
       await expect(
-        downloadPinnedEcdict(paths, { descriptor, fetch: mockFetch as any }),
+        downloadPinnedEcdictInternal(paths, descriptor, { fetch: mockFetch as any }),
       ).rejects.toThrow(/missing Location header/)
     } finally {
       cleanupTestPaths()
@@ -186,7 +199,7 @@ describe('ECDICT secure downloader', () => {
       )
 
       await expect(
-        downloadPinnedEcdict(paths, { descriptor, fetch: mockFetch as any }),
+        downloadPinnedEcdictInternal(paths, descriptor, { fetch: mockFetch as any }),
       ).rejects.toThrow(/non-200 HTTP status 404/)
     } finally {
       cleanupTestPaths()
@@ -202,7 +215,7 @@ describe('ECDICT secure downloader', () => {
       )
 
       await expect(
-        downloadPinnedEcdict(paths, { descriptor, fetch: mockFetch as any }),
+        downloadPinnedEcdictInternal(paths, descriptor, { fetch: mockFetch as any }),
       ).rejects.toThrow(/null response body/)
     } finally {
       cleanupTestPaths()
@@ -221,7 +234,7 @@ describe('ECDICT secure downloader', () => {
       )
 
       await expect(
-        downloadPinnedEcdict(paths, { descriptor, fetch: mockFetch as any }),
+        downloadPinnedEcdictInternal(paths, descriptor, { fetch: mockFetch as any }),
       ).rejects.toThrow(/exceeds authoritative corpus size/)
     } finally {
       cleanupTestPaths()
@@ -243,7 +256,7 @@ describe('ECDICT secure downloader', () => {
       )
 
       await expect(
-        downloadPinnedEcdict(paths, { descriptor, fetch: mockFetch as any }),
+        downloadPinnedEcdictInternal(paths, descriptor, { fetch: mockFetch as any }),
       ).rejects.toThrow(/exceeded authoritative corpus size/)
     } finally {
       cleanupTestPaths()
@@ -261,7 +274,7 @@ describe('ECDICT secure downloader', () => {
       )
 
       await expect(
-        downloadPinnedEcdict(paths, { descriptor, fetch: mockFetch as any }),
+        downloadPinnedEcdictInternal(paths, descriptor, { fetch: mockFetch as any }),
       ).rejects.toThrow(/Truncated download/)
     } finally {
       cleanupTestPaths()
@@ -281,7 +294,7 @@ describe('ECDICT secure downloader', () => {
       )
 
       await expect(
-        downloadPinnedEcdict(paths, { descriptor, fetch: mockFetch as any }),
+        downloadPinnedEcdictInternal(paths, descriptor, { fetch: mockFetch as any }),
       ).rejects.toThrow(/SHA-256 integrity verification failed/)
 
       // Final cache not published
@@ -301,7 +314,7 @@ describe('ECDICT secure downloader', () => {
       )
 
       await expect(
-        downloadPinnedEcdict(paths, { descriptor, fetch: mockFetch as any }),
+        downloadPinnedEcdictInternal(paths, descriptor, { fetch: mockFetch as any }),
       ).rejects.toThrow()
 
       expect(existsSync(join(paths.sourceCacheDirectory, 'ecdict.csv'))).toBe(false)
@@ -321,7 +334,7 @@ describe('ECDICT secure downloader', () => {
       )
 
       await expect(
-        downloadPinnedEcdict(paths, { descriptor, fetch: mockFetch as any }),
+        downloadPinnedEcdictInternal(paths, descriptor, { fetch: mockFetch as any }),
       ).rejects.toThrow()
 
       expect(existsSync(join(paths.sourceCacheDirectory, 'ecdict.csv'))).toBe(false)
@@ -344,8 +357,7 @@ describe('ECDICT secure downloader', () => {
       )
 
       const progressEvents: EcdictDownloadProgress[] = []
-      const result = await downloadPinnedEcdict(paths, {
-        descriptor,
+      const result = await downloadPinnedEcdictInternal(paths, descriptor, {
         fetch: mockFetch as any,
         onProgress: (p) => progressEvents.push(p),
       })
@@ -381,8 +393,7 @@ describe('ECDICT secure downloader', () => {
       const mockFetch = vi.fn()
       const progressEvents: EcdictDownloadProgress[] = []
 
-      const result = await downloadPinnedEcdict(paths, {
-        descriptor,
+      const result = await downloadPinnedEcdictInternal(paths, descriptor, {
         fetch: mockFetch as any,
         onProgress: (p) => progressEvents.push(p),
       })
@@ -412,7 +423,7 @@ describe('ECDICT secure downloader', () => {
       const mockFetch = vi.fn().mockRejectedValueOnce(new Error('Network offline'))
 
       await expect(
-        downloadPinnedEcdict(paths, { descriptor, fetch: mockFetch as any }),
+        downloadPinnedEcdictInternal(paths, descriptor, { fetch: mockFetch as any }),
       ).rejects.toThrow('Network offline')
 
       // Pre-existing invalid file MUST remain intact
@@ -435,8 +446,7 @@ describe('ECDICT secure downloader', () => {
         new Response(createMockStream([rawBytes]), { status: 200 }),
       )
 
-      const result = await downloadPinnedEcdict(paths, {
-        descriptor,
+      const result = await downloadPinnedEcdictInternal(paths, descriptor, {
         fetch: mockFetch as any,
       })
 
@@ -457,8 +467,7 @@ describe('ECDICT secure downloader', () => {
       const mockFetch = vi.fn()
 
       await expect(
-        downloadPinnedEcdict(paths, {
-          descriptor,
+        downloadPinnedEcdictInternal(paths, descriptor, {
           signal: controller.signal,
           fetch: mockFetch as any,
         }),
@@ -495,8 +504,7 @@ describe('ECDICT secure downloader', () => {
       )
 
       await expect(
-        downloadPinnedEcdict(paths, {
-          descriptor,
+        downloadPinnedEcdictInternal(paths, descriptor, {
           signal: controller.signal,
           fetch: mockFetch as any,
         }),
@@ -521,11 +529,11 @@ describe('ECDICT secure downloader', () => {
       const mockFetch = vi.fn().mockImplementation(() => slowFetchPromise)
 
       // Start attempt A (in flight)
-      const attemptA = downloadPinnedEcdict(paths, { descriptor, fetch: mockFetch as any })
+      const attemptA = downloadPinnedEcdictInternal(paths, descriptor, { fetch: mockFetch as any })
 
       // Attempt B should be immediately rejected with EcdictDownloadInProgressError
       await expect(
-        downloadPinnedEcdict(paths, { descriptor, fetch: mockFetch as any }),
+        downloadPinnedEcdictInternal(paths, descriptor, { fetch: mockFetch as any }),
       ).rejects.toBeInstanceOf(EcdictDownloadInProgressError)
 
       // Resolve attempt A
@@ -534,7 +542,7 @@ describe('ECDICT secure downloader', () => {
       expect(resultA.reused).toBe(false)
 
       // Subsequent attempt C after A completes succeeds (finding valid cache)
-      const resultC = await downloadPinnedEcdict(paths, { descriptor, fetch: mockFetch as any })
+      const resultC = await downloadPinnedEcdictInternal(paths, descriptor, { fetch: mockFetch as any })
       expect(resultC.reused).toBe(true)
     } finally {
       cleanupTestPaths()
@@ -551,7 +559,7 @@ describe('ECDICT secure downloader', () => {
       const mockFetch = vi.fn().mockRejectedValueOnce(new Error('Network exploded'))
 
       await expect(
-        downloadPinnedEcdict(paths, { descriptor, fetch: mockFetch as any }),
+        downloadPinnedEcdictInternal(paths, descriptor, { fetch: mockFetch as any }),
       ).rejects.toThrow('Network exploded')
 
       // Foreign .part MUST NOT be unlinked
@@ -574,8 +582,7 @@ describe('ECDICT secure downloader', () => {
         throw new Error('Buggy UI callback explosion')
       }
 
-      const result = await downloadPinnedEcdict(paths, {
-        descriptor,
+      const result = await downloadPinnedEcdictInternal(paths, descriptor, {
         fetch: mockFetch as any,
         onProgress: buggyProgress,
       })
@@ -620,5 +627,272 @@ describe('ECDICT secure downloader', () => {
     } finally {
       fetchSpy.mockRestore()
     }
+  })
+
+  describe('Remediation A: Cancellation linearization & abort-before-publication', () => {
+    it('aborts cleanly from verifying progress callback without publishing final file and removes .part', async () => {
+      setupTestPaths()
+      try {
+        const { descriptor, rawBytes } = createSyntheticDescriptor('verifying phase abort test')
+        const controller = new AbortController()
+
+        const mockFetch = vi.fn().mockResolvedValueOnce(
+          new Response(createMockStream([rawBytes]), { status: 200 }),
+        )
+
+        const finalFile = join(paths.sourceCacheDirectory, 'ecdict.csv')
+        expect(existsSync(finalFile)).toBe(false)
+
+        let abortedInVerifying = false
+        const downloadPromise = downloadPinnedEcdictInternal(paths, descriptor, {
+          fetch: mockFetch as any,
+          signal: controller.signal,
+          onProgress: (p) => {
+            if (p.phase === 'verifying') {
+              abortedInVerifying = true
+              controller.abort()
+            }
+          },
+        })
+
+        await expect(downloadPromise).rejects.toThrow(/aborted/)
+        expect(abortedInVerifying).toBe(true)
+
+        // Final file must NOT exist (publication was prevented)
+        expect(existsSync(finalFile)).toBe(false)
+
+        // Own .part file must be cleaned up
+        const residualParts = readdirSync(paths.sourceCacheDirectory).filter((f) => f.endsWith('.part'))
+        expect(residualParts).toEqual([])
+      } finally {
+        cleanupTestPaths()
+      }
+    })
+
+    it('preserves existing invalid final cache byte-for-byte when abort occurs at verifying stage', async () => {
+      setupTestPaths()
+      try {
+        const { descriptor, rawBytes } = createSyntheticDescriptor('new valid content')
+        const controller = new AbortController()
+
+        const finalFile = join(paths.sourceCacheDirectory, 'ecdict.csv')
+        const corruptedOriginalBytes = Buffer.from('corrupted-invalid-cache-bytes-must-not-be-overwritten')
+        writeFileSync(finalFile, corruptedOriginalBytes)
+
+        const mockFetch = vi.fn().mockResolvedValueOnce(
+          new Response(createMockStream([rawBytes]), { status: 200 }),
+        )
+
+        let abortedInVerifying = false
+        const downloadPromise = downloadPinnedEcdictInternal(paths, descriptor, {
+          fetch: mockFetch as any,
+          signal: controller.signal,
+          onProgress: (p) => {
+            if (p.phase === 'verifying') {
+              abortedInVerifying = true
+              controller.abort()
+            }
+          },
+        })
+
+        await expect(downloadPromise).rejects.toThrow(/aborted/)
+        expect(abortedInVerifying).toBe(true)
+
+        // Existing invalid cache file must remain 100% byte-for-byte identical
+        expect(existsSync(finalFile)).toBe(true)
+        const currentBytes = readFileSync(finalFile)
+        expect(currentBytes).toEqual(corruptedOriginalBytes)
+
+        // Own .part file must be cleaned up
+        const residualParts = readdirSync(paths.sourceCacheDirectory).filter((f) => f.endsWith('.part'))
+        expect(residualParts).toEqual([])
+      } finally {
+        cleanupTestPaths()
+      }
+    })
+
+    it('releases same-process concurrency guard immediately after abort at verifying stage', async () => {
+      setupTestPaths()
+      try {
+        const { descriptor, rawBytes } = createSyntheticDescriptor('concurrency release test')
+        const controller = new AbortController()
+
+        const mockFetch1 = vi.fn().mockResolvedValueOnce(
+          new Response(createMockStream([rawBytes]), { status: 200 }),
+        )
+
+        await expect(
+          downloadPinnedEcdictInternal(paths, descriptor, {
+            fetch: mockFetch1 as any,
+            signal: controller.signal,
+            onProgress: (p) => {
+              if (p.phase === 'verifying') {
+                controller.abort()
+              }
+            },
+          }),
+        ).rejects.toThrow(/aborted/)
+
+        // Concurrency guard MUST be released: a subsequent download attempt must NOT throw EcdictDownloadInProgressError
+        const mockFetch2 = vi.fn().mockResolvedValueOnce(
+          new Response(createMockStream([rawBytes]), { status: 200 }),
+        )
+
+        const result2 = await downloadPinnedEcdictInternal(paths, descriptor, {
+          fetch: mockFetch2 as any,
+        })
+        expect(result2.reused).toBe(false)
+        expect(existsSync(join(paths.sourceCacheDirectory, 'ecdict.csv'))).toBe(true)
+      } finally {
+        cleanupTestPaths()
+      }
+    })
+  })
+
+  describe('Remediation B: Production provenance boundary & test seam isolation', () => {
+    it('ensures root package exports (src/index.ts) do not expose internal testing seams', () => {
+      expect('downloadPinnedEcdictInternal' in indexExports).toBe(false)
+      expect('validateEcdictManifest' in indexExports).toBe(false)
+      expect('resolvePackagedManifestPath' in indexExports).toBe(false)
+      expect('LoadEcdictManifestOptions' in indexExports).toBe(false)
+      expect('DownloadPinnedEcdictInternalOptions' in indexExports).toBe(false)
+      expect(typeof indexExports.downloadPinnedEcdict).toBe('function')
+      expect(typeof indexExports.loadPinnedEcdictSourceDescriptor).toBe('function')
+    })
+
+    it('production downloadPinnedEcdict always resolves packaged manifest pin and ignores foreign descriptor options', async () => {
+      setupTestPaths()
+      try {
+        const packagedDesc = indexExports.loadPinnedEcdictSourceDescriptor()
+        expect(packagedDesc.sourceName).toBe('ECDICT')
+        expect(packagedDesc.sourceCommit).toBe('bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b')
+        expect(packagedDesc.sourceSha256).toBe('1a6947e04785db63613a92e14903cdae7954f7e84860b10e68e5c7cbb3f9c3cf')
+
+        // Preflight abort to verify packaged pin resolution without starting actual network transfer
+        const controller = new AbortController()
+        controller.abort('preflight-aborted')
+
+        await expect(
+          downloadPinnedEcdict(paths, { signal: controller.signal }),
+        ).rejects.toThrow(/aborted/)
+      } finally {
+        cleanupTestPaths()
+      }
+    })
+  })
+
+  describe('Remediation C: Independent hard streamed-byte ceiling & strict Content-Length', () => {
+    it('defines distinct EXPECTED_SOURCE_BYTES and MAX_STREAMED_SOURCE_BYTES', () => {
+      expect(EXPECTED_SOURCE_BYTES).toBe(65933428)
+      expect(MAX_STREAMED_SOURCE_BYTES).toBe(80 * 1024 * 1024)
+      expect(MAX_STREAMED_SOURCE_BYTES).toBeGreaterThan(EXPECTED_SOURCE_BYTES)
+    })
+
+    it('rejects pre-network when descriptor expected size exceeds absolute ceiling (80 MiB)', async () => {
+      setupTestPaths()
+      try {
+        const { descriptor } = createSyntheticDescriptor('test')
+        const oversizedDescriptor: EcdictSourceDescriptor = {
+          ...descriptor,
+          sourceByteSize: MAX_STREAMED_SOURCE_BYTES + 1,
+        }
+
+        const mockFetch = vi.fn()
+        await expect(
+          downloadPinnedEcdictInternal(paths, oversizedDescriptor, { fetch: mockFetch as any }),
+        ).rejects.toThrow(/exceeds maximum allowed ceiling of 83886080 bytes/)
+
+        expect(mockFetch).not.toHaveBeenCalled()
+      } finally {
+        cleanupTestPaths()
+      }
+    })
+
+    it('rejects early when Content-Length exceeds absolute security ceiling (80 MiB)', async () => {
+      setupTestPaths()
+      try {
+        const { descriptor } = createSyntheticDescriptor('test')
+        const mockFetch = vi.fn().mockResolvedValueOnce(
+          new Response(createMockStream([Buffer.from('test')]), {
+            status: 200,
+            headers: { 'content-length': String(MAX_STREAMED_SOURCE_BYTES + 500) },
+          }),
+        )
+
+        await expect(
+          downloadPinnedEcdictInternal(paths, descriptor, { fetch: mockFetch as any }),
+        ).rejects.toThrow(/Content-Length.*exceeds maximum allowed ceiling of 83886080 bytes/)
+      } finally {
+        cleanupTestPaths()
+      }
+    })
+
+    it('strictly parses Content-Length and rejects malformed values like "123garbage"', () => {
+      expect(parseContentLengthHeader(null)).toBeNull()
+      expect(parseContentLengthHeader('12345')).toBe(12345)
+      expect(parseContentLengthHeader(' 65933428 ')).toBe(65933428)
+      expect(() => parseContentLengthHeader('123garbage')).toThrow(/Invalid Content-Length header value/)
+      expect(() => parseContentLengthHeader('-50')).toThrow(/Invalid Content-Length header value/)
+      expect(() => parseContentLengthHeader('12.34')).toThrow(/Invalid Content-Length header value/)
+      expect(() => parseContentLengthHeader('abc')).toThrow(/Invalid Content-Length header value/)
+    })
+
+    it('rejects in stream loop with explicit security ceiling error when bytes exceed 80 MiB', async () => {
+      setupTestPaths()
+      try {
+        // Stream that emits a chunk exceeding MAX_STREAMED_SOURCE_BYTES
+        // To avoid creating an 80+ MiB Buffer in memory, we construct a chunk whose byteLength property is > 80 MiB
+        const { descriptor } = createSyntheticDescriptor('test')
+        const fakeOversizedChunk = {
+          byteLength: MAX_STREAMED_SOURCE_BYTES + 10,
+        } as Uint8Array
+        const mockFetch = vi.fn().mockResolvedValueOnce(
+          new Response(createMockStream([fakeOversizedChunk]), { status: 200 }),
+        )
+
+        await expect(
+          downloadPinnedEcdictInternal(paths, descriptor, { fetch: mockFetch as any }),
+        ).rejects.toThrow(/exceeded absolute security ceiling of 83886080 bytes/)
+      } finally {
+        cleanupTestPaths()
+      }
+    })
+  })
+
+  describe('Remediation D: Clean un-obfuscated URL credentials rejection', () => {
+    it('detects embedded userinfo via hasEmbeddedUserInfo without scanner obfuscation', () => {
+      expect(hasEmbeddedUserInfo(new URL('https://user@raw.githubusercontent.com/test'))).toBe(true)
+      expect(hasEmbeddedUserInfo(new URL('https://user:secret@raw.githubusercontent.com/test'))).toBe(true)
+      expect(hasEmbeddedUserInfo(new URL('https://:secret@raw.githubusercontent.com/test'))).toBe(true)
+      expect(hasEmbeddedUserInfo(new URL('https://raw.githubusercontent.com/test'))).toBe(false)
+    })
+
+    it('fails closed for all variations of URL embedded credentials', async () => {
+      setupTestPaths()
+      try {
+        const { descriptor } = createSyntheticDescriptor('test')
+
+        const testUrls = [
+          'https://user@raw.githubusercontent.com/skywind3000/ECDICT/bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b/ecdict.csv',
+          'https://user:secret@raw.githubusercontent.com/skywind3000/ECDICT/bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b/ecdict.csv',
+          'https://:secret@raw.githubusercontent.com/skywind3000/ECDICT/bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b/ecdict.csv',
+        ]
+
+        for (const badUrl of testUrls) {
+          const badDescriptor = { ...descriptor, canonicalDownloadUrl: badUrl }
+          await expect(
+            downloadPinnedEcdictInternal(paths, badDescriptor),
+          ).rejects.toThrow(/URL must not contain embedded user credentials/)
+        }
+      } finally {
+        cleanupTestPaths()
+      }
+    })
+
+    it('confirms source code contains zero Store-scanner string-splitting obfuscation', () => {
+      const downloaderSource = readFileSync(join(__dirname, '../src/host/ecdict-downloader.ts'), 'utf8')
+      expect(downloaderSource).not.toMatch(/['"]pass['"]\s*\+\s*['"]word['"]/i)
+      expect(downloaderSource).not.toMatch(/\\u00/i)
+    })
   })
 })

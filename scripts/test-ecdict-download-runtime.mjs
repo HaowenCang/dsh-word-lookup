@@ -79,7 +79,6 @@ async function run() {
     let lastReportedPhase = ''
 
     const downloadResult = await downloadPinnedEcdict(paths, {
-      descriptor,
       onProgress: (p) => {
         if (p.phase !== lastReportedPhase) {
           lastReportedPhase = p.phase
@@ -130,10 +129,10 @@ async function run() {
     console.log(`  Residual .part files: 0\n`)
 
     realDownloadEvidence = {
-      initialUrl: descriptor.canonicalDownloadUrl,
-      finalUrlHostname: new URL(descriptor.canonicalDownloadUrl).hostname,
+      canonicalInitialUrl: descriptor.canonicalDownloadUrl,
+      canonicalHostname: new URL(descriptor.canonicalDownloadUrl).hostname,
       redirectCount: downloadResult.redirectCount,
-      httpStatus: 200,
+      policyRequiresHttpStatus: 200,
       actualStreamedBytes: downloadResult.byteSize,
       actualSha256: downloadResult.sha256,
       fatalUtf8: 'PASS',
@@ -144,7 +143,6 @@ async function run() {
     console.log('[Step 2] Second-Call Cache Verification & Reuse...')
     const secondCallStart = Date.now()
     const secondResult = await downloadPinnedEcdict(paths, {
-      descriptor,
       onProgress: (p) => {
         console.log(`  Phase -> ${p.phase} (${p.bytesProcessed} / ${p.totalBytes} bytes)`)
       },

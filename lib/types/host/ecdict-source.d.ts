@@ -25,7 +25,7 @@ export declare const ALLOWED_SOURCE_REPOSITORY = "https://github.com/skywind3000
 export declare const ALLOWED_SOURCE_PATH = "ecdict.csv";
 /** Strict network hostname allowlist for canonical downloads. */
 export declare const ALLOWED_DOWNLOAD_HOSTNAME = "raw.githubusercontent.com";
-/** Absolute security ceiling for corpus byte size (128 MiB = 134,217,728 bytes). */
+/** Absolute security ceiling for corpus byte size (80 MiB = 83,886,080 bytes). */
 export declare const MAX_MANIFEST_BYTE_SIZE: number;
 /** Expected relative directory of the packaged manifest within the package. */
 export declare const CORPUS_DIRECTORY = "corpus";
@@ -85,15 +85,22 @@ export declare function resolvePackagedManifestPath(fromUrl?: string): string;
  */
 export declare function validateEcdictManifest(raw: unknown): EcdictSourceDescriptor;
 /**
- * Load and validate the authoritative ECDICT source descriptor.
+ * Load and validate the authoritative ECDICT source descriptor from the packaged manifest.
  *
- * Reads `corpus/ecdict.manifest.json` from the package tree (or explicit test path)
- * and produces a frozen {@link EcdictSourceDescriptor}.
+ * Reads `corpus/ecdict.manifest.json` relative to package installation root.
+ * In production, does not accept any parameters or overrides.
+ *
+ * @returns validated, frozen descriptor.
+ */
+export declare function loadPinnedEcdictSourceDescriptor(): EcdictSourceDescriptor;
+/**
+ * @internal Test-only loader supporting explicit manifest path or fromUrl overrides.
+ * Strictly forbidden from package root exports.
  *
  * @param options - optional explicit manifest path or fromUrl.
  * @returns validated, frozen descriptor.
  */
-export declare function loadPinnedEcdictSourceDescriptor(options?: LoadEcdictManifestOptions): EcdictSourceDescriptor;
+export declare function loadPinnedEcdictSourceDescriptorForTesting(options?: LoadEcdictManifestOptions): EcdictSourceDescriptor;
 /**
  * Convert a validated {@link EcdictSourceDescriptor} to an {@link ActiveMetadataSource}
  * compatible with Phase 7A.3 active metadata storage contracts.

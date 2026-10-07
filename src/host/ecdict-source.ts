@@ -35,8 +35,8 @@ export const ALLOWED_SOURCE_PATH = 'ecdict.csv'
 /** Strict network hostname allowlist for canonical downloads. */
 export const ALLOWED_DOWNLOAD_HOSTNAME = 'raw.githubusercontent.com'
 
-/** Absolute security ceiling for corpus byte size (128 MiB = 134,217,728 bytes). */
-export const MAX_MANIFEST_BYTE_SIZE = 128 * 1024 * 1024
+/** Absolute security ceiling for corpus byte size (80 MiB = 83,886,080 bytes). */
+export const MAX_MANIFEST_BYTE_SIZE = 80 * 1024 * 1024
 
 /** Expected relative directory of the packaged manifest within the package. */
 export const CORPUS_DIRECTORY = 'corpus'
@@ -156,7 +156,7 @@ export function validateEcdictManifest(raw: unknown): EcdictSourceDescriptor {
 
   if (sourceByteSize > MAX_MANIFEST_BYTE_SIZE) {
     throw new TypeError(
-      `Manifest sourceByteSize ${sourceByteSize} exceeds maximum security ceiling of ${MAX_MANIFEST_BYTE_SIZE} bytes (128 MiB)`,
+      `Manifest sourceByteSize ${sourceByteSize} exceeds maximum security ceiling of ${MAX_MANIFEST_BYTE_SIZE} bytes (80 MiB)`,
     )
   }
 
@@ -192,18 +192,7 @@ export function validateEcdictManifest(raw: unknown): EcdictSourceDescriptor {
   })
 }
 
-/**
- * Load and validate the authoritative ECDICT source descriptor.
- *
- * Reads `corpus/ecdict.manifest.json` from the package tree (or explicit test path)
- * and produces a frozen {@link EcdictSourceDescriptor}.
- *
- * @param options - optional explicit manifest path or fromUrl.
- * @returns validated, frozen descriptor.
- */
-export function loadPinnedEcdictSourceDescriptor(options?: LoadEcdictManifestOptions): EcdictSourceDescriptor {
-  const manifestPath = options?.manifestPath ?? resolvePackagedManifestPath(options?.fromUrl)
-
+function loadDescriptorFromManifestPath(manifestPath: string): EcdictSourceDescriptor {
   let content: string
   try {
     content = readFileSync(manifestPath, 'utf8')
@@ -219,6 +208,31 @@ export function loadPinnedEcdictSourceDescriptor(options?: LoadEcdictManifestOpt
   }
 
   return validateEcdictManifest(parsed)
+}
+
+/**
+ * Load and validate the authoritative ECDICT source descriptor from the packaged manifest.
+ *
+ * Reads `corpus/ecdict.manifest.json` relative to package installation root.
+ * In production, does not accept any parameters or overrides.
+ *
+ * @returns validated, frozen descriptor.
+ */
+export function loadPinnedEcdictSourceDescriptor(): EcdictSourceDescriptor {
+  const manifestPath = resolvePackagedManifestPath()
+  return loadDescriptorFromManifestPath(manifestPath)
+}
+
+/**
+ * @internal Test-only loader supporting explicit manifest path or fromUrl overrides.
+ * Strictly forbidden from package root exports.
+ *
+ * @param options - optional explicit manifest path or fromUrl.
+ * @returns validated, frozen descriptor.
+ */
+export function loadPinnedEcdictSourceDescriptorForTesting(options?: LoadEcdictManifestOptions): EcdictSourceDescriptor {
+  const manifestPath = options?.manifestPath ?? resolvePackagedManifestPath(options?.fromUrl)
+  return loadDescriptorFromManifestPath(manifestPath)
 }
 
 /**

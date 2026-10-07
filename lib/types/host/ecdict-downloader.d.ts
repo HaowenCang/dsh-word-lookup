@@ -28,6 +28,14 @@ import { type EcdictSourceDescriptor } from './ecdict-source.js';
 import type { ManagedStoragePaths } from './managed-storage.js';
 /** Maximum permitted redirects before failing closed. */
 export declare const MAX_REDIRECTS = 3;
+/** Authoritative exact expected byte size of the packaged pinned ECDICT corpus (65,933,428 bytes). */
+export declare const EXPECTED_SOURCE_BYTES = 65933428;
+/**
+ * Independent hard security ceiling on any streamed source bytes (80 MiB = 83,886,080 bytes).
+ * Enforced unconditionally chunk-by-chunk during network retrieval to prevent resource exhaustion
+ * and runaway/infinite streams, completely independent of expected integrity byte size.
+ */
+export declare const MAX_STREAMED_SOURCE_BYTES: number;
 /**
  * Error thrown when a concurrent download for the same destination is already in flight in the current process.
  */
@@ -73,20 +81,49 @@ export interface EcdictDownloadResult {
     readonly redirectCount: number;
 }
 /**
- * Options for {@link downloadPinnedEcdict}.
+ * Options for production-facing {@link downloadPinnedEcdict}.
+ *
+ * Production callers can only provide cancellation signals and progress observers.
+ * Production callers cannot override source URL, commit, hash, byte size, fetch, or UUID generation.
  */
 export interface DownloadPinnedEcdictOptions {
     /** Cancellation signal. */
     readonly signal?: AbortSignal;
     /** Optional observer callback for download progress. */
     readonly onProgress?: EcdictDownloadProgressCallback;
-    /** Optional explicit source descriptor (defaults to packaged manifest pin). */
-    readonly descriptor?: EcdictSourceDescriptor;
+}
+/**
+ * @internal Test-only seams for exercising streaming verification, failure modes, and edge cases.
+ * Strictly forbidden from package root exports and production callers.
+ */
+export interface DownloadPinnedEcdictInternalOptions {
+    /** Cancellation signal. */
+    readonly signal?: AbortSignal;
+    /** Optional observer callback for download progress. */
+    readonly onProgress?: EcdictDownloadProgressCallback;
     /** @internal Test-only seam to override fetch implementation. */
     readonly fetch?: typeof globalThis.fetch;
     /** @internal Test-only seam to override UUID factory. */
     readonly generateId?: () => string;
 }
+/**
+ * Detect whether a URL contains embedded userinfo (username, password-only, or username:password).
+ *
+ * Implements strict protocol validation per RFC 3986 §3.2 and §3.2.1:
+ * Checks standard WHATWG URL `username` property, and verifies whether the authority
+ * component (between scheme and path/query/fragment) contains the userinfo delimiter `@`.
+ *
+ * @param url - parsed URL object.
+ * @returns true if userinfo is present, false otherwise.
+ */
+export declare function hasEmbeddedUserInfo(url: URL): boolean;
+/**
+ * Strict Content-Length header parser.
+ *
+ * Rejects non-digits (e.g. "123garbage"), negative numbers, non-integers,
+ * and unsafe integers. Returns null if header is not present.
+ */
+export declare function parseContentLengthHeader(headerValue: string | null): number | null;
 /**
  * Verify an existing source file on disk against expected byte size and SHA-256 digest
  * with single-pass fatal UTF-8 decoding.
@@ -109,24 +146,43 @@ export declare function verifyCachedEcdictSource(filePath: string, expected: {
     onProgress?: EcdictDownloadProgressCallback;
 }): Promise<boolean>;
 /**
- * Download and verify the authoritative pinned ECDICT corpus into managed cache storage.
+ * Download and verify the authoritative packaged pinned ECDICT corpus into managed cache storage.
  *
- * Sequence:
- * 1. Concurrency check: fails immediately if destination is already active in this process.
- * 2. Directory check: ensures `<home>/cache/dsh-word-lookup/sources` exists.
- * 3. Pre-flight cache verification: if `ecdict.csv` already exists and matches exact size,
- *    SHA-256, and fatal UTF-8, returns immediately with `reused: true` (zero network calls).
- * 4. Partial file preparation: opens unique `ecdict.csv.<uuid>.part` with exclusive `'wx'` flag.
- * 5. Secure network fetch: fetches canonical URL with manual redirects (<= 3) and HTTPS validation.
- * 6. Streaming verification: reads chunks, writes to `.part` disk handle with partial-write loops,
- *    updates SHA-256, validates fatal UTF-8, and strictly enforces byte ceiling.
- * 7. Verification completion: syncs and closes `.part` file handle.
- * 8. Atomic publication: renames `.part` to `ecdict.csv`.
- * 9. Concurrency convergence: if rename fails, verifies whether another concurrent process published
- *    valid final cache before throwing.
+ * Production entrypoint:
+ * - Automatically loads and strictly validates packaged `corpus/ecdict.manifest.json`.
+ * - Constructs canonical source descriptor bound to authoritative commit and SHA-256.
+ * - Downloads exclusively that canonical source.
+ * - Production callers cannot override source URL, commit, hash, byte size, fetch, or UUID generation.
  *
  * @param paths - resolved managed storage paths.
- * @param options - optional signal, progress observer, descriptor, and test seams.
+ * @param options - optional cancellation signal and progress observer.
  * @returns frozen {@link EcdictDownloadResult}.
  */
 export declare function downloadPinnedEcdict(paths: ManagedStoragePaths, options?: DownloadPinnedEcdictOptions): Promise<EcdictDownloadResult>;
+/**
+ * @internal Test-only internal core downloader accepting arbitrary descriptors and test seams.
+ * Strictly forbidden from package root exports (src/index.ts).
+ *
+ * Sequence:
+ * 1. Pre-network security ceiling check: fails immediately if descriptor sourceByteSize > 80 MiB.
+ * 2. Concurrency check: fails immediately if destination is already active in this process.
+ * 3. Directory check: ensures `<home>/cache/dsh-word-lookup/sources` exists.
+ * 4. Pre-flight cache verification: if `ecdict.csv` already exists and matches exact size,
+ *    SHA-256, and fatal UTF-8, returns immediately with `reused: true` (zero network calls).
+ * 5. Partial file preparation: opens unique `ecdict.csv.<uuid>.part` with exclusive `'wx'` flag.
+ * 6. Secure network fetch: fetches canonical URL with manual redirects (<= 3) and HTTPS validation.
+ * 7. Content-Length check: parses strictly and rejects if exceeding ceiling or expected size.
+ * 8. Streaming verification: reads chunks, enforces independent ceiling + exact size,
+ *    writes to `.part` disk handle with partial-write loops, updates SHA-256, validates fatal UTF-8.
+ * 9. Publication linearization: checks abort at multiple gates prior to rename publication.
+ * 10. Verification completion: syncs and closes `.part` file handle.
+ * 11. Atomic publication commit: renames `.part` to `ecdict.csv`.
+ * 12. Concurrency convergence: if rename fails, verifies whether another concurrent process published
+ *    valid final cache before throwing.
+ *
+ * @param paths - resolved managed storage paths.
+ * @param descriptor - source descriptor to download.
+ * @param options - optional signal, progress observer, and test seams.
+ * @returns frozen {@link EcdictDownloadResult}.
+ */
+export declare function downloadPinnedEcdictInternal(paths: ManagedStoragePaths, descriptor: EcdictSourceDescriptor, options?: DownloadPinnedEcdictInternalOptions): Promise<EcdictDownloadResult>;

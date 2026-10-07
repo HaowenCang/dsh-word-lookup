@@ -72,10 +72,7 @@ import {
 import {
   descriptorToActiveMetadataSource,
   loadPinnedEcdictSourceDescriptor,
-  resolvePackagedManifestPath,
-  validateEcdictManifest,
   type EcdictSourceDescriptor,
-  type LoadEcdictManifestOptions,
 } from './host/ecdict-source.js'
 import {
   downloadPinnedEcdict,
@@ -114,10 +111,7 @@ export {
   type ResolveManagedStorageOptions,
   descriptorToActiveMetadataSource,
   loadPinnedEcdictSourceDescriptor,
-  resolvePackagedManifestPath,
-  validateEcdictManifest,
   type EcdictSourceDescriptor,
-  type LoadEcdictManifestOptions,
   downloadPinnedEcdict,
   verifyCachedEcdictSource,
   EcdictDownloadInProgressError,
