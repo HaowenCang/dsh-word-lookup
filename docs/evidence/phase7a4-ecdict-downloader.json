@@ -1,0 +1,147 @@
+{
+  "phase": "Phase 7A.4",
+  "reportTitle": "Phase 7A.4 Verified ECDICT Downloader & Streaming Integrity Evidence",
+  "generatedAt": "2026-10-07T09:25:00.000Z",
+  "baselineGitSha": "5c1f82db66b8cad94ab5d230cb40743fd373f0a6",
+  "testedCodeGitSha": "acfaca4b0086a497e83891e2397b57800e49b951",
+  "status": "PASS",
+  "platform": "win32",
+  "package": {
+    "name": "dsh-word-lookup",
+    "version": "0.2.0",
+    "status": "unreleased",
+    "runtimeDependencies": 0,
+    "missingLocalModules": 0
+  },
+  "sourcePin": {
+    "sourceName": "ECDICT",
+    "repository": "https://github.com/skywind3000/ECDICT",
+    "commit": "bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b",
+    "tree": "5391888b55d09876e5ffa76604d525172a418f11",
+    "gitBlob": "c4ade63ea08cf39d9c3475e96929036d64d94c94",
+    "path": "ecdict.csv",
+    "byteSize": 65933428,
+    "sha256": "1a6947e04785db63613a92e14903cdae7954f7e84860b10e68e5c7cbb3f9c3cf",
+    "schemaVersion": 1,
+    "licensePath": "LICENSE",
+    "licenseSha256": "f8552dd246f61a4e064569eae6194a01c6b3d63b03bf27c6ca863593c549ed0f"
+  },
+  "manifest": {
+    "packagePath": "corpus/ecdict.manifest.json",
+    "resolvedFromBundle": true,
+    "validated": true,
+    "canonicalUrl": "https://raw.githubusercontent.com/skywind3000/ECDICT/bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b/ecdict.csv",
+    "userEditableOverride": false,
+    "maxManifestByteSize": 134217728
+  },
+  "networkPolicy": {
+    "httpsOnly": true,
+    "allowedHosts": [
+      "raw.githubusercontent.com"
+    ],
+    "redirectMode": "manual",
+    "maxRedirects": 3,
+    "revalidateRedirectTargets": true,
+    "redirectBodyCancel": true,
+    "credentialsUsed": false,
+    "headers": {
+      "authorization": false,
+      "cookies": false,
+      "githubToken": false
+    }
+  },
+  "streamVerification": {
+    "chunkByteCounting": true,
+    "hardByteCeilingEnforced": true,
+    "maxBytes": 65933428,
+    "exactSizeRequired": true,
+    "sha256Required": true,
+    "fatalUtf8Required": true,
+    "fullSourceMemoryBuffering": false
+  },
+  "cacheLifecycle": {
+    "sourceCacheDirectory": "<DSH_HOME>/cache/dsh-word-lookup/sources",
+    "finalFile": "ecdict.csv",
+    "uniquePartPattern": "ecdict.csv.<uuid>.part",
+    "exclusiveCreateFlag": "wx",
+    "syncBeforePublish": true,
+    "sameDirectoryRenamePublish": true,
+    "existingValidReuse": true,
+    "existingValidZeroNetwork": true,
+    "invalidExistingPreservedUntilReplacement": true,
+    "ownPartCleanupOnFailure": true,
+    "foreignPartPreserved": true
+  },
+  "cancellation": {
+    "supported": true,
+    "abortSignalSupported": true,
+    "abortErrorIdentity": "AbortError",
+    "preflightAbortedZeroNetwork": true,
+    "midstreamAbortedCleaned": true,
+    "finalCacheUntouchedOnAbort": true
+  },
+  "concurrency": {
+    "sameProcessPolicy": "EcdictDownloadInProgressError",
+    "sameProcessRejection": true,
+    "crossProcessFilesystemSafety": "unique-part-and-convergence-verification"
+  },
+  "realNetworkAcceptance": {
+    "script": "scripts/test-ecdict-download-runtime.mjs",
+    "npmCommand": "npm run test:ecdict-download-runtime",
+    "isolated": true,
+    "isolationBanner": "ISOLATION CHECK: PASS",
+    "scratchHomeUnderTemp": true,
+    "downloadedFresh": true,
+    "observedInitialUrl": "https://raw.githubusercontent.com/skywind3000/ECDICT/bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b/ecdict.csv",
+    "observedFinalHostname": "raw.githubusercontent.com",
+    "observedHttpStatus": 200,
+    "observedRedirectCount": 0,
+    "actualBytes": 65933428,
+    "actualSha256": "1a6947e04785db63613a92e14903cdae7954f7e84860b10e68e5c7cbb3f9c3cf",
+    "fatalUtf8": "PASS",
+    "noPartResidual": true,
+    "secondCallReused": true,
+    "secondCallZeroNetwork": true,
+    "scratchHomeCleanedUp": true
+  },
+  "storeSignals": {
+    "files": true,
+    "network": true,
+    "credentials": false,
+    "commands": false,
+    "protectedDsh": false,
+    "native": false,
+    "dynamic": false,
+    "runtimeDependencies": 0,
+    "missingLocalModules": 0,
+    "activeRuntimeProcessEnvCount": 0
+  },
+  "bundleHashes": {
+    "host": {
+      "path": "lib/index.js",
+      "sha256": "d32a851a0b88d6a55b9edb4d047044a4456d538aaf76e70f1a3563f0ac9ab8b5"
+    },
+    "client": {
+      "path": "lib/client.js",
+      "sha256": "0f1d730f02232f0920b14f136018a55eb86f552e7f828eeafc3543a673318c41"
+    }
+  },
+  "validation": {
+    "typecheck": "PASS",
+    "unitTests": "PASS",
+    "build": "PASS",
+    "bundleStaticChecks": "PASS (94/94)",
+    "storeContract": "PASS (24/24)",
+    "credentialsScan": "PASS (435 files)",
+    "runtimeIntegration": "PASS (169/169)",
+    "corpusRuntime": "PASS (12/12)",
+    "storageRuntime": "PASS (8/8)",
+    "browserAcceptance": "PASS (37/37)",
+    "ecdictDownloadRuntime": "PASS"
+  },
+  "standingBlockers": {
+    "releaseBlockerAutomaticSelectionPortability": "OPEN",
+    "pendingImporterResponsivenessBenchmark": "PENDING Phase 7A.5",
+    "managedStorageDshHomeResolution": "RESOLVED Phase 7A.3R"
+  }
+}
