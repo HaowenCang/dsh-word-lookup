@@ -1,10 +1,11 @@
 {
   "phase": "Phase 7A.3",
   "reportTitle": "Phase 7A.3 Managed Storage & DSH Home Resolution Verification Evidence",
-  "generatedAt": "2026-10-07T07:22:00.000Z",
-  "baselineGitSha": "8eea4875c63e85868f16318877ba7205c4e34c1e",
-  "testedCodeGitSha": "749cd9454bd3ac6bea5b9a69beb5fbf4f73fdbc3",
+  "generatedAt": "2026-10-07T08:05:00.000Z",
+  "baselineGitSha": "e6eaf27ea45f5bc5a3418e51db1b6df387e1b9f4",
+  "testedCodeGitSha": "9fbe7eb28f70bb568da72f39ddee49b87ad5a7e1",
   "status": "PASS",
+  "platform": "win32",
   "package": {
     "name": "dsh-word-lookup",
     "version": "0.2.0",
@@ -15,11 +16,36 @@
   "bundleHashes": {
     "host": {
       "path": "lib/index.js",
-      "sha256": "c66575055f2d42c77594835a867117717fad2a693151df6b72d5371010764141"
+      "sha256": "4c469cf69b2d517fd0c0ee43915f9f3383e9141e9f697e8e0bde0054bc560d6b"
     },
     "client": {
       "path": "lib/client.js",
       "sha256": "0f1d730f02232f0920b14f136018a55eb86f552e7f828eeafc3543a673318c41"
+    }
+  },
+  "upstreamHomePaths": {
+    "repository": "deepseek-ai/deepseek-harness",
+    "tag": "dsh-v0.2.0-rc.2",
+    "tagCommit": "639ed015397290b3745d163aafe02ffee4aa3f84",
+    "homePaths": {
+      "path": "packages/util/home-paths/src/index.ts",
+      "blob": "0d7b934003ac0d0d14dc473062f51700d77f036c",
+      "resolveDshHomeUsesProcessEnvDefault": true
+    },
+    "appBoot": {
+      "path": "packages/boot/app-boot/src/index.ts",
+      "blob": "188cb33460f659393f28bbc5569c86b59ae135e0",
+      "providesDshHomePath": true
+    },
+    "profileContext": {
+      "path": "packages/boot/app-boot/src/profile-context.ts",
+      "blob": "328b543e00678640f021e338d49ffb0926c05aa0",
+      "hasHomeField": true
+    },
+    "cliProfileBoot": {
+      "path": "apps/cli/src/profile-boot.ts",
+      "blob": "b795f627ca432ebeaa61fba98cdf63aa25b9d94b",
+      "providesProfileContextBeforePluginTree": true
     }
   },
   "homeResolution": {
@@ -33,6 +59,15 @@
     "storeCredentialsSignal": false,
     "failClosedOnMissingHome": true,
     "explanation": "DSH home is resolved strictly through official Cordis context surfaces provided by the DSH host runtime (profileContext or dshHomePath) or explicit parameter injection. The active runtime bundle contains 0 process.env occurrences, preserving the Store credentials=false invariant without requiring @deepseek-ai/dsh-home-paths as a runtime dependency."
+  },
+  "runtimeHomeResolution": {
+    "realDshProcess": true,
+    "profile": "word-lookup-test",
+    "profileContextPresent": true,
+    "dshHomePathServicePresent": true,
+    "profileHomeMatchesIsolatedHome": true,
+    "resolverHomeMatchesIsolatedHome": true,
+    "dshHomePathMatchesIsolatedHome": true
   },
   "managedStorageLayout": {
     "sourceCacheDirectory": "<DSH_HOME>/cache/dsh-word-lookup/sources",
@@ -63,8 +98,14 @@
   "atomicMetadataPersistence": {
     "schemaVersion": 1,
     "activeMode": "managed-ecdict",
-    "writePattern": "serialize -> write sibling active.json.tmp-<uuid> -> flush -> atomic rename over active.json",
+    "writePattern": "validate -> serialize -> write sibling active.json.tmp-<uuid> with flush:true -> close -> atomic rename over active.json",
+    "durabilitySemantics": "temporary file contents are explicitly flushed before rename; namespace replacement uses same-directory rename over active.json",
     "windowsAtomicReplaceVerified": true,
+    "platform": "win32",
+    "failureInjection": {
+      "tempWriteFlushFailure": "PASS (old active.json bytes unchanged, parsed generation unchanged, temp artifact cleaned)",
+      "renameFailure": "PASS (old active.json bytes unchanged, parsed generation unchanged, temp artifact cleaned)"
+    },
     "databaseReferenceStyle": "relative basename only, strictly matching ecdict-<identity>.sqlite3 and preventing path traversal or host leakage",
     "malformedJsonHandling": "fail-closed, throws without modifying active.json or disk",
     "invalidSchemaHandling": "fail-closed, throws without modifying active.json or disk"
@@ -115,8 +156,11 @@
     "activeMetadataSourceValidation": "PASS (strictly validates commit length, sha256 length, schemaVersion)",
     "ensureDirectoriesRecursive": "PASS (creates source cache and database directories recursively)",
     "readMissingActiveMetadata": "PASS (returns null when active.json does not exist)",
-    "writeReadActiveMetadataAtomically": "PASS (writes and reads active metadata atomically via temp file rename)",
+    "writeReadActiveMetadataAtomically": "PASS (writes and reads active metadata atomically via temp file rename with flush:true)",
     "replaceActiveMetadataAtomically": "PASS (subsequent atomic writes replace metadata safely)",
+    "failureInjectionTempWriteFlush": "PASS (old active.json bytes unchanged on write/flush error, temp artifact cleaned)",
+    "failureInjectionRename": "PASS (old active.json bytes unchanged on rename error, temp file cleaned)",
+    "windowsAtomicReplace": "PASS (verified real filesystem atomic replacement on win32)",
     "failClosedMalformedActiveJson": "PASS (malformed JSON throws without modifying disk)",
     "failClosedInvalidSchemaActiveJson": "PASS (invalid schema throws without modifying disk)",
     "staleArtifactCleanup": "PASS (unlinks temporary and part files while preserving active.json, databases, and README)"
@@ -128,7 +172,7 @@
     },
     "unitTests": {
       "passed": true,
-      "total": 535,
+      "total": 538,
       "testFiles": 30,
       "command": "npm test"
     },
@@ -153,7 +197,7 @@
     },
     "credentialScan": {
       "passed": true,
-      "filesScanned": 433,
+      "filesScanned": 435,
       "candidates": 4,
       "leaks": 0,
       "command": "node scripts/scan-credentials.mjs"
@@ -167,6 +211,11 @@
       "passed": true,
       "total": 12,
       "command": "npm run test:corpus-runtime"
+    },
+    "storageRuntime": {
+      "passed": true,
+      "total": 8,
+      "command": "npm run test:storage-runtime"
     },
     "browserAcceptance": {
       "passed": true,
