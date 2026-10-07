@@ -69,6 +69,24 @@ import {
   type ManagedStoragePaths,
   type ResolveManagedStorageOptions,
 } from './host/managed-storage.js'
+import {
+  descriptorToActiveMetadataSource,
+  loadPinnedEcdictSourceDescriptor,
+  resolvePackagedManifestPath,
+  validateEcdictManifest,
+  type EcdictSourceDescriptor,
+  type LoadEcdictManifestOptions,
+} from './host/ecdict-source.js'
+import {
+  downloadPinnedEcdict,
+  verifyCachedEcdictSource,
+  EcdictDownloadInProgressError,
+  type DownloadPinnedEcdictOptions,
+  type EcdictDownloadProgress,
+  type EcdictDownloadProgressCallback,
+  type EcdictDownloadProgressPhase,
+  type EcdictDownloadResult,
+} from './host/ecdict-downloader.js'
 import { LOOKUP_PATH } from './host/route.js'
 
 export { Config }
@@ -94,6 +112,20 @@ export {
   type ActiveMetadataSource,
   type ManagedStoragePaths,
   type ResolveManagedStorageOptions,
+  descriptorToActiveMetadataSource,
+  loadPinnedEcdictSourceDescriptor,
+  resolvePackagedManifestPath,
+  validateEcdictManifest,
+  type EcdictSourceDescriptor,
+  type LoadEcdictManifestOptions,
+  downloadPinnedEcdict,
+  verifyCachedEcdictSource,
+  EcdictDownloadInProgressError,
+  type DownloadPinnedEcdictOptions,
+  type EcdictDownloadProgress,
+  type EcdictDownloadProgressCallback,
+  type EcdictDownloadProgressPhase,
+  type EcdictDownloadResult,
 }
 
 /** Package name; equals the Loader entry id and the settings namespace. */

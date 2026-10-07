@@ -9,7 +9,7 @@ nothing leaves your machine and no model is involved.
 **Current development target: v0.2.0 — unreleased.**
 The latest published release is **v0.1.0**.
 
-The plugin is local-first and uses SQLite for dictionary lookup. The public package does not redistribute the full ECDICT corpus. In Phase 7A.2, the host runtime establishes `DictionaryManager` for atomic hot switching while still starting on the deterministic offline fixture database.
+The plugin is local-first and uses SQLite for dictionary lookup. The public package does not redistribute the full ECDICT corpus. In Phase 7A.4, a pinned, HTTPS-only ECDICT downloader primitive is implemented with streaming size, SHA-256, and fatal UTF-8 verification, cancellation, and safe cache publication; host startup performs no automatic download (fixture-only on startup), and user-facing installation UI orchestration remains pending.
 
 | Area | State |
 | --- | --- |
@@ -115,8 +115,8 @@ lookup route → DictionaryManager → active Dictionary
 
 - **DictionaryManager Lifecycle & Hot Switching**:
   The route maintains a stable reference to `DictionaryManager`, which implements the `Dictionary` interface. Candidate dictionaries are opened and validated prior to atomic active reference replacement.
-- **Deterministic Fixture Mode Startup**:
-  In Phase 7A.2, the host runtime continues to start strictly on the built-in deterministic fixture database (`sqlite-fixture`). Subsequent phases will establish managed ECDICT filesystem storage, downloading, and UI-driven switching.
+- **Deterministic Fixture Mode Startup & Zero Automatic Network**:
+  The host runtime continues to start strictly on the built-in deterministic fixture database (`sqlite-fixture`) and makes zero external network requests on startup. Network access occurs only when an explicit future install action invokes the downloader. User-facing installation UI orchestration remains pending (Phase 7A.6/7A.7). The full ECDICT corpus is not redistributed in the repository or npm packages.
 - **Zero Legacy Environment Variables**:
   Legacy environment variable database activation has been completely removed. Host startup and dictionary resolution no longer inspect any process environment variables.
 - **Fail-Closed Guarantee**:

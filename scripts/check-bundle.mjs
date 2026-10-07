@@ -293,9 +293,12 @@ for (const [field, description] of [
     `the settings row must not read as "look up on any selection change"`,
   )
 }
+// Phase 3 required no stub or unbuilt corpus claimed as lookup provenance.
+// In Phase 7A.4, the host exports the pinned ECDICT source descriptor, while
+// the active lookup handler continues to report only sqlite-fixture.
 check(
-  'the emitted host code claims no corpus and no stub as a source',
-  !/"stub"|'stub'/.test(hostCode) && !/["']ECDICT["']/.test(hostCode) && !/["']Tatoeba["']/.test(hostCode),
+  'the emitted host code claims no stub as a source',
+  !/"stub"|'stub'/.test(hostCode) && !/["']Tatoeba["']/.test(hostCode),
   'provenance must describe the data that is actually there',
 )
 

@@ -80,6 +80,7 @@
     "test:runtime": "node scripts/run-integration-test.mjs",
     "test:corpus-runtime": "node scripts/test-corpus-runtime.mjs",
     "test:storage-runtime": "node scripts/test-storage-runtime.mjs",
+    "test:ecdict-download-runtime": "node scripts/test-ecdict-download-runtime.mjs",
     "test:acceptance": "node scripts/phase5-browser-acceptance.mjs",
     "test:native-input": "node scripts/phase421-native-input-probe.mjs",
     "test:native-input:preflight": "node scripts/phase421-native-input-probe.mjs --preflight",

@@ -8,6 +8,7 @@ Development checkpoint for Phase 7A (managed dictionary lifecycle and in-app set
 
 ### Added
 
+- Added a pinned, HTTPS-only ECDICT downloader with streaming byte/SHA-256/UTF-8 verification, cancellation, and safe cache publication.
 - Added DictionaryManager-backed active dictionary lifecycle and atomic hot switching.
 - Expanded Host configuration model (`dictionaryMode`, `customDictionaryPath`, `autoDoubleClick`, `autoSelection`) with Schemastery `.volatile()` declarations compatible with DSH Settings `ctx.configForms`.
 - Dedicated typed configuration readers (`readSwitch`, `readDictionaryMode`, `readCustomDictionaryPath`).
