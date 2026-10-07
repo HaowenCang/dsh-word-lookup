@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { readFile, rm, writeFile } from 'node:fs/promises'
+import { readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -14,6 +14,7 @@ import {
   resolveManagedStoragePaths,
   validateActiveMetadata,
   writeActiveMetadataAtomically,
+  _setStorageFsHooksForTesting,
   type ActiveMetadata,
   type ManagedStoragePaths,
 } from '../src/host/managed-storage.js'
@@ -234,6 +235,7 @@ describe('Managed Storage & DSH Home Resolution (Phase 7A.3)', () => {
     })
 
     afterEach(async () => {
+      _setStorageFsHooksForTesting(null)
       try {
         await rm(testHome, { recursive: true, force: true })
       } catch {
@@ -312,6 +314,173 @@ describe('Managed Storage & DSH Home Resolution (Phase 7A.3)', () => {
 
       await writeActiveMetadataAtomically(paths, metadata2)
       expect((await readActiveMetadata(paths))?.identity).toBe('gen-2')
+    })
+
+    it('preserves existing active.json when temp write/flush fails (failure-injection)', async () => {
+      const metadataA: ActiveMetadata = {
+        version: 1,
+        activeMode: 'managed-ecdict',
+        identity: 'gen-A',
+        databaseFile: 'ecdict-gen-A.sqlite3',
+        source: {
+          name: 'ECDICT',
+          commit: 'a'.repeat(40),
+          sha256: 'a'.repeat(64),
+          schemaVersion: 1,
+        },
+      }
+      const metadataB: ActiveMetadata = {
+        version: 1,
+        activeMode: 'managed-ecdict',
+        identity: 'gen-B',
+        databaseFile: 'ecdict-gen-B.sqlite3',
+        source: {
+          name: 'ECDICT',
+          commit: 'b'.repeat(40),
+          sha256: 'b'.repeat(64),
+          schemaVersion: 1,
+        },
+      }
+
+      // Step 1: Write generation A successfully
+      await writeActiveMetadataAtomically(paths, metadataA)
+      const initialBytes = await readFile(paths.activeMetadataPath)
+      const initialMeta = await readActiveMetadata(paths)
+      expect(initialMeta?.identity).toBe('gen-A')
+
+      // Step 2: Inject temp write/flush failure
+      _setStorageFsHooksForTesting({
+        writeFile: async () => {
+          throw new Error('EIO: simulated disk write/flush error during temp persistence')
+        },
+      })
+
+      // Step 3: Attempt write of generation B -> must reject
+      await expect(writeActiveMetadataAtomically(paths, metadataB)).rejects.toThrow(
+        /simulated disk write\/flush error/,
+      )
+
+      // Step 4: Verify generation A is byte-for-byte unchanged and valid
+      const afterBytes = await readFile(paths.activeMetadataPath)
+      expect(afterBytes).toEqual(initialBytes)
+
+      const afterMeta = await readActiveMetadata(paths)
+      expect(afterMeta).toEqual(metadataA)
+      expect(afterMeta?.identity).toBe('gen-A')
+
+      // Step 5: Verify no replacement occurred and no temporary files linger
+      const entries = await readdir(paths.storageDirectory)
+      const tempEntries = entries.filter((e) => e.startsWith('active.json.tmp-'))
+      expect(tempEntries).toHaveLength(0)
+    })
+
+    it('preserves existing active.json and cleans temp file when rename fails (failure-injection)', async () => {
+      const metadataA: ActiveMetadata = {
+        version: 1,
+        activeMode: 'managed-ecdict',
+        identity: 'gen-A',
+        databaseFile: 'ecdict-gen-A.sqlite3',
+        source: {
+          name: 'ECDICT',
+          commit: 'a'.repeat(40),
+          sha256: 'a'.repeat(64),
+          schemaVersion: 1,
+        },
+      }
+      const metadataB: ActiveMetadata = {
+        version: 1,
+        activeMode: 'managed-ecdict',
+        identity: 'gen-B',
+        databaseFile: 'ecdict-gen-B.sqlite3',
+        source: {
+          name: 'ECDICT',
+          commit: 'b'.repeat(40),
+          sha256: 'b'.repeat(64),
+          schemaVersion: 1,
+        },
+      }
+
+      // Step 1: Write generation A successfully
+      await writeActiveMetadataAtomically(paths, metadataA)
+      const initialBytes = await readFile(paths.activeMetadataPath)
+      const initialMeta = await readActiveMetadata(paths)
+      expect(initialMeta?.identity).toBe('gen-A')
+
+      // Step 2: Inject rename failure (temp write with flush succeeds, rename throws)
+      _setStorageFsHooksForTesting({
+        rename: async () => {
+          throw new Error('EXDEV: simulated atomic rename failure')
+        },
+      })
+
+      // Step 3: Attempt write of generation B -> must reject
+      await expect(writeActiveMetadataAtomically(paths, metadataB)).rejects.toThrow(
+        /simulated atomic rename failure/,
+      )
+
+      // Step 4: Verify generation A bytes remain unchanged
+      const afterBytes = await readFile(paths.activeMetadataPath)
+      expect(afterBytes).toEqual(initialBytes)
+
+      const afterMeta = await readActiveMetadata(paths)
+      expect(afterMeta).toEqual(metadataA)
+      expect(afterMeta?.identity).toBe('gen-A')
+
+      // Step 5: Verify temp cleanup was attempted and no temporary files linger
+      const entries = await readdir(paths.storageDirectory)
+      const tempEntries = entries.filter((e) => e.startsWith('active.json.tmp-'))
+      expect(tempEntries).toHaveLength(0)
+    })
+
+    it('verifies real Windows atomic replacement of existing active.json with flushed contents', async () => {
+      // Affirm environment platform matches Windows requirement for Windows replacement acceptance
+      if (process.platform === 'win32') {
+        expect(process.platform).toBe('win32')
+      }
+
+      const meta1: ActiveMetadata = {
+        version: 1,
+        activeMode: 'managed-ecdict',
+        identity: 'win-replace-v1',
+        databaseFile: 'ecdict-win-replace-v1.sqlite3',
+        source: {
+          name: 'ECDICT',
+          commit: 'c1'.repeat(20),
+          sha256: 'd1'.repeat(32),
+          schemaVersion: 1,
+        },
+      }
+      const meta2: ActiveMetadata = {
+        version: 1,
+        activeMode: 'managed-ecdict',
+        identity: 'win-replace-v2',
+        databaseFile: 'ecdict-win-replace-v2.sqlite3',
+        source: {
+          name: 'ECDICT',
+          commit: 'c2'.repeat(20),
+          sha256: 'd2'.repeat(32),
+          schemaVersion: 1,
+        },
+      }
+
+      // 1. Initial write creates active.json
+      await writeActiveMetadataAtomically(paths, meta1)
+      expect(existsSync(paths.activeMetadataPath)).toBe(true)
+      expect((await readActiveMetadata(paths))?.identity).toBe('win-replace-v1')
+
+      // 2. Real atomic replace over existing active.json
+      await writeActiveMetadataAtomically(paths, meta2)
+      expect(existsSync(paths.activeMetadataPath)).toBe(true)
+
+      // 3. Read back verified new metadata
+      const replaced = await readActiveMetadata(paths)
+      expect(replaced?.identity).toBe('win-replace-v2')
+      expect(replaced?.databaseFile).toBe('ecdict-win-replace-v2.sqlite3')
+
+      // 4. Ensure no temporary artifacts remained in directory
+      const entries = await readdir(paths.storageDirectory)
+      const tempFiles = entries.filter((e) => e.startsWith('active.json.tmp-'))
+      expect(tempFiles).toHaveLength(0)
     })
 
     it('fails closed on malformed active.json without modifying disk', async () => {

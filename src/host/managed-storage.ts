@@ -361,13 +361,34 @@ export async function readActiveMetadata(paths: ManagedStoragePaths): Promise<Ac
   return validateActiveMetadata(parsed)
 }
 
+/** Internal hooks interface for filesystem operation failure injection in tests. */
+export interface StorageFsHooks {
+  readonly writeFile?: (
+    path: string,
+    data: string,
+    options: { encoding: 'utf8'; flush: boolean },
+  ) => Promise<void>
+  readonly rename?: (oldPath: string, newPath: string) => Promise<void>
+  readonly unlink?: (path: string) => Promise<void>
+}
+
+let storageFsHooks: StorageFsHooks | null = null
+
+/**
+ * Configure internal filesystem hooks for failure-injection testing.
+ * @internal Test-only helper. Pass `null` to reset to standard `node:fs/promises` operations.
+ */
+export function _setStorageFsHooksForTesting(hooks: StorageFsHooks | null): void {
+  storageFsHooks = hooks
+}
+
 /**
  * Atomically write active dictionary metadata to `<home>/storages/dsh-word-lookup/active.json`.
  *
  * Sequence:
  * 1. Validate metadata schema before disk operations.
  * 2. Ensure storage directory exists.
- * 3. Write serialized JSON to a sibling temporary file (`active.json.tmp-<randomUUID>`).
+ * 3. Write serialized JSON to a sibling temporary file (`active.json.tmp-<randomUUID>`) with explicit `flush: true`.
  * 4. Atomically rename temporary file to `active.json` (atomic replacement on Windows and POSIX).
  * 5. On failure, best-effort cleanup of temporary file without corrupting existing `active.json`.
  *
@@ -386,12 +407,19 @@ export async function writeActiveMetadataAtomically(
   const tempName = `active.json.tmp-${randomUUID()}`
   const tempPath = join(paths.storageDirectory, tempName)
 
+  const doWriteFile = storageFsHooks?.writeFile ?? writeFile
+  const doRename = storageFsHooks?.rename ?? rename
+  const doUnlink = storageFsHooks?.unlink ?? unlink
+
   try {
-    await writeFile(tempPath, serialized, 'utf8')
-    await rename(tempPath, paths.activeMetadataPath)
+    await doWriteFile(tempPath, serialized, {
+      encoding: 'utf8',
+      flush: true,
+    })
+    await doRename(tempPath, paths.activeMetadataPath)
   } catch (error) {
     try {
-      await unlink(tempPath)
+      await doUnlink(tempPath)
     } catch {
       // best-effort cleanup
     }
