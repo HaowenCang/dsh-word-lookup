@@ -1,0 +1,191 @@
+{
+  "phase": "Phase 7A.3",
+  "reportTitle": "Phase 7A.3 Managed Storage & DSH Home Resolution Verification Evidence",
+  "generatedAt": "2026-10-07T07:22:00.000Z",
+  "baselineGitSha": "8eea4875c63e85868f16318877ba7205c4e34c1e",
+  "testedCodeGitSha": "749cd9454bd3ac6bea5b9a69beb5fbf4f73fdbc3",
+  "status": "PASS",
+  "package": {
+    "name": "dsh-word-lookup",
+    "version": "0.2.0",
+    "status": "unreleased",
+    "runtimeDependencies": 0,
+    "missingLocalModules": 0
+  },
+  "bundleHashes": {
+    "host": {
+      "path": "lib/index.js",
+      "sha256": "c66575055f2d42c77594835a867117717fad2a693151df6b72d5371010764141"
+    },
+    "client": {
+      "path": "lib/client.js",
+      "sha256": "0f1d730f02232f0920b14f136018a55eb86f552e7f828eeafc3543a673318c41"
+    }
+  },
+  "homeResolution": {
+    "strategy": "OFFICIAL_EXPLICIT_HOME",
+    "supportedSurfaces": [
+      "ctx.get('profileContext')?.home",
+      "ctx.get('dshHomePath')?.()",
+      "options.home"
+    ],
+    "ambientProcessEnvInRuntime": false,
+    "storeCredentialsSignal": false,
+    "failClosedOnMissingHome": true,
+    "explanation": "DSH home is resolved strictly through official Cordis context surfaces provided by the DSH host runtime (profileContext or dshHomePath) or explicit parameter injection. The active runtime bundle contains 0 process.env occurrences, preserving the Store credentials=false invariant without requiring @deepseek-ai/dsh-home-paths as a runtime dependency."
+  },
+  "managedStorageLayout": {
+    "sourceCacheDirectory": "<DSH_HOME>/cache/dsh-word-lookup/sources",
+    "storageDirectory": "<DSH_HOME>/storages/dsh-word-lookup",
+    "databaseDirectory": "<DSH_HOME>/storages/dsh-word-lookup/databases",
+    "activeMetadataPath": "<DSH_HOME>/storages/dsh-word-lookup/active.json",
+    "recursiveDirectoryCreation": true
+  },
+  "versionedDatabaseArtifacts": {
+    "namingPattern": "ecdict-<identity>.sqlite3",
+    "safeIdentityPattern": "^[a-zA-Z0-9._-]{1,64}$",
+    "pathTraversalProtected": true,
+    "rejectedInputs": [
+      "..",
+      ".",
+      "../sub",
+      "..\\sub",
+      "sub/nested",
+      "sub\\nested",
+      "C:\\sub",
+      "has spaces",
+      "bad*char",
+      "bad?char",
+      "bad\"quote"
+    ],
+    "windowsHandleSafety": "Databases use immutable versioned filenames rather than static mutable files. Hot-swapping switches databaseFile references in active.json rather than replacing locked SQLite files on disk, ensuring safety under Windows open file locking."
+  },
+  "atomicMetadataPersistence": {
+    "schemaVersion": 1,
+    "activeMode": "managed-ecdict",
+    "writePattern": "serialize -> write sibling active.json.tmp-<uuid> -> flush -> atomic rename over active.json",
+    "windowsAtomicReplaceVerified": true,
+    "databaseReferenceStyle": "relative basename only, strictly matching ecdict-<identity>.sqlite3 and preventing path traversal or host leakage",
+    "malformedJsonHandling": "fail-closed, throws without modifying active.json or disk",
+    "invalidSchemaHandling": "fail-closed, throws without modifying active.json or disk"
+  },
+  "temporaryArtifactCleanup": {
+    "recognizedPatterns": [
+      "^active\\.json\\.tmp-[a-zA-Z0-9_-]+$",
+      "^.*\\.tmp-[a-zA-Z0-9_-]+$",
+      "^.*\\.part$"
+    ],
+    "scannedDirectories": [
+      "storageDirectory",
+      "databaseDirectory",
+      "sourceCacheDirectory"
+    ],
+    "preservesValidArtifacts": true,
+    "preservesDatabases": true,
+    "preservesActiveJson": true
+  },
+  "storeSignals": {
+    "files": true,
+    "network": true,
+    "credentials": false,
+    "commands": false,
+    "protectedDsh": false,
+    "native": false,
+    "dynamic": false
+  },
+  "tests": {
+    "contextResolutionNull": "PASS (returns null on undefined context or missing surfaces)",
+    "contextResolutionProfileContext": "PASS (resolves home from ctx.get('profileContext')?.home)",
+    "contextResolutionDirectProfileContext": "PASS (resolves home from direct ctx.profileContext.home)",
+    "contextResolutionDshHomePath": "PASS (resolves home from ctx.get('dshHomePath')?.())",
+    "contextResolutionDirectDshHomePath": "PASS (resolves home from direct ctx.dshHomePath())",
+    "contextResolutionPrecedence": "PASS (profileContext.home takes precedence over dshHomePath)",
+    "contextResolutionWhitespace": "PASS (ignores empty or whitespace home values)",
+    "layoutPathsExplicitHome": "PASS (resolves all standard paths from explicit home)",
+    "layoutPathsContextHome": "PASS (resolves all standard paths from context home)",
+    "layoutPathsPrecedence": "PASS (explicit home takes precedence over context home)",
+    "layoutPathsFailClosed": "PASS (throws when neither explicit home nor context surface is available)",
+    "databaseFileNameValid": "PASS (formats valid ecdict-<identity>.sqlite3 names)",
+    "databasePathAbsolute": "PASS (builds normalized path under databaseDirectory)",
+    "databasePathTraversalRejection": "PASS (rejects .., ., slashes, drive letters, special characters)",
+    "activeMetadataValidationCompliant": "PASS (validates compliant metadata descriptor)",
+    "activeMetadataNormalization": "PASS (normalizes commit and sha256 to lowercase hex)",
+    "activeMetadataVersionGating": "PASS (rejects version != 1 and non-managed activeMode)",
+    "activeMetadataPathSecurity": "PASS (rejects absolute, slash-containing, or mismatched databaseFile)",
+    "activeMetadataSourceValidation": "PASS (strictly validates commit length, sha256 length, schemaVersion)",
+    "ensureDirectoriesRecursive": "PASS (creates source cache and database directories recursively)",
+    "readMissingActiveMetadata": "PASS (returns null when active.json does not exist)",
+    "writeReadActiveMetadataAtomically": "PASS (writes and reads active metadata atomically via temp file rename)",
+    "replaceActiveMetadataAtomically": "PASS (subsequent atomic writes replace metadata safely)",
+    "failClosedMalformedActiveJson": "PASS (malformed JSON throws without modifying disk)",
+    "failClosedInvalidSchemaActiveJson": "PASS (invalid schema throws without modifying disk)",
+    "staleArtifactCleanup": "PASS (unlinks temporary and part files while preserving active.json, databases, and README)"
+  },
+  "validation": {
+    "typecheck": {
+      "passed": true,
+      "command": "npm run typecheck"
+    },
+    "unitTests": {
+      "passed": true,
+      "total": 535,
+      "testFiles": 30,
+      "command": "npm test"
+    },
+    "build": {
+      "passed": true,
+      "command": "npm run build"
+    },
+    "verify": {
+      "passed": true,
+      "steps": 6,
+      "command": "npm run verify"
+    },
+    "storeContract": {
+      "passed": true,
+      "command": "npm run verify:store-contract"
+    },
+    "bundleChecks": {
+      "passed": true,
+      "total": 94,
+      "passedCount": 94,
+      "command": "node scripts/check-bundle.mjs"
+    },
+    "credentialScan": {
+      "passed": true,
+      "filesScanned": 433,
+      "candidates": 4,
+      "leaks": 0,
+      "command": "node scripts/scan-credentials.mjs"
+    },
+    "isolatedRuntime": {
+      "passed": true,
+      "total": 169,
+      "command": "npm run test:runtime"
+    },
+    "corpusRuntime": {
+      "passed": true,
+      "total": 12,
+      "command": "npm run test:corpus-runtime"
+    },
+    "browserAcceptance": {
+      "passed": true,
+      "total": 37,
+      "command": "npm run test:acceptance"
+    }
+  },
+  "standingBlockers": {
+    "automaticSelectionPortability": "RELEASE BLOCKER — automatic-selection portability: OPEN",
+    "homePathsDependency": "RESOLVED — official host context surfaces (profileContext.home & dshHomePath) with zero process.env",
+    "importerResponsiveness": "PENDING — importer responsiveness benchmark (Phase 7A.5)"
+  },
+  "phaseBoundaryAudit": {
+    "managedStorageLayout": "IMPLEMENTED (Phase 7A.3)",
+    "dshHomeResolution": "IMPLEMENTED (Phase 7A.3)",
+    "ecdictDownloader": "NOT IMPLEMENTED (Phase 7A.4)",
+    "streamingCsvImporter": "NOT IMPLEMENTED (Phase 7A.5)",
+    "managementRestRoutes": "NOT IMPLEMENTED (Phase 7A.6)",
+    "dictionarySettingsUi": "NOT IMPLEMENTED (Phase 7A.7)",
+    "customDictionaryPathActivation": "NOT IMPLEMENTED (Phase 7A.8)"
+  }
+}
