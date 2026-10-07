@@ -1,0 +1,198 @@
+{
+  "phase": "Phase 7A.4R",
+  "reportTitle": "Phase 7A.4R Verified ECDICT Downloader Remediation Evidence",
+  "generatedAt": "2026-10-07T12:58:35.030Z",
+  "baselineGitSha": "6e52427c85e8751887203e51a63864f7bb271f05",
+  "testedCodeGitSha": "205dd00e5707aec21283a83e6656c1b22b7f548c",
+  "status": "PASS",
+  "platform": "win32",
+  "package": {
+    "name": "dsh-word-lookup",
+    "version": "0.2.0",
+    "status": "unreleased",
+    "runtimeDependencies": 0,
+    "missingLocalModules": 0
+  },
+  "sourcePin": {
+    "sourceName": "ECDICT",
+    "repository": "https://github.com/skywind3000/ECDICT",
+    "commit": "bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b",
+    "tree": "5391888b55d09876e5ffa76604d525172a418f11",
+    "gitBlob": "c4ade63ea08cf39d9c3475e96929036d64d94c94",
+    "path": "ecdict.csv",
+    "byteSize": 65933428,
+    "sha256": "1a6947e04785db63613a92e14903cdae7954f7e84860b10e68e5c7cbb3f9c3cf",
+    "schemaVersion": 1,
+    "licensePath": "LICENSE",
+    "licenseSha256": "f8552dd246f61a4e064569eae6194a01c6b3d63b03bf27c6ca863593c549ed0f"
+  },
+  "auditRemediations": {
+    "defectA_cancellationLinearization": {
+      "fixed": true,
+      "linearizationContract": "Abort observed before rename publication commits rejects with AbortError, closes output handle, unlinks own .part, and preserves existing final cache byte-for-byte. Once rename publication successfully commits, success wins.",
+      "abortGates": [
+        "preflight before starting network",
+        "before following redirects",
+        "each chunk during stream loop",
+        "after EOF before verifying progress callback",
+        "immediately after verifying progress callback",
+        "after verification stage before handle.sync()",
+        "after handle.sync() before handle.close()",
+        "immediately before atomic rename publication"
+      ]
+    },
+    "defectB_productionProvenanceBoundary": {
+      "fixed": true,
+      "productionPublicApi": "downloadPinnedEcdict(paths, { signal?, onProgress? })",
+      "descriptorOverrideForbidden": true,
+      "customFetchForbidden": true,
+      "customUuidForbidden": true,
+      "internalTestingSeamsReExported": false,
+      "sourceOfTruth": "corpus/ecdict.manifest.json packaged inside plugin"
+    },
+    "defectC_independentHardStreamedByteCeiling": {
+      "fixed": true,
+      "expectedSourceBytes": 65933428,
+      "maxStreamedSourceBytes": 83886080,
+      "distinction": "EXPECTED_SOURCE_BYTES is the exact integrity size (65,933,428 bytes). MAX_STREAMED_SOURCE_BYTES is an independent hard resource ceiling (80 MiB = 83,886,080 bytes) checked chunk-by-chunk to prevent resource exhaustion and runaway streams.",
+      "descriptorPreNetworkCeilingGate": true,
+      "strictContentLengthHeaderParsing": true
+    },
+    "defectD_scannerObfuscationRemoval": {
+      "fixed": true,
+      "obfuscationRemoved": "Deleted ('pass' + 'word') string concatenation and all scanner evasion patterns.",
+      "protocolUserinfoValidation": "hasEmbeddedUserInfo(url: URL) validates username property and inspects authority component for '@' delimiter per RFC 3986 §3.2 and §3.2.1.",
+      "credentialsSignal": false,
+      "credentialsReason": "Legitimate absence of credentials access: 0 process.env access, 0 keychain/credentials access, 0 tokens in active runtime."
+    }
+  },
+  "testReconciliation": {
+    "testFiles": 32,
+    "totalTests": 588,
+    "vitestSummary": "32 passed (32 test files), 588 passed (588 tests)",
+    "explanation": "Authoritative Phase 7A.3R baseline had 30 test files and 538 tests. Phase 7A.4 added 2 test files (ecdict-source.spec.ts: 13 tests, ecdict-downloader.spec.ts: 23 tests), yielding 32 files and 574 tests. Phase 7A.4R added 14 new regression tests in ecdict-downloader.spec.ts covering audit Remediations A, B, C, and D, totaling 588 tests across 32 test files. Previous report had erroneously cited '37 test files, 502 tests' due to conflating 37 browser acceptance checks and unrelated benchmark numbers."
+  },
+  "manifest": {
+    "packagePath": "corpus/ecdict.manifest.json",
+    "resolvedFromBundle": true,
+    "validated": true,
+    "canonicalUrl": "https://raw.githubusercontent.com/skywind3000/ECDICT/bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b/ecdict.csv",
+    "userEditableOverride": false,
+    "maxManifestByteSize": 83886080
+  },
+  "networkPolicy": {
+    "httpsOnly": true,
+    "allowedHosts": [
+      "raw.githubusercontent.com"
+    ],
+    "redirectMode": "manual",
+    "maxRedirects": 3,
+    "revalidateRedirectTargets": true,
+    "redirectBodyCancel": true,
+    "credentialsUsed": false,
+    "headers": {
+      "authorization": false,
+      "cookies": false,
+      "githubToken": false
+    }
+  },
+  "streamVerification": {
+    "chunkByteCounting": true,
+    "hardByteCeilingEnforced": true,
+    "maxStreamedBytesCeiling": 83886080,
+    "expectedExactSourceBytes": 65933428,
+    "exactSizeRequired": true,
+    "sha256Required": true,
+    "fatalUtf8Required": true,
+    "fullSourceMemoryBuffering": false
+  },
+  "cacheLifecycle": {
+    "sourceCacheDirectory": "<DSH_HOME>/cache/dsh-word-lookup/sources",
+    "finalFile": "ecdict.csv",
+    "uniquePartPattern": "ecdict.csv.<uuid>.part",
+    "exclusiveCreateFlag": "wx",
+    "syncBeforePublish": true,
+    "sameDirectoryRenamePublish": true,
+    "existingValidReuse": true,
+    "existingValidZeroNetwork": true,
+    "invalidExistingPreservedUntilReplacement": true,
+    "ownPartCleanupOnFailure": true,
+    "foreignPartPreserved": true
+  },
+  "cancellation": {
+    "supported": true,
+    "abortSignalSupported": true,
+    "abortErrorIdentity": "AbortError",
+    "preflightAbortedZeroNetwork": true,
+    "midstreamAbortedCleaned": true,
+    "lateAbortAtVerifyingCleansPart": true,
+    "lateAbortPreservesExistingInvalidBytes": true,
+    "lateAbortReleasesConcurrencyGuard": true,
+    "finalCacheUntouchedOnAbort": true
+  },
+  "concurrency": {
+    "sameProcessPolicy": "EcdictDownloadInProgressError",
+    "sameProcessRejection": true,
+    "crossProcessFilesystemSafety": "unique-part-and-convergence-verification"
+  },
+  "realNetworkAcceptance": {
+    "script": "scripts/test-ecdict-download-runtime.mjs",
+    "npmCommand": "npm run test:ecdict-download-runtime",
+    "isolated": true,
+    "isolationBanner": "ISOLATION CHECK: PASS",
+    "scratchHomeUnderTemp": true,
+    "downloadedFresh": true,
+    "canonicalInitialUrl": "https://raw.githubusercontent.com/skywind3000/ECDICT/bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b/ecdict.csv",
+    "canonicalHostname": "raw.githubusercontent.com",
+    "redirectCount": 0,
+    "policyRequiresHttpStatus": 200,
+    "actualBytes": 65933428,
+    "actualSha256": "1a6947e04785db63613a92e14903cdae7954f7e84860b10e68e5c7cbb3f9c3cf",
+    "fatalUtf8": "PASS",
+    "noPartResidual": true,
+    "secondCallReused": true,
+    "secondCallZeroNetwork": true,
+    "secondCallDurationSeconds": 0.171,
+    "scratchHomeCleanedUp": true
+  },
+  "storeSignals": {
+    "files": true,
+    "network": true,
+    "credentials": false,
+    "commands": false,
+    "protectedDsh": false,
+    "native": false,
+    "dynamic": false,
+    "runtimeDependencies": 0,
+    "missingLocalModules": 0,
+    "activeRuntimeProcessEnvCount": 0
+  },
+  "bundleHashes": {
+    "host": {
+      "path": "lib/index.js",
+      "sha256": "bc9dbe1fd7880cf8c583fd53663664a8ee341d9458d734078e33643f500c87a6"
+    },
+    "client": {
+      "path": "lib/client.js",
+      "sha256": "0f1d730f02232f0920b14f136018a55eb86f552e7f828eeafc3543a673318c41"
+    }
+  },
+  "validation": {
+    "typecheck": "PASS",
+    "unitTests": "PASS (32 files, 588 tests)",
+    "build": "PASS",
+    "bundleStaticChecks": "PASS (94/94)",
+    "storeContract": "PASS (24/24)",
+    "credentialsScan": "PASS (443 files)",
+    "runtimeIntegration": "PASS (169/169)",
+    "corpusRuntime": "PASS (12/12)",
+    "storageRuntime": "PASS (8/8)",
+    "browserAcceptance": "PASS (37/37)",
+    "ecdictDownloadRuntime": "PASS"
+  },
+  "standingBlockers": {
+    "releaseBlockerAutomaticSelectionPortability": "OPEN",
+    "pendingImporterResponsivenessBenchmark": "PENDING Phase 7A.5",
+    "managedStorageDshHomeResolution": "RESOLVED Phase 7A.3R"
+  }
+}
