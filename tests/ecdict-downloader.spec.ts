@@ -14,7 +14,6 @@ import { ReadableStream } from 'node:stream/web'
 
 import {
   EcdictDownloadInProgressError,
-  EXPECTED_SOURCE_BYTES,
   MAX_STREAMED_SOURCE_BYTES,
   downloadPinnedEcdict,
   downloadPinnedEcdictInternal,
@@ -22,7 +21,10 @@ import {
   parseContentLengthHeader,
   type EcdictDownloadProgress,
 } from '../src/host/ecdict-downloader.js'
-import type { EcdictSourceDescriptor } from '../src/host/ecdict-source.js'
+import {
+  loadPinnedEcdictSourceDescriptor,
+  type EcdictSourceDescriptor,
+} from '../src/host/ecdict-source.js'
 import { resolveManagedStoragePaths, type ManagedStoragePaths } from '../src/host/managed-storage.js'
 import { apply } from '../src/index.js'
 import * as indexExports from '../src/index.js'
@@ -47,7 +49,7 @@ function createSyntheticDescriptor(content: string | Buffer): {
   return { descriptor, rawBytes }
 }
 
-function createMockStream(chunks: Uint8Array[]): any {
+function createMockStream(chunks: Uint8Array[], onCancel?: (reason?: any) => void): any {
   let index = 0
   return new ReadableStream<Uint8Array>({
     pull(controller) {
@@ -56,6 +58,9 @@ function createMockStream(chunks: Uint8Array[]): any {
       } else {
         controller.close()
       }
+    },
+    cancel(reason) {
+      onCancel?.(reason)
     },
   })
 }
@@ -226,16 +231,28 @@ describe('ECDICT secure downloader', () => {
     setupTestPaths()
     try {
       const { descriptor } = createSyntheticDescriptor('hello world')
+      let cancelCalled = false
       const mockFetch = vi.fn().mockResolvedValueOnce(
-        new Response(createMockStream([Buffer.from('hello world')]), {
-          status: 200,
-          headers: { 'content-length': String(descriptor.sourceByteSize + 100) },
-        }),
+        new Response(
+          createMockStream([Buffer.from('hello world')], () => {
+            cancelCalled = true
+          }),
+          {
+            status: 200,
+            headers: { 'content-length': String(descriptor.sourceByteSize + 100) },
+          },
+        ),
       )
 
       await expect(
         downloadPinnedEcdictInternal(paths, descriptor, { fetch: mockFetch as any }),
       ).rejects.toThrow(/exceeds authoritative corpus size/)
+
+      expect(cancelCalled).toBe(true)
+      const finalCachePath = join(paths.sourceCacheDirectory, 'ecdict.csv')
+      expect(existsSync(finalCachePath)).toBe(false)
+      const partFiles = readdirSync(paths.sourceCacheDirectory).filter((f) => f.includes('.part'))
+      expect(partFiles).toEqual([])
     } finally {
       cleanupTestPaths()
     }
@@ -782,10 +799,11 @@ describe('ECDICT secure downloader', () => {
   })
 
   describe('Remediation C: Independent hard streamed-byte ceiling & strict Content-Length', () => {
-    it('defines distinct EXPECTED_SOURCE_BYTES and MAX_STREAMED_SOURCE_BYTES', () => {
-      expect(EXPECTED_SOURCE_BYTES).toBe(65933428)
+    it('defines distinct manifest sourceByteSize and MAX_STREAMED_SOURCE_BYTES ceiling', () => {
+      const descriptor = loadPinnedEcdictSourceDescriptor()
+      expect(descriptor.sourceByteSize).toBe(65933428)
       expect(MAX_STREAMED_SOURCE_BYTES).toBe(80 * 1024 * 1024)
-      expect(MAX_STREAMED_SOURCE_BYTES).toBeGreaterThan(EXPECTED_SOURCE_BYTES)
+      expect(MAX_STREAMED_SOURCE_BYTES).toBeGreaterThan(descriptor.sourceByteSize)
     })
 
     it('rejects pre-network when descriptor expected size exceeds absolute ceiling (80 MiB)', async () => {
@@ -812,16 +830,28 @@ describe('ECDICT secure downloader', () => {
       setupTestPaths()
       try {
         const { descriptor } = createSyntheticDescriptor('test')
+        let cancelCalled = false
         const mockFetch = vi.fn().mockResolvedValueOnce(
-          new Response(createMockStream([Buffer.from('test')]), {
-            status: 200,
-            headers: { 'content-length': String(MAX_STREAMED_SOURCE_BYTES + 500) },
-          }),
+          new Response(
+            createMockStream([Buffer.from('test')], () => {
+              cancelCalled = true
+            }),
+            {
+              status: 200,
+              headers: { 'content-length': String(MAX_STREAMED_SOURCE_BYTES + 500) },
+            },
+          ),
         )
 
         await expect(
           downloadPinnedEcdictInternal(paths, descriptor, { fetch: mockFetch as any }),
         ).rejects.toThrow(/Content-Length.*exceeds maximum allowed ceiling of 83886080 bytes/)
+
+        expect(cancelCalled).toBe(true)
+        const finalCachePath = join(paths.sourceCacheDirectory, 'ecdict.csv')
+        expect(existsSync(finalCachePath)).toBe(false)
+        const partFiles = readdirSync(paths.sourceCacheDirectory).filter((f) => f.includes('.part'))
+        expect(partFiles).toEqual([])
       } finally {
         cleanupTestPaths()
       }
@@ -835,6 +865,103 @@ describe('ECDICT secure downloader', () => {
       expect(() => parseContentLengthHeader('-50')).toThrow(/Invalid Content-Length header value/)
       expect(() => parseContentLengthHeader('12.34')).toThrow(/Invalid Content-Length header value/)
       expect(() => parseContentLengthHeader('abc')).toThrow(/Invalid Content-Length header value/)
+    })
+
+    it('cancels response body and cleans up .part when Content-Length is malformed ("123garbage") without touching absent final', async () => {
+      setupTestPaths()
+      try {
+        const { descriptor } = createSyntheticDescriptor('test payload')
+        let cancelCalled = false
+        const mockFetch = vi.fn().mockResolvedValueOnce(
+          new Response(
+            createMockStream([Buffer.from('test payload')], () => {
+              cancelCalled = true
+            }),
+            {
+              status: 200,
+              headers: { 'content-length': '123garbage' },
+            },
+          ),
+        )
+
+        await expect(
+          downloadPinnedEcdictInternal(paths, descriptor, { fetch: mockFetch as any }),
+        ).rejects.toThrow(/Invalid Content-Length header value: "123garbage"/)
+
+        expect(cancelCalled).toBe(true)
+        const finalCachePath = join(paths.sourceCacheDirectory, 'ecdict.csv')
+        expect(existsSync(finalCachePath)).toBe(false)
+        const partFiles = readdirSync(paths.sourceCacheDirectory).filter((f) => f.includes('.part'))
+        expect(partFiles).toEqual([])
+      } finally {
+        cleanupTestPaths()
+      }
+    })
+
+    it('cancels response body, cleans up .part, and preserves existing invalid final cache byte-for-byte on malformed Content-Length', async () => {
+      setupTestPaths()
+      try {
+        const { descriptor } = createSyntheticDescriptor('test payload')
+        const finalCachePath = join(paths.sourceCacheDirectory, 'ecdict.csv')
+        const corruptedFinal = Buffer.from('preserved corrupted final bytes sequence')
+        writeFileSync(finalCachePath, corruptedFinal)
+
+        let cancelCalled = false
+        const mockFetch = vi.fn().mockResolvedValueOnce(
+          new Response(
+            createMockStream([Buffer.from('test payload')], () => {
+              cancelCalled = true
+            }),
+            {
+              status: 200,
+              headers: { 'content-length': '-50' },
+            },
+          ),
+        )
+
+        await expect(
+          downloadPinnedEcdictInternal(paths, descriptor, { fetch: mockFetch as any }),
+        ).rejects.toThrow(/Invalid Content-Length header value: "-50"/)
+
+        expect(cancelCalled).toBe(true)
+        expect(existsSync(finalCachePath)).toBe(true)
+        expect(readFileSync(finalCachePath)).toEqual(corruptedFinal)
+        const partFiles = readdirSync(paths.sourceCacheDirectory).filter((f) => f.includes('.part'))
+        expect(partFiles).toEqual([])
+      } finally {
+        cleanupTestPaths()
+      }
+    })
+
+    it('cancels response body and cleans up .part when Content-Length is an unsafe integer', async () => {
+      setupTestPaths()
+      try {
+        const { descriptor } = createSyntheticDescriptor('test payload')
+        let cancelCalled = false
+        const mockFetch = vi.fn().mockResolvedValueOnce(
+          new Response(
+            createMockStream([Buffer.from('test payload')], () => {
+              cancelCalled = true
+            }),
+            {
+              status: 200,
+              headers: { 'content-length': '9007199254740992' },
+            },
+          ),
+        )
+
+        await expect(
+          downloadPinnedEcdictInternal(paths, descriptor, { fetch: mockFetch as any }),
+        ).rejects.toThrow(/Content-Length value out of safe integer range/)
+
+        expect(cancelCalled).toBe(true)
+        const finalCachePath = join(paths.sourceCacheDirectory, 'ecdict.csv')
+        expect(existsSync(finalCachePath)).toBe(false)
+        const partFiles = readdirSync(paths.sourceCacheDirectory).filter((f) => f.includes('.part'))
+        expect(partFiles).toEqual([])
+      } finally {
+        cleanupTestPaths()
+      }
     })
 
     it('rejects in stream loop with explicit security ceiling error when bytes exceed 80 MiB', async () => {

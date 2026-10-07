@@ -28,8 +28,6 @@ import { type EcdictSourceDescriptor } from './ecdict-source.js';
 import type { ManagedStoragePaths } from './managed-storage.js';
 /** Maximum permitted redirects before failing closed. */
 export declare const MAX_REDIRECTS = 3;
-/** Authoritative exact expected byte size of the packaged pinned ECDICT corpus (65,933,428 bytes). */
-export declare const EXPECTED_SOURCE_BYTES = 65933428;
 /**
  * Independent hard security ceiling on any streamed source bytes (80 MiB = 83,886,080 bytes).
  * Enforced unconditionally chunk-by-chunk during network retrieval to prevent resource exhaustion

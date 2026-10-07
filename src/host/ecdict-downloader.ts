@@ -40,9 +40,6 @@ import type { ManagedStoragePaths } from './managed-storage.js'
 /** Maximum permitted redirects before failing closed. */
 export const MAX_REDIRECTS = 3
 
-/** Authoritative exact expected byte size of the packaged pinned ECDICT corpus (65,933,428 bytes). */
-export const EXPECTED_SOURCE_BYTES = 65_933_428
-
 /**
  * Independent hard security ceiling on any streamed source bytes (80 MiB = 83,886,080 bytes).
  * Enforced unconditionally chunk-by-chunk during network retrieval to prevent resource exhaustion
@@ -570,7 +567,13 @@ export async function downloadPinnedEcdictInternal(
       // Early Content-Length check if present
       const clHeader = response.headers.get('content-length')
       if (clHeader !== null) {
-        const declaredLength = parseContentLengthHeader(clHeader)
+        let declaredLength: number | null
+        try {
+          declaredLength = parseContentLengthHeader(clHeader)
+        } catch (error) {
+          await response.body.cancel().catch(() => {})
+          throw error
+        }
         if (declaredLength !== null) {
           if (declaredLength > MAX_STREAMED_SOURCE_BYTES) {
             await response.body.cancel().catch(() => {})
