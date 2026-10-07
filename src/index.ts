@@ -84,6 +84,15 @@ import {
   type EcdictDownloadProgressPhase,
   type EcdictDownloadResult,
 } from './host/ecdict-downloader.js'
+import {
+  buildManagedEcdictDatabase,
+  EcdictImportInProgressError,
+  type BuildManagedEcdictDatabaseOptions,
+  type EcdictImportProgress,
+  type EcdictImportProgressCallback,
+  type EcdictImportProgressPhase,
+  type ManagedEcdictBuildResult,
+} from './host/ecdict-importer.js'
 import { LOOKUP_PATH } from './host/route.js'
 
 export { Config }
@@ -120,6 +129,13 @@ export {
   type EcdictDownloadProgressCallback,
   type EcdictDownloadProgressPhase,
   type EcdictDownloadResult,
+  buildManagedEcdictDatabase,
+  EcdictImportInProgressError,
+  type BuildManagedEcdictDatabaseOptions,
+  type EcdictImportProgress,
+  type EcdictImportProgressCallback,
+  type EcdictImportProgressPhase,
+  type ManagedEcdictBuildResult,
 }
 
 /** Package name; equals the Loader entry id and the settings namespace. */
