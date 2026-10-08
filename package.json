@@ -20,6 +20,7 @@
   "files": [
     "lib/index.js",
     "lib/client.js",
+    "lib/ecdict-integrity-worker.js",
     "cordis.patch.yml",
     "README.md",
     "LICENSE",

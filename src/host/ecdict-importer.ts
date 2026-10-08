@@ -30,6 +30,10 @@ import { link, mkdir, open, stat, unlink } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 
+import {
+  verifyCandidateDatabaseWithWorker,
+  type IntegrityVerificationResult,
+} from './ecdict-integrity-verifier.js'
 import { openProductionDictionary } from './corpus-db.js'
 import { StreamingCsvParser } from './csv-parser.js'
 import { loadPinnedEcdictSourceDescriptor, type EcdictSourceDescriptor } from './ecdict-source.js'
@@ -238,6 +242,13 @@ export interface BuildManagedEcdictDatabaseInternalOptions {
   readonly yieldFn?: () => Promise<void>
   /** @internal Custom candidate unlink hook for cleanup error testing (test only). */
   readonly unlinkFn?: (path: string) => Promise<void>
+  /** @internal Custom integrity verifier hook (test only). */
+  readonly integrityVerifier?: (
+    candidatePath: string,
+    signal?: AbortSignal,
+  ) => Promise<IntegrityVerificationResult>
+  /** @internal Custom worker URL for fault-injection testing (test only). */
+  readonly workerUrl?: URL
 }
 
 /** Set of normalized database directories currently being built in this process. */
@@ -934,43 +945,56 @@ export async function buildManagedEcdictDatabaseInternal(
     dbOpen = false
     await yieldToEventLoop()
 
-    // 11. Run full PRAGMA integrity_check synchronously on main thread using read-only connection
+    // 11. Run full PRAGMA integrity_check in static companion worker on isolated thread
     notifyProgress(options?.onProgress, { phase: 'validating' })
     checkAbort(signal)
     await yieldToEventLoop()
 
-    const validationDb = options?.sqliteFactory
-      ? options.sqliteFactory(candidatePath)
-      : new DatabaseSync(candidatePath, { readOnly: true })
     let integrityCheckDurationMs = 0
-    try {
+    if (options?.sqliteFactory) {
+      // Backward-compatible internal test seam: execute custom SQLite factory
+      const validationDb = options.sqliteFactory(candidatePath)
       try {
-        validationDb.exec('PRAGMA mmap_size = 268435456')
-        validationDb.exec('PRAGMA cache_size = -64000')
-      } catch {
-        // ignore if not supported
+        try {
+          validationDb.exec('PRAGMA mmap_size = 268435456')
+          validationDb.exec('PRAGMA cache_size = -64000')
+        } catch {
+          // ignore if not supported
+        }
+
+        checkAbort(signal)
+        const integrityStartNs = process.hrtime.bigint()
+        const rows = validationDb.prepare('PRAGMA integrity_check').all() as Record<string, unknown>[]
+        const integrityEndNs = process.hrtime.bigint()
+        integrityCheckDurationMs = Math.round(Number(integrityEndNs - integrityStartNs) / 1e6)
+
+        if (rows.length !== 1 || Object.values(rows[0] ?? {})[0] !== 'ok') {
+          const errorDetails = rows
+            .map((r) => String(Object.values(r)[0] ?? 'unknown integrity error'))
+            .join('; ')
+          throw new Error(
+            `Candidate SQLite PRAGMA integrity_check failed: ${errorDetails || 'empty result'}`,
+          )
+        }
+      } finally {
+        validationDb.close()
       }
-
-      checkAbort(signal)
-      const integrityStartNs = process.hrtime.bigint()
-      const rows = validationDb.prepare('PRAGMA integrity_check').all() as Record<string, unknown>[]
-      const integrityEndNs = process.hrtime.bigint()
-      integrityCheckDurationMs = Math.round(Number(integrityEndNs - integrityStartNs) / 1e6)
-
-      if (rows.length !== 1 || Object.values(rows[0] ?? {})[0] !== 'ok') {
-        const errorDetails = rows
-          .map((r) => String(Object.values(r)[0] ?? 'unknown integrity error'))
-          .join('; ')
-        throw new Error(
-          `Candidate SQLite PRAGMA integrity_check failed: ${errorDetails || 'empty result'}`,
-        )
-      }
-
-      phaseTimings['integrityCheck'] = integrityCheckDurationMs
-      checkAbort(signal)
-    } finally {
-      validationDb.close()
+    } else if (options?.integrityVerifier) {
+      // Internal test seam: execute injected verifier adapter
+      const verifierRes = await options.integrityVerifier(candidatePath, signal)
+      integrityCheckDurationMs = verifierRes.durationMs
+    } else {
+      // Production path: execute static companion worker in isolated thread
+      const verifierRes = await verifyCandidateDatabaseWithWorker(candidatePath, {
+        signal,
+        workerUrl: options?.workerUrl,
+      })
+      integrityCheckDurationMs = verifierRes.durationMs
     }
+
+    phaseTimings['integrityCheck'] = integrityCheckDurationMs
+    checkAbort(signal)
+    await yieldToEventLoop()
 
     checkAbort(signal)
     await yieldToEventLoop()
@@ -1160,8 +1184,14 @@ export async function buildManagedEcdictDatabaseInternal(
       dbOpen = false
     }
 
+    const workerTerminationFailed =
+      err instanceof Error &&
+      (err.message.includes('worker termination failed') ||
+        (err instanceof AggregateError &&
+          err.errors.some((e) => String(e).includes('worker termination failed'))))
+
     let cleanupError: unknown = null
-    if (!published && candidatePath !== null) {
+    if (!published && candidatePath !== null && !workerTerminationFailed) {
       try {
         await cleanupCandidateArtifacts(candidatePath, options?.unlinkFn)
       } catch (cErr) {

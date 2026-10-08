@@ -24,6 +24,7 @@
  * @module dsh-word-lookup/host/ecdict-importer
  */
 import { DatabaseSync } from 'node:sqlite';
+import { type IntegrityVerificationResult } from './ecdict-integrity-verifier.js';
 import { type EcdictSourceDescriptor } from './ecdict-source.js';
 import { type ManagedStoragePaths } from './managed-storage.js';
 import type { SqliteDictionary } from './sqlite-dictionary.js';
@@ -167,6 +168,10 @@ export interface BuildManagedEcdictDatabaseInternalOptions {
     readonly yieldFn?: () => Promise<void>;
     /** @internal Custom candidate unlink hook for cleanup error testing (test only). */
     readonly unlinkFn?: (path: string) => Promise<void>;
+    /** @internal Custom integrity verifier hook (test only). */
+    readonly integrityVerifier?: (candidatePath: string, signal?: AbortSignal) => Promise<IntegrityVerificationResult>;
+    /** @internal Custom worker URL for fault-injection testing (test only). */
+    readonly workerUrl?: URL;
 }
 /**
  * Generate a deterministic versioned safe managed database identity string.

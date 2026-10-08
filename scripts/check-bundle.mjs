@@ -17,6 +17,7 @@
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { auditHostWorkerUsage, auditCompanionWorker } from './store-worker-audit.mjs'
 
 /** Repository root, derived from this script's own location. */
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
@@ -78,8 +79,11 @@ const libEntries = readdirSync(join(ROOT, 'lib'), { withFileTypes: true })
   .map((entry) => entry.name)
   .sort()
 check(
-  'lib contains exactly the two emitted artifacts',
-  libEntries.length === 2 && libEntries.includes('client.js') && libEntries.includes('index.js'),
+  'lib contains exactly the approved emitted artifacts',
+  libEntries.length === 3 &&
+    libEntries.includes('client.js') &&
+    libEntries.includes('index.js') &&
+    libEntries.includes('ecdict-integrity-worker.js'),
   libEntries.join(', '),
 )
 check(
@@ -199,11 +203,25 @@ check(
   'host bundle imports no model provider package',
   !/from\s+"@deepseek-ai\/dsh-llm/.test(host) && !/dsh-llm-deepseek/.test(host),
 )
-check('host bundle contains no worker_threads', !host.includes('node:worker_threads') && !host.includes('worker_threads'))
-check('host bundle contains no Worker eval', !host.includes('eval: true') && !host.includes('new Worker'))
+const hostWorkerAudit = auditHostWorkerUsage(host)
+check(
+  'host bundle worker usage complies with Architecture Exception 1 & 2',
+  hostWorkerAudit.approved,
+  hostWorkerAudit.errors.join('; ') || `workerCount: ${hostWorkerAudit.workerCount}`,
+)
+check('host bundle contains no Worker eval', !host.includes('eval: true') && !host.includes('eval : true'))
+check('host bundle contains no eval() or Function()', !/\b(?:eval|Function)\s*\(/.test(host))
 check('host bundle contains no dynamic import', !/\bimport\s*\(/.test(host))
 check('host bundle contains no child_process', !host.includes('child_process'))
 check('host bundle contains no process.env', !host.includes('process.env'))
+
+const workerContent = read('lib/ecdict-integrity-worker.js')
+const companionAudit = auditCompanionWorker(workerContent)
+check(
+  'companion worker bundle contains no forbidden capabilities',
+  companionAudit.approved,
+  companionAudit.errors.join('; ') || 'clean companion worker',
+)
 
 // --- Phase 3: the dictionary lives on the host side and only there -----------
 // Phase 3 replaces the stub with a real SQLite store. The invariant that makes

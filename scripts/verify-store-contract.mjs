@@ -23,6 +23,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { dirname, join, posix } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { auditHostWorkerUsage, auditCompanionWorker } from './store-worker-audit.mjs'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 const CANONICAL_REPO = 'https://github.com/HaowenCang/dsh-word-lookup'
@@ -235,7 +236,7 @@ function checkPermissionSignals(source) {
   return { files, network, commands, credentials, protectedDsh }
 }
 
-function checkLocalModuleEvidence(source) {
+function checkLocalModuleEvidence(source, filePath) {
   const text = String(source ?? '')
   const code = javascriptCode(text)
   const pattern = /\b(?:from\s*|import\s*(?:\(\s*)?|require\s*\(\s*)['"]([^'"\r\n]+)['"]/g
@@ -246,11 +247,26 @@ function checkLocalModuleEvidence(source) {
   }
   const hasWorkerEval = /\b(?:new\s+)?Worker\s*\([^)]*?\beval\s*:\s*true/si.test(code)
     || /\beval\s*:\s*true\b/i.test(code)
-  const hasWorkerThreads = /(?:node:)?worker_threads/i.test(text)
-  const dynamic = /\b(?:eval|Function)\s*\(/.test(code)
+  let dynamic = /\b(?:eval|Function)\s*\(/.test(code)
     || hasWorkerEval
-    || hasWorkerThreads
     || /\bimport\s*\(/.test(code)
+
+  if (/(?:node:)?worker_threads/i.test(text)) {
+    if (filePath === 'lib/index.js') {
+      const hostAudit = auditHostWorkerUsage(text)
+      if (!hostAudit.approved) {
+        dynamic = true
+      }
+    } else if (filePath === 'lib/ecdict-integrity-worker.js') {
+      const workerAudit = auditCompanionWorker(text)
+      if (!workerAudit.approved) {
+        dynamic = true
+      }
+    } else {
+      dynamic = true
+    }
+  }
+
   return { references: [...new Set(references)], dynamic }
 }
 
@@ -384,7 +400,7 @@ export function runStoreContractCheck() {
     const content = readFileSync(fullPath, 'utf8')
 
     // Module evidence
-    const { references, dynamic } = checkLocalModuleEvidence(content)
+    const { references, dynamic } = checkLocalModuleEvidence(content, filePath)
     if (dynamic) cumulativeSignals.dynamic = true
 
     for (const ref of references) {
@@ -420,8 +436,8 @@ export function runStoreContractCheck() {
   addCheck('Permission files signal is PRESENT (expected SQLite capability)', cumulativeSignals.files)
   addCheck('Permission network signal is PRESENT (expected same-origin host route)', cumulativeSignals.network)
 
-  // 10. Phase 7A.5R regression rules: host production bundle cleanliness
-  let forbiddenWorkerThreads = []
+  // 10. Phase 7A.5R4 rules: worker threads usage strictly restricted to approved companion worker
+  let unapprovedWorkerUsage = []
   let forbiddenWorkerEval = []
   let forbiddenEvalOrFunction = []
   let forbiddenDynamicImport = []
@@ -435,7 +451,20 @@ export function runStoreContractCheck() {
     const content = readFileSync(fullPath, 'utf8')
     const code = javascriptCode(content)
 
-    if (/(?:node:)?worker_threads/i.test(content)) forbiddenWorkerThreads.push(filePath)
+    if (filePath === 'lib/index.js') {
+      const hostAudit = auditHostWorkerUsage(content)
+      if (!hostAudit.approved) {
+        unapprovedWorkerUsage.push(`lib/index.js: ${hostAudit.errors.join('; ')}`)
+      }
+    } else if (filePath === 'lib/ecdict-integrity-worker.js') {
+      const workerAudit = auditCompanionWorker(content)
+      if (!workerAudit.approved) {
+        unapprovedWorkerUsage.push(`lib/ecdict-integrity-worker.js: ${workerAudit.errors.join('; ')}`)
+      }
+    } else if (/(?:node:)?worker_threads/i.test(content)) {
+      unapprovedWorkerUsage.push(`${filePath}: unexpected worker_threads reference`)
+    }
+
     if (/\b(?:new\s+)?Worker\s*\([^)]*?\beval\s*:\s*true/si.test(code) || /\beval\s*:\s*true\b/i.test(code)) forbiddenWorkerEval.push(filePath)
     if (/\b(?:eval|Function)\s*\(/.test(code)) forbiddenEvalOrFunction.push(filePath)
     if (/\bimport\s*\(/.test(code)) forbiddenDynamicImport.push(filePath)
@@ -443,7 +472,14 @@ export function runStoreContractCheck() {
     if (/process\s*\.\s*env/i.test(code)) forbiddenProcessEnv.push(filePath)
   }
 
-  addCheck('Host production bundle contains no node:worker_threads (0)', forbiddenWorkerThreads.length === 0, forbiddenWorkerThreads.join(', '))
+  // Ensure companion worker file exists if referenced by host bundle
+  const hostReferencesWorker = packedFiles.includes('lib/index.js')
+  const companionWorkerPackaged = packedFiles.includes('lib/ecdict-integrity-worker.js')
+  if (hostReferencesWorker && !companionWorkerPackaged) {
+    unapprovedWorkerUsage.push('Host bundle references companion worker, but lib/ecdict-integrity-worker.js is missing from package')
+  }
+
+  addCheck('Worker threads usage restricted to approved companion worker (Architecture Exception 1 & 2)', unapprovedWorkerUsage.length === 0, unapprovedWorkerUsage.join(', '))
   addCheck('Host production bundle contains no Worker eval (0)', forbiddenWorkerEval.length === 0, forbiddenWorkerEval.join(', '))
   addCheck('Host production bundle contains no eval() or Function() (0)', forbiddenEvalOrFunction.length === 0, forbiddenEvalOrFunction.join(', '))
   addCheck('Host production bundle contains no dynamic import() (0)', forbiddenDynamicImport.length === 0, forbiddenDynamicImport.join(', '))

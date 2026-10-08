@@ -56,6 +56,9 @@ export default defineConfig([
     // The package's `exports["."]` addresses `./lib/index.js`; tsdown's default
     // for an ESM Node build is `.mjs`.
     outExtensions: () => ({ js: '.js' }),
+    define: {
+      __PROD_BUNDLE__: 'true',
+    },
     deps: {
       // Provided by the DSH host process. Bundling a second copy would make
       // this plugin's schema objects come from a different schemastery
@@ -89,5 +92,19 @@ export default defineConfig([
     },
     banner: BANNER,
     footer: FOOTER,
+  },
+  {
+    name: 'dsh-word-lookup-worker',
+    entry: { 'ecdict-integrity-worker': 'src/host/ecdict-integrity-worker.ts' },
+    outDir: 'lib',
+    format: 'esm',
+    platform: 'node',
+    target: 'node22',
+    dts: false,
+    clean: false,
+    outExtensions: () => ({ js: '.js' }),
+    deps: {
+      neverBundle: [/^node:/],
+    },
   },
 ])
