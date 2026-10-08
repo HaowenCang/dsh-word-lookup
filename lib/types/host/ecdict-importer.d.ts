@@ -76,6 +76,15 @@ export interface EcdictImportProgress {
  */
 export type EcdictImportProgressCallback = (progress: EcdictImportProgress) => void;
 /**
+ * Outcome of post-publication candidate file and sidecar cleanup.
+ */
+export interface PostPublicationCleanupResult {
+    /** Whether own candidate database file was confirmed unlinked and absent from disk. */
+    readonly candidateRemoved: boolean;
+    /** System error code if unlinking failed (e.g. `EPERM`, `EACCES`, `EBUSY`). */
+    readonly errorCode?: string;
+}
+/**
  * Immutable build outcome descriptor returned upon successful managed database publication.
  */
 export interface ManagedEcdictBuildResult {
@@ -115,6 +124,8 @@ export interface ManagedEcdictBuildResult {
     readonly integrityCheckDurationMs?: number;
     /** Detailed timing breakdown per build phase in milliseconds. */
     readonly phaseTimings?: Readonly<Record<string, number>>;
+    /** Post-publication candidate temporary file and sidecars cleanup outcome. */
+    readonly postPublicationCleanup: PostPublicationCleanupResult;
 }
 /**
  * Options for production {@link buildManagedEcdictDatabase}.

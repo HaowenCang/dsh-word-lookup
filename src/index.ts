@@ -92,6 +92,7 @@ import {
   type EcdictImportProgressCallback,
   type EcdictImportProgressPhase,
   type ManagedEcdictBuildResult,
+  type PostPublicationCleanupResult,
 } from './host/ecdict-importer.js'
 import { LOOKUP_PATH } from './host/route.js'
 
@@ -136,6 +137,7 @@ export {
   type EcdictImportProgressCallback,
   type EcdictImportProgressPhase,
   type ManagedEcdictBuildResult,
+  type PostPublicationCleanupResult,
 }
 
 /** Package name; equals the Loader entry id and the settings namespace. */

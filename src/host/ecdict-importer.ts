@@ -144,6 +144,16 @@ export interface EcdictImportProgress {
 export type EcdictImportProgressCallback = (progress: EcdictImportProgress) => void
 
 /**
+ * Outcome of post-publication candidate file and sidecar cleanup.
+ */
+export interface PostPublicationCleanupResult {
+  /** Whether own candidate database file was confirmed unlinked and absent from disk. */
+  readonly candidateRemoved: boolean
+  /** System error code if unlinking failed (e.g. `EPERM`, `EACCES`, `EBUSY`). */
+  readonly errorCode?: string
+}
+
+/**
  * Immutable build outcome descriptor returned upon successful managed database publication.
  */
 export interface ManagedEcdictBuildResult {
@@ -183,6 +193,8 @@ export interface ManagedEcdictBuildResult {
   readonly integrityCheckDurationMs?: number
   /** Detailed timing breakdown per build phase in milliseconds. */
   readonly phaseTimings?: Readonly<Record<string, number>>
+  /** Post-publication candidate temporary file and sidecars cleanup outcome. */
+  readonly postPublicationCleanup: PostPublicationCleanupResult
 }
 
 /**
@@ -818,6 +830,7 @@ export async function buildManagedEcdictDatabaseInternal(
     // 8. Streaming Logical Database Digest computation via StatementSync.iterate()
     checkAbort(signal)
     const logicalHash = createHash('sha256')
+    const logicalHashStartNs = process.hrtime.bigint()
 
     const dumpEntries = db.prepare(`
       SELECT word, phonetic, definition_en, translation_zh, pos, exchange, frequency
@@ -869,7 +882,6 @@ export async function buildManagedEcdictDatabaseInternal(
       }
     }
 
-    const logicalHashStart = Date.now()
     const dumpExamples = db.prepare(`
       SELECT id, headword, english, chinese, source, source_id, score
       FROM examples
@@ -894,7 +906,8 @@ export async function buildManagedEcdictDatabaseInternal(
     }
 
     const logicalSha256 = logicalHash.digest('hex').toLowerCase()
-    phaseTimings['logicalHashing'] = Date.now() - logicalHashStart
+    const logicalHashEndNs = process.hrtime.bigint()
+    phaseTimings['logicalHashing'] = Math.round(Number(logicalHashEndNs - logicalHashStartNs) / 1e6)
 
     // 9. Write authoritative metadata into candidate meta table
     checkAbort(signal)
@@ -919,7 +932,7 @@ export async function buildManagedEcdictDatabaseInternal(
     dbOpen = false
     await yieldToEventLoop()
 
-    // 11. Run PRAGMA integrity_check synchronously on main thread table by table with cooperative yielding
+    // 11. Run full PRAGMA integrity_check synchronously on main thread using read-only connection
     notifyProgress(options?.onProgress, { phase: 'validating' })
     checkAbort(signal)
     await yieldToEventLoop()
@@ -931,44 +944,28 @@ export async function buildManagedEcdictDatabaseInternal(
     try {
       try {
         validationDb.exec('PRAGMA mmap_size = 268435456')
+        validationDb.exec('PRAGMA cache_size = -64000')
       } catch {
         // ignore if not supported
       }
 
-      const tablesToCheck = ['meta', 'examples', 'forms']
-      for (const table of tablesToCheck) {
-        checkAbort(signal)
-        await yieldToEventLoop()
-
-        const integrityStart = Date.now()
-        const row = validationDb.prepare(`PRAGMA integrity_check(${table})`).get() as Record<string, unknown> | undefined
-        integrityCheckDurationMs += Date.now() - integrityStart
-
-        const val = Object.values(row ?? {})[0]
-        if (val !== 'ok') {
-          throw new Error(
-            `Candidate SQLite PRAGMA integrity_check failed: ${String(val)}`,
-          )
-        }
-      }
-
       checkAbort(signal)
-      await yieldToEventLoop()
+      const integrityStartNs = process.hrtime.bigint()
+      const rows = validationDb.prepare('PRAGMA integrity_check').all() as Record<string, unknown>[]
+      const integrityEndNs = process.hrtime.bigint()
+      integrityCheckDurationMs = Math.round(Number(integrityEndNs - integrityStartNs) / 1e6)
 
-      const entriesCheckStart = Date.now()
-      const entriesRow = validationDb.prepare('PRAGMA quick_check(entries)').get() as Record<string, unknown> | undefined
-      integrityCheckDurationMs += Date.now() - entriesCheckStart
-
-      const entriesVal = Object.values(entriesRow ?? {})[0]
-      if (entriesVal !== 'ok') {
+      if (rows.length !== 1 || Object.values(rows[0] ?? {})[0] !== 'ok') {
+        const errorDetails = rows
+          .map((r) => String(Object.values(r)[0] ?? 'unknown integrity error'))
+          .join('; ')
         throw new Error(
-          `Candidate SQLite PRAGMA integrity_check failed: ${String(entriesVal)}`,
+          `Candidate SQLite PRAGMA integrity_check failed: ${errorDetails || 'empty result'}`,
         )
       }
-      phaseTimings['integrityCheck'] = integrityCheckDurationMs
 
+      phaseTimings['integrityCheck'] = integrityCheckDurationMs
       checkAbort(signal)
-      await yieldToEventLoop()
     } finally {
       validationDb.close()
     }
@@ -1030,12 +1027,60 @@ export async function buildManagedEcdictDatabaseInternal(
     published = true
     phaseTimings['publication'] = Date.now() - pubStart
 
-    // Clean up own candidate temp name after committed publication
-    try {
-      await unlink(candidatePath)
-    } catch {
-      // Publication committed; candidate temp unlink failure must not delete final
+    // Clean up own candidate temp file and sidecars after committed publication
+    let candidateRemoved = false
+    let cleanupErrorCode: string | undefined
+
+    const candidateUnlinkFn = options?.unlinkFn ?? unlink
+
+    // Clean up sidecars if any exist
+    const sidecarSuffixes = ['-journal', '-wal', '-shm']
+    for (const suffix of sidecarSuffixes) {
+      try {
+        await candidateUnlinkFn(candidatePath + suffix)
+      } catch (scErr: any) {
+        if (scErr?.code !== 'ENOENT') {
+          if (!cleanupErrorCode) {
+            cleanupErrorCode = typeof scErr?.code === 'string' ? scErr.code : 'UNKNOWN'
+          }
+        }
+      }
     }
+
+    // Bounded retries for candidate file cleanup
+    const MAX_CLEANUP_ATTEMPTS = 3
+    for (let attempt = 1; attempt <= MAX_CLEANUP_ATTEMPTS; attempt++) {
+      try {
+        await candidateUnlinkFn(candidatePath)
+        if (!existsSync(candidatePath)) {
+          candidateRemoved = true
+          cleanupErrorCode = undefined
+          break
+        }
+      } catch (unlinkErr: any) {
+        if (unlinkErr?.code === 'ENOENT') {
+          if (!existsSync(candidatePath)) {
+            candidateRemoved = true
+            cleanupErrorCode = undefined
+            break
+          } else {
+            cleanupErrorCode = 'ENOENT'
+          }
+        } else {
+          cleanupErrorCode = typeof unlinkErr?.code === 'string' ? unlinkErr.code : 'UNKNOWN'
+        }
+      }
+
+      if (attempt < MAX_CLEANUP_ATTEMPTS) {
+        await yieldToEventLoop()
+      }
+    }
+
+    const postPublicationCleanup: PostPublicationCleanupResult = Object.freeze(
+      cleanupErrorCode || !candidateRemoved
+        ? { candidateRemoved: false, errorCode: cleanupErrorCode ?? 'UNKNOWN' }
+        : { candidateRemoved: true },
+    )
 
     notifyProgress(options?.onProgress, {
       phase: 'complete',
@@ -1062,6 +1107,7 @@ export async function buildManagedEcdictDatabaseInternal(
       yieldCount,
       integrityCheckDurationMs,
       phaseTimings: Object.freeze({ ...phaseTimings }),
+      postPublicationCleanup,
     })
   } catch (err) {
     if (inTx) {

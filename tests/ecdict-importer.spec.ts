@@ -142,6 +142,7 @@ describe('ECDICT Runtime Streaming Importer', () => {
       expect(existsSync(result.path)).toBe(true)
       expect(result.fileSha256).toMatch(/^[0-9a-f]{64}$/)
       expect(result.logicalSha256).toMatch(/^[0-9a-f]{64}$/)
+      expect(result.postPublicationCleanup).toEqual({ candidateRemoved: true })
 
       // Progress lifecycle verification
       const phases = progressEvents.map((e) => e.phase)
@@ -825,15 +826,17 @@ describe('ECDICT Runtime Streaming Importer', () => {
       const sourceFile = join(paths.sourceCacheDirectory, 'ecdict.csv')
       writeFileSync(sourceFile, rawBytes)
 
-      // Mock sqlite factory that returns a DB where integrity_check is hijacked or corrupt
+      const preparedSql: string[] = []
+      // Mock sqlite factory that returns a DB where integrity_check reports corruption
       const customFactory = (dbPath: string): DatabaseSync => {
         const realDb = new DatabaseSync(dbPath)
         const origPrepare = realDb.prepare.bind(realDb)
         realDb.prepare = (sql: string) => {
-          if (sql.includes('integrity_check')) {
+          preparedSql.push(sql)
+          if (sql === 'PRAGMA integrity_check') {
             return {
-              all: () => [{ integrity_check: 'corruption detected!' }],
-              get: () => ({ integrity_check: 'corruption detected!' }),
+              all: () => [{ integrity_check: 'freelist page corruption' }],
+              get: () => ({ integrity_check: 'freelist page corruption' }),
             } as any
           }
           return origPrepare(sql)
@@ -848,10 +851,37 @@ describe('ECDICT Runtime Streaming Importer', () => {
           sqliteFactory: customFactory,
           verifyProbes: false,
         }),
-      ).rejects.toThrow(/PRAGMA integrity_check/)
+      ).rejects.toThrow(/PRAGMA integrity_check failed: freelist page corruption/)
 
+      expect(preparedSql).toContain('PRAGMA integrity_check')
+
+      // Own candidate is cleaned up and final is absent
       const dbFiles = readdirSync(paths.databaseDirectory)
       expect(dbFiles).toEqual([])
+
+      // Concurrency lock is released: subsequent run is not blocked by activeImports
+      const secondFactory = (dbPath: string): DatabaseSync => {
+        const realDb = new DatabaseSync(dbPath)
+        const origPrepare = realDb.prepare.bind(realDb)
+        realDb.prepare = (sql: string) => {
+          if (sql === 'PRAGMA integrity_check') {
+            return {
+              all: () => [{ integrity_check: 'still corrupted' }],
+            } as any
+          }
+          return origPrepare(sql)
+        }
+        return realDb
+      }
+
+      await expect(
+        buildManagedEcdictDatabaseInternal(paths, {
+          descriptor,
+          sourcePath: sourceFile,
+          sqliteFactory: secondFactory,
+          verifyProbes: false,
+        }),
+      ).rejects.toThrow(/PRAGMA integrity_check failed/)
     } finally {
       cleanupTestPaths()
     }
@@ -981,6 +1011,212 @@ describe('ECDICT Runtime Streaming Importer', () => {
       expect(caughtError).toBeDefined()
       expect(caughtError instanceof AggregateError).toBe(true)
       expect((caughtError as AggregateError).errors.some((e: any) => e.code === 'EPERM')).toBe(true)
+    } finally {
+      cleanupTestPaths()
+    }
+  })
+
+  it('executes full PRAGMA integrity_check statement without table filters or quick_check', async () => {
+    setupTestPaths()
+    try {
+      const csv = createSyntheticCsv([['apple', '', '', '', '', '', '', '', '', '', 'p:apples', '', '']])
+      const { descriptor, rawBytes } = createSyntheticDescriptor(csv)
+      const sourceFile = join(paths.sourceCacheDirectory, 'ecdict.csv')
+      writeFileSync(sourceFile, rawBytes)
+
+      const preparedSql: string[] = []
+      const customFactory = (dbPath: string): DatabaseSync => {
+        const realDb = new DatabaseSync(dbPath)
+        const origPrepare = realDb.prepare.bind(realDb)
+        realDb.prepare = (sql: string) => {
+          preparedSql.push(sql)
+          return origPrepare(sql)
+        }
+        return realDb
+      }
+
+      const result = await buildManagedEcdictDatabaseInternal(paths, {
+        descriptor,
+        sourcePath: sourceFile,
+        sqliteFactory: customFactory,
+        verifyProbes: false,
+      })
+
+      expect(preparedSql).toContain('PRAGMA integrity_check')
+      expect(preparedSql.some((s) => s.includes('quick_check'))).toBe(false)
+      expect(preparedSql.some((s) => s.includes('integrity_check('))).toBe(false)
+      expect(typeof result.integrityCheckDurationMs).toBe('number')
+      expect(result.integrityCheckDurationMs).toBeGreaterThanOrEqual(0)
+    } finally {
+      cleanupTestPaths()
+    }
+  })
+
+  it('covers complete logical hashing duration in phase timings across entries, forms, and examples', async () => {
+    setupTestPaths()
+    try {
+      const rows: string[][] = []
+      for (let i = 0; i < 5; i++) {
+        rows.push([`word${i}`, '', '', '', '', '', '', '', '', '', `p:words${i}`, '', ''])
+      }
+      const csv = createSyntheticCsv(rows)
+      const { descriptor, rawBytes } = createSyntheticDescriptor(csv)
+      const sourceFile = join(paths.sourceCacheDirectory, 'ecdict.csv')
+      writeFileSync(sourceFile, rawBytes)
+
+      const ARTIFICIAL_DELAY_MS = 25
+      const delayedYield = async () => {
+        await new Promise((resolve) => setTimeout(resolve, ARTIFICIAL_DELAY_MS))
+      }
+
+      const result = await buildManagedEcdictDatabaseInternal(paths, {
+        descriptor,
+        sourcePath: sourceFile,
+        yieldInterval: 1, // yield on every iterated entry
+        yieldFn: delayedYield,
+        verifyProbes: false,
+      })
+
+      expect(typeof result.phaseTimings?.logicalHashing).toBe('number')
+      // Delayed yield is triggered during dumpEntries iteration, so logicalHashing must span it
+      expect(result.phaseTimings?.logicalHashing).toBeGreaterThanOrEqual(ARTIFICIAL_DELAY_MS)
+      expect(result.logicalSha256).toMatch(/^[0-9a-f]{64}$/)
+    } finally {
+      cleanupTestPaths()
+    }
+  })
+
+  it('completes normal publication with candidate unlinked and postPublicationCleanup.candidateRemoved = true', async () => {
+    setupTestPaths()
+    try {
+      const csv = createSyntheticCsv([['apple', '', '', '', '', '', '', '', '', '', '', '', '']])
+      const { descriptor, rawBytes } = createSyntheticDescriptor(csv)
+      const sourceFile = join(paths.sourceCacheDirectory, 'ecdict.csv')
+      writeFileSync(sourceFile, rawBytes)
+
+      const result = await buildManagedEcdictDatabaseInternal(paths, {
+        descriptor,
+        sourcePath: sourceFile,
+        verifyProbes: false,
+      })
+
+      expect(result.postPublicationCleanup).toBeDefined()
+      expect(result.postPublicationCleanup.candidateRemoved).toBe(true)
+      expect(result.postPublicationCleanup.errorCode).toBeUndefined()
+      expect(existsSync(result.path)).toBe(true)
+
+      const dirFiles = readdirSync(paths.databaseDirectory)
+      expect(dirFiles).toEqual([result.databaseFile])
+    } finally {
+      cleanupTestPaths()
+    }
+  })
+
+  it('retains published final and records cleanup error on post-publication unlink failure (EPERM)', async () => {
+    setupTestPaths()
+    try {
+      const csv = createSyntheticCsv([['apple', '', '', '', '', '', '', '', '', '', '', '', '']])
+      const { descriptor, rawBytes } = createSyntheticDescriptor(csv)
+      const sourceFile = join(paths.sourceCacheDirectory, 'ecdict.csv')
+      writeFileSync(sourceFile, rawBytes)
+
+      const failingUnlink = async (targetPath: string) => {
+        const err = new Error(`Simulated EPERM on ${targetPath}`) as any
+        err.code = 'EPERM'
+        throw err
+      }
+
+      const result = await buildManagedEcdictDatabaseInternal(paths, {
+        descriptor,
+        sourcePath: sourceFile,
+        verifyProbes: false,
+        unlinkFn: failingUnlink,
+      })
+
+      // Publication is committed, not rolled back
+      expect(result.postPublicationCleanup.candidateRemoved).toBe(false)
+      expect(result.postPublicationCleanup.errorCode).toBe('EPERM')
+      expect(existsSync(result.path)).toBe(true)
+
+      // Final file remains valid and SHA matches
+      const diskBytes = readFileSync(result.path)
+      const diskSha = createHash('sha256').update(diskBytes).digest('hex').toLowerCase()
+      expect(diskSha).toBe(result.fileSha256)
+
+      // Read-only opening succeeds
+      const checkDb = new DatabaseSync(result.path, { readOnly: true })
+      try {
+        const metaRow = checkDb.prepare('SELECT value FROM meta WHERE key = ?').get('corpus_name') as any
+        expect(metaRow?.value).toBe('ECDICT')
+      } finally {
+        checkDb.close()
+      }
+
+      // Concurrency lock is released: another import attempt runs and succeeds without EcdictImportInProgressError
+      const secondResult = await buildManagedEcdictDatabaseInternal(paths, {
+        descriptor,
+        sourcePath: sourceFile,
+        verifyProbes: false,
+      })
+      expect(secondResult.entryCount).toBe(1)
+    } finally {
+      cleanupTestPaths()
+    }
+  })
+
+  it('preserves foreign final byte-for-byte and cleans own candidate on pre-publication link collision (EEXIST)', async () => {
+    setupTestPaths()
+    try {
+      const csv = createSyntheticCsv([['apple', '', '', '', '', '', '', '', '', '', '', '', '']])
+      const { descriptor, rawBytes } = createSyntheticDescriptor(csv)
+      const sourceFile = join(paths.sourceCacheDirectory, 'ecdict.csv')
+      writeFileSync(sourceFile, rawBytes)
+
+      const fixedNonce = 'collision012'
+      const identity = generateManagedDatabaseIdentity(
+        descriptor.schemaVersion,
+        descriptor.sourceCommit,
+        descriptor.sourceSha256,
+        fixedNonce,
+      )
+      const finalTarget = managedDatabasePath(paths, identity)
+      const FOREIGN_PAYLOAD = 'FOREIGN_PRE_EXISTING_DATABASE_PAYLOAD'
+
+      let publishingFired = false
+      await expect(
+        buildManagedEcdictDatabaseInternal(paths, {
+          descriptor,
+          sourcePath: sourceFile,
+          generateNonce: () => fixedNonce,
+          verifyProbes: false,
+          onProgress: (p) => {
+            if (p.phase === 'publishing') {
+              publishingFired = true
+              writeFileSync(finalTarget, FOREIGN_PAYLOAD)
+            }
+          },
+        }),
+      ).rejects.toThrow(/EEXIST/)
+
+      expect(publishingFired).toBe(true)
+
+      // Foreign final is preserved byte-for-byte
+      expect(existsSync(finalTarget)).toBe(true)
+      expect(readFileSync(finalTarget, 'utf8')).toBe(FOREIGN_PAYLOAD)
+
+      // Candidate temp file was cleaned up: only the foreign final remains in directory
+      const dirFiles = readdirSync(paths.databaseDirectory)
+      expect(dirFiles).toEqual([managedDatabaseFileName(identity)])
+
+      // Concurrency lock is released: next attempt does not fail with in-progress error
+      await expect(
+        buildManagedEcdictDatabaseInternal(paths, {
+          descriptor,
+          sourcePath: sourceFile,
+          generateNonce: () => fixedNonce,
+          verifyProbes: false,
+        }),
+      ).rejects.toThrow(/Managed database already exists/)
     } finally {
       cleanupTestPaths()
     }
