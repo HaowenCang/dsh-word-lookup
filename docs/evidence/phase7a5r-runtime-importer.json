@@ -1,0 +1,139 @@
+{
+  "phase": "Phase 7A.5R",
+  "reportTitle": "Phase 7A.5R Runtime Importer Correctness, Publication, and Store Remediation Evidence",
+  "generatedAt": "2026-10-08T07:55:00.000Z",
+  "baselineGitSha": "99d1703e14e8f281a4c62cc4229e75c45272dcb8",
+  "testedCodeGitSha": "fc88d558f4293bdd8659c7e538ba7a69381dcdba",
+  "status": "PASS",
+  "platform": "win32",
+  "nodeVersion": "v24.13.0",
+  "package": {
+    "name": "dsh-word-lookup",
+    "version": "0.2.0",
+    "status": "unreleased",
+    "runtimeDependencies": 0,
+    "missingLocalModules": 0
+  },
+  "sourcePin": {
+    "sourceName": "ECDICT",
+    "repository": "https://github.com/skywind3000/ECDICT",
+    "commit": "bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b",
+    "tree": "5391888b55d09876e5ffa76604d525172a418f11",
+    "gitBlob": "c4ade63ea08cf39d9c3475e96929036d64d94c94",
+    "path": "ecdict.csv",
+    "byteSize": 65933428,
+    "sha256": "1a6947e04785db63613a92e14903cdae7954f7e84860b10e68e5c7cbb3f9c3cf",
+    "schemaVersion": 1,
+    "soleAuthoritativeSource": "corpus/ecdict.manifest.json"
+  },
+  "databaseArtifact": {
+    "fileName": "ecdict-s1-bc015ed2e24a-1a6947e04785-3e3378652afa.sqlite3",
+    "byteSize": 88354816,
+    "fileSha256": "5f2e9cc1abad6f88090628b052cdf439bc52e882ed9a9e7a43dbb91736a1f142",
+    "logicalSha256": "591e53bdd8e3d227fd92c21ce2cfe7d375fffcd90f97a9f6a64f7d26e7c78bd9",
+    "expectedHistoricalLogicalSha256": "591e53bdd8e3d227fd92c21ce2cfe7d375fffcd90f97a9f6a64f7d26e7c78bd9",
+    "logicalDigestExactMatch": true,
+    "entriesCount": 770611,
+    "formsCount": 57689,
+    "examplesCount": 0,
+    "ambiguousFormsCount": 463,
+    "rejectedRowsCount": 0,
+    "sourceRowsCount": 770611
+  },
+  "responsivenessGates": {
+    "peakRssMiB": 379.2,
+    "peakRssGateMiB": 512,
+    "peakRssPass": true,
+    "eventLoopDelayP99Ms": 32.15,
+    "eventLoopDelayP99GateMs": 100,
+    "eventLoopDelayP99Pass": true,
+    "eventLoopDelayMaxMs": 115.93,
+    "eventLoopDelayMaxGateMs": 500,
+    "eventLoopDelayMaxPass": true,
+    "contiguousStallMs": 96,
+    "contiguousStallGateMs": 1000,
+    "contiguousStallPass": true,
+    "throughputRowsPerSec": 89181,
+    "durationMs": 8641,
+    "cooperativeYieldCount": 1376,
+    "integrityCheckDurationMs": 188,
+    "phaseTimings": {
+      "entryImport": 3691,
+      "formResolution": 94,
+      "formInsertion": 141,
+      "indexCreation": 23,
+      "logicalHashing": 1,
+      "metadata": 0,
+      "integrityCheck": 188,
+      "fileSync": 30,
+      "productValidation": 13,
+      "physicalDigest": 169,
+      "publication": 1
+    }
+  },
+  "validationProbes": {
+    "canonicalProbesVerified": true,
+    "probes": [
+      "go",
+      "went",
+      "gone",
+      "tooth",
+      "teeth",
+      "derive",
+      "derived",
+      "conservation",
+      "wave",
+      "function",
+      "wave function",
+      "Wave Function",
+      "miss"
+    ],
+    "exactPrecedenceOverForms": true,
+    "caseInsensitiveMatching": true,
+    "morphologicalMappingsVerified": true
+  },
+  "remediationGuarantees": {
+    "exclusiveCandidateReservationWx": true,
+    "preDeletionUnownedDatabaseZero": true,
+    "sameDirectoryHardLinkLinearization": true,
+    "eexistFailClosedCollisionSafety": true,
+    "prePublicationMetadataComputation": true,
+    "synchronousMainThreadIntegrityCheck": true,
+    "zeroWorkerThreads": true,
+    "zeroWorkerEval": true,
+    "zeroDynamicImport": true,
+    "failClosedCandidateCleanup": true,
+    "aggregateErrorCleanupPropagation": true,
+    "enotdirBoundaryProtection": true,
+    "sameProcessConcurrencyLock": "EcdictImportInProgressError"
+  },
+  "validation": {
+    "typecheck": "PASS",
+    "unitTests": "PASS (33 files, 616 tests)",
+    "bundleStaticChecks": "PASS (99/99)",
+    "storeContract": "PASS (30/30)",
+    "credentialsScan": "PASS (450 files)",
+    "corpusRuntime": "PASS (12/12)",
+    "storageRuntime": "PASS (8/8)",
+    "browserAcceptance": "PASS (37/37)",
+    "ecdictDownloadRuntime": "PASS",
+    "ecdictImportRuntime": "PASS"
+  },
+  "bundleHashes": {
+    "host": {
+      "path": "lib/index.js",
+      "sha256": "2462a5f3cbe7d9d0cced54a066925d8657b97a3560f07fed4497c52a41c9a275"
+    },
+    "client": {
+      "path": "lib/client.js",
+      "sha256": "0f1d730f02232f0920b14f136018a55eb86f552e7f828eeafc3543a673318c41"
+    }
+  },
+  "boundaryInvariants": {
+    "dictionaryManagerActivation": false,
+    "activeJsonWritten": false,
+    "managementRestRoutes": false,
+    "settingsUiChanged": false,
+    "clientBundleUntouched": true
+  }
+}
