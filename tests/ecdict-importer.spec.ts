@@ -130,6 +130,11 @@ describe('ECDICT Runtime Streaming Importer', () => {
       expect(result.entryCount).toBe(2)
       expect(result.formCount).toBe(1)
       expect(result.exampleCount).toBe(0)
+      expect(result.ambiguousFormCount).toBe(0)
+      expect(result.rejectedRowCount).toBe(0)
+      expect(result.sourceRowCount).toBe(2)
+      expect(typeof result.integrityCheckDurationMs).toBe('number')
+      expect(result.integrityCheckDurationMs).toBeGreaterThanOrEqual(0)
       expect(result.schemaVersion).toBe(1)
       expect(result.sourceCommit).toBe(descriptor.sourceCommit)
       expect(result.sourceSha256).toBe(descriptor.sourceSha256)
@@ -679,6 +684,139 @@ describe('ECDICT Runtime Streaming Importer', () => {
     }
   })
 
+  it('enforces exclusive candidate ownership and preserves foreign pre-existing candidate on collision', async () => {
+    setupTestPaths()
+    try {
+      const csv = createSyntheticCsv([['word', '', '', '', '', '', '', '', '', '', '', '', '']])
+      const { descriptor, rawBytes } = createSyntheticDescriptor(csv)
+      const sourceFile = join(paths.sourceCacheDirectory, 'ecdict.csv')
+      writeFileSync(sourceFile, rawBytes)
+
+      const fixedNonce = 'fixednonce02'
+      const identity = generateManagedDatabaseIdentity(
+        descriptor.schemaVersion,
+        descriptor.sourceCommit,
+        descriptor.sourceSha256,
+        fixedNonce,
+      )
+      const finalFileName = managedDatabaseFileName(identity)
+      const collidedCandidateId = 'collided-candidate-id'
+      const candidateSentinelPath = join(
+        paths.databaseDirectory,
+        `${finalFileName}.tmp-${collidedCandidateId}`,
+      )
+      const sentinelBytes = 'SENTINEL_FOREIGN_CANDIDATE_BYTES_DO_NOT_TOUCH'
+      writeFileSync(candidateSentinelPath, sentinelBytes)
+
+      await expect(
+        buildManagedEcdictDatabaseInternal(paths, {
+          descriptor,
+          sourcePath: sourceFile,
+          generateNonce: () => fixedNonce,
+          generateCandidateId: () => collidedCandidateId,
+          verifyProbes: false,
+        }),
+      ).rejects.toThrow(/Candidate file reservation collision \(EEXIST\)/)
+
+      // Foreign pre-existing candidate remains byte-for-byte untouched
+      expect(existsSync(candidateSentinelPath)).toBe(true)
+      expect(readFileSync(candidateSentinelPath, 'utf8')).toBe(sentinelBytes)
+
+      // No final database published
+      const finalTarget = managedDatabasePath(paths, identity)
+      expect(existsSync(finalTarget)).toBe(false)
+    } finally {
+      cleanupTestPaths()
+    }
+  })
+
+  it('fails safely on publication-time final collision race and preserves foreign final bytes', async () => {
+    setupTestPaths()
+    try {
+      const csv = createSyntheticCsv([['word', '', '', '', '', '', '', '', '', '', '', '', '']])
+      const { descriptor, rawBytes } = createSyntheticDescriptor(csv)
+      const sourceFile = join(paths.sourceCacheDirectory, 'ecdict.csv')
+      writeFileSync(sourceFile, rawBytes)
+
+      const fixedNonce = 'fixednonce03'
+      const identity = generateManagedDatabaseIdentity(
+        descriptor.schemaVersion,
+        descriptor.sourceCommit,
+        descriptor.sourceSha256,
+        fixedNonce,
+      )
+      const finalTarget = managedDatabasePath(paths, identity)
+      const foreignFinalSentinel = 'FOREIGN_FINAL_DB_SENTINEL_DO_NOT_OVERWRITE'
+
+      // Simulate a concurrent process creating finalPath right during the validating phase
+      // (AFTER initial existsSync check has already passed)
+      let raceInjected = false
+      await expect(
+        buildManagedEcdictDatabaseInternal(paths, {
+          descriptor,
+          sourcePath: sourceFile,
+          generateNonce: () => fixedNonce,
+          verifyProbes: false,
+          onProgress: (p: EcdictImportProgress) => {
+            if (p.phase === 'validating' && !raceInjected) {
+              raceInjected = true
+              writeFileSync(finalTarget, foreignFinalSentinel)
+            }
+          },
+        }),
+      ).rejects.toThrow()
+
+      expect(raceInjected).toBe(true)
+      // Foreign final must remain byte-for-byte unchanged
+      expect(existsSync(finalTarget)).toBe(true)
+      expect(readFileSync(finalTarget, 'utf8')).toBe(foreignFinalSentinel)
+
+      // Candidate artifacts and sidecars cleaned up (only the foreign final remains)
+      const dbDirFiles = readdirSync(paths.databaseDirectory)
+      expect(dbDirFiles).toEqual([managedDatabaseFileName(identity)])
+
+      // active.json was not created
+      expect(existsSync(paths.activeMetadataPath)).toBe(false)
+    } finally {
+      cleanupTestPaths()
+    }
+  })
+
+  it('exposes ambiguousFormCount, rejectedRowCount, and timing breakdown in build result', async () => {
+    setupTestPaths()
+    try {
+      // 1 valid row, 1 duplicate row (rejected), and forms with ambiguous mappings
+      const csv = createSyntheticCsv([
+        ['apple', '', '', '', '', '', '', '', '', '', 'p:apples', '', ''],
+        ['apple', '', '', '', '', '', '', '', '', '', 'p:apples', '', ''], // Duplicate headword -> rejected
+        ['orange', '', '', '', '', '', '', '', '', '', 'p:apples', '', ''], // 'apples' mapped to both apple and orange -> ambiguous
+      ])
+      const { descriptor, rawBytes } = createSyntheticDescriptor(csv)
+      const sourceFile = join(paths.sourceCacheDirectory, 'ecdict.csv')
+      writeFileSync(sourceFile, rawBytes)
+
+      const result = await buildManagedEcdictDatabaseInternal(paths, {
+        descriptor,
+        sourcePath: sourceFile,
+        verifyProbes: false,
+      })
+
+      expect(result.entryCount).toBe(2) // apple + orange
+      expect(result.rejectedRowCount).toBe(1) // 1 duplicate rejected
+      expect(result.sourceRowCount).toBe(3)
+      expect(result.ambiguousFormCount).toBe(1) // 'apples' is ambiguous
+      expect(result.formCount).toBe(0) // 0 unambiguous forms
+      expect(typeof result.integrityCheckDurationMs).toBe('number')
+      expect(result.integrityCheckDurationMs).toBeGreaterThanOrEqual(0)
+      expect(result.phaseTimings).toBeDefined()
+      expect(typeof result.phaseTimings?.integrityCheck).toBe('number')
+      expect(typeof result.phaseTimings?.entryImport).toBe('number')
+      expect(typeof result.phaseTimings?.publication).toBe('number')
+    } finally {
+      cleanupTestPaths()
+    }
+  })
+
   it('cleans up candidate if PRAGMA integrity_check fails', async () => {
     setupTestPaths()
     try {
@@ -813,6 +951,39 @@ describe('ECDICT Runtime Streaming Importer', () => {
       },
     }
     expect(() => verifyCandidateProbes(incompleteDict as any)).toThrow(/probe word "go"/)
+  })
+
+  it('preserves cleanup failure when both import and cleanup fail', async () => {
+    setupTestPaths()
+    try {
+      const csv = createSyntheticCsv([['word', '', '', '', '', '', '', '', '', '', '', '', '']])
+      const { descriptor, rawBytes } = createSyntheticDescriptor(csv)
+      const sourceFile = join(paths.sourceCacheDirectory, 'ecdict.csv')
+      writeFileSync(sourceFile, rawBytes)
+
+      const failingUnlink = async () => {
+        const err = new Error('Simulated cleanup EPERM error') as any
+        err.code = 'EPERM'
+        throw err
+      }
+
+      let caughtError: any = null
+      try {
+        await buildManagedEcdictDatabaseInternal(paths, {
+          descriptor,
+          sourcePath: sourceFile,
+          verifyProbes: true, // Will fail on probes because synthetic CSV lacks probe words
+          unlinkFn: failingUnlink,
+        })
+      } catch (err) {
+        caughtError = err
+      }
+      expect(caughtError).toBeDefined()
+      expect(caughtError instanceof AggregateError).toBe(true)
+      expect((caughtError as AggregateError).errors.some((e: any) => e.code === 'EPERM')).toBe(true)
+    } finally {
+      cleanupTestPaths()
+    }
   })
 
   it('strictly adheres to Host startup boundary (apply() remains fixture-only)', () => {

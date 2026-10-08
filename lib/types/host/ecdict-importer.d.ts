@@ -97,6 +97,12 @@ export interface ManagedEcdictBuildResult {
     readonly formCount: number;
     /** Count of examples imported into `examples` table (0 for ECDICT). */
     readonly exampleCount: number;
+    /** Count of excluded ambiguous morphological forms colliding across headwords. */
+    readonly ambiguousFormCount: number;
+    /** Count of rejected rows during CSV parsing. */
+    readonly rejectedRowCount: number;
+    /** Count of all source CSV rows processed (valid + rejected). */
+    readonly sourceRowCount: number;
     /** Logical database SHA-256 digest computed across ordered tables. */
     readonly logicalSha256: string;
     /** Physical SQLite file SHA-256 digest. */
@@ -105,6 +111,10 @@ export interface ManagedEcdictBuildResult {
     readonly byteSize: number;
     /** Number of cooperative event-loop yields executed during the build. */
     readonly yieldCount: number;
+    /** Duration in milliseconds of synchronous PRAGMA integrity_check verification. */
+    readonly integrityCheckDurationMs?: number;
+    /** Detailed timing breakdown per build phase in milliseconds. */
+    readonly phaseTimings?: Readonly<Record<string, number>>;
 }
 /**
  * Options for production {@link buildManagedEcdictDatabase}.
@@ -134,12 +144,16 @@ export interface BuildManagedEcdictDatabaseInternalOptions {
     readonly yieldInterval?: number;
     /** @internal Custom nonce generator for identity (test only). */
     readonly generateNonce?: () => string;
+    /** @internal Custom candidate ID generator (test only). */
+    readonly generateCandidateId?: () => string;
     /** @internal Whether to execute standard probe lookups (defaults to true; set false for synthetic small tests). */
     readonly verifyProbes?: boolean;
     /** @internal Custom SQLite factory hook (test only). */
     readonly sqliteFactory?: (path: string) => DatabaseSync;
     /** @internal Custom yield function hook (test only). */
     readonly yieldFn?: () => Promise<void>;
+    /** @internal Custom candidate unlink hook for cleanup error testing (test only). */
+    readonly unlinkFn?: (path: string) => Promise<void>;
 }
 /**
  * Generate a deterministic versioned safe managed database identity string.

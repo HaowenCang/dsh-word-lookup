@@ -199,6 +199,11 @@ check(
   'host bundle imports no model provider package',
   !/from\s+"@deepseek-ai\/dsh-llm/.test(host) && !/dsh-llm-deepseek/.test(host),
 )
+check('host bundle contains no worker_threads', !host.includes('node:worker_threads') && !host.includes('worker_threads'))
+check('host bundle contains no Worker eval', !host.includes('eval: true') && !host.includes('new Worker'))
+check('host bundle contains no dynamic import', !/\bimport\s*\(/.test(host))
+check('host bundle contains no child_process', !host.includes('child_process'))
+check('host bundle contains no process.env', !host.includes('process.env'))
 
 // --- Phase 3: the dictionary lives on the host side and only there -----------
 // Phase 3 replaces the stub with a real SQLite store. The invariant that makes

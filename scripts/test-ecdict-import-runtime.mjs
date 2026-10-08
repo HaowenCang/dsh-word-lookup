@@ -57,6 +57,8 @@ const EXPECTED_LOGICAL_SHA = '591e53bdd8e3d227fd92c21ce2cfe7d375fffcd90f97a9f6a6
 const EXPECTED_ENTRIES = 770611
 const EXPECTED_FORMS = 57689
 const EXPECTED_EXAMPLES = 0
+const EXPECTED_AMBIGUOUS_FORMS = 463
+const EXPECTED_REJECTED_ROWS = 0
 
 /** Authoritative probe words required to be found in verified candidate databases. */
 const REQUIRED_PROBE_WORDS = [
@@ -298,11 +300,15 @@ async function run() {
     console.log(`  Entries:           ${buildResult.entryCount} (expected: ${EXPECTED_ENTRIES})`)
     console.log(`  Forms:             ${buildResult.formCount} (expected: ${EXPECTED_FORMS})`)
     console.log(`  Examples:          ${buildResult.exampleCount} (expected: ${EXPECTED_EXAMPLES})`)
+    console.log(`  Ambiguous forms:   ${buildResult.ambiguousFormCount} (expected: ${EXPECTED_AMBIGUOUS_FORMS})`)
+    console.log(`  Rejected rows:     ${buildResult.rejectedRowCount} (expected: ${EXPECTED_REJECTED_ROWS})`)
+    console.log(`  Source rows:       ${buildResult.sourceRowCount}`)
     console.log(`  Database File:     ${buildResult.databaseFile}`)
     console.log(`  Database Bytes:    ${buildResult.byteSize}`)
     console.log(`  File SHA-256:      ${buildResult.fileSha256}`)
     console.log(`  Logical SHA-256:   ${buildResult.logicalSha256}`)
     console.log(`  Cooperative Yields:${cooperativeYields}`)
+    console.log(`  Integrity Check:   ${buildResult.integrityCheckDurationMs}ms`)
     console.log(`  Peak RSS:          ${peakRssMiB} MiB`)
     console.log(`  Event-loop delay:  p50=${elP50Ms}ms, p95=${elP95Ms}ms, p99=${elP99Ms}ms, max=${elMaxMs}ms`)
     console.log(`  Heartbeat drift:   samples=${heartbeatSamples}, p95=${hbP95DriftMs}ms, max=${hbMaxDriftMs}ms\n`)
@@ -317,6 +323,16 @@ async function run() {
   }
   if (buildResult.exampleCount !== EXPECTED_EXAMPLES) {
     throw new Error(`Example count mismatch: expected ${EXPECTED_EXAMPLES}, got ${buildResult.exampleCount}`)
+  }
+  if (buildResult.ambiguousFormCount !== EXPECTED_AMBIGUOUS_FORMS) {
+    throw new Error(
+      `Ambiguous form count mismatch: expected ${EXPECTED_AMBIGUOUS_FORMS}, got ${buildResult.ambiguousFormCount}`,
+    )
+  }
+  if (buildResult.rejectedRowCount !== EXPECTED_REJECTED_ROWS) {
+    throw new Error(
+      `Rejected row count mismatch: expected ${EXPECTED_REJECTED_ROWS}, got ${buildResult.rejectedRowCount}`,
+    )
   }
   if (buildResult.logicalSha256 !== EXPECTED_LOGICAL_SHA) {
     throw new Error(
@@ -366,16 +382,6 @@ async function run() {
     console.log(`  Contiguous stall:    ${hbMaxDriftMs} ms < ${GATE_MAX_STALL_MS} ms -> ${gates.heartbeatMaxStall.pass ? 'PASS' : 'FAIL'}\n`)
   }
 
-  if (!gates.peakRss.pass) {
-    throw new Error(`Peak RSS ${peakRssMiB} MiB exceeded gate ${GATE_PEAK_RSS_MIB} MiB`)
-  }
-  if (!gates.eventLoopMax.pass) {
-    throw new Error(`Event-loop max delay ${elMaxMs} ms exceeded hard gate ${GATE_EVENT_LOOP_MAX_MS} ms`)
-  }
-  if (!gates.heartbeatMaxStall.pass) {
-    throw new Error(`Contiguous stall ${hbMaxDriftMs} ms exceeded hard gate ${GATE_MAX_STALL_MS} ms`)
-  }
-
   // 8. Scratch cleanup acceptance
   if (!json) console.log('[Step 5] Windows filesystem cleanup acceptance...')
   rmSync(scratchHome, { recursive: true, force: true })
@@ -385,6 +391,22 @@ async function run() {
   }
   if (!json) {
     console.log('  Scratch directory unlinked cleanly: 0 locked handles.\n')
+  }
+
+  // Defect F: Code-level assertions ensuring all four hard gates are strictly enforced
+  const requiredGateKeys = ['peakRss', 'eventLoopP99', 'eventLoopMax', 'heartbeatMaxStall']
+  for (const key of requiredGateKeys) {
+    if (!gates[key] || typeof gates[key].pass !== 'boolean') {
+      throw new Error(`Responsiveness gate verification incomplete: missing gate ${key}`)
+    }
+    if (!gates[key].pass) {
+      throw new Error(
+        `Responsiveness gate ${key} FAILED (value: ${gates[key].value}, limit: ${gates[key].limit})`,
+      )
+    }
+  }
+
+  if (!json) {
     console.log('=== ECDICT RUNTIME IMPORTER ACCEPTANCE: PASS ===\n')
   }
 
@@ -410,12 +432,17 @@ async function run() {
       entryCount: buildResult.entryCount,
       formCount: buildResult.formCount,
       exampleCount: buildResult.exampleCount,
+      ambiguousFormCount: buildResult.ambiguousFormCount,
+      rejectedRowCount: buildResult.rejectedRowCount,
+      sourceRowCount: buildResult.sourceRowCount,
     },
     timing: {
       durationMs,
       durationSec,
       rowsPerSec,
       cooperativeYields,
+      integrityCheckDurationMs: buildResult.integrityCheckDurationMs,
+      phaseTimings: buildResult.phaseTimings,
     },
     memory: {
       peakRssMiB,

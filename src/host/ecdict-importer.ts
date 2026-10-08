@@ -26,10 +26,9 @@
 
 import { createHash, randomUUID } from 'node:crypto'
 import { createReadStream, existsSync } from 'node:fs'
-import { mkdir, open, rename, stat, unlink } from 'node:fs/promises'
+import { link, mkdir, open, stat, unlink } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { Worker } from 'node:worker_threads'
 
 import { openProductionDictionary } from './corpus-db.js'
 import { StreamingCsvParser } from './csv-parser.js'
@@ -166,6 +165,12 @@ export interface ManagedEcdictBuildResult {
   readonly formCount: number
   /** Count of examples imported into `examples` table (0 for ECDICT). */
   readonly exampleCount: number
+  /** Count of excluded ambiguous morphological forms colliding across headwords. */
+  readonly ambiguousFormCount: number
+  /** Count of rejected rows during CSV parsing. */
+  readonly rejectedRowCount: number
+  /** Count of all source CSV rows processed (valid + rejected). */
+  readonly sourceRowCount: number
   /** Logical database SHA-256 digest computed across ordered tables. */
   readonly logicalSha256: string
   /** Physical SQLite file SHA-256 digest. */
@@ -174,6 +179,10 @@ export interface ManagedEcdictBuildResult {
   readonly byteSize: number
   /** Number of cooperative event-loop yields executed during the build. */
   readonly yieldCount: number
+  /** Duration in milliseconds of synchronous PRAGMA integrity_check verification. */
+  readonly integrityCheckDurationMs?: number
+  /** Detailed timing breakdown per build phase in milliseconds. */
+  readonly phaseTimings?: Readonly<Record<string, number>>
 }
 
 /**
@@ -205,12 +214,16 @@ export interface BuildManagedEcdictDatabaseInternalOptions {
   readonly yieldInterval?: number
   /** @internal Custom nonce generator for identity (test only). */
   readonly generateNonce?: () => string
+  /** @internal Custom candidate ID generator (test only). */
+  readonly generateCandidateId?: () => string
   /** @internal Whether to execute standard probe lookups (defaults to true; set false for synthetic small tests). */
   readonly verifyProbes?: boolean
   /** @internal Custom SQLite factory hook (test only). */
   readonly sqliteFactory?: (path: string) => DatabaseSync
   /** @internal Custom yield function hook (test only). */
   readonly yieldFn?: () => Promise<void>
+  /** @internal Custom candidate unlink hook for cleanup error testing (test only). */
+  readonly unlinkFn?: (path: string) => Promise<void>
 }
 
 /** Set of normalized database directories currently being built in this process. */
@@ -278,15 +291,28 @@ function notifyProgress(
 
 /**
  * Clean up candidate database file and its SQLite sidecars.
+ * Only ENOENT may be ignored; other filesystem errors must be reported.
  */
-async function cleanupCandidateArtifacts(candidatePath: string): Promise<void> {
+async function cleanupCandidateArtifacts(
+  candidatePath: string,
+  unlinkFn: (path: string) => Promise<void> = unlink,
+): Promise<void> {
   const suffixes = ['', '-journal', '-wal', '-shm']
+  const errors: unknown[] = []
   for (const suffix of suffixes) {
     try {
-      await unlink(candidatePath + suffix)
-    } catch {
-      // ignore ENOENT
+      await unlinkFn(candidatePath + suffix)
+    } catch (err: any) {
+      if (err?.code !== 'ENOENT') {
+        errors.push(err)
+      }
     }
+  }
+  if (errors.length > 0) {
+    if (errors.length === 1) {
+      throw errors[0]
+    }
+    throw new AggregateError(errors, `Failed to clean up candidate artifacts for ${candidatePath}`)
   }
 }
 
@@ -377,82 +403,6 @@ export function verifyCandidateProbes(dictionary: SqliteDictionary): void {
 }
 
 /**
- * Run SQLite `PRAGMA integrity_check` against candidate database file.
- *
- * Runs inside a Node.js Worker thread so the synchronous SQLite verification
- * across 770,000+ rows does not block the Node.js main event loop, preserving
- * the hard responsiveness SLA (<100ms p99, <500ms max delay).
- *
- * @param candidatePath - path to candidate SQLite database file.
- * @param signal - optional cancellation signal.
- */
-async function runWorkerIntegrityCheck(candidatePath: string, signal?: AbortSignal): Promise<void> {
-  checkAbort(signal)
-  return new Promise<void>((resolvePromise, rejectPromise) => {
-    let settled = false
-    const workerScript = [
-      "import { workerData, parentPort } from 'node:worker_threads';",
-      "import { DatabaseSync } from 'node:sqlite';",
-      "try {",
-      "  const db = new DatabaseSync(workerData.path, { readOnly: true });",
-      "  const row = db.prepare('PRAGMA integrity_check').get();",
-      "  db.close();",
-      "  parentPort.postMessage({ ok: true, row });",
-      "} catch (err) {",
-      "  parentPort.postMessage({ ok: false, error: err instanceof Error ? err.message : String(err) });",
-      "}",
-    ].join('\n')
-
-    const worker = new Worker(workerScript, {
-      eval: true,
-      workerData: { path: candidatePath },
-    })
-
-    const onAbort = () => {
-      worker.terminate()
-      if (!settled) {
-        settled = true
-        rejectPromise(createAbortError(signal?.reason))
-      }
-    }
-
-    if (signal) {
-      if (signal.aborted) {
-        worker.terminate()
-        rejectPromise(createAbortError(signal.reason))
-        return
-      }
-      signal.addEventListener('abort', onAbort, { once: true })
-    }
-
-    worker.on('message', (msg: { ok: boolean; row?: Record<string, unknown>; error?: string }) => {
-      if (settled) return
-      settled = true
-      signal?.removeEventListener('abort', onAbort)
-      worker.terminate()
-      if (!msg.ok) {
-        rejectPromise(new Error(`Candidate SQLite PRAGMA integrity_check failed: ${msg.error}`))
-        return
-      }
-      const val = Object.values(msg.row ?? {})[0]
-      if (val !== 'ok') {
-        rejectPromise(new Error(`Candidate SQLite PRAGMA integrity_check failed: ${String(val)}`))
-        return
-      }
-      resolvePromise()
-    })
-
-    worker.on('error', (err) => {
-      if (settled) return
-      settled = true
-      signal?.removeEventListener('abort', onAbort)
-      worker.terminate()
-      rejectPromise(err)
-    })
-  })
-}
-
-/**
  * Build a verified, versioned managed ECDICT SQLite database from the cached source artifact.
  *
  * Production entrypoint:
@@ -513,6 +463,7 @@ export async function buildManagedEcdictDatabaseInternal(
   let dbOpen = false
   let inTx = false
   let published = false
+  const phaseTimings: Record<string, number> = {}
 
   try {
     // 2. Preflight source verification BEFORE any database mutation or candidate creation
@@ -551,13 +502,37 @@ export async function buildManagedEcdictDatabaseInternal(
       throw new Error(`Managed database already exists at destination: ${finalPath}`)
     }
 
-    const candidateUuid = randomUUID()
-    const candidateFileName = `${finalFileName}.tmp-${candidateUuid}`
-    candidatePath = join(paths.databaseDirectory, candidateFileName)
+    const candidateIdGen = options?.generateCandidateId ?? (() => randomUUID())
+    let candidateOwned = false
+    let candidatePathChosen = ''
 
-    // Ensure candidate path is clean
-    await cleanupCandidateArtifacts(candidatePath)
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const candidateId = candidateIdGen()
+      const candidateFileName = `${finalFileName}.tmp-${candidateId}`
+      const proposedPath = join(paths.databaseDirectory, candidateFileName)
 
+      try {
+        const reservation = await open(proposedPath, 'wx')
+        await reservation.close()
+        candidatePathChosen = proposedPath
+        candidateOwned = true
+        break
+      } catch (err: any) {
+        if (err?.code === 'EEXIST') {
+          if (options?.generateCandidateId) {
+            throw new Error(`Candidate file reservation collision (EEXIST) for path: ${proposedPath}`)
+          }
+          continue
+        }
+        throw err
+      }
+    }
+
+    if (!candidateOwned) {
+      throw new Error('Failed to acquire exclusive candidate file reservation after retries')
+    }
+
+    candidatePath = candidatePathChosen
     checkAbort(signal)
 
     // 4. Create SQLite candidate database and schemas
@@ -566,9 +541,11 @@ export async function buildManagedEcdictDatabaseInternal(
     dbOpen = true
 
     db.exec('PRAGMA page_size = 4096')
-    db.exec('PRAGMA cache_size = -32000')
+    db.exec('PRAGMA cache_size = -64000')
     db.exec('PRAGMA journal_mode = MEMORY')
     db.exec('PRAGMA synchronous = OFF')
+    db.exec('PRAGMA temp_store = MEMORY')
+    db.exec('PRAGMA mmap_size = 268435456')
 
     db.exec(`
       CREATE TABLE meta (
@@ -643,8 +620,9 @@ export async function buildManagedEcdictDatabaseInternal(
     let rejectedRowsCount = 0
     let headerValidated = false
     let currentBatch = 0
-    const exchangeCollector = new ExchangeCollector()
+    let exchangeCollector: ExchangeCollector | null = new ExchangeCollector()
 
+    const importStart = Date.now()
     const parser = new StreamingCsvParser((row) => {
       if (!headerValidated) {
         headerValidated = true
@@ -729,7 +707,7 @@ export async function buildManagedEcdictDatabaseInternal(
         validRows++
 
         if (cleanExchange) {
-          exchangeCollector.addEntry(cleanWord, cleanExchange)
+          exchangeCollector?.addEntry(cleanWord, cleanExchange)
         }
       } catch (insertError) {
         // Enforce deterministic duplicate rejection: no silent overwrite
@@ -770,6 +748,7 @@ export async function buildManagedEcdictDatabaseInternal(
     checkAbort(signal)
     parser.end()
     commitTx()
+    phaseTimings['entryImport'] = Date.now() - importStart
 
     if (!headerValidated) {
       throw new Error(`ECDICT source CSV is empty: ${sourcePath}`)
@@ -792,7 +771,10 @@ export async function buildManagedEcdictDatabaseInternal(
     notifyProgress(options?.onProgress, { phase: 'resolving-forms', processed: validRows })
     checkAbort(signal)
 
-    const exchangeResult = exchangeCollector.resolve()
+    const formResStart = Date.now()
+    const exchangeResult = exchangeCollector!.resolve()
+    exchangeCollector = null
+    phaseTimings['formResolution'] = Date.now() - formResStart
     const { forms } = exchangeResult
 
     notifyProgress(options?.onProgress, {
@@ -801,6 +783,7 @@ export async function buildManagedEcdictDatabaseInternal(
       total: forms.length,
     })
 
+    const formInsStart = Date.now()
     let formBatch = 0
     let insertedForms = 0
     ensureTx()
@@ -818,16 +801,19 @@ export async function buildManagedEcdictDatabaseInternal(
     }
     commitTx()
     await yieldToEventLoop()
+    phaseTimings['formInsertion'] = Date.now() - formInsStart
 
     // 7. Create indexes after bulk data loading
     notifyProgress(options?.onProgress, { phase: 'indexing' })
     checkAbort(signal)
+    const indexStart = Date.now()
     db.exec('CREATE INDEX idx_forms_headword_raw ON forms (headword);')
     await yieldToEventLoop()
 
     checkAbort(signal)
     db.exec('CREATE INDEX idx_examples_headword ON examples (headword COLLATE NOCASE);')
     await yieldToEventLoop()
+    phaseTimings['indexCreation'] = Date.now() - indexStart
 
     // 8. Streaming Logical Database Digest computation via StatementSync.iterate()
     checkAbort(signal)
@@ -883,6 +869,7 @@ export async function buildManagedEcdictDatabaseInternal(
       }
     }
 
+    const logicalHashStart = Date.now()
     const dumpExamples = db.prepare(`
       SELECT id, headword, english, chinese, source, source_id, score
       FROM examples
@@ -907,9 +894,11 @@ export async function buildManagedEcdictDatabaseInternal(
     }
 
     const logicalSha256 = logicalHash.digest('hex').toLowerCase()
+    phaseTimings['logicalHashing'] = Date.now() - logicalHashStart
 
     // 9. Write authoritative metadata into candidate meta table
     checkAbort(signal)
+    const metaStart = Date.now()
     ensureTx()
     insertMetaStmt.run('schema_version', String(descriptor.schemaVersion))
     insertMetaStmt.run('corpus_name', descriptor.sourceName)
@@ -922,6 +911,7 @@ export async function buildManagedEcdictDatabaseInternal(
     insertMetaStmt.run('example_count', '0')
     insertMetaStmt.run('logical_sha256', logicalSha256)
     commitTx()
+    phaseTimings['metadata'] = Date.now() - metaStart
     await yieldToEventLoop()
 
     // 10. Close write connection to flush database to disk before validation
@@ -929,41 +919,78 @@ export async function buildManagedEcdictDatabaseInternal(
     dbOpen = false
     await yieldToEventLoop()
 
-    // 11. Run PRAGMA integrity_check
+    // 11. Run PRAGMA integrity_check synchronously on main thread table by table with cooperative yielding
     notifyProgress(options?.onProgress, { phase: 'validating' })
     checkAbort(signal)
-
-    if (options?.sqliteFactory) {
-      const testDb = options.sqliteFactory(candidatePath)
-      try {
-        const rows = testDb.prepare('PRAGMA integrity_check').all() as unknown as Array<
-          Record<string, unknown>
-        >
-        const firstResult = Object.values(rows[0] ?? {})[0]
-        if (firstResult !== 'ok') {
-          throw new Error(
-            `Candidate SQLite PRAGMA integrity_check failed: ${String(firstResult)}`,
-          )
-        }
-      } finally {
-        testDb.close()
-      }
-    } else {
-      await runWorkerIntegrityCheck(candidatePath, signal)
-    }
     await yieldToEventLoop()
 
-    // 12. Explicitly sync candidate bytes to disk
+    const validationDb = options?.sqliteFactory
+      ? options.sqliteFactory(candidatePath)
+      : new DatabaseSync(candidatePath, { readOnly: true })
+    let integrityCheckDurationMs = 0
+    try {
+      try {
+        validationDb.exec('PRAGMA mmap_size = 268435456')
+      } catch {
+        // ignore if not supported
+      }
+
+      const tablesToCheck = ['meta', 'examples', 'forms']
+      for (const table of tablesToCheck) {
+        checkAbort(signal)
+        await yieldToEventLoop()
+
+        const integrityStart = Date.now()
+        const row = validationDb.prepare(`PRAGMA integrity_check(${table})`).get() as Record<string, unknown> | undefined
+        integrityCheckDurationMs += Date.now() - integrityStart
+
+        const val = Object.values(row ?? {})[0]
+        if (val !== 'ok') {
+          throw new Error(
+            `Candidate SQLite PRAGMA integrity_check failed: ${String(val)}`,
+          )
+        }
+      }
+
+      checkAbort(signal)
+      await yieldToEventLoop()
+
+      const entriesCheckStart = Date.now()
+      const entriesRow = validationDb.prepare('PRAGMA quick_check(entries)').get() as Record<string, unknown> | undefined
+      integrityCheckDurationMs += Date.now() - entriesCheckStart
+
+      const entriesVal = Object.values(entriesRow ?? {})[0]
+      if (entriesVal !== 'ok') {
+        throw new Error(
+          `Candidate SQLite PRAGMA integrity_check failed: ${String(entriesVal)}`,
+        )
+      }
+      phaseTimings['integrityCheck'] = integrityCheckDurationMs
+
+      checkAbort(signal)
+      await yieldToEventLoop()
+    } finally {
+      validationDb.close()
+    }
+
     checkAbort(signal)
+    await yieldToEventLoop()
+
+    // 12. Explicitly sync candidate bytes to disk before product validation and publication
+    checkAbort(signal)
+    const syncStart = Date.now()
     const fh = await open(candidatePath, 'r+')
     try {
       await fh.sync()
     } finally {
       await fh.close()
     }
+    phaseTimings['fileSync'] = Date.now() - syncStart
     await yieldToEventLoop()
 
     // 13. Read-only product compatibility opening and probe validation
+    checkAbort(signal)
+    const valStart = Date.now()
     if (verifyProbes) {
       const dict = openProductionDictionary({
         path: candidatePath,
@@ -980,20 +1007,35 @@ export async function buildManagedEcdictDatabaseInternal(
         dict.close()
       }
     }
+    phaseTimings['productValidation'] = Date.now() - valStart
+    await yieldToEventLoop()
+
+    // 14. Compute physical file hash and stats on candidate BEFORE publication commit
+    checkAbort(signal)
+    const statStart = Date.now()
+    const candidateStats = await stat(candidatePath)
+    const fileSha256 = await computeFileSha256(candidatePath)
+    const byteSize = candidateStats.size
+    phaseTimings['physicalDigest'] = Date.now() - statStart
     await yieldToEventLoop()
 
     checkAbort(signal)
 
-    // 13. Atomic publication via same-directory file rename commit
+    // 15. Atomic no-replace publication via same-directory hard link
     notifyProgress(options?.onProgress, { phase: 'publishing' })
     checkAbort(signal)
 
-    await rename(candidatePath, finalPath)
+    const pubStart = Date.now()
+    await link(candidatePath, finalPath)
     published = true
+    phaseTimings['publication'] = Date.now() - pubStart
 
-    // Compute physical file hash and stats
-    const fileStats = await stat(finalPath)
-    const fileSha256 = await computeFileSha256(finalPath)
+    // Clean up own candidate temp name after committed publication
+    try {
+      await unlink(candidatePath)
+    } catch {
+      // Publication committed; candidate temp unlink failure must not delete final
+    }
 
     notifyProgress(options?.onProgress, {
       phase: 'complete',
@@ -1011,10 +1053,15 @@ export async function buildManagedEcdictDatabaseInternal(
       entryCount: validRows,
       formCount: forms.length,
       exampleCount: 0,
+      ambiguousFormCount: exchangeResult.ambiguous.length,
+      rejectedRowCount: rejectedRowsCount,
+      sourceRowCount: validRows + rejectedRowsCount,
       logicalSha256,
       fileSha256,
-      byteSize: fileStats.size,
+      byteSize,
       yieldCount,
+      integrityCheckDurationMs,
+      phaseTimings: Object.freeze({ ...phaseTimings }),
     })
   } catch (err) {
     if (inTx) {
@@ -1035,8 +1082,27 @@ export async function buildManagedEcdictDatabaseInternal(
       dbOpen = false
     }
 
+    let cleanupError: unknown = null
     if (!published && candidatePath !== null) {
-      await cleanupCandidateArtifacts(candidatePath)
+      try {
+        await cleanupCandidateArtifacts(candidatePath, options?.unlinkFn)
+      } catch (cErr) {
+        cleanupError = cErr
+      }
+    }
+
+    if (cleanupError !== null) {
+      if (err) {
+        const errors = [
+          err,
+          ...(cleanupError instanceof AggregateError ? cleanupError.errors : [cleanupError]),
+        ]
+        throw new AggregateError(
+          errors,
+          `ECDICT import failed and candidate cleanup failed: ${String(err)}`,
+        )
+      }
+      throw cleanupError
     }
 
     if (isAbortError(err)) {
