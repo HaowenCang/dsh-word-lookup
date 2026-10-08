@@ -309,7 +309,9 @@ async function run() {
     console.log(`  Logical SHA-256:   ${buildResult.logicalSha256}`)
     console.log(`  Cooperative Yields:${cooperativeYields}`)
     console.log(`  Integrity Check:   ${buildResult.integrityCheckDurationMs}ms`)
-    console.log(`  Cleanup:           candidateRemoved=${buildResult.postPublicationCleanup?.candidateRemoved}`)
+    console.log(
+      `  Cleanup:           candidateRemoved=${buildResult.postPublicationCleanup?.candidateRemoved}, sidecarsRemoved=${buildResult.postPublicationCleanup?.sidecarsRemoved}`,
+    )
     console.log(`  Peak RSS:          ${peakRssMiB} MiB`)
     console.log(`  Event-loop delay:  p50=${elP50Ms}ms, p95=${elP95Ms}ms, p99=${elP99Ms}ms, max=${elMaxMs}ms`)
     console.log(`  Heartbeat drift:   samples=${heartbeatSamples}, p95=${hbP95DriftMs}ms, max=${hbMaxDriftMs}ms\n`)
@@ -340,9 +342,12 @@ async function run() {
       `Logical SHA-256 digest mismatch! Expected ${EXPECTED_LOGICAL_SHA}, got ${buildResult.logicalSha256}`,
     )
   }
-  if (!buildResult.postPublicationCleanup?.candidateRemoved) {
+  const cleanupComplete =
+    Boolean(buildResult.postPublicationCleanup?.candidateRemoved) &&
+    Boolean(buildResult.postPublicationCleanup?.sidecarsRemoved)
+  if (!cleanupComplete) {
     throw new Error(
-      `Post-publication cleanup incomplete: candidate file was not removed (${JSON.stringify(buildResult.postPublicationCleanup)})`,
+      `Post-publication cleanup incomplete: candidate or sidecars were not removed (${JSON.stringify(buildResult.postPublicationCleanup)})`,
     )
   }
 
@@ -474,6 +479,8 @@ async function run() {
     },
     cleanup: {
       candidateRemoved: buildResult.postPublicationCleanup?.candidateRemoved,
+      sidecarsRemoved: buildResult.postPublicationCleanup?.sidecarsRemoved,
+      cleanupComplete,
       unlinkedCleanly: !scratchExists,
     },
   }

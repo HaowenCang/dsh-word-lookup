@@ -81,6 +81,8 @@ export type EcdictImportProgressCallback = (progress: EcdictImportProgress) => v
 export interface PostPublicationCleanupResult {
     /** Whether own candidate database file was confirmed unlinked and absent from disk. */
     readonly candidateRemoved: boolean;
+    /** Whether all candidate sidecars were confirmed absent or unlinked from disk. */
+    readonly sidecarsRemoved: boolean;
     /** System error code if unlinking failed (e.g. `EPERM`, `EACCES`, `EBUSY`). */
     readonly errorCode?: string;
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createHash, randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { unlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
@@ -142,7 +143,7 @@ describe('ECDICT Runtime Streaming Importer', () => {
       expect(existsSync(result.path)).toBe(true)
       expect(result.fileSha256).toMatch(/^[0-9a-f]{64}$/)
       expect(result.logicalSha256).toMatch(/^[0-9a-f]{64}$/)
-      expect(result.postPublicationCleanup).toEqual({ candidateRemoved: true })
+      expect(result.postPublicationCleanup).toEqual({ candidateRemoved: true, sidecarsRemoved: true })
 
       // Progress lifecycle verification
       const phases = progressEvents.map((e) => e.phase)
@@ -1086,7 +1087,7 @@ describe('ECDICT Runtime Streaming Importer', () => {
     }
   })
 
-  it('completes normal publication with candidate unlinked and postPublicationCleanup.candidateRemoved = true', async () => {
+  it('completes normal publication with candidate unlinked and postPublicationCleanup.candidateRemoved = true and sidecarsRemoved = true', async () => {
     setupTestPaths()
     try {
       const csv = createSyntheticCsv([['apple', '', '', '', '', '', '', '', '', '', '', '', '']])
@@ -1102,11 +1103,158 @@ describe('ECDICT Runtime Streaming Importer', () => {
 
       expect(result.postPublicationCleanup).toBeDefined()
       expect(result.postPublicationCleanup.candidateRemoved).toBe(true)
+      expect(result.postPublicationCleanup.sidecarsRemoved).toBe(true)
       expect(result.postPublicationCleanup.errorCode).toBeUndefined()
       expect(existsSync(result.path)).toBe(true)
 
       const dirFiles = readdirSync(paths.databaseDirectory)
       expect(dirFiles).toEqual([result.databaseFile])
+
+      // Published final valid
+      const checkDb = new DatabaseSync(result.path, { readOnly: true })
+      try {
+        const row = checkDb.prepare('SELECT COUNT(*) as c FROM entries').get() as any
+        expect(row?.c).toBe(1)
+      } finally {
+        checkDb.close()
+      }
+    } finally {
+      cleanupTestPaths()
+    }
+  })
+
+  it('records sidecar failure with sidecarsRemoved = false and preserves published final when sidecar unlink fails with EPERM', async () => {
+    setupTestPaths()
+    try {
+      const csv = createSyntheticCsv([['apple', '', '', '', '', '', '', '', '', '', '', '', '']])
+      const { descriptor, rawBytes } = createSyntheticDescriptor(csv)
+      const sourceFile = join(paths.sourceCacheDirectory, 'ecdict.csv')
+      writeFileSync(sourceFile, rawBytes)
+
+      const fixedCandidateId = 'sidecar-fail-test-id'
+      const fixedNonce = 'sidecar-fail-nonce'
+      const identity = generateManagedDatabaseIdentity(
+        descriptor.schemaVersion,
+        descriptor.sourceCommit,
+        descriptor.sourceSha256,
+        fixedNonce,
+      )
+      const finalFileName = managedDatabaseFileName(identity)
+      const candidateFileName = `${finalFileName}.tmp-${fixedCandidateId}`
+      const candidatePath = join(paths.databaseDirectory, candidateFileName)
+      const sidecarPath = candidatePath + '-journal'
+      const sidecarPayload = 'REAL_OBSERVABLE_SIDECAR_PAYLOAD'
+
+      const failingSidecarUnlink = async (targetPath: string) => {
+        if (targetPath.endsWith('-journal')) {
+          const err = new Error(`Simulated EPERM on ${targetPath}`) as any
+          err.code = 'EPERM'
+          throw err
+        }
+        await unlink(targetPath)
+      }
+
+      const result = await buildManagedEcdictDatabaseInternal(paths, {
+        descriptor,
+        sourcePath: sourceFile,
+        generateNonce: () => fixedNonce,
+        generateCandidateId: () => fixedCandidateId,
+        verifyProbes: false,
+        onProgress: (p) => {
+          if (p.phase === 'publishing') {
+            writeFileSync(sidecarPath, sidecarPayload)
+          }
+        },
+        unlinkFn: failingSidecarUnlink,
+      })
+
+      // Assertions:
+      // candidateRemoved = true
+      // sidecarsRemoved = false
+      // errorCode = EPERM
+      expect(result.postPublicationCleanup.candidateRemoved).toBe(true)
+      expect(result.postPublicationCleanup.sidecarsRemoved).toBe(false)
+      expect(result.postPublicationCleanup.errorCode).toBe('EPERM')
+
+      // published final exists
+      expect(existsSync(result.path)).toBe(true)
+
+      // published final SHA unchanged
+      const diskBytes = readFileSync(result.path)
+      const diskSha = createHash('sha256').update(diskBytes).digest('hex').toLowerCase()
+      expect(diskSha).toBe(result.fileSha256)
+
+      // failed sidecar remains observable
+      expect(existsSync(sidecarPath)).toBe(true)
+      expect(readFileSync(sidecarPath, 'utf8')).toBe(sidecarPayload)
+
+      // concurrency guard released
+      const secondResult = await buildManagedEcdictDatabaseInternal(paths, {
+        descriptor,
+        sourcePath: sourceFile,
+        verifyProbes: false,
+      })
+      expect(secondResult.entryCount).toBe(1)
+    } finally {
+      cleanupTestPaths()
+    }
+  })
+
+  it('records candidate failure with candidateRemoved = false and preserves published final when candidate unlink fails with EPERM', async () => {
+    setupTestPaths()
+    try {
+      const csv = createSyntheticCsv([['apple', '', '', '', '', '', '', '', '', '', '', '', '']])
+      const { descriptor, rawBytes } = createSyntheticDescriptor(csv)
+      const sourceFile = join(paths.sourceCacheDirectory, 'ecdict.csv')
+      writeFileSync(sourceFile, rawBytes)
+
+      const failingCandidateUnlink = async (targetPath: string) => {
+        if (!targetPath.endsWith('-journal') && !targetPath.endsWith('-wal') && !targetPath.endsWith('-shm')) {
+          const err = new Error(`Simulated EPERM on ${targetPath}`) as any
+          err.code = 'EPERM'
+          throw err
+        }
+        await unlink(targetPath)
+      }
+
+      const result = await buildManagedEcdictDatabaseInternal(paths, {
+        descriptor,
+        sourcePath: sourceFile,
+        verifyProbes: false,
+        unlinkFn: failingCandidateUnlink,
+      })
+
+      // Assertions:
+      // candidateRemoved = false
+      // sidecarsRemoved = true
+      // errorCode = EPERM
+      // published final remains valid
+      expect(result.postPublicationCleanup.candidateRemoved).toBe(false)
+      expect(result.postPublicationCleanup.sidecarsRemoved).toBe(true)
+      expect(result.postPublicationCleanup.errorCode).toBe('EPERM')
+      expect(existsSync(result.path)).toBe(true)
+
+      // Final file remains valid and SHA matches
+      const diskBytes = readFileSync(result.path)
+      const diskSha = createHash('sha256').update(diskBytes).digest('hex').toLowerCase()
+      expect(diskSha).toBe(result.fileSha256)
+
+      // Read-only opening succeeds
+      const checkDb = new DatabaseSync(result.path, { readOnly: true })
+      try {
+        const metaRow = checkDb.prepare('SELECT value FROM meta WHERE key = ?').get('corpus_name') as any
+        expect(metaRow?.value).toBe('ECDICT')
+      } finally {
+        checkDb.close()
+      }
+
+      // Concurrency lock is released: another import attempt runs and succeeds without EcdictImportInProgressError
+      const secondResult = await buildManagedEcdictDatabaseInternal(paths, {
+        descriptor,
+        sourcePath: sourceFile,
+        verifyProbes: false,
+      })
+      expect(secondResult.entryCount).toBe(1)
     } finally {
       cleanupTestPaths()
     }
@@ -1135,6 +1283,7 @@ describe('ECDICT Runtime Streaming Importer', () => {
 
       // Publication is committed, not rolled back
       expect(result.postPublicationCleanup.candidateRemoved).toBe(false)
+      expect(result.postPublicationCleanup.sidecarsRemoved).toBe(false)
       expect(result.postPublicationCleanup.errorCode).toBe('EPERM')
       expect(existsSync(result.path)).toBe(true)
 

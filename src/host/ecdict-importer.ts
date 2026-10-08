@@ -149,6 +149,8 @@ export type EcdictImportProgressCallback = (progress: EcdictImportProgress) => v
 export interface PostPublicationCleanupResult {
   /** Whether own candidate database file was confirmed unlinked and absent from disk. */
   readonly candidateRemoved: boolean
+  /** Whether all candidate sidecars were confirmed absent or unlinked from disk. */
+  readonly sidecarsRemoved: boolean
   /** System error code if unlinking failed (e.g. `EPERM`, `EACCES`, `EBUSY`). */
   readonly errorCode?: string
 }
@@ -1029,19 +1031,36 @@ export async function buildManagedEcdictDatabaseInternal(
 
     // Clean up own candidate temp file and sidecars after committed publication
     let candidateRemoved = false
-    let cleanupErrorCode: string | undefined
+    let sidecarsRemoved = true
+    let sidecarErrorCode: string | undefined
+    let candidateErrorCode: string | undefined
 
     const candidateUnlinkFn = options?.unlinkFn ?? unlink
 
     // Clean up sidecars if any exist
     const sidecarSuffixes = ['-journal', '-wal', '-shm']
     for (const suffix of sidecarSuffixes) {
+      const sidecarPath = candidatePath + suffix
       try {
-        await candidateUnlinkFn(candidatePath + suffix)
+        await candidateUnlinkFn(sidecarPath)
+        if (existsSync(sidecarPath)) {
+          sidecarsRemoved = false
+          if (!sidecarErrorCode) {
+            sidecarErrorCode = 'UNKNOWN'
+          }
+        }
       } catch (scErr: any) {
         if (scErr?.code !== 'ENOENT') {
-          if (!cleanupErrorCode) {
-            cleanupErrorCode = typeof scErr?.code === 'string' ? scErr.code : 'UNKNOWN'
+          sidecarsRemoved = false
+          if (!sidecarErrorCode) {
+            sidecarErrorCode = typeof scErr?.code === 'string' ? scErr.code : 'UNKNOWN'
+          }
+        } else {
+          if (existsSync(sidecarPath)) {
+            sidecarsRemoved = false
+            if (!sidecarErrorCode) {
+              sidecarErrorCode = 'ENOENT'
+            }
           }
         }
       }
@@ -1054,20 +1073,20 @@ export async function buildManagedEcdictDatabaseInternal(
         await candidateUnlinkFn(candidatePath)
         if (!existsSync(candidatePath)) {
           candidateRemoved = true
-          cleanupErrorCode = undefined
+          candidateErrorCode = undefined
           break
         }
       } catch (unlinkErr: any) {
         if (unlinkErr?.code === 'ENOENT') {
           if (!existsSync(candidatePath)) {
             candidateRemoved = true
-            cleanupErrorCode = undefined
+            candidateErrorCode = undefined
             break
           } else {
-            cleanupErrorCode = 'ENOENT'
+            candidateErrorCode = 'ENOENT'
           }
         } else {
-          cleanupErrorCode = typeof unlinkErr?.code === 'string' ? unlinkErr.code : 'UNKNOWN'
+          candidateErrorCode = typeof unlinkErr?.code === 'string' ? unlinkErr.code : 'UNKNOWN'
         }
       }
 
@@ -1076,10 +1095,23 @@ export async function buildManagedEcdictDatabaseInternal(
       }
     }
 
+    if (!candidateRemoved && !candidateErrorCode) {
+      candidateErrorCode = 'UNKNOWN'
+    }
+
+    const effectiveErrorCode = sidecarErrorCode ?? candidateErrorCode
+
     const postPublicationCleanup: PostPublicationCleanupResult = Object.freeze(
-      cleanupErrorCode || !candidateRemoved
-        ? { candidateRemoved: false, errorCode: cleanupErrorCode ?? 'UNKNOWN' }
-        : { candidateRemoved: true },
+      effectiveErrorCode || !candidateRemoved || !sidecarsRemoved
+        ? {
+            candidateRemoved,
+            sidecarsRemoved,
+            errorCode: effectiveErrorCode ?? 'UNKNOWN',
+          }
+        : {
+            candidateRemoved: true,
+            sidecarsRemoved: true,
+          },
     )
 
     notifyProgress(options?.onProgress, {
