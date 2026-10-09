@@ -1,0 +1,267 @@
+{
+  "phase": "Phase 7A.5R4.1",
+  "reportTitle": "Phase 7A.5R4.1 Worker Termination Safety, Concurrency Isolation & Acceptance Evidence Closure",
+  "generatedAt": "2026-10-09T09:05:42.000Z",
+  "baselineGitSha": "7db9a589e9ce833ef91d69acfe473fe2af09e18b",
+  "testedCodeGitSha": "41bd63f4cf68c3d2bc123bbceaff45302167bea8",
+  "status": "ACCEPTED",
+  "platform": "win32",
+  "nodeVersion": "v24.13.0",
+  "targetEnvironment": {
+    "dshVersion": "0.2.0-rc.2",
+    "dshUpstreamCommit": "639ed015397290b3745d163aafe02ffee4aa3f84",
+    "nodeVersion": "24.13.0",
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "Windows 11 (NT 10.0.26220.0)"
+  },
+  "package": {
+    "name": "dsh-word-lookup",
+    "version": "0.2.0",
+    "status": "unreleased",
+    "runtimeDependencies": 0,
+    "missingLocalModules": 0,
+    "packArtifactCount": 8,
+    "packFiles": [
+      "LICENSE",
+      "README.md",
+      "cordis.patch.yml",
+      "corpus/ecdict.manifest.json",
+      "lib/client.js",
+      "lib/ecdict-integrity-worker.js",
+      "lib/index.js",
+      "package.json"
+    ]
+  },
+  "defectsResolved": {
+    "defectAWorkerEventRacesAndTerminationTiming": {
+      "status": "RESOLVED",
+      "verifiedScenarios": [
+        "valid message -> late error -> termination: late isolate errors trapped without crashing process",
+        "valid message -> premature abnormal exit: premature non-zero worker exit rejects fail-closed",
+        "error and exit competing: single settlement preserved, worker terminated cleanly",
+        "abort and success message competing: abort signal race settles single outcome without unhandled rejections",
+        "timeout and worker error competing: timeout boundary race settles once fail-closed",
+        "worker.terminate() rejects: typed WorkerTerminationError distinguishes TERMINATION_UNCONFIRMED",
+        "worker.terminate() remains pending: bounded termination timeout prevents process hangs",
+        "duplicate IPC messages: secondary IPC responses discarded without multiple settlements"
+      ],
+      "testSuiteFile": "tests/worker-lifecycle-safety.spec.ts"
+    },
+    "defectBTerminationUnconfirmedConcurrencyIsolation": {
+      "status": "RESOLVED",
+      "verifiedScenarios": [
+        "terminate success -> cleanup -> guard released: clean worker termination releases directory lock",
+        "terminate rejection -> no unsafe cleanup: unconfirmed termination engages directory quarantine guard",
+        "termination unconfirmed -> concurrent import rejected: subsequent imports blocked with EcdictImportQuarantinedError",
+        "verified termination -> safe recovery: recoverQuarantinedDirectory cleans candidate and releases quarantine without silent deadlock",
+        "error aggregation preserved: AggregateError preserves underlying check error and termination error",
+        "foreign files untouched: pre-existing foreign files in database directory remain completely intact"
+      ],
+      "testSuiteFile": "tests/ecdict-concurrency-quarantine.spec.ts"
+    },
+    "defectCandidatePathBoundaryProtection": {
+      "status": "RESOLVED",
+      "verifiedScenarios": [
+        "candidate path containment within target managed database directory",
+        "candidate filename contract enforcement via CANDIDATE_DATABASE_FILENAME_PATTERN",
+        "parent directory traversal rejection (.. disallowed)",
+        "symbolic link and junction rejection fail-closed",
+        "pre-publication validation ensures no unverified file can be linked"
+      ],
+      "validatorFunction": "validateCandidateDatabasePath"
+    },
+    "defectRealNpmTarballInstallationVerification": {
+      "status": "RESOLVED",
+      "verifiedScenarios": [
+        "npm pack executed into isolated disposable directory",
+        "unpacked artifacts from generated .tgz verified for Host, Client, Worker, and manifest",
+        "static Worker URL resolved from installed Host bundle directory",
+        "real SQLite candidate PRAGMA integrity_check executed by unpacked Worker",
+        "SQLite OS file handle release verified via post-termination candidate unlink",
+        "complete cleanup of disposable directory verified"
+      ],
+      "testSuiteFile": "tests/npm-tarball-worker-verification.spec.ts"
+    }
+  },
+  "sourcePin": {
+    "sourceName": "ECDICT",
+    "repository": "https://github.com/skywind3000/ECDICT",
+    "commit": "bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b",
+    "tree": "5391888b55d09876e5ffa76604d525172a418f11",
+    "gitBlob": "c4ade63ea08cf39d9c3475e96929036d64d94c94",
+    "path": "ecdict.csv",
+    "byteSize": 65933428,
+    "sha256": "1a6947e04785db63613a92e14903cdae7954f7e84860b10e68e5c7cbb3f9c3cf",
+    "schemaVersion": 1,
+    "soleAuthoritativeSource": "corpus/ecdict.manifest.json"
+  },
+  "databaseArtifact": {
+    "byteSize": 88354816,
+    "fileSha256": "5f2e9cc1abad6f88090628b052cdf439bc52e882ed9a9e7a43dbb91736a1f142",
+    "logicalSha256": "591e53bdd8e3d227fd92c21ce2cfe7d375fffcd90f97a9f6a64f7d26e7c78bd9",
+    "expectedLogicalSha256": "591e53bdd8e3d227fd92c21ce2cfe7d375fffcd90f97a9f6a64f7d26e7c78bd9",
+    "logicalDigestExactMatch": true,
+    "entriesCount": 770611,
+    "formsCount": 57689,
+    "examplesCount": 0,
+    "ambiguousFormsCount": 463,
+    "rejectedRowsCount": 0,
+    "sourceRowsCount": 770611,
+    "postPublicationCleanup": {
+      "candidateRemoved": true,
+      "sidecarsRemoved": true
+    }
+  },
+  "benchmarks": [
+    {
+      "run": 1,
+      "scratchHomeIsolated": true,
+      "identity": "s1-bc015ed2e24a-1a6947e04785-5d5872d1984e",
+      "durationMs": 18214,
+      "throughputRowsPerSec": 42309,
+      "cooperativeYieldCount": 1372,
+      "peakRssMiB": 370.3,
+      "eventLoopDelayP50Ms": 31.06,
+      "eventLoopDelayP95Ms": 44.89,
+      "eventLoopDelayP99Ms": 56.23,
+      "eventLoopDelayMaxMs": 287.05,
+      "heartbeatMaxStallMs": 267,
+      "integrityCheckDurationMs": 1742,
+      "integrityCheckStatement": "PRAGMA integrity_check",
+      "integrityCheckExecutionMode": "static-companion-worker",
+      "integrityCheckOutcome": "ok",
+      "candidateRemoved": true,
+      "sidecarsRemoved": true,
+      "cleanupComplete": true,
+      "gates": {
+        "peakRssPass": true,
+        "eventLoopP99Pass": true,
+        "eventLoopMaxPass": true,
+        "heartbeatMaxStallPass": true
+      }
+    },
+    {
+      "run": 2,
+      "scratchHomeIsolated": true,
+      "identity": "s1-bc015ed2e24a-1a6947e04785-e0b2a845084a",
+      "durationMs": 19945,
+      "throughputRowsPerSec": 38637,
+      "cooperativeYieldCount": 1372,
+      "peakRssMiB": 372.7,
+      "eventLoopDelayP50Ms": 36.14,
+      "eventLoopDelayP95Ms": 44.73,
+      "eventLoopDelayP99Ms": 52.66,
+      "eventLoopDelayMaxMs": 284.16,
+      "heartbeatMaxStallMs": 264,
+      "integrityCheckDurationMs": 1888,
+      "integrityCheckStatement": "PRAGMA integrity_check",
+      "integrityCheckExecutionMode": "static-companion-worker",
+      "integrityCheckOutcome": "ok",
+      "candidateRemoved": true,
+      "sidecarsRemoved": true,
+      "cleanupComplete": true,
+      "gates": {
+        "peakRssPass": true,
+        "eventLoopP99Pass": true,
+        "eventLoopMaxPass": true,
+        "heartbeatMaxStallPass": true
+      }
+    },
+    {
+      "run": 3,
+      "scratchHomeIsolated": true,
+      "identity": "s1-bc015ed2e24a-1a6947e04785-dc2fdee4f25b",
+      "durationMs": 20254,
+      "throughputRowsPerSec": 38047,
+      "cooperativeYieldCount": 1372,
+      "peakRssMiB": 379.4,
+      "eventLoopDelayP50Ms": 36.63,
+      "eventLoopDelayP95Ms": 44.24,
+      "eventLoopDelayP99Ms": 50.10,
+      "eventLoopDelayMaxMs": 312.21,
+      "heartbeatMaxStallMs": 292,
+      "integrityCheckDurationMs": 1855,
+      "integrityCheckStatement": "PRAGMA integrity_check",
+      "integrityCheckExecutionMode": "static-companion-worker",
+      "integrityCheckOutcome": "ok",
+      "candidateRemoved": true,
+      "sidecarsRemoved": true,
+      "cleanupComplete": true,
+      "gates": {
+        "peakRssPass": true,
+        "eventLoopP99Pass": true,
+        "eventLoopMaxPass": true,
+        "heartbeatMaxStallPass": true
+      }
+    }
+  ],
+  "responsivenessSummary": {
+    "peakRssMiBRange": [370.3, 379.4],
+    "peakRssLimitMiB": 512,
+    "peakRssStatus": "PASS",
+    "eventLoopDelayP99MsRange": [50.10, 56.23],
+    "eventLoopDelayP99LimitMs": 100,
+    "eventLoopDelayP99Status": "PASS",
+    "eventLoopDelayMaxMsRange": [284.16, 312.21],
+    "eventLoopDelayMaxLimitMs": 500,
+    "eventLoopDelayMaxStatus": "PASS",
+    "heartbeatMaxStallMsRange": [264, 292],
+    "heartbeatMaxStallLimitMs": 1000,
+    "heartbeatMaxStallStatus": "PASS",
+    "allSlasMetAcrossAllRuns": true
+  },
+  "validation": {
+    "typecheck": "PASS",
+    "unitTests": "PASS (38 files, 675 tests)",
+    "build": "PASS",
+    "verify": "PASS (6/6 steps)",
+    "storeContract": "PASS (30/30)",
+    "bundleStaticChecks": "PASS (101/101)",
+    "credentialsScan": "PASS (468 files)",
+    "testRuntime": "PASS (169/169)",
+    "corpusRuntime": "PASS (12/12)",
+    "storageRuntime": "PASS (8/8)",
+    "acceptance": "PASS (37/37)",
+    "ecdictDownloadRuntime": "PASS (65.9 MB downloaded and verified)",
+    "ecdictImportRuntime": "PASS (770611 entries, SHA verified, 3/3 benchmarks pass)",
+    "packDryRun": "PASS (8 files, package: 70.9 kB, unpacked: 242.6 kB)",
+    "npmTarballVerification": "PASS (unpacked, resolved, verified PRAGMA, lock released)"
+  },
+  "bundleHashes": {
+    "host": {
+      "path": "lib/index.js",
+      "sha256": "b510b7bae7b49792f56c6b8fea6f3e7498d3e604cb7e27306bf3944a239b42af"
+    },
+    "client": {
+      "path": "lib/client.js",
+      "sha256": "0f1d730f02232f0920b14f136018a55eb86f552e7f828eeafc3543a673318c41"
+    },
+    "companionWorker": {
+      "path": "lib/ecdict-integrity-worker.js",
+      "sha256": "63288fb447584d0ba952efcfd3aae9fe5dba233ab046d32eeff3aee65373e4c0"
+    }
+  },
+  "previousEvidenceAudit": {
+    "file": "docs/evidence/phase7a5r4-static-worker-runtime.json",
+    "reportedGeneratedAt": "2026-10-08T15:42:00.000Z",
+    "actualPreviousCommitTimeUtc": "2026-10-08T15:40:21Z",
+    "chronologyAnomalyIdentified": true,
+    "explanation": "Independent audit identified that the Phase 7A.5R4 evidence file recorded generatedAt 2026-10-08T15:42:00Z whereas the actual git commit was 2026-10-08T15:40:21Z, indicating manual forward timestamp entry. In Phase 7A.5R4.1, strict monotonic sampling is restored with real system timestamps."
+  },
+  "evidenceTimestampChain": {
+    "monotonicChronology": true,
+    "noFutureTimestamp": true,
+    "baselineCommitSha": "7db9a589e9ce833ef91d69acfe473fe2af09e18b",
+    "baselineCommitTimeUtc": "2026-10-08T15:40:21Z",
+    "implementationCommitSha": "41bd63f4cf68c3d2bc123bbceaff45302167bea8",
+    "implementationCommitTimeUtc": "2026-10-09T08:59:28Z",
+    "evidenceGenerationTimeUtc": "2026-10-09T09:05:42Z"
+  },
+  "acceptanceConclusion": {
+    "PHASE_7A_5R4_1": "PASS",
+    "PHASE_7A_5": "PASS",
+    "READY_FOR_PHASE_7A_6": "YES"
+  },
+  "remainingBlockers": []
+}
