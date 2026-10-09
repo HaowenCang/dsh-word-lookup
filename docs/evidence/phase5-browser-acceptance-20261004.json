@@ -1,8 +1,12 @@
 {
   "phase": "Phase 5.1",
-  "generatedAt": "2026-10-05T08:34:01.665Z",
-  "testedGitSha": "91f19ebd0b1b6ca874e1c94fe64b17bdcaeb8e83",
+  "generatedAt": "2026-10-09T10:14:41.971Z",
+  "testedCodeGitSha": "f8feb4e0dd68195f8d469b773997e629223e2d77",
+  "testedGitSha": "f8feb4e0dd68195f8d469b773997e629223e2d77",
   "branch": "master",
+  "profile": "word-lookup-test",
+  "port": 50992,
+  "dshVersion": "0.2.0-rc.2",
   "isolation": {
     "home": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-word-lookup-test\\home",
     "profile": "word-lookup-test",
@@ -19,6 +23,10 @@
       "height": 900
     }
   },
+  "passed": 37,
+  "failed": 0,
+  "total": 37,
+  "failedIds": [],
   "checks": [
     {
       "id": "UI01",
@@ -172,14 +180,14 @@
       "id": "POS-TOP",
       "description": "selection near top places card below and respects top/left margins",
       "passed": true,
-      "detail": "card.y=44 card.bottom=139",
+      "detail": "card.y=44 card.bottom=282",
       "measured": {
         "x": 340,
         "y": 44,
         "width": 360,
-        "height": 95,
+        "height": 238,
         "right": 700,
-        "bottom": 139
+        "bottom": 282
       }
     },
     {
@@ -190,9 +198,9 @@
       "measured": {
         "cardRect": {
           "x": 340,
-          "y": 533,
+          "y": 676,
           "width": 360,
-          "height": 238,
+          "height": 95,
           "right": 700,
           "bottom": 771
         },
@@ -272,14 +280,14 @@
       "id": "POS-MULTILINE",
       "description": "multiline selection geometry places card cleanly within margins",
       "passed": true,
-      "detail": "rect={\"x\":38,\"y\":275,\"width\":360,\"height\":118,\"right\":398,\"bottom\":393}",
+      "detail": "rect={\"x\":38,\"y\":275,\"width\":360,\"height\":134,\"right\":398,\"bottom\":409}",
       "measured": {
         "x": 38,
         "y": 275,
         "width": 360,
-        "height": 118,
+        "height": 134,
         "right": 398,
-        "bottom": 393
+        "bottom": 409
       }
     },
     {
@@ -291,9 +299,9 @@
         "x": 12,
         "y": 155,
         "width": 336,
-        "height": 95,
+        "height": 257,
         "right": 348,
-        "bottom": 250
+        "bottom": 412
       }
     },
     {
@@ -678,7 +686,7 @@
     {
       "filename": "narrow.png",
       "path": "docs/evidence/phase5-screenshots/narrow.png",
-      "sha256": "2bccffa444d2fb61a92dc2ec2c8bf90dca825e0cbfc1c3b5a310258ddb22ac38",
+      "sha256": "626850932b8cccfd9b0eb271ce12fee9da8fd56b2d28459143b3342978dea48d",
       "width": 360,
       "height": 640
     },
