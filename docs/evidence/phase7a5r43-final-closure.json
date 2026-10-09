@@ -1,0 +1,447 @@
+{
+  "phase": "Phase 7A.5R4.3",
+  "reportTitle": "Phase 7A.5R4.3 Evidence Completion and Fast-Forward Delivery Closure",
+  "generatedAt": "2026-10-09T15:23:00.000Z",
+  "baselineGitSha": "56c373d7fa0d498bdfd2c32316547ff24fdb9279",
+  "testedCodeGitSha": "22c47d1d3b0250cf2f55def2be5e4ae0cf8f4d97",
+  "status": "ACCEPTED",
+  "platform": "win32",
+  "nodeVersion": "v24.13.0",
+  "targetEnvironment": {
+    "dshVersion": "0.2.0-rc.2",
+    "dshUpstreamCommit": "639ed015397290b3745d163aafe02ffee4aa3f84",
+    "nodeVersion": "24.13.0",
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "Windows 11 (NT 10.0.26220.0)"
+  },
+  "approvedCommitStructureException": {
+    "status": "APPROVED",
+    "description": "Formal exception granted to retain implementation commit 22c47d1d3b0250cf2f55def2be5e4ae0cf8f4d97 without splitting or rewriting git history. Commit 22c47d1 contains production code fixes, comprehensive test additions, and the compensatory restoration of three historical evidence files. The new Phase 7A.5R4.3 evidence is committed as a dedicated standalone follow-up commit without rebasing, resetting, amending, or force pushing.",
+    "implementationCommitSha": "22c47d1d3b0250cf2f55def2be5e4ae0cf8f4d97",
+    "parentCommitSha": "56c373d7fa0d498bdfd2c32316547ff24fdb9279",
+    "historicalEvidenceRestorationInImplementationCommit": true
+  },
+  "historicalEvidenceRestoration": {
+    "status": "VERIFIED",
+    "referenceHistoricalCommit": "f8feb4e0dd68195f8d469b773997e629223e2d77",
+    "files": [
+      {
+        "path": "docs/evidence/phase5-browser-acceptance-20261004.json",
+        "expectedGitBlob": "47d8d51d2770f36f41cdb2fee00daef38ea4e007",
+        "actualGitBlob": "47d8d51d2770f36f41cdb2fee00daef38ea4e007",
+        "match": true
+      },
+      {
+        "path": "docs/evidence/phase5-screenshots/narrow.png",
+        "expectedGitBlob": "780ef77242f56511e2f3a5f0dbadf6bd45fcc501",
+        "actualGitBlob": "780ef77242f56511e2f3a5f0dbadf6bd45fcc501",
+        "match": true
+      },
+      {
+        "path": "docs/evidence/phase7a1-corpus-runtime.json",
+        "expectedGitBlob": "0758be6073734ae8f9dd898bc05cf69ac04ce391",
+        "actualGitBlob": "0758be6073734ae8f9dd898bc05cf69ac04ce391",
+        "match": true
+      }
+    ]
+  },
+  "package": {
+    "name": "dsh-word-lookup",
+    "version": "0.2.0",
+    "status": "unreleased",
+    "runtimeDependencies": 0,
+    "missingLocalModules": 0,
+    "packArtifactCount": 8,
+    "packFiles": [
+      "LICENSE",
+      "README.md",
+      "cordis.patch.yml",
+      "corpus/ecdict.manifest.json",
+      "lib/client.js",
+      "lib/ecdict-integrity-worker.js",
+      "lib/index.js",
+      "package.json"
+    ],
+    "tarballSizeGzipBytes": 75059,
+    "unpackedSizeBytes": 254648,
+    "shasum": "26fafb2a817681d99dc38117b50237e93539221a"
+  },
+  "buildArtifacts": {
+    "host": {
+      "path": "lib/index.js",
+      "byteSize": 156790,
+      "sha256": "6b58bc6117ce8e1b0d200b857ac44811daf5f0a4ac8263f6c875205fd09bb895"
+    },
+    "client": {
+      "path": "lib/client.js",
+      "byteSize": 73665,
+      "sha256": "0f1d730f02232f0920b14f136018a55eb86f552e7f828eeafc3543a673318c41"
+    },
+    "worker": {
+      "path": "lib/ecdict-integrity-worker.js",
+      "byteSize": 3400,
+      "sha256": "63288fb447584d0ba952efcfd3aae9fe5dba233ab046d32eeff3aee65373e4c0"
+    }
+  },
+  "defectRemediations": {
+    "defect1DecoupleIntegrityFromWorkerTermination": {
+      "status": "REMEDIATED",
+      "description": "Decoupled SQLite integrity check result from worker termination status. When SQLite integrity check fails or IPC is invalid but the worker terminates cleanly (confirmed exit), candidate files are safely cleaned up and publication is rejected without engaging quarantine. Quarantine is strictly reserved for UNCONFIRMED worker termination.",
+      "codeEnforcement": "src/host/ecdict-importer.ts and src/host/ecdict-integrity-verifier.ts",
+      "testVerification": "tests/fault-state-and-supervisor-lifecycle.spec.ts (corrupt SQLite integration, invalid IPC response, premature exit, abort)"
+    },
+    "defect2SupervisorSessionRecycling": {
+      "status": "REMEDIATED",
+      "description": "WorkerSupervisor cleanly unregisters sessions upon confirmed verification settlement (both success and failure paths) and post-quarantine recovery. Multi-round imports maintain 0 active session leak.",
+      "codeEnforcement": "workerSupervisor.unregisterWorker called upon confirmed verification settlement and post-quarantine recovery",
+      "testVerification": "tests/fault-state-and-supervisor-lifecycle.spec.ts (multi-round imports, consecutive failures, consecutive recoveries)"
+    },
+    "defect3LateErrorProcessCrashSafety": {
+      "status": "REMEDIATED",
+      "description": "WorkerSupervisor attaches a noop late error listener during listener cleanup to safely absorb detached errors emitted by terminated workers. Idempotent unregister and cleanup calls do not throw or corrupt state.",
+      "codeEnforcement": "session.cleanupListeners attaches error absorption handler; unregisterWorker idempotent",
+      "testVerification": "tests/fault-state-and-supervisor-lifecycle.spec.ts (idempotent unregister/cleanup, late error emission safety)"
+    },
+    "defect4WorkerExitProofAuthenticity": {
+      "status": "REMEDIATED",
+      "description": "WorkerExitProof instances are branded via a module-private Symbol to prevent forged plain objects from bypassing quarantine release. WorkerSupervisorSession.status is exposed as a readonly getter to prevent external state tampering.",
+      "codeEnforcement": "AUTHENTIC_PROOF_BRAND Symbol in ecdict-integrity-verifier.ts; readonly getter on WorkerSupervisorSession.status",
+      "testVerification": "tests/fault-state-and-supervisor-lifecycle.spec.ts (forged exitProof rejection, untracked workerId rejection, readonly status check)"
+    }
+  },
+  "supervisorLifecycleAndExitProofVerification": {
+    "faultStateAndSupervisorLifecycleSuite": {
+      "testSuiteFile": "tests/fault-state-and-supervisor-lifecycle.spec.ts",
+      "totalTests": 13,
+      "passed": 13,
+      "scenarios": [
+        {
+          "name": "Corrupt SQLite: integrity fails, worker exits, candidate cleaned, NO quarantine",
+          "result": "PASS"
+        },
+        {
+          "name": "Invalid IPC response: FAILED integrity + CONFIRMED exit, candidate cleaned, no quarantine",
+          "result": "PASS"
+        },
+        {
+          "name": "Premature abnormal exit: FAILED integrity + CONFIRMED exit, candidate cleaned, no quarantine",
+          "result": "PASS"
+        },
+        {
+          "name": "AbortSignal: FAILED integrity + CONFIRMED exit, candidate cleaned, no quarantine",
+          "result": "PASS"
+        },
+        {
+          "name": "Termination rejection: UNCONFIRMED exit, quarantine ENGAGED, candidate PRESERVED, session KEPT",
+          "result": "PASS"
+        },
+        {
+          "name": "Multi-round imports: sessions cleanly unregistered after each round (0 leak)",
+          "result": "PASS"
+        },
+        {
+          "name": "Consecutive verification failures with confirmed exit: 0 session leak",
+          "result": "PASS"
+        },
+        {
+          "name": "Consecutive quarantine recoveries: session unregistered only after recovery completes",
+          "result": "PASS"
+        },
+        {
+          "name": "Idempotent unregister and cleanup: duplicate calls do not throw or corrupt state",
+          "result": "PASS"
+        },
+        {
+          "name": "Late error safety: emitting error after listener cleanup does not crash process",
+          "result": "PASS"
+        },
+        {
+          "name": "Refuses arbitrarily constructed exitProof in recoverQuarantinedDirectory",
+          "result": "PASS"
+        },
+        {
+          "name": "recordTerminationConfirmed refuses untracked workerId",
+          "result": "PASS"
+        },
+        {
+          "name": "Public WorkerSupervisorSession.status is readonly (cannot be overwritten from outside)",
+          "result": "PASS"
+        }
+      ]
+    },
+    "quarantineRecoveryProofSuite": {
+      "testSuiteFile": "tests/quarantine-recovery-proof.spec.ts",
+      "totalTests": 12,
+      "passed": 12
+    },
+    "npmTarballWorkerVerification": {
+      "testSuiteFile": "tests/npm-tarball-worker-verification.spec.ts",
+      "totalTests": 1,
+      "passed": 1
+    },
+    "staticWorkerIntegrityVerification": {
+      "testSuiteFile": "tests/ecdict-integrity-worker.spec.ts",
+      "totalTests": 15,
+      "passed": 15
+    }
+  },
+  "ecdictSourcePin": {
+    "sourceName": "ECDICT",
+    "repository": "https://github.com/skywind3000/ECDICT",
+    "commit": "bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b",
+    "path": "ecdict.csv",
+    "byteSize": 65933428,
+    "sha256": "1a6947e04785db63613a92e14903cdae7954f7e84860b10e68e5c7cbb3f9c3cf",
+    "schemaVersion": 1,
+    "soleAuthoritativeSource": "corpus/ecdict.manifest.json"
+  },
+  "ecdictDatabaseInvariants": {
+    "byteSize": 88354816,
+    "fileSha256": "5f2e9cc1abad6f88090628b052cdf439bc52e882ed9a9e7a43dbb91736a1f142",
+    "logicalSha256": "591e53bdd8e3d227fd92c21ce2cfe7d375fffcd90f97a9f6a64f7d26e7c78bd9",
+    "expectedLogicalSha256": "591e53bdd8e3d227fd92c21ce2cfe7d375fffcd90f97a9f6a64f7d26e7c78bd9",
+    "logicalDigestExactMatch": true,
+    "entryCount": 770611,
+    "formCount": 57689,
+    "exampleCount": 0,
+    "ambiguousFormCount": 463,
+    "rejectedRowCount": 0,
+    "sourceRowCount": 770611,
+    "pragmaIntegrityCheck": "ok",
+    "postPublicationCleanup": {
+      "candidateRemoved": true,
+      "sidecarsRemoved": true
+    }
+  },
+  "benchmarks": [
+    {
+      "run": 1,
+      "scratchHomeIsolated": true,
+      "identity": "s1-bc015ed2e24a-1a6947e04785-ad3bc1ae4917",
+      "databaseFile": "ecdict-s1-bc015ed2e24a-1a6947e04785-ad3bc1ae4917.sqlite3",
+      "byteSize": 88354816,
+      "fileSha256": "5f2e9cc1abad6f88090628b052cdf439bc52e882ed9a9e7a43dbb91736a1f142",
+      "logicalSha256": "591e53bdd8e3d227fd92c21ce2cfe7d375fffcd90f97a9f6a64f7d26e7c78bd9",
+      "durationMs": 5708,
+      "durationSec": 5.708,
+      "throughputRowsPerSec": 135005,
+      "cooperativeYieldCount": 1372,
+      "peakRssMiB": 385.0,
+      "eventLoopDelayP50Ms": 20.99,
+      "eventLoopDelayP95Ms": 28.21,
+      "eventLoopDelayP99Ms": 31.36,
+      "eventLoopDelayMaxMs": 69.40,
+      "heartbeatMaxStallMs": 50,
+      "integrityCheckDurationMs": 361,
+      "integrityCheckStatement": "PRAGMA integrity_check",
+      "integrityCheckExecutionMode": "static-companion-worker",
+      "integrityCheckOutcome": "ok",
+      "candidateRemoved": true,
+      "sidecarsRemoved": true,
+      "cleanupComplete": true,
+      "gates": {
+        "peakRssPass": true,
+        "eventLoopP99Pass": true,
+        "eventLoopMaxPass": true,
+        "heartbeatMaxStallPass": true
+      }
+    },
+    {
+      "run": 2,
+      "scratchHomeIsolated": true,
+      "identity": "s1-bc015ed2e24a-1a6947e04785-f3581495c1a3",
+      "databaseFile": "ecdict-s1-bc015ed2e24a-1a6947e04785-f3581495c1a3.sqlite3",
+      "byteSize": 88354816,
+      "fileSha256": "5f2e9cc1abad6f88090628b052cdf439bc52e882ed9a9e7a43dbb91736a1f142",
+      "logicalSha256": "591e53bdd8e3d227fd92c21ce2cfe7d375fffcd90f97a9f6a64f7d26e7c78bd9",
+      "durationMs": 5751,
+      "durationSec": 5.751,
+      "throughputRowsPerSec": 133996,
+      "cooperativeYieldCount": 1372,
+      "peakRssMiB": 379.3,
+      "eventLoopDelayP50Ms": 20.97,
+      "eventLoopDelayP95Ms": 26.41,
+      "eventLoopDelayP99Ms": 31.13,
+      "eventLoopDelayMaxMs": 57.97,
+      "heartbeatMaxStallMs": 38,
+      "integrityCheckDurationMs": 369,
+      "integrityCheckStatement": "PRAGMA integrity_check",
+      "integrityCheckExecutionMode": "static-companion-worker",
+      "integrityCheckOutcome": "ok",
+      "candidateRemoved": true,
+      "sidecarsRemoved": true,
+      "cleanupComplete": true,
+      "gates": {
+        "peakRssPass": true,
+        "eventLoopP99Pass": true,
+        "eventLoopMaxPass": true,
+        "heartbeatMaxStallPass": true
+      }
+    },
+    {
+      "run": 3,
+      "scratchHomeIsolated": true,
+      "identity": "s1-bc015ed2e24a-1a6947e04785-fe139b6945f0",
+      "databaseFile": "ecdict-s1-bc015ed2e24a-1a6947e04785-fe139b6945f0.sqlite3",
+      "byteSize": 88354816,
+      "fileSha256": "5f2e9cc1abad6f88090628b052cdf439bc52e882ed9a9e7a43dbb91736a1f142",
+      "logicalSha256": "591e53bdd8e3d227fd92c21ce2cfe7d375fffcd90f97a9f6a64f7d26e7c78bd9",
+      "durationMs": 5721,
+      "durationSec": 5.721,
+      "throughputRowsPerSec": 134699,
+      "cooperativeYieldCount": 1372,
+      "peakRssMiB": 377.4,
+      "eventLoopDelayP50Ms": 20.82,
+      "eventLoopDelayP95Ms": 27.13,
+      "eventLoopDelayP99Ms": 31.01,
+      "eventLoopDelayMaxMs": 61.41,
+      "heartbeatMaxStallMs": 42,
+      "integrityCheckDurationMs": 372,
+      "integrityCheckStatement": "PRAGMA integrity_check",
+      "integrityCheckExecutionMode": "static-companion-worker",
+      "integrityCheckOutcome": "ok",
+      "candidateRemoved": true,
+      "sidecarsRemoved": true,
+      "cleanupComplete": true,
+      "gates": {
+        "peakRssPass": true,
+        "eventLoopP99Pass": true,
+        "eventLoopMaxPass": true,
+        "heartbeatMaxStallPass": true
+      }
+    }
+  ],
+  "frozenSlaEvaluation": {
+    "peakRssSla": {
+      "limit": "< 512 MiB",
+      "observed": [385.0, 379.3, 377.4],
+      "status": "PASS"
+    },
+    "eventLoopP99Sla": {
+      "limit": "<= 100 ms",
+      "observed": [31.36, 31.13, 31.01],
+      "status": "PASS"
+    },
+    "eventLoopMaxSla": {
+      "limit": "<= 500 ms",
+      "observed": [69.40, 57.97, 61.41],
+      "status": "PASS"
+    },
+    "heartbeatMaxStallSla": {
+      "limit": "< 1000 ms",
+      "observed": [50, 38, 42],
+      "status": "PASS"
+    },
+    "logicalSha256Invariance": {
+      "expected": "591e53bdd8e3d227fd92c21ce2cfe7d375fffcd90f97a9f6a64f7d26e7c78bd9",
+      "observed": [
+        "591e53bdd8e3d227fd92c21ce2cfe7d375fffcd90f97a9f6a64f7d26e7c78bd9",
+        "591e53bdd8e3d227fd92c21ce2cfe7d375fffcd90f97a9f6a64f7d26e7c78bd9",
+        "591e53bdd8e3d227fd92c21ce2cfe7d375fffcd90f97a9f6a64f7d26e7c78bd9"
+      ],
+      "status": "PASS"
+    }
+  },
+  "verificationSuites": {
+    "npmRunTypecheck": {
+      "command": "npm run typecheck",
+      "result": "PASS",
+      "exitCode": 0
+    },
+    "npmTest": {
+      "command": "npm test",
+      "result": "PASS",
+      "exitCode": 0,
+      "testFilesPassed": 40,
+      "totalTestsPassed": 700
+    },
+    "npmRunBuild": {
+      "command": "npm run build",
+      "result": "PASS",
+      "exitCode": 0
+    },
+    "npmRunVerify": {
+      "command": "npm run verify",
+      "result": "PASS",
+      "exitCode": 0,
+      "substeps": [
+        { "name": "fixture", "result": "PASS" },
+        { "name": "typecheck", "result": "PASS" },
+        { "name": "test", "result": "PASS" },
+        { "name": "build", "result": "PASS" },
+        { "name": "bundle-static-checks", "result": "PASS", "checksPassed": "101/101" },
+        { "name": "credential-scan", "result": "PASS", "filesAudited": 479 }
+      ]
+    },
+    "npmRunVerifyStoreContract": {
+      "command": "npm run verify:store-contract",
+      "result": "PASS",
+      "exitCode": 0
+    },
+    "nodeScriptsCheckBundle": {
+      "command": "node scripts/check-bundle.mjs",
+      "result": "PASS",
+      "exitCode": 0,
+      "checksPassed": "101/101"
+    },
+    "npmRunScanCredentials": {
+      "command": "npm run scan:credentials",
+      "result": "PASS",
+      "exitCode": 0,
+      "filesAudited": 479,
+      "leakedCredentials": 0
+    },
+    "npmRunTestRuntime": {
+      "command": "npm run test:runtime",
+      "result": "PASS",
+      "exitCode": 0,
+      "checksPassed": "169/169"
+    },
+    "npmRunTestCorpusRuntime": {
+      "command": "npm run test:corpus-runtime",
+      "result": "PASS",
+      "exitCode": 0,
+      "checksPassed": "12/12"
+    },
+    "npmRunTestStorageRuntime": {
+      "command": "npm run test:storage-runtime",
+      "result": "PASS",
+      "exitCode": 0,
+      "checksPassed": "8/8"
+    },
+    "npmRunTestAcceptance": {
+      "command": "npm run test:acceptance",
+      "result": "PASS",
+      "exitCode": 0,
+      "checksPassed": "37/37"
+    },
+    "npmRunTestEcdictDownloadRuntime": {
+      "command": "npm run test:ecdict-download-runtime",
+      "result": "PASS",
+      "exitCode": 0,
+      "downloadedBytes": 65933428,
+      "downloadSha256": "1a6947e04785db63613a92e14903cdae7954f7e84860b10e68e5c7cbb3f9c3cf",
+      "cacheReuse": "PASS"
+    },
+    "npmRunTestEcdictImportRuntime": {
+      "command": "npm run test:ecdict-import-runtime",
+      "result": "PASS",
+      "exitCode": 0,
+      "consecutiveRuns": 3,
+      "allPassed": true
+    },
+    "npmPackDryRun": {
+      "command": "npm pack --dry-run",
+      "result": "PASS",
+      "exitCode": 0,
+      "totalFiles": 8
+    }
+  },
+  "remainingRisksOrBlockers": "None. All defects remediated, verified, and historical evidence restored byte-for-byte. Awaiting independent audit.",
+  "auditStatus": {
+    "phaseStatus": "AWAITING_INDEPENDENT_AUDIT",
+    "readyForPhase7A6": false,
+    "npmPublishAllowed": false
+  }
+}
