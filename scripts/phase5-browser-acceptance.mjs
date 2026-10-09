@@ -146,7 +146,7 @@ async function dismissDialogs(page) {
 const EVIDENCE_DIR = join(REPO_ROOT, 'docs', 'evidence')
 const SCREENSHOT_DIR = options['screenshot-dir']
   ? resolve(options['screenshot-dir'])
-  : (options.out ? join(EVIDENCE_DIR, 'store1306-v011-screenshots') : join(EVIDENCE_DIR, 'phase5-screenshots'))
+  : (options.out ? join(EVIDENCE_DIR, 'store1306-v011-screenshots') : join(REPO_ROOT, 'verify-out', 'phase5-screenshots'))
 mkdirSync(SCREENSHOT_DIR, { recursive: true })
 
 const ANSI = /\x1B\[[0-?]*[ -/]*[@-~]/g
@@ -1621,7 +1621,7 @@ async function run() {
   }
 
   // Generate machine-readable JSON evidence
-  const jsonReportPath = options.out ? resolve(options.out) : join(EVIDENCE_DIR, 'phase5-browser-acceptance-20261004.json')
+  const jsonReportPath = options.out ? resolve(options.out) : join(REPO_ROOT, 'verify-out', 'phase5-browser-acceptance.json')
   const jsonReport = {
     phase: options.out ? 'Phase 6R.1' : 'Phase 5.1',
     generatedAt: new Date().toISOString(),

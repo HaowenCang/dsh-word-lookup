@@ -423,7 +423,7 @@ export async function recoverQuarantinedDirectory(
         )
       }
       const supProof = workerSupervisor.getExitProof(p.workerId)
-      if (!supProof) {
+      if (!supProof || !workerSupervisor.isExitProofAuthentic(p)) {
         throw new QuarantineRecoveryError(
           `Supplied exitProof cannot be validated against worker supervisor records for workerId "${p.workerId}"`,
           'UNVERIFIED_EXIT_PROOF',
@@ -443,7 +443,7 @@ export async function recoverQuarantinedDirectory(
           supProof = null
         }
       }
-      if (!supProof) {
+      if (!supProof || !workerSupervisor.isExitProofAuthentic(supProof)) {
         throw new QuarantineRecoveryError(
           `Worker exit proof not confirmed for worker "${record.workerId}". Worker may still be alive with open file handles.`,
           'WORKER_EXIT_UNCONFIRMED',
@@ -494,6 +494,9 @@ export async function recoverQuarantinedDirectory(
 
     // 6. Release directory from quarantine upon successful cleanup
     quarantinedDirectories.delete(normalized)
+    if (record.workerId) {
+      workerSupervisor.unregisterWorker(record.workerId)
+    }
     return { recovered: true, candidateCleaned, exitProof: confirmedProof }
   })()
 

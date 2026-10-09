@@ -647,8 +647,10 @@ async function run() {
     writeFileSync(outPath, JSON.stringify(evidenceDoc, null, 2) + '\n', 'utf8')
     console.log(`Saved machine-readable evidence to:\n  ${outPath}`)
   } else {
-    writeFileSync(EVIDENCE_FILE_7A1, JSON.stringify(evidenceDoc, null, 2) + '\n', 'utf8')
-    console.log(`Saved machine-readable evidence to:\n  ${EVIDENCE_FILE_7A1}`)
+    const outPath = join(REPO_ROOT, 'verify-out', 'phase7a1-corpus-runtime.json')
+    mkdirSync(dirname(outPath), { recursive: true })
+    writeFileSync(outPath, JSON.stringify(evidenceDoc, null, 2) + '\n', 'utf8')
+    console.log(`Saved machine-readable evidence to:\n  ${outPath}`)
   }
 
   if (failed.length > 0) {

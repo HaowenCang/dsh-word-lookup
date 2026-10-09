@@ -91,6 +91,11 @@ export function matchesCandidateFileIdentity(
 }
 
 /**
+ * Private symbol brand ensuring authentic supervisor provenance for worker exit proofs.
+ */
+export const EXIT_PROOF_BRAND = Symbol('dsh.worker.exit_proof_brand')
+
+/**
  * Structurally reliable proof of worker termination.
  */
 export interface WorkerExitProof {
@@ -98,6 +103,8 @@ export interface WorkerExitProof {
   readonly exitCode: number
   readonly confirmedAt: number
   readonly proofSource: 'terminate' | 'exit_event'
+  /** @internal Private cryptographic/symbol token guaranteeing supervisor provenance. */
+  readonly [EXIT_PROOF_BRAND]?: boolean
 }
 
 /**
@@ -180,7 +187,7 @@ export interface IntegrityVerificationErrorOptions {
 export class IntegrityVerificationError extends Error {
   readonly errorCode: string
   readonly durationMs?: number
-  readonly terminationStatus: WorkerTerminationStatus
+  terminationStatus: WorkerTerminationStatus
   readonly workerId?: string
   readonly candidatePath?: string
   readonly candidateFileIdentity?: CandidateFileIdentity | null
@@ -275,8 +282,8 @@ export interface WorkerSupervisorSession {
   readonly candidatePath: string
   readonly candidateFileIdentity: CandidateFileIdentity | null
   readonly worker: WorkerLike
-  status: WorkerTerminationStatus | 'RUNNING' | 'TERMINATING'
-  exitProof: WorkerExitProof | null
+  readonly status: WorkerTerminationStatus | 'RUNNING' | 'TERMINATING'
+  readonly exitProof: WorkerExitProof | null
   readonly lateErrors: readonly Error[]
   waitForExit(timeoutMs?: number): Promise<WorkerExitProof>
   cleanupListeners?: () => void
@@ -344,7 +351,7 @@ export class WorkerSupervisor {
     }
 
     const onExit = (code: number) => {
-      this.recordTerminationConfirmed(workerId, code, 'exit_event')
+      this.recordTerminationConfirmedInternal(workerId, code, 'exit_event')
     }
 
     const onError = (err: Error) => {
@@ -360,6 +367,17 @@ export class WorkerSupervisor {
         try {
           if (typeof params.worker.removeListener === 'function') {
             params.worker.removeListener('exit', onExit)
+            params.worker.removeListener('error', onError)
+          }
+        } catch {
+          // ignore
+        }
+        // Safe late-error absorber: prevent unhandled 'error' event crash
+        try {
+          if (typeof params.worker.on === 'function') {
+            params.worker.on('error', (err: Error) => {
+              record.lateErrors.push(err)
+            })
           }
         } catch {
           // ignore
@@ -377,9 +395,6 @@ export class WorkerSupervisor {
       worker: params.worker,
       get status() {
         return record.status
-      },
-      set status(s) {
-        record.status = s
       },
       get exitProof() {
         return record.exitProof
@@ -408,9 +423,6 @@ export class WorkerSupervisor {
       get status() {
         return rec.status
       },
-      set status(s) {
-        rec.status = s
-      },
       get exitProof() {
         return rec.exitProof
       },
@@ -428,6 +440,37 @@ export class WorkerSupervisor {
     return this.getSession(workerId)
   }
 
+  private recordTerminationConfirmedInternal(
+    workerId: string,
+    exitCode: number,
+    proofSource: 'terminate' | 'exit_event',
+  ): WorkerExitProof | null {
+    const rec = this.records.get(workerId)
+    if (!rec) {
+      return null
+    }
+
+    if (!rec.exitProof) {
+      const proof: WorkerExitProof = Object.freeze({
+        workerId,
+        exitCode,
+        confirmedAt: Date.now(),
+        proofSource,
+        [EXIT_PROOF_BRAND]: true,
+      })
+      rec.exitProof = proof
+      rec.status = 'TERMINATED_CONFIRMED'
+      rec.cleanupListeners?.()
+      rec.resolveExit(proof)
+    }
+
+    return rec.exitProof
+  }
+
+  recordTerminationViaTerminate(workerId: string, exitCode: number): WorkerExitProof | null {
+    return this.recordTerminationConfirmedInternal(workerId, exitCode, 'terminate')
+  }
+
   recordTerminationConfirmed(
     workerId: string,
     exitCode: number,
@@ -435,27 +478,35 @@ export class WorkerSupervisor {
   ): WorkerExitProof {
     const rec = this.records.get(workerId)
     if (!rec) {
-      return {
-        workerId,
-        exitCode,
-        confirmedAt: Date.now(),
-        proofSource,
-      }
+      throw new WorkerTerminationError(
+        `Cannot record termination confirmation: no tracked worker found for workerId "${workerId}"`,
+        'TERMINATION_UNCONFIRMED',
+        { workerId },
+      )
     }
+    return this.recordTerminationConfirmedInternal(workerId, exitCode, proofSource)!
+  }
 
-    if (!rec.exitProof) {
-      rec.exitProof = {
-        workerId,
-        exitCode,
-        confirmedAt: Date.now(),
-        proofSource,
-      }
-      rec.status = 'TERMINATED_CONFIRMED'
-      rec.cleanupListeners?.()
-      rec.resolveExit(rec.exitProof)
-    }
+  _injectTerminationConfirmedForTesting(
+    workerId: string,
+    exitCode: number,
+    proofSource: 'terminate' | 'exit_event' = 'exit_event',
+  ): WorkerExitProof {
+    return this.recordTerminationConfirmed(workerId, exitCode, proofSource)
+  }
 
-    return rec.exitProof
+  isExitProofAuthentic(proof: unknown): proof is WorkerExitProof {
+    if (!proof || typeof proof !== 'object') return false
+    const p = proof as WorkerExitProof
+    if (p[EXIT_PROOF_BRAND] !== true) return false
+    const rec = this.records.get(p.workerId)
+    if (!rec || !rec.exitProof) return false
+    return (
+      rec.exitProof.workerId === p.workerId &&
+      rec.exitProof.exitCode === p.exitCode &&
+      rec.exitProof.confirmedAt === p.confirmedAt &&
+      rec.exitProof.proofSource === p.proofSource
+    )
   }
 
   recordTerminationUnconfirmed(workerId: string, error?: Error): void {
@@ -518,6 +569,18 @@ export class WorkerSupervisor {
       this.byCandidate.delete(rec.candidatePath)
       this.records.delete(workerId)
     }
+  }
+
+  getActiveSessionCount(): number {
+    return this.records.size
+  }
+
+  hasSession(workerId: string): boolean {
+    return this.records.has(workerId)
+  }
+
+  getTrackedWorkerIds(): string[] {
+    return Array.from(this.records.keys())
   }
 
   resetForTesting(): void {
@@ -781,7 +844,6 @@ export async function verifyCandidateDatabaseWithWorker(
         return // Ignore duplicate messages or competing events
       }
       phase = 'TERMINATING'
-      session.status = 'TERMINATING'
       primaryOutcome = outcome
 
       // Clear external timers and listeners immediately
@@ -818,15 +880,12 @@ export async function verifyCandidateDatabaseWithWorker(
 
         const termExitCode = await Promise.race([termPromise, timeoutPromise])
         terminationStatus = 'TERMINATED_CONFIRMED'
-        session.status = 'TERMINATED_CONFIRMED'
-        workerSupervisor.recordTerminationConfirmed(
+        workerSupervisor.recordTerminationViaTerminate(
           workerId,
           typeof termExitCode === 'number' ? termExitCode : 0,
-          'terminate',
         )
       } catch (termErr) {
         terminationStatus = 'TERMINATION_UNCONFIRMED'
-        session.status = 'TERMINATION_UNCONFIRMED'
         workerSupervisor.recordTerminationUnconfirmed(
           workerId,
           termErr instanceof Error ? termErr : new Error(String(termErr)),
@@ -854,7 +913,16 @@ export async function verifyCandidateDatabaseWithWorker(
       // Only clean up worker listeners once termination completes/fails
       if (terminationStatus === 'TERMINATED_CONFIRMED') {
         session.cleanupListeners?.()
-        worker.removeAllListeners()
+        try {
+          if (typeof worker.removeAllListeners === 'function') {
+            worker.removeAllListeners()
+          }
+          if (typeof worker.on === 'function') {
+            worker.on('error', () => {})
+          }
+        } catch {
+          // ignore
+        }
       } else {
         // Retain supervisor exit tracking and error shield on unconfirmed worker
         try {
@@ -872,6 +940,15 @@ export async function verifyCandidateDatabaseWithWorker(
 
       phase = 'SETTLED'
 
+      // Separate integrity verification outcome from worker termination outcome:
+      // Update terminationStatus on primaryOutcome.error to reflect actual termination outcome
+      if (primaryOutcome?.kind === 'failure') {
+        const err = primaryOutcome.error
+        if (err instanceof IntegrityVerificationError) {
+          err.terminationStatus = terminationStatus
+        }
+      }
+
       // Evaluate late errors
       if (lateErrors.length > 0) {
         if (primaryOutcome?.kind === 'success') {
@@ -883,6 +960,9 @@ export async function verifyCandidateDatabaseWithWorker(
             terminationStatus,
             { cause: firstLate, workerId, candidatePath: resolvedCandidatePath, candidateFileIdentity },
           )
+          if (terminationStatus === 'TERMINATED_CONFIRMED') {
+            workerSupervisor.unregisterWorker(workerId)
+          }
           if (lateErrors.length === 1 && !terminateError) {
             rejectPromise(lateErr)
           } else {
@@ -898,11 +978,17 @@ export async function verifyCandidateDatabaseWithWorker(
           return
         } else {
           const base = primaryOutcome?.error ?? new Error('Unknown verification failure')
+          if (base instanceof IntegrityVerificationError) {
+            base.terminationStatus = terminationStatus
+          }
           const all = [
             base,
             ...lateErrors,
             ...(terminateError ? [terminateError] : []),
           ]
+          if (terminationStatus === 'TERMINATED_CONFIRMED') {
+            workerSupervisor.unregisterWorker(workerId)
+          }
           rejectPromise(
             new AggregateError(
               all,
@@ -919,6 +1005,9 @@ export async function verifyCandidateDatabaseWithWorker(
           rejectPromise(terminateError)
         } else {
           const base = primaryOutcome?.error ?? new Error('Integrity check failed')
+          if (base instanceof IntegrityVerificationError) {
+            base.terminationStatus = 'TERMINATION_UNCONFIRMED'
+          }
           rejectPromise(
             new AggregateError(
               [base, terminateError],
@@ -931,8 +1020,12 @@ export async function verifyCandidateDatabaseWithWorker(
 
       // Clean successful termination
       if (primaryOutcome?.kind === 'success') {
+        workerSupervisor.unregisterWorker(workerId)
         resolvePromise(primaryOutcome.result)
       } else {
+        if (terminationStatus === 'TERMINATED_CONFIRMED') {
+          workerSupervisor.unregisterWorker(workerId)
+        }
         rejectPromise(primaryOutcome?.error ?? new Error('Unknown verification failure'))
       }
     }

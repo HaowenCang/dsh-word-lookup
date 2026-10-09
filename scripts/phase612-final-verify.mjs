@@ -355,7 +355,10 @@ async function main() {
 
   // 9. npm run test:acceptance
   const stepAcceptance = await runStep('npm run test:acceptance', NPM, ['run', 'test:acceptance'])
-  const acceptanceReportPath = join(EVIDENCE_DIR, 'phase5-browser-acceptance-20261004.json')
+  const verifyOutAcceptance = join(ROOT, 'verify-out', 'phase5-browser-acceptance.json')
+  const acceptanceReportPath = existsSync(verifyOutAcceptance)
+    ? verifyOutAcceptance
+    : join(EVIDENCE_DIR, 'phase5-browser-acceptance-20261004.json')
   const acceptanceReport = JSON.parse(readFileSync(acceptanceReportPath, 'utf8'))
   commandResults.push({
     command: 'npm run test:acceptance',

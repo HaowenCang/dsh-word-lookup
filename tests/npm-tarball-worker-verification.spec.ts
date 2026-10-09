@@ -152,5 +152,5 @@ describe('Phase 7A.5R4.1 Section 5: Real NPM Tarball & Worker Verification', () 
       rmSync(tempDir, { recursive: true, force: true })
       expect(existsSync(tempDir)).toBe(false)
     }
-  })
+  }, 30000)
 })

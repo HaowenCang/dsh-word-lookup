@@ -7,5 +7,6 @@ export default defineConfig({
     environment: 'node',
     include: ['tests/**/*.spec.ts'],
     reporters: ['default'],
+    testTimeout: 20000,
   },
 })

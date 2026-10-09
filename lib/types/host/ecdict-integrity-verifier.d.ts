@@ -48,6 +48,10 @@ export declare function captureCandidateFileIdentity(filePath: string): Candidat
  */
 export declare function matchesCandidateFileIdentity(currentStat: Stats, recorded: CandidateFileIdentity): boolean;
 /**
+ * Private symbol brand ensuring authentic supervisor provenance for worker exit proofs.
+ */
+export declare const EXIT_PROOF_BRAND: unique symbol;
+/**
  * Structurally reliable proof of worker termination.
  */
 export interface WorkerExitProof {
@@ -55,6 +59,8 @@ export interface WorkerExitProof {
     readonly exitCode: number;
     readonly confirmedAt: number;
     readonly proofSource: 'terminate' | 'exit_event';
+    /** @internal Private cryptographic/symbol token guaranteeing supervisor provenance. */
+    readonly [EXIT_PROOF_BRAND]?: boolean;
 }
 /**
  * Options for constructing {@link WorkerTerminationError}.
@@ -101,7 +107,7 @@ export interface IntegrityVerificationErrorOptions {
 export declare class IntegrityVerificationError extends Error {
     readonly errorCode: string;
     readonly durationMs?: number;
-    readonly terminationStatus: WorkerTerminationStatus;
+    terminationStatus: WorkerTerminationStatus;
     readonly workerId?: string;
     readonly candidatePath?: string;
     readonly candidateFileIdentity?: CandidateFileIdentity | null;
@@ -139,8 +145,8 @@ export interface WorkerSupervisorSession {
     readonly candidatePath: string;
     readonly candidateFileIdentity: CandidateFileIdentity | null;
     readonly worker: WorkerLike;
-    status: WorkerTerminationStatus | 'RUNNING' | 'TERMINATING';
-    exitProof: WorkerExitProof | null;
+    readonly status: WorkerTerminationStatus | 'RUNNING' | 'TERMINATING';
+    readonly exitProof: WorkerExitProof | null;
     readonly lateErrors: readonly Error[];
     waitForExit(timeoutMs?: number): Promise<WorkerExitProof>;
     cleanupListeners?: () => void;
@@ -165,10 +171,17 @@ export declare class WorkerSupervisor {
     getExitProof(workerId: string): WorkerExitProof | null;
     getSession(workerId: string): WorkerSupervisorSession | null;
     getSessionByCandidatePath(candidatePath: string): WorkerSupervisorSession | null;
+    private recordTerminationConfirmedInternal;
+    recordTerminationViaTerminate(workerId: string, exitCode: number): WorkerExitProof | null;
     recordTerminationConfirmed(workerId: string, exitCode: number, proofSource?: 'terminate' | 'exit_event'): WorkerExitProof;
+    _injectTerminationConfirmedForTesting(workerId: string, exitCode: number, proofSource?: 'terminate' | 'exit_event'): WorkerExitProof;
+    isExitProofAuthentic(proof: unknown): proof is WorkerExitProof;
     recordTerminationUnconfirmed(workerId: string, error?: Error): void;
     waitForExit(workerId: string, timeoutMs?: number): Promise<WorkerExitProof>;
     unregisterWorker(workerId: string): void;
+    getActiveSessionCount(): number;
+    hasSession(workerId: string): boolean;
+    getTrackedWorkerIds(): string[];
     resetForTesting(): void;
 }
 /** Global singleton worker supervisor. */

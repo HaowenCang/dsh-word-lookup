@@ -196,9 +196,11 @@ describe('Phase 7A.5R4.1 Defect B: Termination Unconfirmed Concurrency Isolation
       writeFileSync(sourceFile, rawBytes)
 
       let trackedWorkerId: string | undefined
+      let mockWorkerInstance: any = null
       const failingVerifier = async (candPath: string) => {
         const mockWorker = new EventEmitter() as any
         mockWorker.terminate = async () => 1
+        mockWorkerInstance = mockWorker
         const session = workerSupervisor.registerWorker({
           worker: mockWorker,
           candidatePath: candPath,
@@ -222,11 +224,12 @@ describe('Phase 7A.5R4.1 Defect B: Termination Unconfirmed Concurrency Isolation
 
       expect(isDatabaseDirectoryQuarantined(paths.databaseDirectory)).toBe(true)
 
-      // Verified termination: exit proof confirmed before safe recovery
-      workerSupervisor.recordTerminationConfirmed(trackedWorkerId!, 0, 'exit_event')
+      // Verified termination: exit proof confirmed via authentic worker exit event before safe recovery
+      mockWorkerInstance?.emit('exit', 0)
       const recoveryResult = await recoverQuarantinedDirectory(paths.databaseDirectory)
       expect(recoveryResult.recovered).toBe(true)
       expect(recoveryResult.candidateCleaned).toBe(true)
+      expect(recoveryResult.exitProof?.workerId).toBe(trackedWorkerId)
       expect(isDatabaseDirectoryQuarantined(paths.databaseDirectory)).toBe(false)
 
       // Next import proceeds cleanly without any deadlock
@@ -291,9 +294,11 @@ describe('Phase 7A.5R4.1 Defect B: Termination Unconfirmed Concurrency Isolation
       writeFileSync(foreignDoc, 'USER_DOCUMENTATION_CONTENT')
 
       let trackedWorkerId: string | undefined
+      let mockWorkerInstance: any = null
       const failingVerifier = async (candPath: string) => {
         const mockWorker = new EventEmitter() as any
         mockWorker.terminate = async () => 1
+        mockWorkerInstance = mockWorker
         const session = workerSupervisor.registerWorker({
           worker: mockWorker,
           candidatePath: candPath,
@@ -319,9 +324,11 @@ describe('Phase 7A.5R4.1 Defect B: Termination Unconfirmed Concurrency Isolation
       expect(readFileSync(foreignDb, 'utf8')).toBe('USER_DATABASE_CONTENT')
       expect(readFileSync(foreignDoc, 'utf8')).toBe('USER_DOCUMENTATION_CONTENT')
 
-      // Exit confirmed before recovery
-      workerSupervisor.recordTerminationConfirmed(trackedWorkerId!, 0, 'exit_event')
-      await recoverQuarantinedDirectory(paths.databaseDirectory)
+      // Exit confirmed via authentic worker exit event before recovery
+      mockWorkerInstance?.emit('exit', 0)
+      const recoveryResult = await recoverQuarantinedDirectory(paths.databaseDirectory)
+      expect(recoveryResult.recovered).toBe(true)
+      expect(recoveryResult.exitProof?.workerId).toBe(trackedWorkerId)
 
       // Foreign files must be untouched during recovery
       expect(readFileSync(foreignDb, 'utf8')).toBe('USER_DATABASE_CONTENT')
