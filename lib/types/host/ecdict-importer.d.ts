@@ -24,7 +24,7 @@
  * @module dsh-word-lookup/host/ecdict-importer
  */
 import { DatabaseSync } from 'node:sqlite';
-import { type IntegrityVerificationResult } from './ecdict-integrity-verifier.js';
+import { type CandidateFileIdentity, type IntegrityRequest, type IntegrityVerificationResult, type WorkerExitProof, type WorkerLike } from './ecdict-integrity-verifier.js';
 import { type EcdictSourceDescriptor } from './ecdict-source.js';
 import { type ManagedStoragePaths } from './managed-storage.js';
 import type { SqliteDictionary } from './sqlite-dictionary.js';
@@ -67,6 +67,12 @@ export interface QuarantineRecord {
     readonly reason: string;
     /** Underlying error that caused unconfirmed termination. */
     readonly error: unknown;
+    /** Tracked worker ID associated with the quarantine, if any. */
+    readonly workerId?: string;
+    /** Captured candidate file identity at quarantine time. */
+    readonly candidateFileIdentity?: CandidateFileIdentity | null;
+    /** Validated worker exit proof confirming termination, if already proven. */
+    readonly exitProof?: WorkerExitProof | null;
 }
 /**
  * Error thrown when an ECDICT import is attempted on a quarantined database directory.
@@ -197,35 +203,64 @@ export interface BuildManagedEcdictDatabaseInternalOptions {
     readonly integrityVerifier?: (candidatePath: string, signal?: AbortSignal) => Promise<IntegrityVerificationResult>;
     /** @internal Custom worker URL for fault-injection testing (test only). */
     readonly workerUrl?: URL;
+    /** @internal Custom worker adapter for deterministic lifecycle testing (test only). */
+    readonly workerAdapter?: (request: IntegrityRequest) => WorkerLike;
+    /** @internal Custom termination timeout in milliseconds (test only). */
+    readonly terminationTimeoutMs?: number;
 }
 /**
  * Check whether a database directory is currently quarantined.
  */
 export declare function isDatabaseDirectoryQuarantined(databaseDirectory: string): boolean;
 /**
+ * Check whether a quarantine recovery is currently active for a database directory.
+ */
+export declare function isRecoveryInProgress(databaseDirectory: string): boolean;
+/**
  * Get active quarantine record for a database directory, if any.
  */
 export declare function getQuarantineRecord(databaseDirectory: string): QuarantineRecord | null;
 /**
+ * Options for recovering a quarantined database directory.
+ */
+export interface RecoverQuarantinedDirectoryOptions {
+    /** Optional custom unlink function for testing file deletion errors. */
+    readonly unlinkFn?: (path: string) => Promise<void>;
+    /** Optional wait timeout in milliseconds to await worker exit proof. */
+    readonly timeoutMs?: number;
+    /** Optional explicit worker exit proof object. */
+    readonly exitProof?: WorkerExitProof;
+}
+/**
+ * Result of quarantine recovery attempt.
+ */
+export interface RecoverQuarantinedDirectoryResult {
+    readonly recovered: boolean;
+    readonly candidateCleaned: boolean;
+    readonly exitProof?: WorkerExitProof;
+}
+/**
  * Verify termination and safely recover a quarantined database directory.
  *
- * Requirements for safe release:
- * - Checks that the directory is currently quarantined.
- * - If candidate file exists, validates path containment and unlinks candidate and sidecars.
- * - Releases directory from quarantine upon clean verification.
+ * Requirements for safe release (Strict Proof-First Invariant):
+ * 1. Checks that the directory is currently quarantined.
+ * 2. Confirms authentic worker exit proof before any file modification or quarantine release:
+ *    - Worker exit event confirmed, OR
+ *    - terminate() Promise settled with confirmed exit.
+ *    - Unconfirmed worker status REFUSES recovery and PRESERVES quarantine and candidate.
+ * 3. Validates candidate database path containment within the database directory.
+ * 4. Validates candidate database file identity against captured quarantine signature
+ *    to prevent deleting substituted or foreign files.
+ * 5. Cleans up candidate file and sidecars using safe cleanup contracts.
+ * 6. Only releases directory from quarantine after cleanup reaches safe state.
  *
  * @param databaseDirectory - database directory to recover.
- * @param options - optional custom unlink function.
+ * @param options - optional recovery options.
  * @returns outcome of recovery attempt.
  */
-export declare function recoverQuarantinedDirectory(databaseDirectory: string, options?: {
-    unlinkFn?: (path: string) => Promise<void>;
-}): Promise<{
-    recovered: boolean;
-    candidateCleaned: boolean;
-}>;
+export declare function recoverQuarantinedDirectory(databaseDirectory: string, options?: RecoverQuarantinedDirectoryOptions): Promise<RecoverQuarantinedDirectoryResult>;
 /**
- * @internal Reset active imports and quarantined directories (test only).
+ * @internal Reset active imports, recoveries, and quarantined directories (test only).
  */
 export declare function _resetQuarantinesForTesting(): void;
 /**

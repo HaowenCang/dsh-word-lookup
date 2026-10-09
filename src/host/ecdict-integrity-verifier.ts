@@ -15,7 +15,7 @@
  */
 
 import { randomUUID } from 'node:crypto'
-import { existsSync, lstatSync } from 'node:fs'
+import { existsSync, lstatSync, statSync, type Stats } from 'node:fs'
 import { resolve } from 'node:path'
 import { Worker } from 'node:worker_threads'
 
@@ -45,21 +45,133 @@ export interface IntegrityVerificationResult {
 }
 
 /**
+ * File identity signature used to verify candidate file authenticity before deletion.
+ */
+export interface CandidateFileIdentity {
+  readonly dev: number
+  readonly ino: number
+  readonly birthtimeMs: number
+  readonly mtimeMs: number
+  readonly size: number
+}
+
+/**
+ * Capture file identity signature for candidate database path.
+ */
+export function captureCandidateFileIdentity(filePath: string): CandidateFileIdentity | null {
+  try {
+    const st = statSync(filePath)
+    return {
+      dev: st.dev,
+      ino: st.ino,
+      birthtimeMs: st.birthtimeMs,
+      mtimeMs: st.mtimeMs,
+      size: st.size,
+    }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Check whether a file's current stat matches the recorded candidate file identity.
+ */
+export function matchesCandidateFileIdentity(
+  currentStat: Stats,
+  recorded: CandidateFileIdentity,
+): boolean {
+  if (recorded.ino !== 0 && currentStat.ino !== 0) {
+    return currentStat.dev === recorded.dev && currentStat.ino === recorded.ino
+  }
+  return (
+    currentStat.dev === recorded.dev &&
+    Math.abs(currentStat.birthtimeMs - recorded.birthtimeMs) < 10 &&
+    currentStat.size === recorded.size
+  )
+}
+
+/**
+ * Structurally reliable proof of worker termination.
+ */
+export interface WorkerExitProof {
+  readonly workerId: string
+  readonly exitCode: number
+  readonly confirmedAt: number
+  readonly proofSource: 'terminate' | 'exit_event'
+}
+
+/**
+ * Options for constructing {@link WorkerTerminationError}.
+ */
+export interface WorkerTerminationErrorOptions {
+  readonly cause?: unknown
+  readonly workerId?: string
+  readonly candidatePath?: string
+  readonly candidateFileIdentity?: CandidateFileIdentity | null
+}
+
+/**
  * Error thrown when worker termination fails or cannot be confirmed within deadline.
  */
 export class WorkerTerminationError extends Error {
   readonly errorCode = 'WORKER_TERMINATION_FAILED'
   readonly terminationStatus: WorkerTerminationStatus
+  readonly workerId?: string
+  readonly candidatePath?: string
+  readonly candidateFileIdentity?: CandidateFileIdentity | null
 
   constructor(
     message: string,
     terminationStatus: WorkerTerminationStatus = 'TERMINATION_UNCONFIRMED',
-    options?: { cause?: unknown },
+    options?: WorkerTerminationErrorOptions,
   ) {
-    super(message, options)
+    super(message, options ? { cause: options.cause } : undefined)
     this.name = 'WorkerTerminationError'
     this.terminationStatus = terminationStatus
+    this.workerId = options?.workerId
+    this.candidatePath = options?.candidatePath
+    this.candidateFileIdentity = options?.candidateFileIdentity ?? null
   }
+}
+
+/**
+ * Error thrown when quarantine recovery cannot be safely completed.
+ */
+export class QuarantineRecoveryError extends WorkerTerminationError {
+  readonly directory: string
+
+  constructor(
+    message: string,
+    errorCode = 'QUARANTINE_RECOVERY_REFUSED',
+    directory = '',
+    candidatePath?: string,
+    workerId?: string,
+    options?: { cause?: unknown; candidateFileIdentity?: CandidateFileIdentity | null },
+  ) {
+    super(message, 'TERMINATION_UNCONFIRMED', {
+      cause: options?.cause,
+      workerId,
+      candidatePath,
+      candidateFileIdentity: options?.candidateFileIdentity,
+    })
+    this.name = 'QuarantineRecoveryError'
+    Object.defineProperty(this, 'errorCode', {
+      value: errorCode,
+      writable: true,
+      configurable: true,
+    })
+    this.directory = directory
+  }
+}
+
+/**
+ * Options for constructing {@link IntegrityVerificationError}.
+ */
+export interface IntegrityVerificationErrorOptions {
+  readonly cause?: unknown
+  readonly workerId?: string
+  readonly candidatePath?: string
+  readonly candidateFileIdentity?: CandidateFileIdentity | null
 }
 
 /**
@@ -69,19 +181,25 @@ export class IntegrityVerificationError extends Error {
   readonly errorCode: string
   readonly durationMs?: number
   readonly terminationStatus: WorkerTerminationStatus
+  readonly workerId?: string
+  readonly candidatePath?: string
+  readonly candidateFileIdentity?: CandidateFileIdentity | null
 
   constructor(
     message: string,
     errorCode = 'INTEGRITY_VERIFICATION_FAILED',
     durationMs?: number,
     terminationStatus: WorkerTerminationStatus = 'TERMINATED_CONFIRMED',
-    options?: { cause?: unknown },
+    options?: IntegrityVerificationErrorOptions,
   ) {
-    super(message, options)
+    super(message, options ? { cause: options.cause } : undefined)
     this.name = 'IntegrityVerificationError'
     this.errorCode = errorCode
     this.durationMs = durationMs
     this.terminationStatus = terminationStatus
+    this.workerId = options?.workerId
+    this.candidatePath = options?.candidatePath
+    this.candidateFileIdentity = options?.candidateFileIdentity ?? null
   }
 }
 
@@ -102,6 +220,41 @@ export function isTerminationUnconfirmed(err: unknown): boolean {
 }
 
 /**
+ * Extract worker termination identifiers and candidate metadata from an error or aggregate error.
+ */
+export function extractWorkerTerminationInfo(err: unknown): {
+  workerId?: string
+  candidatePath?: string
+  candidateFileIdentity?: CandidateFileIdentity | null
+} | null {
+  if (!err || typeof err !== 'object') {
+    return null
+  }
+  const obj = err as Record<string, unknown>
+  const workerId = typeof obj.workerId === 'string' ? obj.workerId : undefined
+  const candidatePath = typeof obj.candidatePath === 'string' ? obj.candidatePath : undefined
+  const candidateFileIdentity =
+    obj.candidateFileIdentity && typeof obj.candidateFileIdentity === 'object'
+      ? (obj.candidateFileIdentity as CandidateFileIdentity)
+      : null
+
+  if (workerId || candidatePath || candidateFileIdentity) {
+    return { workerId, candidatePath, candidateFileIdentity }
+  }
+
+  if (err instanceof AggregateError) {
+    for (const sub of err.errors) {
+      const extracted = extractWorkerTerminationInfo(sub)
+      if (extracted?.workerId || extracted?.candidatePath || extracted?.candidateFileIdentity) {
+        return extracted
+      }
+    }
+  }
+
+  return null
+}
+
+/**
  * Structural interface for worker instances, enabling internal adapter injection.
  */
 export interface WorkerLike {
@@ -109,8 +262,281 @@ export interface WorkerLike {
   on(event: 'error', listener: (err: Error) => void): this
   on(event: 'exit', listener: (exitCode: number) => void): this
   on(event: string, listener: (...args: any[]) => void): this
+  removeListener?(event: string, listener: (...args: any[]) => void): this
   removeAllListeners(event?: string): this
   terminate(): Promise<number>
+}
+
+/**
+ * Active session tracking a worker instance during candidate verification.
+ */
+export interface WorkerSupervisorSession {
+  readonly workerId: string
+  readonly candidatePath: string
+  readonly candidateFileIdentity: CandidateFileIdentity | null
+  readonly worker: WorkerLike
+  status: WorkerTerminationStatus | 'RUNNING' | 'TERMINATING'
+  exitProof: WorkerExitProof | null
+  readonly lateErrors: readonly Error[]
+  waitForExit(timeoutMs?: number): Promise<WorkerExitProof>
+  cleanupListeners?: () => void
+}
+
+/**
+ * Registration parameters for the worker supervisor.
+ */
+export interface WorkerSupervisorRegistrationParams {
+  readonly worker: WorkerLike
+  readonly candidatePath: string
+  readonly candidateFileIdentity?: CandidateFileIdentity | null
+  readonly workerId?: string
+}
+
+interface WorkerTrackingRecordInternal {
+  readonly workerId: string
+  readonly candidatePath: string
+  readonly candidateFileIdentity: CandidateFileIdentity | null
+  readonly worker: WorkerLike
+  readonly spawnedAt: number
+  status: WorkerTerminationStatus | 'RUNNING' | 'TERMINATING'
+  exitProof: WorkerExitProof | null
+  readonly lateErrors: Error[]
+  readonly exitPromise: Promise<WorkerExitProof>
+  readonly resolveExit: (proof: WorkerExitProof) => void
+  readonly rejectExit: (err: Error) => void
+  exitListenersCleaned: boolean
+  cleanupListeners?: () => void
+}
+
+/**
+ * Supervisor tracking active and terminating worker lifecycles, exit proofs,
+ * and candidate file associations.
+ */
+export class WorkerSupervisor {
+  private readonly records = new Map<string, WorkerTrackingRecordInternal>()
+  private readonly byCandidate = new Map<string, string>()
+
+  registerWorker(params: WorkerSupervisorRegistrationParams): WorkerSupervisorSession {
+    const workerId = params.workerId ?? randomUUID()
+    const resolvedPath = resolve(params.candidatePath)
+    const fileIdentity = params.candidateFileIdentity ?? captureCandidateFileIdentity(resolvedPath)
+
+    let resolveExitPromise!: (proof: WorkerExitProof) => void
+    let rejectExitPromise!: (err: Error) => void
+    const exitPromise = new Promise<WorkerExitProof>((res, rej) => {
+      resolveExitPromise = res
+      rejectExitPromise = rej
+    })
+
+    const record: WorkerTrackingRecordInternal = {
+      workerId,
+      candidatePath: resolvedPath,
+      candidateFileIdentity: fileIdentity,
+      worker: params.worker,
+      spawnedAt: Date.now(),
+      status: 'RUNNING',
+      exitProof: null,
+      lateErrors: [],
+      exitPromise,
+      resolveExit: resolveExitPromise,
+      rejectExit: rejectExitPromise,
+      exitListenersCleaned: false,
+    }
+
+    const onExit = (code: number) => {
+      this.recordTerminationConfirmed(workerId, code, 'exit_event')
+    }
+
+    const onError = (err: Error) => {
+      record.lateErrors.push(err)
+    }
+
+    params.worker.on('exit', onExit)
+    params.worker.on('error', onError)
+
+    record.cleanupListeners = () => {
+      if (!record.exitListenersCleaned) {
+        record.exitListenersCleaned = true
+        try {
+          if (typeof params.worker.removeListener === 'function') {
+            params.worker.removeListener('exit', onExit)
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
+
+    this.records.set(workerId, record)
+    this.byCandidate.set(resolvedPath, workerId)
+
+    return {
+      workerId,
+      candidatePath: resolvedPath,
+      candidateFileIdentity: fileIdentity,
+      worker: params.worker,
+      get status() {
+        return record.status
+      },
+      set status(s) {
+        record.status = s
+      },
+      get exitProof() {
+        return record.exitProof
+      },
+      get lateErrors() {
+        return record.lateErrors
+      },
+      waitForExit: (timeoutMs) => this.waitForExit(workerId, timeoutMs),
+      cleanupListeners: () => record.cleanupListeners?.(),
+    }
+  }
+
+  getExitProof(workerId: string): WorkerExitProof | null {
+    const rec = this.records.get(workerId)
+    return rec?.exitProof ?? null
+  }
+
+  getSession(workerId: string): WorkerSupervisorSession | null {
+    const rec = this.records.get(workerId)
+    if (!rec) return null
+    return {
+      workerId: rec.workerId,
+      candidatePath: rec.candidatePath,
+      candidateFileIdentity: rec.candidateFileIdentity,
+      worker: rec.worker,
+      get status() {
+        return rec.status
+      },
+      set status(s) {
+        rec.status = s
+      },
+      get exitProof() {
+        return rec.exitProof
+      },
+      get lateErrors() {
+        return rec.lateErrors
+      },
+      waitForExit: (timeoutMs) => this.waitForExit(rec.workerId, timeoutMs),
+      cleanupListeners: () => rec.cleanupListeners?.(),
+    }
+  }
+
+  getSessionByCandidatePath(candidatePath: string): WorkerSupervisorSession | null {
+    const workerId = this.byCandidate.get(resolve(candidatePath))
+    if (!workerId) return null
+    return this.getSession(workerId)
+  }
+
+  recordTerminationConfirmed(
+    workerId: string,
+    exitCode: number,
+    proofSource: 'terminate' | 'exit_event' = 'exit_event',
+  ): WorkerExitProof {
+    const rec = this.records.get(workerId)
+    if (!rec) {
+      return {
+        workerId,
+        exitCode,
+        confirmedAt: Date.now(),
+        proofSource,
+      }
+    }
+
+    if (!rec.exitProof) {
+      rec.exitProof = {
+        workerId,
+        exitCode,
+        confirmedAt: Date.now(),
+        proofSource,
+      }
+      rec.status = 'TERMINATED_CONFIRMED'
+      rec.cleanupListeners?.()
+      rec.resolveExit(rec.exitProof)
+    }
+
+    return rec.exitProof
+  }
+
+  recordTerminationUnconfirmed(workerId: string, error?: Error): void {
+    const rec = this.records.get(workerId)
+    if (rec && rec.status !== 'TERMINATED_CONFIRMED') {
+      rec.status = 'TERMINATION_UNCONFIRMED'
+      if (error) {
+        rec.lateErrors.push(error)
+      }
+    }
+  }
+
+  async waitForExit(workerId: string, timeoutMs = 5000): Promise<WorkerExitProof> {
+    const rec = this.records.get(workerId)
+    if (!rec) {
+      throw new WorkerTerminationError(
+        `No tracked worker found for workerId "${workerId}"`,
+        'TERMINATION_UNCONFIRMED',
+      )
+    }
+
+    if (rec.exitProof) {
+      return rec.exitProof
+    }
+
+    if (timeoutMs <= 0) {
+      throw new WorkerTerminationError(
+        `Worker "${workerId}" has not exited and wait timeout is 0ms`,
+        'TERMINATION_UNCONFIRMED',
+        { workerId, candidatePath: rec.candidatePath, candidateFileIdentity: rec.candidateFileIdentity },
+      )
+    }
+
+    let timer: NodeJS.Timeout | null = null
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        reject(
+          new WorkerTerminationError(
+            `Timed out after ${timeoutMs}ms waiting for worker exit confirmation (workerId: ${workerId})`,
+            'TERMINATION_UNCONFIRMED',
+            { workerId, candidatePath: rec.candidatePath, candidateFileIdentity: rec.candidateFileIdentity },
+          ),
+        )
+      }, timeoutMs)
+    })
+
+    try {
+      return await Promise.race([rec.exitPromise, timeoutPromise])
+    } finally {
+      if (timer !== null) {
+        clearTimeout(timer)
+      }
+    }
+  }
+
+  unregisterWorker(workerId: string): void {
+    const rec = this.records.get(workerId)
+    if (rec) {
+      rec.cleanupListeners?.()
+      this.byCandidate.delete(rec.candidatePath)
+      this.records.delete(workerId)
+    }
+  }
+
+  resetForTesting(): void {
+    for (const rec of this.records.values()) {
+      rec.cleanupListeners?.()
+    }
+    this.records.clear()
+    this.byCandidate.clear()
+  }
+}
+
+/** Global singleton worker supervisor. */
+export const workerSupervisor = new WorkerSupervisor()
+
+/**
+ * Access the global worker supervisor.
+ */
+export function getWorkerSupervisor(): WorkerSupervisor {
+  return workerSupervisor
 }
 
 /**
@@ -301,6 +727,7 @@ export async function verifyCandidateDatabaseWithWorker(
     candidatePath: resolvedCandidatePath,
   }
 
+  const candidateFileIdentity = captureCandidateFileIdentity(resolvedCandidatePath)
   const timeoutMs = options?.timeoutMs ?? 30000
   const terminationTimeoutMs = options?.terminationTimeoutMs ?? 5000
 
@@ -317,9 +744,16 @@ export async function verifyCandidateDatabaseWithWorker(
       'WORKER_SPAWN_FAILED',
       undefined,
       'TERMINATED_CONFIRMED',
-      { cause: spawnErr },
+      { cause: spawnErr, candidatePath: resolvedCandidatePath, candidateFileIdentity },
     )
   }
+
+  const session = workerSupervisor.registerWorker({
+    worker,
+    candidatePath: resolvedCandidatePath,
+    candidateFileIdentity,
+  })
+  const workerId = session.workerId
 
   return new Promise<IntegrityVerificationResult>((resolvePromise, rejectPromise) => {
     let phase: 'RUNNING' | 'TERMINATING' | 'SETTLED' = 'RUNNING'
@@ -347,6 +781,7 @@ export async function verifyCandidateDatabaseWithWorker(
         return // Ignore duplicate messages or competing events
       }
       phase = 'TERMINATING'
+      session.status = 'TERMINATING'
       primaryOutcome = outcome
 
       // Clear external timers and listeners immediately
@@ -375,22 +810,39 @@ export async function verifyCandidateDatabaseWithWorker(
               new WorkerTerminationError(
                 `Integrity worker termination timed out after ${terminationTimeoutMs}ms`,
                 'TERMINATION_UNCONFIRMED',
+                { workerId, candidatePath: resolvedCandidatePath, candidateFileIdentity },
               ),
             )
           }, terminationTimeoutMs)
         })
 
-        await Promise.race([termPromise, timeoutPromise])
+        const termExitCode = await Promise.race([termPromise, timeoutPromise])
         terminationStatus = 'TERMINATED_CONFIRMED'
+        session.status = 'TERMINATED_CONFIRMED'
+        workerSupervisor.recordTerminationConfirmed(
+          workerId,
+          typeof termExitCode === 'number' ? termExitCode : 0,
+          'terminate',
+        )
       } catch (termErr) {
         terminationStatus = 'TERMINATION_UNCONFIRMED'
+        session.status = 'TERMINATION_UNCONFIRMED'
+        workerSupervisor.recordTerminationUnconfirmed(
+          workerId,
+          termErr instanceof Error ? termErr : new Error(String(termErr)),
+        )
         terminateError =
           termErr instanceof WorkerTerminationError
             ? termErr
             : new WorkerTerminationError(
                 `Integrity worker termination failed: ${termErr instanceof Error ? termErr.message : String(termErr)}`,
                 'TERMINATION_UNCONFIRMED',
-                { cause: termErr },
+                {
+                  cause: termErr,
+                  workerId,
+                  candidatePath: resolvedCandidatePath,
+                  candidateFileIdentity,
+                },
               )
       } finally {
         if (termTimeoutTimer !== null) {
@@ -401,11 +853,21 @@ export async function verifyCandidateDatabaseWithWorker(
 
       // Only clean up worker listeners once termination completes/fails
       if (terminationStatus === 'TERMINATED_CONFIRMED') {
+        session.cleanupListeners?.()
         worker.removeAllListeners()
       } else {
-        worker.removeAllListeners()
-        // Retain no-op error shield on unconfirmed worker to prevent late unhandled 'error' crash
-        worker.on('error', () => {})
+        // Retain supervisor exit tracking and error shield on unconfirmed worker
+        try {
+          if (typeof worker.removeListener === 'function') {
+            worker.removeListener('message', onMessage)
+            worker.removeListener('error', onErrorVerification)
+            worker.removeListener('exit', onExitVerification)
+          } else if (typeof worker.removeAllListeners === 'function') {
+            worker.removeAllListeners('message')
+          }
+        } catch {
+          // ignore
+        }
       }
 
       phase = 'SETTLED'
@@ -419,7 +881,7 @@ export async function verifyCandidateDatabaseWithWorker(
             'WORKER_UNCAUGHT_ERROR',
             primaryOutcome.result.durationMs,
             terminationStatus,
-            { cause: firstLate },
+            { cause: firstLate, workerId, candidatePath: resolvedCandidatePath, candidateFileIdentity },
           )
           if (lateErrors.length === 1 && !terminateError) {
             rejectPromise(lateErr)
@@ -487,11 +949,12 @@ export async function verifyCandidateDatabaseWithWorker(
           'VERIFICATION_TIMEOUT',
           undefined,
           'TERMINATION_UNCONFIRMED',
+          { workerId, candidatePath: resolvedCandidatePath, candidateFileIdentity },
         ),
       })
     }, timeoutMs)
 
-    worker.on('message', (value: unknown) => {
+    const onMessage = (value: unknown): void => {
       if (phase !== 'RUNNING') return
 
       if (!isValidIntegrityResponse(value)) {
@@ -502,6 +965,7 @@ export async function verifyCandidateDatabaseWithWorker(
             'INVALID_IPC_RESPONSE',
             undefined,
             'TERMINATION_UNCONFIRMED',
+            { workerId, candidatePath: resolvedCandidatePath, candidateFileIdentity },
           ),
         })
         return
@@ -515,6 +979,7 @@ export async function verifyCandidateDatabaseWithWorker(
             'REQUEST_ID_MISMATCH',
             undefined,
             'TERMINATION_UNCONFIRMED',
+            { workerId, candidatePath: resolvedCandidatePath, candidateFileIdentity },
           ),
         })
         return
@@ -528,6 +993,7 @@ export async function verifyCandidateDatabaseWithWorker(
             value.errorCode,
             value.durationMs,
             'TERMINATION_UNCONFIRMED',
+            { workerId, candidatePath: resolvedCandidatePath, candidateFileIdentity },
           ),
         })
         return
@@ -541,6 +1007,7 @@ export async function verifyCandidateDatabaseWithWorker(
             'INTEGRITY_RESULT_NOT_OK',
             value.durationMs,
             'TERMINATION_UNCONFIRMED',
+            { workerId, candidatePath: resolvedCandidatePath, candidateFileIdentity },
           ),
         })
         return
@@ -554,9 +1021,9 @@ export async function verifyCandidateDatabaseWithWorker(
           durationMs: value.durationMs,
         },
       })
-    })
+    }
 
-    worker.on('error', (err: Error) => {
+    const onErrorVerification = (err: Error): void => {
       if (phase === 'RUNNING') {
         initiateTermination({
           kind: 'failure',
@@ -565,15 +1032,15 @@ export async function verifyCandidateDatabaseWithWorker(
             'WORKER_UNCAUGHT_ERROR',
             undefined,
             'TERMINATION_UNCONFIRMED',
-            { cause: err },
+            { cause: err, workerId, candidatePath: resolvedCandidatePath, candidateFileIdentity },
           ),
         })
       } else {
         lateErrors.push(err)
       }
-    })
+    }
 
-    worker.on('exit', (code: number) => {
+    const onExitVerification = (code: number): void => {
       if (phase === 'RUNNING') {
         initiateTermination({
           kind: 'failure',
@@ -582,6 +1049,7 @@ export async function verifyCandidateDatabaseWithWorker(
             'WORKER_PREMATURE_EXIT',
             undefined,
             'TERMINATION_UNCONFIRMED',
+            { workerId, candidatePath: resolvedCandidatePath, candidateFileIdentity },
           ),
         })
       } else if (phase === 'TERMINATING') {
@@ -591,10 +1059,15 @@ export async function verifyCandidateDatabaseWithWorker(
             'WORKER_PREMATURE_EXIT',
             undefined,
             'TERMINATION_UNCONFIRMED',
+            { workerId, candidatePath: resolvedCandidatePath, candidateFileIdentity },
           )
           lateErrors.push(exitErr)
         }
       }
-    })
+    }
+
+    worker.on('message', onMessage)
+    worker.on('error', onErrorVerification)
+    worker.on('exit', onExitVerification)
   })
 }

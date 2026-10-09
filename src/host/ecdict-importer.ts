@@ -25,15 +25,24 @@
  */
 
 import { createHash, randomUUID } from 'node:crypto'
-import { createReadStream, existsSync } from 'node:fs'
+import { createReadStream, existsSync, statSync } from 'node:fs'
 import { link, mkdir, open, stat, unlink } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 
 import {
+  captureCandidateFileIdentity,
+  extractWorkerTerminationInfo,
   isTerminationUnconfirmed,
+  matchesCandidateFileIdentity,
+  QuarantineRecoveryError,
   verifyCandidateDatabaseWithWorker,
+  workerSupervisor,
+  type CandidateFileIdentity,
+  type IntegrityRequest,
   type IntegrityVerificationResult,
+  type WorkerExitProof,
+  type WorkerLike,
 } from './ecdict-integrity-verifier.js'
 import { openProductionDictionary } from './corpus-db.js'
 import { StreamingCsvParser } from './csv-parser.js'
@@ -128,6 +137,12 @@ export interface QuarantineRecord {
   readonly reason: string
   /** Underlying error that caused unconfirmed termination. */
   readonly error: unknown
+  /** Tracked worker ID associated with the quarantine, if any. */
+  readonly workerId?: string
+  /** Captured candidate file identity at quarantine time. */
+  readonly candidateFileIdentity?: CandidateFileIdentity | null
+  /** Validated worker exit proof confirming termination, if already proven. */
+  readonly exitProof?: WorkerExitProof | null
 }
 
 /**
@@ -285,10 +300,20 @@ export interface BuildManagedEcdictDatabaseInternalOptions {
   ) => Promise<IntegrityVerificationResult>
   /** @internal Custom worker URL for fault-injection testing (test only). */
   readonly workerUrl?: URL
+  /** @internal Custom worker adapter for deterministic lifecycle testing (test only). */
+  readonly workerAdapter?: (request: IntegrityRequest) => WorkerLike
+  /** @internal Custom termination timeout in milliseconds (test only). */
+  readonly terminationTimeoutMs?: number
 }
 
 /** Set of normalized database directories currently being built in this process. */
 const activeImports = new Set<string>()
+
+/** Map of in-progress recovery operations per normalized database directory. */
+const activeRecoveries = new Map<
+  string,
+  Promise<RecoverQuarantinedDirectoryResult>
+>()
 
 /** Map of normalized database directories quarantined due to unconfirmed worker termination. */
 const quarantinedDirectories = new Map<string, QuarantineRecord>()
@@ -301,6 +326,13 @@ export function isDatabaseDirectoryQuarantined(databaseDirectory: string): boole
 }
 
 /**
+ * Check whether a quarantine recovery is currently active for a database directory.
+ */
+export function isRecoveryInProgress(databaseDirectory: string): boolean {
+  return activeRecoveries.has(resolve(databaseDirectory))
+}
+
+/**
  * Get active quarantine record for a database directory, if any.
  */
 export function getQuarantineRecord(databaseDirectory: string): QuarantineRecord | null {
@@ -308,46 +340,179 @@ export function getQuarantineRecord(databaseDirectory: string): QuarantineRecord
 }
 
 /**
+ * Options for recovering a quarantined database directory.
+ */
+export interface RecoverQuarantinedDirectoryOptions {
+  /** Optional custom unlink function for testing file deletion errors. */
+  readonly unlinkFn?: (path: string) => Promise<void>
+  /** Optional wait timeout in milliseconds to await worker exit proof. */
+  readonly timeoutMs?: number
+  /** Optional explicit worker exit proof object. */
+  readonly exitProof?: WorkerExitProof
+}
+
+/**
+ * Result of quarantine recovery attempt.
+ */
+export interface RecoverQuarantinedDirectoryResult {
+  readonly recovered: boolean
+  readonly candidateCleaned: boolean
+  readonly exitProof?: WorkerExitProof
+}
+
+/**
  * Verify termination and safely recover a quarantined database directory.
  *
- * Requirements for safe release:
- * - Checks that the directory is currently quarantined.
- * - If candidate file exists, validates path containment and unlinks candidate and sidecars.
- * - Releases directory from quarantine upon clean verification.
+ * Requirements for safe release (Strict Proof-First Invariant):
+ * 1. Checks that the directory is currently quarantined.
+ * 2. Confirms authentic worker exit proof before any file modification or quarantine release:
+ *    - Worker exit event confirmed, OR
+ *    - terminate() Promise settled with confirmed exit.
+ *    - Unconfirmed worker status REFUSES recovery and PRESERVES quarantine and candidate.
+ * 3. Validates candidate database path containment within the database directory.
+ * 4. Validates candidate database file identity against captured quarantine signature
+ *    to prevent deleting substituted or foreign files.
+ * 5. Cleans up candidate file and sidecars using safe cleanup contracts.
+ * 6. Only releases directory from quarantine after cleanup reaches safe state.
  *
  * @param databaseDirectory - database directory to recover.
- * @param options - optional custom unlink function.
+ * @param options - optional recovery options.
  * @returns outcome of recovery attempt.
  */
 export async function recoverQuarantinedDirectory(
   databaseDirectory: string,
-  options?: {
-    unlinkFn?: (path: string) => Promise<void>
-  },
-): Promise<{ recovered: boolean; candidateCleaned: boolean }> {
+  options?: RecoverQuarantinedDirectoryOptions,
+): Promise<RecoverQuarantinedDirectoryResult> {
   const normalized = resolve(databaseDirectory)
-  const record = quarantinedDirectories.get(normalized)
-  if (!record) {
-    return { recovered: false, candidateCleaned: false }
+
+  // 1. Concurrency deduplication: if recovery is already in progress, await the same promise
+  const inFlight = activeRecoveries.get(normalized)
+  if (inFlight) {
+    return inFlight
   }
 
-  let candidateCleaned = false
-  if (existsSync(record.candidatePath)) {
+  const recoveryPromise = (async (): Promise<RecoverQuarantinedDirectoryResult> => {
+    const record = quarantinedDirectories.get(normalized)
+    if (!record) {
+      return { recovered: false, candidateCleaned: false }
+    }
+
+    // 2. Strict Worker Exit Proof Verification
+    let confirmedProof: WorkerExitProof | null = null
+
+    if (options?.exitProof) {
+      const p = options.exitProof
+      if (typeof p !== 'object' || !p.workerId || typeof p.exitCode !== 'number') {
+        throw new QuarantineRecoveryError(
+          'Supplied exitProof is invalid or malformed',
+          'INVALID_EXIT_PROOF',
+          normalized,
+          record.candidatePath,
+          record.workerId,
+          { candidateFileIdentity: record.candidateFileIdentity },
+        )
+      }
+      if (record.workerId && p.workerId !== record.workerId) {
+        throw new QuarantineRecoveryError(
+          `Supplied exitProof workerId "${p.workerId}" does not match quarantined workerId "${record.workerId}"`,
+          'WORKER_ID_MISMATCH',
+          normalized,
+          record.candidatePath,
+          record.workerId,
+          { candidateFileIdentity: record.candidateFileIdentity },
+        )
+      }
+      const supProof = workerSupervisor.getExitProof(p.workerId)
+      if (!supProof) {
+        throw new QuarantineRecoveryError(
+          `Supplied exitProof cannot be validated against worker supervisor records for workerId "${p.workerId}"`,
+          'UNVERIFIED_EXIT_PROOF',
+          normalized,
+          record.candidatePath,
+          record.workerId,
+          { candidateFileIdentity: record.candidateFileIdentity },
+        )
+      }
+      confirmedProof = supProof
+    } else if (record.workerId) {
+      let supProof = workerSupervisor.getExitProof(record.workerId)
+      if (!supProof && options?.timeoutMs && options.timeoutMs > 0) {
+        try {
+          supProof = await workerSupervisor.waitForExit(record.workerId, options.timeoutMs)
+        } catch {
+          supProof = null
+        }
+      }
+      if (!supProof) {
+        throw new QuarantineRecoveryError(
+          `Worker exit proof not confirmed for worker "${record.workerId}". Worker may still be alive with open file handles.`,
+          'WORKER_EXIT_UNCONFIRMED',
+          normalized,
+          record.candidatePath,
+          record.workerId,
+          { candidateFileIdentity: record.candidateFileIdentity },
+        )
+      }
+      confirmedProof = supProof
+    } else {
+      throw new QuarantineRecoveryError(
+        'Quarantined directory cannot be recovered: no verifiable worker tracking record associated with quarantine',
+        'WORKER_EXIT_UNCONFIRMED',
+        normalized,
+        record.candidatePath,
+        undefined,
+        { candidateFileIdentity: record.candidateFileIdentity },
+      )
+    }
+
+    // 3. Verify Candidate Path Containment
     await validateCandidateDatabasePath(record.candidatePath, normalized)
-    await cleanupCandidateArtifacts(record.candidatePath, options?.unlinkFn)
-    candidateCleaned = true
-  }
 
-  quarantinedDirectories.delete(normalized)
-  return { recovered: true, candidateCleaned }
+    // 4. Verify Candidate File Identity and Cleanup
+    let candidateCleaned = false
+    if (existsSync(record.candidatePath)) {
+      const currentStat = statSync(record.candidatePath)
+      if (record.candidateFileIdentity) {
+        if (!matchesCandidateFileIdentity(currentStat, record.candidateFileIdentity)) {
+          throw new QuarantineRecoveryError(
+            `Candidate file identity mismatch for "${record.candidatePath}": file on disk differs from quarantined candidate (possible foreign replacement)`,
+            'CANDIDATE_FILE_IDENTITY_MISMATCH',
+            normalized,
+            record.candidatePath,
+            record.workerId,
+            { candidateFileIdentity: record.candidateFileIdentity },
+          )
+        }
+      }
+
+      // 5. Clean up candidate file and sidecars
+      await cleanupCandidateArtifacts(record.candidatePath, options?.unlinkFn)
+      candidateCleaned = true
+    } else {
+      await cleanupCandidateSidecars(record.candidatePath, options?.unlinkFn)
+    }
+
+    // 6. Release directory from quarantine upon successful cleanup
+    quarantinedDirectories.delete(normalized)
+    return { recovered: true, candidateCleaned, exitProof: confirmedProof }
+  })()
+
+  activeRecoveries.set(normalized, recoveryPromise)
+  try {
+    return await recoveryPromise
+  } finally {
+    activeRecoveries.delete(normalized)
+  }
 }
 
 /**
- * @internal Reset active imports and quarantined directories (test only).
+ * @internal Reset active imports, recoveries, and quarantined directories (test only).
  */
 export function _resetQuarantinesForTesting(): void {
   quarantinedDirectories.clear()
   activeImports.clear()
+  activeRecoveries.clear()
+  workerSupervisor.resetForTesting()
 }
 
 /**
@@ -434,6 +599,32 @@ async function cleanupCandidateArtifacts(
       throw errors[0]
     }
     throw new AggregateError(errors, `Failed to clean up candidate artifacts for ${candidatePath}`)
+  }
+}
+
+/**
+ * Clean up candidate SQLite sidecars when candidate file is absent.
+ */
+async function cleanupCandidateSidecars(
+  candidatePath: string,
+  unlinkFn: (path: string) => Promise<void> = unlink,
+): Promise<void> {
+  const suffixes = ['-journal', '-wal', '-shm']
+  const errors: unknown[] = []
+  for (const suffix of suffixes) {
+    try {
+      await unlinkFn(candidatePath + suffix)
+    } catch (err: any) {
+      if (err?.code !== 'ENOENT') {
+        errors.push(err)
+      }
+    }
+  }
+  if (errors.length > 0) {
+    if (errors.length === 1) {
+      throw errors[0]
+    }
+    throw new AggregateError(errors, `Failed to clean up candidate sidecars for ${candidatePath}`)
   }
 }
 
@@ -580,6 +771,13 @@ export async function buildManagedEcdictDatabaseInternal(
   if (quarantinedDirectories.has(normalizedDbDir)) {
     const record = quarantinedDirectories.get(normalizedDbDir)!
     throw new EcdictImportQuarantinedError(normalizedDbDir, record.reason, record.candidatePath)
+  }
+  if (activeRecoveries.has(normalizedDbDir)) {
+    throw new EcdictImportQuarantinedError(
+      normalizedDbDir,
+      'Recovery is currently in progress for quarantined directory',
+      '',
+    )
   }
   activeImports.add(normalizedDbDir)
 
@@ -1090,6 +1288,8 @@ export async function buildManagedEcdictDatabaseInternal(
         signal,
         workerUrl: options?.workerUrl,
         expectedDirectory: paths.databaseDirectory,
+        workerAdapter: options?.workerAdapter,
+        terminationTimeoutMs: options?.terminationTimeoutMs,
       })
       integrityCheckDurationMs = verifierRes.durationMs
     }
@@ -1292,12 +1492,17 @@ export async function buildManagedEcdictDatabaseInternal(
     const terminationUnconfirmed = isTerminationUnconfirmed(err)
 
     if (terminationUnconfirmed && candidatePath !== null) {
+      const termInfo = extractWorkerTerminationInfo(err)
+      const capturedIdentity =
+        termInfo?.candidateFileIdentity ?? captureCandidateFileIdentity(candidatePath)
       quarantinedDirectories.set(normalizedDbDir, {
         directory: normalizedDbDir,
         candidatePath,
         quarantinedAt: Date.now(),
         reason: 'Worker termination unconfirmed: possible lingering SQLite file handle',
         error: err,
+        workerId: termInfo?.workerId,
+        candidateFileIdentity: capturedIdentity,
       })
     }
 

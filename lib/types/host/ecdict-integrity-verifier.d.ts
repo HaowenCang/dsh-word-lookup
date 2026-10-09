@@ -13,6 +13,7 @@
  *
  * @module dsh-word-lookup/host/ecdict-integrity-verifier
  */
+import { type Stats } from 'node:fs';
 import { Worker } from 'node:worker_threads';
 import type { IntegrityRequest, IntegrityResponse } from './ecdict-integrity-worker.js';
 export type { IntegrityRequest, IntegrityResponse, };
@@ -29,14 +30,70 @@ export interface IntegrityVerificationResult {
     readonly durationMs: number;
 }
 /**
+ * File identity signature used to verify candidate file authenticity before deletion.
+ */
+export interface CandidateFileIdentity {
+    readonly dev: number;
+    readonly ino: number;
+    readonly birthtimeMs: number;
+    readonly mtimeMs: number;
+    readonly size: number;
+}
+/**
+ * Capture file identity signature for candidate database path.
+ */
+export declare function captureCandidateFileIdentity(filePath: string): CandidateFileIdentity | null;
+/**
+ * Check whether a file's current stat matches the recorded candidate file identity.
+ */
+export declare function matchesCandidateFileIdentity(currentStat: Stats, recorded: CandidateFileIdentity): boolean;
+/**
+ * Structurally reliable proof of worker termination.
+ */
+export interface WorkerExitProof {
+    readonly workerId: string;
+    readonly exitCode: number;
+    readonly confirmedAt: number;
+    readonly proofSource: 'terminate' | 'exit_event';
+}
+/**
+ * Options for constructing {@link WorkerTerminationError}.
+ */
+export interface WorkerTerminationErrorOptions {
+    readonly cause?: unknown;
+    readonly workerId?: string;
+    readonly candidatePath?: string;
+    readonly candidateFileIdentity?: CandidateFileIdentity | null;
+}
+/**
  * Error thrown when worker termination fails or cannot be confirmed within deadline.
  */
 export declare class WorkerTerminationError extends Error {
     readonly errorCode = "WORKER_TERMINATION_FAILED";
     readonly terminationStatus: WorkerTerminationStatus;
-    constructor(message: string, terminationStatus?: WorkerTerminationStatus, options?: {
+    readonly workerId?: string;
+    readonly candidatePath?: string;
+    readonly candidateFileIdentity?: CandidateFileIdentity | null;
+    constructor(message: string, terminationStatus?: WorkerTerminationStatus, options?: WorkerTerminationErrorOptions);
+}
+/**
+ * Error thrown when quarantine recovery cannot be safely completed.
+ */
+export declare class QuarantineRecoveryError extends WorkerTerminationError {
+    readonly directory: string;
+    constructor(message: string, errorCode?: string, directory?: string, candidatePath?: string, workerId?: string, options?: {
         cause?: unknown;
+        candidateFileIdentity?: CandidateFileIdentity | null;
     });
+}
+/**
+ * Options for constructing {@link IntegrityVerificationError}.
+ */
+export interface IntegrityVerificationErrorOptions {
+    readonly cause?: unknown;
+    readonly workerId?: string;
+    readonly candidatePath?: string;
+    readonly candidateFileIdentity?: CandidateFileIdentity | null;
 }
 /**
  * Error thrown when integrity verification fails or cannot complete safely.
@@ -45,14 +102,23 @@ export declare class IntegrityVerificationError extends Error {
     readonly errorCode: string;
     readonly durationMs?: number;
     readonly terminationStatus: WorkerTerminationStatus;
-    constructor(message: string, errorCode?: string, durationMs?: number, terminationStatus?: WorkerTerminationStatus, options?: {
-        cause?: unknown;
-    });
+    readonly workerId?: string;
+    readonly candidatePath?: string;
+    readonly candidateFileIdentity?: CandidateFileIdentity | null;
+    constructor(message: string, errorCode?: string, durationMs?: number, terminationStatus?: WorkerTerminationStatus, options?: IntegrityVerificationErrorOptions);
 }
 /**
  * Check whether an error or aggregate error indicates unconfirmed worker termination.
  */
 export declare function isTerminationUnconfirmed(err: unknown): boolean;
+/**
+ * Extract worker termination identifiers and candidate metadata from an error or aggregate error.
+ */
+export declare function extractWorkerTerminationInfo(err: unknown): {
+    workerId?: string;
+    candidatePath?: string;
+    candidateFileIdentity?: CandidateFileIdentity | null;
+} | null;
 /**
  * Structural interface for worker instances, enabling internal adapter injection.
  */
@@ -61,9 +127,56 @@ export interface WorkerLike {
     on(event: 'error', listener: (err: Error) => void): this;
     on(event: 'exit', listener: (exitCode: number) => void): this;
     on(event: string, listener: (...args: any[]) => void): this;
+    removeListener?(event: string, listener: (...args: any[]) => void): this;
     removeAllListeners(event?: string): this;
     terminate(): Promise<number>;
 }
+/**
+ * Active session tracking a worker instance during candidate verification.
+ */
+export interface WorkerSupervisorSession {
+    readonly workerId: string;
+    readonly candidatePath: string;
+    readonly candidateFileIdentity: CandidateFileIdentity | null;
+    readonly worker: WorkerLike;
+    status: WorkerTerminationStatus | 'RUNNING' | 'TERMINATING';
+    exitProof: WorkerExitProof | null;
+    readonly lateErrors: readonly Error[];
+    waitForExit(timeoutMs?: number): Promise<WorkerExitProof>;
+    cleanupListeners?: () => void;
+}
+/**
+ * Registration parameters for the worker supervisor.
+ */
+export interface WorkerSupervisorRegistrationParams {
+    readonly worker: WorkerLike;
+    readonly candidatePath: string;
+    readonly candidateFileIdentity?: CandidateFileIdentity | null;
+    readonly workerId?: string;
+}
+/**
+ * Supervisor tracking active and terminating worker lifecycles, exit proofs,
+ * and candidate file associations.
+ */
+export declare class WorkerSupervisor {
+    private readonly records;
+    private readonly byCandidate;
+    registerWorker(params: WorkerSupervisorRegistrationParams): WorkerSupervisorSession;
+    getExitProof(workerId: string): WorkerExitProof | null;
+    getSession(workerId: string): WorkerSupervisorSession | null;
+    getSessionByCandidatePath(candidatePath: string): WorkerSupervisorSession | null;
+    recordTerminationConfirmed(workerId: string, exitCode: number, proofSource?: 'terminate' | 'exit_event'): WorkerExitProof;
+    recordTerminationUnconfirmed(workerId: string, error?: Error): void;
+    waitForExit(workerId: string, timeoutMs?: number): Promise<WorkerExitProof>;
+    unregisterWorker(workerId: string): void;
+    resetForTesting(): void;
+}
+/** Global singleton worker supervisor. */
+export declare const workerSupervisor: WorkerSupervisor;
+/**
+ * Access the global worker supervisor.
+ */
+export declare function getWorkerSupervisor(): WorkerSupervisor;
 /**
  * Options for spawning the integrity worker.
  */

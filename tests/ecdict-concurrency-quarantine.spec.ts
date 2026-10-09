@@ -11,6 +11,7 @@
  */
 
 import { beforeEach, describe, expect, it } from 'vitest'
+import { EventEmitter } from 'node:events'
 import { randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -25,8 +26,10 @@ import {
   _resetQuarantinesForTesting,
 } from '../src/host/ecdict-importer.js'
 import {
+  captureCandidateFileIdentity,
   isTerminationUnconfirmed,
   WorkerTerminationError,
+  workerSupervisor,
 } from '../src/host/ecdict-integrity-verifier.js'
 import { resolveManagedStoragePaths } from '../src/host/managed-storage.js'
 import type { EcdictSourceDescriptor } from '../src/host/ecdict-source.js'
@@ -192,8 +195,20 @@ describe('Phase 7A.5R4.1 Defect B: Termination Unconfirmed Concurrency Isolation
       const sourceFile = join(paths.sourceCacheDirectory, 'ecdict.csv')
       writeFileSync(sourceFile, rawBytes)
 
-      const failingVerifier = async () => {
-        throw new WorkerTerminationError('Stuck worker thread', 'TERMINATION_UNCONFIRMED')
+      let trackedWorkerId: string | undefined
+      const failingVerifier = async (candPath: string) => {
+        const mockWorker = new EventEmitter() as any
+        mockWorker.terminate = async () => 1
+        const session = workerSupervisor.registerWorker({
+          worker: mockWorker,
+          candidatePath: candPath,
+        })
+        trackedWorkerId = session.workerId
+        throw new WorkerTerminationError('Stuck worker thread', 'TERMINATION_UNCONFIRMED', {
+          workerId: session.workerId,
+          candidatePath: candPath,
+          candidateFileIdentity: captureCandidateFileIdentity(candPath),
+        })
       }
 
       await expect(
@@ -207,7 +222,8 @@ describe('Phase 7A.5R4.1 Defect B: Termination Unconfirmed Concurrency Isolation
 
       expect(isDatabaseDirectoryQuarantined(paths.databaseDirectory)).toBe(true)
 
-      // Safe recovery: caller verifies worker exit and triggers recovery
+      // Verified termination: exit proof confirmed before safe recovery
+      workerSupervisor.recordTerminationConfirmed(trackedWorkerId!, 0, 'exit_event')
       const recoveryResult = await recoverQuarantinedDirectory(paths.databaseDirectory)
       expect(recoveryResult.recovered).toBe(true)
       expect(recoveryResult.candidateCleaned).toBe(true)
@@ -274,8 +290,20 @@ describe('Phase 7A.5R4.1 Defect B: Termination Unconfirmed Concurrency Isolation
       writeFileSync(foreignDb, 'USER_DATABASE_CONTENT')
       writeFileSync(foreignDoc, 'USER_DOCUMENTATION_CONTENT')
 
-      const failingVerifier = async () => {
-        throw new WorkerTerminationError('Unconfirmed worker shutdown', 'TERMINATION_UNCONFIRMED')
+      let trackedWorkerId: string | undefined
+      const failingVerifier = async (candPath: string) => {
+        const mockWorker = new EventEmitter() as any
+        mockWorker.terminate = async () => 1
+        const session = workerSupervisor.registerWorker({
+          worker: mockWorker,
+          candidatePath: candPath,
+        })
+        trackedWorkerId = session.workerId
+        throw new WorkerTerminationError('Unconfirmed worker shutdown', 'TERMINATION_UNCONFIRMED', {
+          workerId: session.workerId,
+          candidatePath: candPath,
+          candidateFileIdentity: captureCandidateFileIdentity(candPath),
+        })
       }
 
       await expect(
@@ -291,7 +319,8 @@ describe('Phase 7A.5R4.1 Defect B: Termination Unconfirmed Concurrency Isolation
       expect(readFileSync(foreignDb, 'utf8')).toBe('USER_DATABASE_CONTENT')
       expect(readFileSync(foreignDoc, 'utf8')).toBe('USER_DOCUMENTATION_CONTENT')
 
-      // Recover quarantine
+      // Exit confirmed before recovery
+      workerSupervisor.recordTerminationConfirmed(trackedWorkerId!, 0, 'exit_event')
       await recoverQuarantinedDirectory(paths.databaseDirectory)
 
       // Foreign files must be untouched during recovery
