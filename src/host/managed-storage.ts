@@ -33,7 +33,7 @@
  */
 
 import { randomUUID } from 'node:crypto'
-import { mkdir, readdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, readdir, readFile, realpath, rename, unlink, writeFile } from 'node:fs/promises'
 import { basename, isAbsolute, join, resolve } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 
@@ -45,6 +45,83 @@ export const MANAGED_DATABASE_FILENAME_PATTERN = /^ecdict-[a-zA-Z0-9._-]{1,64}\.
 
 /** Recognized temporary artifact pattern for safe cleanup. */
 export const STALE_TEMPORARY_ARTIFACT_PATTERN = /^(?:active\.json\.tmp-[a-zA-Z0-9_-]+|.*\.tmp-[a-zA-Z0-9_-]+|.*\.part)$/
+
+/** Candidate temporary database filename pattern during build (`ecdict-<identity>.sqlite3.tmp-<candidateId>`). */
+export const CANDIDATE_DATABASE_FILENAME_PATTERN = /^ecdict-[a-zA-Z0-9._-]{1,64}\.sqlite3\.tmp-[a-zA-Z0-9_-]{1,64}$/
+
+/**
+ * Check whether a filename matches the candidate temporary database contract.
+ */
+export function isCandidateDatabaseFileName(fileName: string): boolean {
+  return CANDIDATE_DATABASE_FILENAME_PATTERN.test(fileName)
+}
+
+/**
+ * Validate that a candidate path resides strictly within the managed database directory,
+ * conforms to the candidate filename pattern, and does not escape via traversal, symlinks, or junctions.
+ *
+ * @param candidatePath - candidate database path.
+ * @param databaseDirectory - expected managed database directory.
+ * @returns normalized resolved candidate path.
+ */
+export async function validateCandidateDatabasePath(
+  candidatePath: string,
+  databaseDirectory: string,
+): Promise<string> {
+  if (typeof candidatePath !== 'string' || candidatePath.trim().length === 0) {
+    throw new TypeError('Candidate database path must be a non-empty string')
+  }
+  if (typeof databaseDirectory !== 'string' || databaseDirectory.trim().length === 0) {
+    throw new TypeError('Database directory must be a non-empty string')
+  }
+
+  if (candidatePath.includes('\0') || databaseDirectory.includes('\0')) {
+    throw new Error('Path contains null bytes')
+  }
+
+  const normalizedDbDir = resolve(databaseDirectory)
+  const resolvedCandidate = resolve(candidatePath)
+
+  // 1. Filename contract
+  const candidateName = basename(resolvedCandidate)
+  if (!CANDIDATE_DATABASE_FILENAME_PATTERN.test(candidateName)) {
+    throw new Error(
+      `Candidate database filename "${candidateName}" violates candidate naming contract (${CANDIDATE_DATABASE_FILENAME_PATTERN.source})`,
+    )
+  }
+
+  // 2. Directory containment check (pre-realpath)
+  const candidateDir = resolve(resolvedCandidate, '..')
+  if (candidateDir !== normalizedDbDir) {
+    throw new Error(
+      `Candidate database path "${resolvedCandidate}" escapes managed database directory "${normalizedDbDir}"`,
+    )
+  }
+
+  // 3. Symlink and junction protection (post-creation inspection)
+  try {
+    const fileStat = await lstat(resolvedCandidate)
+    if (fileStat.isSymbolicLink()) {
+      throw new Error(`Candidate database path "${resolvedCandidate}" must not be a symbolic link`)
+    }
+
+    const realCandidatePath = await realpath(resolvedCandidate)
+    const realDbDir = await realpath(normalizedDbDir)
+
+    const realCandidateDir = resolve(realCandidatePath, '..')
+    if (realCandidateDir !== realDbDir || basename(realCandidatePath) !== candidateName) {
+      throw new Error(
+        `Candidate database realpath "${realCandidatePath}" escapes managed database realpath "${realDbDir}"`,
+      )
+    }
+  } catch (err: any) {
+    if (err?.code !== 'ENOENT') {
+      throw err
+    }
+  }
+
+  return resolvedCandidate
+}
 
 /**
  * Resolved directory and file paths for managed dictionary storage.

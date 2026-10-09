@@ -38,6 +38,21 @@ export declare const SAFE_IDENTITY_PATTERN: RegExp;
 export declare const MANAGED_DATABASE_FILENAME_PATTERN: RegExp;
 /** Recognized temporary artifact pattern for safe cleanup. */
 export declare const STALE_TEMPORARY_ARTIFACT_PATTERN: RegExp;
+/** Candidate temporary database filename pattern during build (`ecdict-<identity>.sqlite3.tmp-<candidateId>`). */
+export declare const CANDIDATE_DATABASE_FILENAME_PATTERN: RegExp;
+/**
+ * Check whether a filename matches the candidate temporary database contract.
+ */
+export declare function isCandidateDatabaseFileName(fileName: string): boolean;
+/**
+ * Validate that a candidate path resides strictly within the managed database directory,
+ * conforms to the candidate filename pattern, and does not escape via traversal, symlinks, or junctions.
+ *
+ * @param candidatePath - candidate database path.
+ * @param databaseDirectory - expected managed database directory.
+ * @returns normalized resolved candidate path.
+ */
+export declare function validateCandidateDatabasePath(candidatePath: string, databaseDirectory: string): Promise<string>;
 /**
  * Resolved directory and file paths for managed dictionary storage.
  */

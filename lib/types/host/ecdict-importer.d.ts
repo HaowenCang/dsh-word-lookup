@@ -54,6 +54,31 @@ export declare class EcdictImportInProgressError extends Error {
     constructor(databaseDirectory: string);
 }
 /**
+ * Record describing a database directory quarantined due to unconfirmed worker termination.
+ */
+export interface QuarantineRecord {
+    /** Quarantined database directory. */
+    readonly directory: string;
+    /** Candidate path that was being checked when termination failed. */
+    readonly candidatePath: string;
+    /** Timestamp when quarantine was engaged. */
+    readonly quarantinedAt: number;
+    /** Reason for quarantine. */
+    readonly reason: string;
+    /** Underlying error that caused unconfirmed termination. */
+    readonly error: unknown;
+}
+/**
+ * Error thrown when an ECDICT import is attempted on a quarantined database directory.
+ */
+export declare class EcdictImportQuarantinedError extends EcdictImportInProgressError {
+    /** Candidate path associated with the quarantine. */
+    readonly candidatePath: string;
+    /** Reason for quarantine. */
+    readonly reason: string;
+    constructor(databaseDirectory: string, reason: string, candidatePath: string);
+}
+/**
  * Progress lifecycle phases during database construction.
  */
 export type EcdictImportProgressPhase = 'verifying-source' | 'preflighting' | 'importing-entries' | 'resolving-forms' | 'inserting-forms' | 'indexing' | 'validating' | 'publishing' | 'complete';
@@ -173,6 +198,36 @@ export interface BuildManagedEcdictDatabaseInternalOptions {
     /** @internal Custom worker URL for fault-injection testing (test only). */
     readonly workerUrl?: URL;
 }
+/**
+ * Check whether a database directory is currently quarantined.
+ */
+export declare function isDatabaseDirectoryQuarantined(databaseDirectory: string): boolean;
+/**
+ * Get active quarantine record for a database directory, if any.
+ */
+export declare function getQuarantineRecord(databaseDirectory: string): QuarantineRecord | null;
+/**
+ * Verify termination and safely recover a quarantined database directory.
+ *
+ * Requirements for safe release:
+ * - Checks that the directory is currently quarantined.
+ * - If candidate file exists, validates path containment and unlinks candidate and sidecars.
+ * - Releases directory from quarantine upon clean verification.
+ *
+ * @param databaseDirectory - database directory to recover.
+ * @param options - optional custom unlink function.
+ * @returns outcome of recovery attempt.
+ */
+export declare function recoverQuarantinedDirectory(databaseDirectory: string, options?: {
+    unlinkFn?: (path: string) => Promise<void>;
+}): Promise<{
+    recovered: boolean;
+    candidateCleaned: boolean;
+}>;
+/**
+ * @internal Reset active imports and quarantined directories (test only).
+ */
+export declare function _resetQuarantinesForTesting(): void;
 /**
  * Generate a deterministic versioned safe managed database identity string.
  *

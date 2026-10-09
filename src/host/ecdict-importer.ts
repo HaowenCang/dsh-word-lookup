@@ -31,6 +31,7 @@ import { join, resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 
 import {
+  isTerminationUnconfirmed,
   verifyCandidateDatabaseWithWorker,
   type IntegrityVerificationResult,
 } from './ecdict-integrity-verifier.js'
@@ -43,6 +44,7 @@ import {
   managedDatabaseFileName,
   managedDatabasePath,
   SAFE_IDENTITY_PATTERN,
+  validateCandidateDatabasePath,
   type ManagedStoragePaths,
 } from './managed-storage.js'
 import type { SqliteDictionary } from './sqlite-dictionary.js'
@@ -109,6 +111,40 @@ export class EcdictImportInProgressError extends Error {
     super(`ECDICT import already in progress for database directory: ${databaseDirectory}`)
     this.name = 'EcdictImportInProgressError'
     this.databaseDirectory = databaseDirectory
+  }
+}
+
+/**
+ * Record describing a database directory quarantined due to unconfirmed worker termination.
+ */
+export interface QuarantineRecord {
+  /** Quarantined database directory. */
+  readonly directory: string
+  /** Candidate path that was being checked when termination failed. */
+  readonly candidatePath: string
+  /** Timestamp when quarantine was engaged. */
+  readonly quarantinedAt: number
+  /** Reason for quarantine. */
+  readonly reason: string
+  /** Underlying error that caused unconfirmed termination. */
+  readonly error: unknown
+}
+
+/**
+ * Error thrown when an ECDICT import is attempted on a quarantined database directory.
+ */
+export class EcdictImportQuarantinedError extends EcdictImportInProgressError {
+  /** Candidate path associated with the quarantine. */
+  readonly candidatePath: string
+  /** Reason for quarantine. */
+  readonly reason: string
+
+  constructor(databaseDirectory: string, reason: string, candidatePath: string) {
+    super(databaseDirectory)
+    this.name = 'EcdictImportQuarantinedError'
+    this.reason = reason
+    this.candidatePath = candidatePath
+    this.message = `ECDICT import directory is quarantined due to unconfirmed worker termination: "${databaseDirectory}" (candidate: "${candidatePath}"). Reason: ${reason}`
   }
 }
 
@@ -253,6 +289,66 @@ export interface BuildManagedEcdictDatabaseInternalOptions {
 
 /** Set of normalized database directories currently being built in this process. */
 const activeImports = new Set<string>()
+
+/** Map of normalized database directories quarantined due to unconfirmed worker termination. */
+const quarantinedDirectories = new Map<string, QuarantineRecord>()
+
+/**
+ * Check whether a database directory is currently quarantined.
+ */
+export function isDatabaseDirectoryQuarantined(databaseDirectory: string): boolean {
+  return quarantinedDirectories.has(resolve(databaseDirectory))
+}
+
+/**
+ * Get active quarantine record for a database directory, if any.
+ */
+export function getQuarantineRecord(databaseDirectory: string): QuarantineRecord | null {
+  return quarantinedDirectories.get(resolve(databaseDirectory)) ?? null
+}
+
+/**
+ * Verify termination and safely recover a quarantined database directory.
+ *
+ * Requirements for safe release:
+ * - Checks that the directory is currently quarantined.
+ * - If candidate file exists, validates path containment and unlinks candidate and sidecars.
+ * - Releases directory from quarantine upon clean verification.
+ *
+ * @param databaseDirectory - database directory to recover.
+ * @param options - optional custom unlink function.
+ * @returns outcome of recovery attempt.
+ */
+export async function recoverQuarantinedDirectory(
+  databaseDirectory: string,
+  options?: {
+    unlinkFn?: (path: string) => Promise<void>
+  },
+): Promise<{ recovered: boolean; candidateCleaned: boolean }> {
+  const normalized = resolve(databaseDirectory)
+  const record = quarantinedDirectories.get(normalized)
+  if (!record) {
+    return { recovered: false, candidateCleaned: false }
+  }
+
+  let candidateCleaned = false
+  if (existsSync(record.candidatePath)) {
+    await validateCandidateDatabasePath(record.candidatePath, normalized)
+    await cleanupCandidateArtifacts(record.candidatePath, options?.unlinkFn)
+    candidateCleaned = true
+  }
+
+  quarantinedDirectories.delete(normalized)
+  return { recovered: true, candidateCleaned }
+}
+
+/**
+ * @internal Reset active imports and quarantined directories (test only).
+ */
+export function _resetQuarantinesForTesting(): void {
+  quarantinedDirectories.clear()
+  activeImports.clear()
+}
 
 /**
  * Yield control to the Node.js event loop via `setImmediate`.
@@ -476,10 +572,14 @@ export async function buildManagedEcdictDatabaseInternal(
   }
   const verifyProbes = options?.verifyProbes !== false
 
-  // 1. Same-process concurrency guard
+  // 1. Same-process concurrency guard & quarantine check
   const normalizedDbDir = resolve(paths.databaseDirectory)
   if (activeImports.has(normalizedDbDir)) {
     throw new EcdictImportInProgressError(normalizedDbDir)
+  }
+  if (quarantinedDirectories.has(normalizedDbDir)) {
+    const record = quarantinedDirectories.get(normalizedDbDir)!
+    throw new EcdictImportQuarantinedError(normalizedDbDir, record.reason, record.candidatePath)
   }
   activeImports.add(normalizedDbDir)
 
@@ -557,6 +657,7 @@ export async function buildManagedEcdictDatabaseInternal(
       throw new Error('Failed to acquire exclusive candidate file reservation after retries')
     }
 
+    await validateCandidateDatabasePath(candidatePathChosen, paths.databaseDirectory)
     candidatePath = candidatePathChosen
     checkAbort(signal)
 
@@ -988,6 +1089,7 @@ export async function buildManagedEcdictDatabaseInternal(
       const verifierRes = await verifyCandidateDatabaseWithWorker(candidatePath, {
         signal,
         workerUrl: options?.workerUrl,
+        expectedDirectory: paths.databaseDirectory,
       })
       integrityCheckDurationMs = verifierRes.durationMs
     }
@@ -1047,6 +1149,9 @@ export async function buildManagedEcdictDatabaseInternal(
     // 15. Atomic no-replace publication via same-directory hard link
     notifyProgress(options?.onProgress, { phase: 'publishing' })
     checkAbort(signal)
+
+    // Strict boundary validation: verify candidate before publication
+    await validateCandidateDatabasePath(candidatePath, paths.databaseDirectory)
 
     const pubStart = Date.now()
     await link(candidatePath, finalPath)
@@ -1184,14 +1289,20 @@ export async function buildManagedEcdictDatabaseInternal(
       dbOpen = false
     }
 
-    const workerTerminationFailed =
-      err instanceof Error &&
-      (err.message.includes('worker termination failed') ||
-        (err instanceof AggregateError &&
-          err.errors.some((e) => String(e).includes('worker termination failed'))))
+    const terminationUnconfirmed = isTerminationUnconfirmed(err)
+
+    if (terminationUnconfirmed && candidatePath !== null) {
+      quarantinedDirectories.set(normalizedDbDir, {
+        directory: normalizedDbDir,
+        candidatePath,
+        quarantinedAt: Date.now(),
+        reason: 'Worker termination unconfirmed: possible lingering SQLite file handle',
+        error: err,
+      })
+    }
 
     let cleanupError: unknown = null
-    if (!published && candidatePath !== null && !workerTerminationFailed) {
+    if (!published && candidatePath !== null && !terminationUnconfirmed) {
       try {
         await cleanupCandidateArtifacts(candidatePath, options?.unlinkFn)
       } catch (cErr) {
