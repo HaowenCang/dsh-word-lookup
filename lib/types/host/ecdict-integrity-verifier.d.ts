@@ -165,16 +165,27 @@ export interface WorkerSupervisorRegistrationParams {
  * and candidate file associations.
  */
 export declare class WorkerSupervisor {
-    private readonly records;
-    private readonly byCandidate;
+    #private;
     registerWorker(params: WorkerSupervisorRegistrationParams): WorkerSupervisorSession;
     getExitProof(workerId: string): WorkerExitProof | null;
     getSession(workerId: string): WorkerSupervisorSession | null;
     getSessionByCandidatePath(candidatePath: string): WorkerSupervisorSession | null;
-    private recordTerminationConfirmedInternal;
-    recordTerminationViaTerminate(workerId: string, exitCode: number): WorkerExitProof | null;
-    recordTerminationConfirmed(workerId: string, exitCode: number, proofSource?: 'terminate' | 'exit_event'): WorkerExitProof;
-    _injectTerminationConfirmedForTesting(workerId: string, exitCode: number, proofSource?: 'terminate' | 'exit_event'): WorkerExitProof;
+    /**
+     * Refuses manual termination confirmation via terminate.
+     * Authentic exit proofs can ONLY originate from genuine worker exit events
+     * or settled terminate() promises bound at registration time.
+     */
+    recordTerminationViaTerminate(workerId: string, _exitCode: number): never;
+    /**
+     * Refuses manual termination confirmation.
+     * Authentic exit proofs can ONLY originate from genuine worker exit events
+     * or settled terminate() promises bound at registration time.
+     */
+    recordTerminationConfirmed(workerId: string, _exitCode: number, _proofSource?: 'terminate' | 'exit_event'): never;
+    /**
+     * Refuses test injection into production supervisor provenance.
+     */
+    _injectTerminationConfirmedForTesting(workerId: string, _exitCode: number, _proofSource?: 'terminate' | 'exit_event'): never;
     isExitProofAuthentic(proof: unknown): proof is WorkerExitProof;
     recordTerminationUnconfirmed(workerId: string, error?: Error): void;
     waitForExit(workerId: string, timeoutMs?: number): Promise<WorkerExitProof>;

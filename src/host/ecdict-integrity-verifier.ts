@@ -96,6 +96,18 @@ export function matchesCandidateFileIdentity(
 export const EXIT_PROOF_BRAND = Symbol('dsh.worker.exit_proof_brand')
 
 /**
+ * Module-private symbol token guaranteeing authentic supervisor provenance.
+ * Kept strictly inside module scope (unexported) so no external code can forge it.
+ */
+const AUTHENTIC_EXIT_PROOF_TOKEN = Symbol('dsh.worker.authentic_exit_proof_token')
+
+/**
+ * Closed-scope WeakSet maintaining referential identity of authentic exit proofs.
+ * Unreachable outside this module closure.
+ */
+const authenticExitProofs = new WeakSet<object>()
+
+/**
  * Structurally reliable proof of worker termination.
  */
 export interface WorkerExitProof {
@@ -320,8 +332,8 @@ interface WorkerTrackingRecordInternal {
  * and candidate file associations.
  */
 export class WorkerSupervisor {
-  private readonly records = new Map<string, WorkerTrackingRecordInternal>()
-  private readonly byCandidate = new Map<string, string>()
+  readonly #records = new Map<string, WorkerTrackingRecordInternal>()
+  readonly #byCandidate = new Map<string, string>()
 
   registerWorker(params: WorkerSupervisorRegistrationParams): WorkerSupervisorSession {
     const workerId = params.workerId ?? randomUUID()
@@ -350,8 +362,29 @@ export class WorkerSupervisor {
       exitListenersCleaned: false,
     }
 
+    // Closed-scope authentic exit proof creator.
+    // Can ONLY be invoked by the worker's own authentic exit event or settled terminate() promise.
+    const confirmExit = (exitCode: number, proofSource: 'terminate' | 'exit_event'): WorkerExitProof => {
+      if (!record.exitProof) {
+        const proof: WorkerExitProof = Object.freeze({
+          workerId,
+          exitCode: typeof exitCode === 'number' ? exitCode : 0,
+          confirmedAt: Date.now(),
+          proofSource,
+          [EXIT_PROOF_BRAND]: true,
+          [AUTHENTIC_EXIT_PROOF_TOKEN]: true,
+        })
+        authenticExitProofs.add(proof)
+        record.exitProof = proof
+        record.status = 'TERMINATED_CONFIRMED'
+        record.cleanupListeners?.()
+        record.resolveExit(proof)
+      }
+      return record.exitProof
+    }
+
     const onExit = (code: number) => {
-      this.recordTerminationConfirmedInternal(workerId, code, 'exit_event')
+      confirmExit(code, 'exit_event')
     }
 
     const onError = (err: Error) => {
@@ -360,6 +393,33 @@ export class WorkerSupervisor {
 
     params.worker.on('exit', onExit)
     params.worker.on('error', onError)
+
+    if (typeof params.worker.terminate === 'function') {
+      const originalTerminate = params.worker.terminate.bind(params.worker)
+      const wrappedTerminate = async function (): Promise<number> {
+        try {
+          const result = await originalTerminate()
+          const code = typeof result === 'number' ? result : 0
+          confirmExit(code, 'terminate')
+          return code
+        } catch (termErr) {
+          if (record.status !== 'TERMINATED_CONFIRMED') {
+            record.status = 'TERMINATION_UNCONFIRMED'
+            record.lateErrors.push(termErr instanceof Error ? termErr : new Error(String(termErr)))
+          }
+          throw termErr
+        }
+      }
+      try {
+        params.worker.terminate = wrappedTerminate
+      } catch {
+        Object.defineProperty(params.worker, 'terminate', {
+          value: wrappedTerminate,
+          writable: true,
+          configurable: true,
+        })
+      }
+    }
 
     record.cleanupListeners = () => {
       if (!record.exitListenersCleaned) {
@@ -385,8 +445,8 @@ export class WorkerSupervisor {
       }
     }
 
-    this.records.set(workerId, record)
-    this.byCandidate.set(resolvedPath, workerId)
+    this.#records.set(workerId, record)
+    this.#byCandidate.set(resolvedPath, workerId)
 
     return {
       workerId,
@@ -408,12 +468,12 @@ export class WorkerSupervisor {
   }
 
   getExitProof(workerId: string): WorkerExitProof | null {
-    const rec = this.records.get(workerId)
+    const rec = this.#records.get(workerId)
     return rec?.exitProof ?? null
   }
 
   getSession(workerId: string): WorkerSupervisorSession | null {
-    const rec = this.records.get(workerId)
+    const rec = this.#records.get(workerId)
     if (!rec) return null
     return {
       workerId: rec.workerId,
@@ -435,72 +495,67 @@ export class WorkerSupervisor {
   }
 
   getSessionByCandidatePath(candidatePath: string): WorkerSupervisorSession | null {
-    const workerId = this.byCandidate.get(resolve(candidatePath))
+    const workerId = this.#byCandidate.get(resolve(candidatePath))
     if (!workerId) return null
     return this.getSession(workerId)
   }
 
-  private recordTerminationConfirmedInternal(
-    workerId: string,
-    exitCode: number,
-    proofSource: 'terminate' | 'exit_event',
-  ): WorkerExitProof | null {
-    const rec = this.records.get(workerId)
-    if (!rec) {
-      return null
-    }
-
-    if (!rec.exitProof) {
-      const proof: WorkerExitProof = Object.freeze({
-        workerId,
-        exitCode,
-        confirmedAt: Date.now(),
-        proofSource,
-        [EXIT_PROOF_BRAND]: true,
-      })
-      rec.exitProof = proof
-      rec.status = 'TERMINATED_CONFIRMED'
-      rec.cleanupListeners?.()
-      rec.resolveExit(proof)
-    }
-
-    return rec.exitProof
+  /**
+   * Refuses manual termination confirmation via terminate.
+   * Authentic exit proofs can ONLY originate from genuine worker exit events
+   * or settled terminate() promises bound at registration time.
+   */
+  recordTerminationViaTerminate(workerId: string, _exitCode: number): never {
+    throw new WorkerTerminationError(
+      `Cannot record termination via terminate: manual proof generation is forbidden for workerId "${workerId}". ` +
+      'Exit proofs must originate from authentic worker exit events or settled terminate() promises.',
+      'TERMINATION_UNCONFIRMED',
+      { workerId },
+    )
   }
 
-  recordTerminationViaTerminate(workerId: string, exitCode: number): WorkerExitProof | null {
-    return this.recordTerminationConfirmedInternal(workerId, exitCode, 'terminate')
-  }
-
+  /**
+   * Refuses manual termination confirmation.
+   * Authentic exit proofs can ONLY originate from genuine worker exit events
+   * or settled terminate() promises bound at registration time.
+   */
   recordTerminationConfirmed(
     workerId: string,
-    exitCode: number,
-    proofSource: 'terminate' | 'exit_event' = 'exit_event',
-  ): WorkerExitProof {
-    const rec = this.records.get(workerId)
-    if (!rec) {
-      throw new WorkerTerminationError(
-        `Cannot record termination confirmation: no tracked worker found for workerId "${workerId}"`,
-        'TERMINATION_UNCONFIRMED',
-        { workerId },
-      )
-    }
-    return this.recordTerminationConfirmedInternal(workerId, exitCode, proofSource)!
+    _exitCode: number,
+    _proofSource: 'terminate' | 'exit_event' = 'exit_event',
+  ): never {
+    throw new WorkerTerminationError(
+      `Cannot record termination confirmation: manual proof generation is forbidden for workerId "${workerId}". ` +
+      'Exit proofs must originate from authentic worker exit events or settled terminate() promises.',
+      'TERMINATION_UNCONFIRMED',
+      { workerId },
+    )
   }
 
+  /**
+   * Refuses test injection into production supervisor provenance.
+   */
   _injectTerminationConfirmedForTesting(
     workerId: string,
-    exitCode: number,
-    proofSource: 'terminate' | 'exit_event' = 'exit_event',
-  ): WorkerExitProof {
-    return this.recordTerminationConfirmed(workerId, exitCode, proofSource)
+    _exitCode: number,
+    _proofSource: 'terminate' | 'exit_event' = 'exit_event',
+  ): never {
+    throw new WorkerTerminationError(
+      `Cannot inject termination confirmation: test injection is segregated from authentic supervisor provenance for workerId "${workerId}".`,
+      'TERMINATION_UNCONFIRMED',
+      { workerId },
+    )
   }
 
   isExitProofAuthentic(proof: unknown): proof is WorkerExitProof {
     if (!proof || typeof proof !== 'object') return false
-    const p = proof as WorkerExitProof
-    if (p[EXIT_PROOF_BRAND] !== true) return false
-    const rec = this.records.get(p.workerId)
+    const p = proof as WorkerExitProof & Record<symbol, unknown>
+    if (!authenticExitProofs.has(p)) return false
+    if (p[AUTHENTIC_EXIT_PROOF_TOKEN] !== true) return false
+    if (typeof p.workerId !== 'string') return false
+    const rec = this.#records.get(p.workerId)
     if (!rec || !rec.exitProof) return false
+    if (rec.exitProof !== p) return false
     return (
       rec.exitProof.workerId === p.workerId &&
       rec.exitProof.exitCode === p.exitCode &&
@@ -510,7 +565,7 @@ export class WorkerSupervisor {
   }
 
   recordTerminationUnconfirmed(workerId: string, error?: Error): void {
-    const rec = this.records.get(workerId)
+    const rec = this.#records.get(workerId)
     if (rec && rec.status !== 'TERMINATED_CONFIRMED') {
       rec.status = 'TERMINATION_UNCONFIRMED'
       if (error) {
@@ -520,7 +575,7 @@ export class WorkerSupervisor {
   }
 
   async waitForExit(workerId: string, timeoutMs = 5000): Promise<WorkerExitProof> {
-    const rec = this.records.get(workerId)
+    const rec = this.#records.get(workerId)
     if (!rec) {
       throw new WorkerTerminationError(
         `No tracked worker found for workerId "${workerId}"`,
@@ -563,32 +618,32 @@ export class WorkerSupervisor {
   }
 
   unregisterWorker(workerId: string): void {
-    const rec = this.records.get(workerId)
+    const rec = this.#records.get(workerId)
     if (rec) {
       rec.cleanupListeners?.()
-      this.byCandidate.delete(rec.candidatePath)
-      this.records.delete(workerId)
+      this.#byCandidate.delete(rec.candidatePath)
+      this.#records.delete(workerId)
     }
   }
 
   getActiveSessionCount(): number {
-    return this.records.size
+    return this.#records.size
   }
 
   hasSession(workerId: string): boolean {
-    return this.records.has(workerId)
+    return this.#records.has(workerId)
   }
 
   getTrackedWorkerIds(): string[] {
-    return Array.from(this.records.keys())
+    return Array.from(this.#records.keys())
   }
 
   resetForTesting(): void {
-    for (const rec of this.records.values()) {
+    for (const rec of this.#records.values()) {
       rec.cleanupListeners?.()
     }
-    this.records.clear()
-    this.byCandidate.clear()
+    this.#records.clear()
+    this.#byCandidate.clear()
   }
 }
 
@@ -878,12 +933,8 @@ export async function verifyCandidateDatabaseWithWorker(
           }, terminationTimeoutMs)
         })
 
-        const termExitCode = await Promise.race([termPromise, timeoutPromise])
+        await Promise.race([termPromise, timeoutPromise])
         terminationStatus = 'TERMINATED_CONFIRMED'
-        workerSupervisor.recordTerminationViaTerminate(
-          workerId,
-          typeof termExitCode === 'number' ? termExitCode : 0,
-        )
       } catch (termErr) {
         terminationStatus = 'TERMINATION_UNCONFIRMED'
         workerSupervisor.recordTerminationUnconfirmed(
