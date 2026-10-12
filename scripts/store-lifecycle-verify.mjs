@@ -33,6 +33,7 @@ import {
 } from './assert-isolated-env.mjs'
 
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url))
+const ROOT_PKG = JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8'))
 const PACKAGE_NAME = 'dsh-word-lookup'
 const BASE_BUNDLES = ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app']
 const V010_VERIFIED_SHA256 = '22d3cdffd9f73790adebb707cf36a258453a4813db981d19d9d5cffb249458cc'
@@ -266,7 +267,7 @@ export async function runStoreLifecycleVerification(opts = {}) {
     phase: '6R.1a',
     testedCodeGitSha,
     workingTreeCleanAtPack: true,
-    candidatePackageVersion: '0.1.1',
+    candidatePackageVersion: ROOT_PKG.version,
     selectedPort: port,
     finalIsolationCheckPassed: true,
     candidateTarballSha256: candidateSha256,
@@ -357,7 +358,7 @@ export async function runStoreLifecycleVerification(opts = {}) {
 
   const installPassed = !isJunction &&
     installedPluginDir !== REPO_ROOT &&
-    candidateVersion === '0.1.1' &&
+    candidateVersion === ROOT_PKG.version &&
     patchExists &&
     clientExists &&
     indexExists &&
