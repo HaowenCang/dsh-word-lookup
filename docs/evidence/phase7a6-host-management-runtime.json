@@ -1,0 +1,146 @@
+{
+  "phase": "Phase 7A.6",
+  "reportTitle": "Phase 7A.6 Host Dictionary Operation Manager & Management API Acceptance",
+  "generatedAt": "2026-10-12T13:47:09.633Z",
+  "testedCodeGitSha": "817d3aba470a9bb5ec1f36c0be7c45b976b612d1",
+  "status": "ACCEPTED",
+  "platform": "win32",
+  "nodeVersion": "v24.13.0",
+  "targetEnvironment": {
+    "dshVersion": "0.2.0-rc.2",
+    "dshUpstreamCommit": "639ed015397290b3745d163aafe02ffee4aa3f84",
+    "platform": "win32",
+    "arch": "x64",
+    "nodeVersion": "v24.13.0"
+  },
+  "managementEndpoints": [
+    {
+      "method": "GET",
+      "path": "/api/dsh-word-lookup/dictionary/status",
+      "verified": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/dsh-word-lookup/dictionary/install",
+      "verified": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/dsh-word-lookup/dictionary/cancel",
+      "verified": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/dsh-word-lookup/dictionary/remove",
+      "verified": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/dsh-word-lookup/dictionary/verify",
+      "verified": true
+    }
+  ],
+  "invariantsEnforced": {
+    "zeroAutomaticDownloadsOnBoot": true,
+    "singleRunningOperationMutex": true,
+    "safeCancellationDispatch": true,
+    "throttledProgressUpdates": "<= 10 Hz",
+    "atomicThreeStepActivation": true,
+    "safeRemovalReleasingWindowsLocks": true,
+    "failClosedErrorSanitization": true,
+    "cordisSingleEffectDrainOnUnload": true
+  },
+  "latencySummary": {
+    "p50Ms": 31.36,
+    "p95Ms": 47.35,
+    "p99Ms": 53.08,
+    "maxMs": 285.21
+  },
+  "rounds": [
+    {
+      "round": 1,
+      "durationMs": 21375,
+      "peakRssMb": 243,
+      "progressThrottling": {
+        "minIntervalMs": 100,
+        "avgIntervalMs": 100,
+        "observedFrequencyHz": 10,
+        "compliantWith10HzLimit": true
+      },
+      "phasesObserved": [
+        "queued",
+        "checking-cache",
+        "building",
+        "verifying-source",
+        "validating-database",
+        "activating",
+        "completed"
+      ],
+      "lookupHit": {
+        "query": "derive",
+        "headword": "derive",
+        "source": "ecdict-local"
+      },
+      "verifiedEntries": 770611,
+      "verifiedForms": 57689,
+      "removalSuccessful": true
+    },
+    {
+      "round": 2,
+      "durationMs": 34121,
+      "peakRssMb": 260,
+      "progressThrottling": {
+        "minIntervalMs": 100,
+        "avgIntervalMs": 100,
+        "observedFrequencyHz": 10,
+        "compliantWith10HzLimit": true
+      },
+      "phasesObserved": [
+        "queued",
+        "checking-cache",
+        "cancelled",
+        "building",
+        "verifying-source",
+        "validating-database",
+        "activating",
+        "completed"
+      ],
+      "lookupHit": {
+        "query": "derive",
+        "headword": "derive",
+        "source": "ecdict-local"
+      },
+      "verifiedEntries": 770611,
+      "verifiedForms": 57689,
+      "removalSuccessful": true
+    },
+    {
+      "round": 3,
+      "durationMs": 34168,
+      "peakRssMb": 256,
+      "progressThrottling": {
+        "minIntervalMs": 100,
+        "avgIntervalMs": 100,
+        "observedFrequencyHz": 10,
+        "compliantWith10HzLimit": true
+      },
+      "phasesObserved": [
+        "queued",
+        "checking-cache",
+        "building",
+        "verifying-source",
+        "validating-database",
+        "activating",
+        "completed"
+      ],
+      "lookupHit": {
+        "query": "derive",
+        "headword": "derive",
+        "source": "ecdict-local"
+      },
+      "verifiedEntries": 770611,
+      "verifiedForms": 57689,
+      "removalSuccessful": true
+    }
+  ]
+}

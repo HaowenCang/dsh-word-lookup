@@ -15,3 +15,13 @@
  */
 /** Absolute path of the exact Fetch route owned by this plugin. */
 export declare const LOOKUP_PATH = "/api/dsh-word-lookup";
+/** Absolute path of dictionary management status route. */
+export declare const MANAGEMENT_STATUS_PATH = "/api/dsh-word-lookup/dictionary/status";
+/** Absolute path of dictionary installation route. */
+export declare const MANAGEMENT_INSTALL_PATH = "/api/dsh-word-lookup/dictionary/install";
+/** Absolute path of dictionary cancellation route. */
+export declare const MANAGEMENT_CANCEL_PATH = "/api/dsh-word-lookup/dictionary/cancel";
+/** Absolute path of dictionary removal route. */
+export declare const MANAGEMENT_REMOVE_PATH = "/api/dsh-word-lookup/dictionary/remove";
+/** Absolute path of dictionary verification route. */
+export declare const MANAGEMENT_VERIFY_PATH = "/api/dsh-word-lookup/dictionary/verify";

@@ -10,8 +10,22 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { LOOKUP_PATH } from '../src/host/route.js'
+import {
+  LOOKUP_PATH,
+  MANAGEMENT_CANCEL_PATH,
+  MANAGEMENT_INSTALL_PATH,
+  MANAGEMENT_REMOVE_PATH,
+  MANAGEMENT_STATUS_PATH,
+  MANAGEMENT_VERIFY_PATH,
+} from '../src/host/route.js'
 import { LOOKUP_DOCUMENT_PATH } from '../src/shared/protocol.js'
+import {
+  MANAGEMENT_CANCEL_DOCUMENT_PATH,
+  MANAGEMENT_INSTALL_DOCUMENT_PATH,
+  MANAGEMENT_REMOVE_DOCUMENT_PATH,
+  MANAGEMENT_STATUS_DOCUMENT_PATH,
+  MANAGEMENT_VERIFY_DOCUMENT_PATH,
+} from '../src/shared/dictionary-management-protocol.js'
 
 describe('lookup route path', () => {
   it('spells the same route in both halves', () => {
@@ -40,4 +54,30 @@ describe('lookup route path', () => {
       expect(segment).not.toBe('..')
     }
   })
+})
+
+describe('dictionary management route paths', () => {
+  const routes = [
+    { host: MANAGEMENT_STATUS_PATH, doc: MANAGEMENT_STATUS_DOCUMENT_PATH },
+    { host: MANAGEMENT_INSTALL_PATH, doc: MANAGEMENT_INSTALL_DOCUMENT_PATH },
+    { host: MANAGEMENT_CANCEL_PATH, doc: MANAGEMENT_CANCEL_DOCUMENT_PATH },
+    { host: MANAGEMENT_REMOVE_PATH, doc: MANAGEMENT_REMOVE_DOCUMENT_PATH },
+    { host: MANAGEMENT_VERIFY_PATH, doc: MANAGEMENT_VERIFY_DOCUMENT_PATH },
+  ]
+
+  for (const { host, doc } of routes) {
+    it(`spells ${host} in both halves with correct relative and absolute prefixes`, () => {
+      expect(host).toBe(`/${doc}`)
+      expect(host.startsWith('/api/')).toBe(true)
+      expect(doc.startsWith('/')).toBe(false)
+      expect(doc.startsWith('api/')).toBe(true)
+
+      const segments = host.split('/').slice(1)
+      for (const seg of segments) {
+        expect(seg).not.toBe('')
+        expect(seg).not.toBe('.')
+        expect(seg).not.toBe('..')
+      }
+    })
+  }
 })

@@ -94,11 +94,58 @@ import {
   type ManagedEcdictBuildResult,
   type PostPublicationCleanupResult,
 } from './host/ecdict-importer.js'
-import { LOOKUP_PATH } from './host/route.js'
+import {
+  LOOKUP_PATH,
+  MANAGEMENT_CANCEL_PATH,
+  MANAGEMENT_INSTALL_PATH,
+  MANAGEMENT_REMOVE_PATH,
+  MANAGEMENT_STATUS_PATH,
+  MANAGEMENT_VERIFY_PATH,
+} from './host/route.js'
+import {
+  ActivationCoordinator,
+  type ActivationCoordinatorOptions,
+  type ActivationStateSummary,
+  type CustomDatabaseVerificationResult,
+} from './host/dictionary-activation.js'
+import {
+  DictionaryOperationManager,
+  OperationDirectoryQuarantinedError,
+  OperationInProgressError,
+  OperationNotFoundError,
+  sanitizeErrorMessage,
+  type DictionaryOperationManagerOptions,
+} from './host/dictionary-operations.js'
+import {
+  registerDictionaryManagementRoutes,
+  createStatusHandler,
+  createInstallHandler,
+  createCancelHandler,
+  createRemoveHandler,
+  createVerifyHandler,
+} from './host/dictionary-management-route.js'
+import type {
+  DictionaryCancelRequest,
+  DictionaryCancelResponse,
+  DictionaryErrorResponse,
+  DictionaryInstallResponse,
+  DictionaryOperationError,
+  DictionaryOperationPhase,
+  DictionaryOperationProgress,
+  DictionaryOperationSnapshot,
+  DictionaryOperationStatus,
+  DictionaryRemoveResponse,
+  DictionaryStatusResponse,
+  DictionaryVerifyRequest,
+  DictionaryVerifyResponse,
+  InstalledCorpusInfo,
+  ManagementErrorCode,
+} from './shared/dictionary-management-protocol.js'
 
 export { Config }
 export type { HostConfig }
 export {
+  openFixtureDictionary,
   openProductionDictionary,
   resolveProductionDatabasePath,
   DictionaryUnavailableError,
@@ -138,6 +185,44 @@ export {
   type EcdictImportProgressPhase,
   type ManagedEcdictBuildResult,
   type PostPublicationCleanupResult,
+  LOOKUP_PATH,
+  MANAGEMENT_CANCEL_PATH,
+  MANAGEMENT_INSTALL_PATH,
+  MANAGEMENT_REMOVE_PATH,
+  MANAGEMENT_STATUS_PATH,
+  MANAGEMENT_VERIFY_PATH,
+  ActivationCoordinator,
+  type ActivationCoordinatorOptions,
+  type ActivationStateSummary,
+  type CustomDatabaseVerificationResult,
+  DictionaryOperationManager,
+  OperationDirectoryQuarantinedError,
+  OperationInProgressError,
+  OperationNotFoundError,
+  sanitizeErrorMessage,
+  type DictionaryOperationManagerOptions,
+  registerDictionaryManagementRoutes,
+  createStatusHandler,
+  createInstallHandler,
+  createCancelHandler,
+  createRemoveHandler,
+  createVerifyHandler,
+  createLookupHandler,
+  type DictionaryCancelRequest,
+  type DictionaryCancelResponse,
+  type DictionaryErrorResponse,
+  type DictionaryInstallResponse,
+  type DictionaryOperationError,
+  type DictionaryOperationPhase,
+  type DictionaryOperationProgress,
+  type DictionaryOperationSnapshot,
+  type DictionaryOperationStatus,
+  type DictionaryRemoveResponse,
+  type DictionaryStatusResponse,
+  type DictionaryVerifyRequest,
+  type DictionaryVerifyResponse,
+  type InstalledCorpusInfo,
+  type ManagementErrorCode,
 }
 
 /** Package name; equals the Loader entry id and the settings namespace. */
@@ -150,15 +235,22 @@ export const inject: readonly string[] = ['connection']
  * Register the host contributions.
  *
  * One effect owns the whole host surface, so unloading the loader entry closes
- * the database and removes the route exactly once. A second registration of the
- * same path would throw `connection: exact Fetch route "…" is already
- * registered`, which is a load-time signal rather than a silent duplicate.
+ * the database, safely aborts and drains in-flight operations, and unregisters all
+ * Fetch routes.
  *
  * @param ctx - the host plugin context.
  * @param config - the parsed {@link Config} output for this loader entry.
  */
 export function apply(ctx: Context, config: HostConfig): void {
   ctx.effect(() => {
+    let paths: ManagedStoragePaths | null = null
+    try {
+      paths = resolveManagedStoragePaths({ ctx })
+    } catch {
+      // In minimal test harnesses or environments where DSH home is not supplied,
+      // paths remains null and host gracefully operates in fixture-only mode.
+    }
+
     const fixture = openFixtureDictionary()
     const manager = new DictionaryManager({
       mode: 'fixture',
@@ -166,26 +258,78 @@ export function apply(ctx: Context, config: HostConfig): void {
       dictionary: fixture,
     })
 
-    let disposeRoute: (() => Promise<void>) | undefined
+    const coordinator = new ActivationCoordinator({
+      ctx,
+      paths,
+      manager,
+      config,
+    })
+
+    const operationManager = new DictionaryOperationManager({
+      paths,
+      activationCoordinator: coordinator,
+      logger: (ctx as { logger?: DictionaryOperationManagerOptions['logger'] }).logger,
+    })
+
+    // Initiate startup recovery check
+    const recoveryPromise = coordinator.recoverOnStartup().catch(() => {
+      // Recovery errors are tracked inside coordinator diagnostic state
+    })
+
+    let disposeManagement: (() => Promise<void>) | undefined
+    let disposeLookup: (() => Promise<void>) | undefined
+
     try {
-      disposeRoute = ctx.connection.fetch.register({
+      // 1. Register five dictionary management routes
+      disposeManagement = registerDictionaryManagementRoutes(ctx, operationManager, coordinator)
+
+      // 2. Register lookup route
+      disposeLookup = ctx.connection.fetch.register({
         path: LOOKUP_PATH,
         methods: ['POST'],
         requestBody: 'buffered',
         fetch: createLookupHandler(config, manager),
       })
     } catch (error) {
-      // The route never registered, so nothing else will release the handle.
+      try { void disposeManagement?.() } catch { /* ignore */ }
+      try { void disposeLookup?.() } catch { /* ignore */ }
+      void operationManager.dispose()
       manager.close()
       throw error
     }
 
     return async () => {
       try {
-        await disposeRoute?.()
-      } finally {
+        await recoveryPromise
+      } catch {
+        // ignore
+      }
+
+      const errors: unknown[] = []
+      try {
+        await disposeLookup?.()
+      } catch (err) {
+        errors.push(err)
+      }
+      try {
+        await disposeManagement?.()
+      } catch (err) {
+        errors.push(err)
+      }
+      try {
+        await operationManager.dispose()
+      } catch (err) {
+        errors.push(err)
+      }
+      try {
         manager.close()
+      } catch (err) {
+        errors.push(err)
+      }
+
+      if (errors.length > 0) {
+        throw new AggregateError(errors, 'Failed to cleanly unregister dsh-word-lookup routes and manager')
       }
     }
-  }, 'dsh-word-lookup: local sqlite dictionary and exact fetch route')
+  }, 'dsh-word-lookup: local sqlite dictionary, exact fetch route and dictionary management api')
 }

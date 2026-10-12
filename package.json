@@ -83,6 +83,7 @@
     "test:storage-runtime": "node scripts/test-storage-runtime.mjs",
     "test:ecdict-download-runtime": "node scripts/test-ecdict-download-runtime.mjs",
     "test:ecdict-import-runtime": "node scripts/test-ecdict-import-runtime.mjs",
+    "test:mgmt-runtime": "node scripts/phase7a6-management-runtime.mjs",
     "test:acceptance": "node scripts/phase5-browser-acceptance.mjs",
     "test:native-input": "node scripts/phase421-native-input-probe.mjs",
     "test:native-input:preflight": "node scripts/phase421-native-input-probe.mjs --preflight",
