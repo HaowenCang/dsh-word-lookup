@@ -1,8 +1,8 @@
 {
   "phase": "Phase 7A.6",
   "reportTitle": "Phase 7A.6 Host Dictionary Operation Manager & Management API Acceptance",
-  "generatedAt": "2026-10-12T13:47:09.633Z",
-  "testedCodeGitSha": "817d3aba470a9bb5ec1f36c0be7c45b976b612d1",
+  "generatedAt": "2026-10-12T13:52:46.875Z",
+  "testedCodeGitSha": "6a7b4663f19d9b9ec1ee5edb1f0199a6000259a0",
   "status": "ACCEPTED",
   "platform": "win32",
   "nodeVersion": "v24.13.0",
@@ -51,16 +51,16 @@
     "cordisSingleEffectDrainOnUnload": true
   },
   "latencySummary": {
-    "p50Ms": 31.36,
-    "p95Ms": 47.35,
-    "p99Ms": 53.08,
-    "maxMs": 285.21
+    "p50Ms": 30.83,
+    "p95Ms": 46.04,
+    "p99Ms": 56.2,
+    "maxMs": 265.55
   },
   "rounds": [
     {
       "round": 1,
-      "durationMs": 21375,
-      "peakRssMb": 243,
+      "durationMs": 20956,
+      "peakRssMb": 246,
       "progressThrottling": {
         "minIntervalMs": 100,
         "avgIntervalMs": 100,
@@ -87,8 +87,8 @@
     },
     {
       "round": 2,
-      "durationMs": 34121,
-      "peakRssMb": 260,
+      "durationMs": 32682,
+      "peakRssMb": 261,
       "progressThrottling": {
         "minIntervalMs": 100,
         "avgIntervalMs": 100,
@@ -116,8 +116,8 @@
     },
     {
       "round": 3,
-      "durationMs": 34168,
-      "peakRssMb": 256,
+      "durationMs": 32463,
+      "peakRssMb": 264,
       "progressThrottling": {
         "minIntervalMs": 100,
         "avgIntervalMs": 100,
