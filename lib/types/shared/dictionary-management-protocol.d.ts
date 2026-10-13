@@ -137,6 +137,10 @@ export interface DictionaryStatusResponse {
     readonly quarantineReason: string | null;
     /** Startup recovery or disk anomaly message if degraded. */
     readonly recoveryError: string | null;
+    /** Settings update synchronization error if persistence failed. */
+    readonly settingsSyncError?: string | null;
+    /** Last activation rollback error message, if any. */
+    readonly lastRollbackError?: string | null;
     /** Last retirement close error message, if any. */
     readonly lastRetirementError: string | null;
     /** Manager generation counter. */

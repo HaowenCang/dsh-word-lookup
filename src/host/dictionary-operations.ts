@@ -84,6 +84,40 @@ export class OperationNotFoundError extends Error {
 }
 
 /**
+ * Error thrown when draining in-flight operations times out during dispose.
+ */
+export class OperationDrainTimeoutError extends Error {
+  readonly code = 'DRAIN_TIMEOUT'
+  readonly timeoutMs: number
+
+  constructor(timeoutMs: number, message?: string) {
+    super(message ?? `Dictionary operation failed to drain within ${timeoutMs}ms: worker or network exit status unknown`)
+    this.name = 'OperationDrainTimeoutError'
+    this.timeoutMs = timeoutMs
+  }
+}
+
+/**
+ * Diagnostic summary of resource drain and worker lifecycle status upon disposal.
+ */
+export interface OperationDrainSummary {
+  /** Whether cancellation signal was dispatched. */
+  readonly requestedCancel: boolean
+  /** Whether the operation workflow settled completely. */
+  readonly workflowSettled: boolean
+  /** Whether worker termination was authentically confirmed. */
+  readonly workerExited: boolean
+  /** Whether drain timed out before settlement. */
+  readonly timedOut: boolean
+  /** Whether worker or resource status is unknown (fail-closed). */
+  readonly statusUnknown: boolean
+  /** Whether database directory was left quarantined. */
+  readonly quarantined: boolean
+  /** Diagnostic error explanation if drain encountered issues. */
+  readonly error?: string
+}
+
+/**
  * Sanitize error message to prevent leaking machine-specific paths, credentials, or stack traces.
  */
 export function sanitizeErrorMessage(rawMessage: string): string {
@@ -131,6 +165,8 @@ export class DictionaryOperationManager {
 
   #currentOp: ActiveOperationContext | null = null
   #lastOp: DictionaryOperationSnapshot | null = null
+  #activeRemove = false
+  #drainSummary: OperationDrainSummary | null = null
   #disposed = false
   #lastEmitTime = 0
   readonly #listeners = new Set<(snapshot: DictionaryOperationSnapshot) => void>()
@@ -163,16 +199,37 @@ export class DictionaryOperationManager {
   }
 
   /**
+   * Return diagnostic drain summary after disposal.
+   */
+  getDrainSummary(): OperationDrainSummary | null {
+    return this.#drainSummary ? Object.freeze({ ...this.#drainSummary }) : null
+  }
+
+  /**
    * Check whether an installation operation can currently be accepted.
    */
   canInstall(): boolean {
     if (this.#disposed) return false
     if (!this.#paths) return false
-    if (this.#currentOp !== null && this.#currentOp.snapshot.status === 'running') return false
+    if (this.isBusy()) return false
     if (isDatabaseDirectoryQuarantined(this.#paths.databaseDirectory) || getQuarantineRecord(this.#paths.databaseDirectory) !== null) {
       return false
     }
     return true
+  }
+
+  /**
+   * Check whether the managed dictionary can currently be removed.
+   */
+  canRemove(): boolean {
+    if (this.#disposed) return false
+    if (!this.#paths) return false
+    if (this.isBusy()) return false
+    if (isDatabaseDirectoryQuarantined(this.#paths.databaseDirectory) || getQuarantineRecord(this.#paths.databaseDirectory) !== null) {
+      return false
+    }
+    const summary = this.#activationCoordinator.getStatusSummary()
+    return summary.installed
   }
 
   /**
@@ -183,10 +240,10 @@ export class DictionaryOperationManager {
   }
 
   /**
-   * Check whether an operation is currently active.
+   * Check whether an operation (install or remove) is currently active.
    */
   isBusy(): boolean {
-    return this.#currentOp !== null && this.#currentOp.snapshot.status === 'running'
+    return this.#activeRemove || (this.#currentOp !== null && this.#currentOp.snapshot.status === 'running')
   }
 
   /**
@@ -225,9 +282,9 @@ export class DictionaryOperationManager {
       throw new OperationDirectoryQuarantinedError(this.#paths.databaseDirectory, quarantine.reason)
     }
 
-    // 2. Concurrency check
-    if (this.#currentOp && this.#currentOp.snapshot.status === 'running') {
-      throw new OperationInProgressError(this.#currentOp.operationId)
+    // 2. Concurrency check across all operations
+    if (this.isBusy()) {
+      throw new OperationInProgressError(this.#currentOp?.operationId ?? 'remove')
     }
 
     // 3. Allocate operationId and initial snapshot
@@ -333,6 +390,50 @@ export class DictionaryOperationManager {
   }
 
   /**
+   * Request removal of managed ECDICT database and reversion to fixture.
+   *
+   * Executes under exclusive operation mutex:
+   * - Cannot run concurrently with installation or another removal.
+   * - Awaits startup recovery to settle before mutating state.
+   * - Releases Windows file locks prior to unlinking.
+   *
+   * @returns removal outcome.
+   */
+  async remove(): Promise<{ removed: boolean }> {
+    if (this.#disposed) {
+      throw new Error('DictionaryOperationManager is disposed')
+    }
+
+    if (!this.#paths) {
+      throw new Error('Managed storage is unavailable: DSH home cannot be resolved')
+    }
+
+    // 1. Quarantine check
+    const quarantine = getQuarantineRecord(this.#paths.databaseDirectory)
+    if (quarantine) {
+      throw new OperationDirectoryQuarantinedError(this.#paths.databaseDirectory, quarantine.reason)
+    }
+
+    // 2. Concurrency check across all operations
+    if (this.isBusy()) {
+      throw new OperationInProgressError(this.#currentOp?.operationId ?? 'remove')
+    }
+
+    // 3. Ensure startup recovery settled if active
+    if (this.#activationCoordinator.isRecovering) {
+      await this.#activationCoordinator.ensureReady()
+    }
+
+    // 4. Claim exclusive remove lock
+    this.#activeRemove = true
+    try {
+      return await this.#activationCoordinator.removeManagedDatabase()
+    } finally {
+      this.#activeRemove = false
+    }
+  }
+
+  /**
    * Dispose operation manager and await safe drainage of in-flight tasks.
    *
    * @param timeoutMs - maximum wait duration for active worker/download drainage (defaults to 5000ms).
@@ -342,18 +443,52 @@ export class DictionaryOperationManager {
     this.#disposed = true
 
     if (this.#currentOp && this.#currentOp.snapshot.status === 'running') {
+      this.#currentOp.cancelRequested = true
       this.#currentOp.abortController.abort()
 
-      // Await settlement with timeout
       let timer: NodeJS.Timeout | undefined
-      const timeoutPromise = new Promise<void>((resolve) => {
-        timer = setTimeout(resolve, timeoutMs)
+      const timeoutPromise = new Promise<'timeout'>((resolve) => {
+        timer = setTimeout(() => resolve('timeout'), timeoutMs)
       })
 
-      try {
-        await Promise.race([this.#currentOp.promise, timeoutPromise])
-      } finally {
-        if (timer) clearTimeout(timer)
+      const outcome = await Promise.race([
+        this.#currentOp.promise.then(() => 'settled' as const),
+        timeoutPromise,
+      ])
+      if (timer) clearTimeout(timer)
+
+      if (outcome === 'timeout') {
+        const isQuar = this.#paths ? isDatabaseDirectoryQuarantined(this.#paths.databaseDirectory) : false
+        this.#drainSummary = {
+          requestedCancel: true,
+          workflowSettled: false,
+          workerExited: false,
+          timedOut: true,
+          statusUnknown: true,
+          quarantined: isQuar,
+          error: `Operation failed to drain within ${timeoutMs}ms`,
+        }
+        throw new OperationDrainTimeoutError(timeoutMs)
+      } else {
+        const isQuar = this.#paths ? isDatabaseDirectoryQuarantined(this.#paths.databaseDirectory) : false
+        this.#drainSummary = {
+          requestedCancel: true,
+          workflowSettled: true,
+          workerExited: !isQuar,
+          timedOut: false,
+          statusUnknown: isQuar,
+          quarantined: isQuar,
+        }
+      }
+    } else {
+      const isQuar = this.#paths ? isDatabaseDirectoryQuarantined(this.#paths.databaseDirectory) : false
+      this.#drainSummary = {
+        requestedCancel: false,
+        workflowSettled: true,
+        workerExited: !isQuar,
+        timedOut: false,
+        statusUnknown: isQuar,
+        quarantined: isQuar,
       }
     }
   }
@@ -363,6 +498,8 @@ export class DictionaryOperationManager {
    */
   async #runInstallWorkflow(ctx: ActiveOperationContext): Promise<void> {
     const signal = ctx.abortController.signal
+    let committed = false
+    let buildResult: ManagedEcdictBuildResult | null = null
 
     try {
       const paths = this.#paths
@@ -370,9 +507,16 @@ export class DictionaryOperationManager {
         throw new Error('Managed storage unavailable: DSH home cannot be resolved')
       }
 
+      // Step 0: Ensure startup recovery settled before proceeding if active
+      if (this.#activationCoordinator.isRecovering) {
+        await this.#activationCoordinator.ensureReady()
+      }
+
+      if (this.#disposed || signal.aborted) throw this.#createAbortError()
+
       // Step 1: Check cache & Download if needed
       this.#transitionPhase(ctx, 'checking-cache', 'Verifying local ECDICT source cache...')
-      if (signal.aborted) throw this.#createAbortError()
+      if (this.#disposed || signal.aborted) throw this.#createAbortError()
 
       await downloadPinnedEcdict(paths, {
         signal,
@@ -381,24 +525,28 @@ export class DictionaryOperationManager {
         },
       })
 
-      if (signal.aborted) throw this.#createAbortError()
+      if (this.#disposed || signal.aborted) throw this.#createAbortError()
 
       // Step 2: Build Database with static Worker integrity check
       this.#transitionPhase(ctx, 'building', 'Building managed SQLite database from source...')
 
-      const buildResult: ManagedEcdictBuildResult = await buildManagedEcdictDatabase(paths, {
+      buildResult = await buildManagedEcdictDatabase(paths, {
         signal,
         onProgress: (importProgress: EcdictImportProgress) => {
           this.#handleImportProgress(ctx, importProgress)
         },
       })
 
-      if (signal.aborted) throw this.#createAbortError()
+      if (this.#disposed || signal.aborted) throw this.#createAbortError()
 
       // Step 3: Validate database & Atomic Activation
       this.#transitionPhase(ctx, 'activating', 'Validating and activating managed dictionary...')
 
+      // Final pre-commit check: if disposed or aborted before commit point, do not commit!
+      if (this.#disposed || signal.aborted) throw this.#createAbortError()
+
       await this.#activationCoordinator.activateManagedDatabase(buildResult)
+      committed = true
 
       // Step 4: Settle as Completed
       this.#settleOperation(ctx, 'completed', 'completed', {
@@ -408,11 +556,19 @@ export class DictionaryOperationManager {
         message: `ECDICT corpus successfully installed (${buildResult.entryCount.toLocaleString()} entries)`,
       })
     } catch (error) {
-      if (signal.aborted || this.#isAbortError(error)) {
+      if (!committed && (signal.aborted || this.#isAbortError(error))) {
         this.#settleOperation(ctx, 'cancelled', 'cancelled', {
           phase: 'cancelled',
           unit: 'steps',
-          message: 'Operation cancelled by user',
+          message: 'Operation cancelled by user before commit point',
+        })
+      } else if (committed) {
+        // Committed before cancellation was processed: remains completed
+        this.#settleOperation(ctx, 'completed', 'completed', {
+          phase: 'completed',
+          percent: 100,
+          unit: 'steps',
+          message: `ECDICT corpus successfully installed (${buildResult?.entryCount ?? 0} entries)`,
         })
       } else {
         const errorRecord = this.#formatError(error)

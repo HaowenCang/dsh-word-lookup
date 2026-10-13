@@ -17,10 +17,13 @@ import { join } from 'node:path'
 
 import {
   ActivationCoordinator,
+  ActivationRollbackError,
 } from '../src/host/dictionary-activation.js'
 import { DictionaryManager } from '../src/host/dictionary-manager.js'
 import { openFixtureDictionary } from '../src/host/fixture-db.js'
 import {
+  _setStorageFsHooksForTesting,
+  readActiveMetadata,
   resolveManagedStoragePaths,
   writeActiveMetadataAtomically,
   type ActiveMetadata,
@@ -370,5 +373,423 @@ describe('ActivationCoordinator', () => {
     const badDbOutcome = await coordinator.verifyCustomDatabase(textFilePath)
     expect(badDbOutcome.valid).toBe(false)
     expect(badDbOutcome.errorCode).toBe('INVALID_SQLITE_FILE')
+  })
+
+  describe('Phase 7A.6R2 Fix A: Activation & Startup Recovery Consistency (A01-A08)', () => {
+    it('A01: fresh boot without active.json leaves manager on fixture without error', async () => {
+      const coordinator = new ActivationCoordinator({
+        paths,
+        manager,
+        config: Config({ dictionaryMode: 'managed-ecdict' }),
+      })
+      await coordinator.ensureReady()
+      await coordinator.recoverOnStartup()
+      const summary = coordinator.getStatusSummary()
+      expect(summary.activeMode).toBe('fixture')
+      expect(summary.installed).toBe(false)
+      expect(summary.installedCorpus).toBeNull()
+      expect(summary.recoveryError).toBeNull()
+    })
+
+    it('A02: corrupt active.json leaves manager on fixture and records recoveryError', async () => {
+      writeFileSync(paths.activeMetadataPath, '{{broken-json', 'utf8')
+      const coordinator = new ActivationCoordinator({
+        paths,
+        manager,
+        config: Config({ dictionaryMode: 'managed-ecdict' }),
+      })
+      await coordinator.recoverOnStartup()
+      const summary = coordinator.getStatusSummary()
+      expect(summary.activeMode).toBe('fixture')
+      expect(summary.installed).toBe(false)
+      expect(summary.recoveryError).toContain('Corrupt active metadata')
+    })
+
+    it('A03: active.json exists but database file is missing records recoveryError', async () => {
+      const metadata: ActiveMetadata = {
+        version: 1,
+        activeMode: 'managed-ecdict',
+        identity: 'missing-db-file',
+        databaseFile: 'ecdict-missing-db-file.sqlite3',
+        source: {
+          name: 'ECDICT',
+          commit: PINNED_COMMIT,
+          sha256: PINNED_SHA256,
+          schemaVersion: 1,
+        },
+      }
+      await writeActiveMetadataAtomically(paths, metadata)
+      const coordinator = new ActivationCoordinator({
+        paths,
+        manager,
+        config: Config({ dictionaryMode: 'managed-ecdict' }),
+      })
+      await coordinator.recoverOnStartup()
+      const summary = coordinator.getStatusSummary()
+      expect(summary.activeMode).toBe('fixture')
+      expect(summary.installed).toBe(false)
+      expect(summary.recoveryError).toContain('Managed database file missing')
+    })
+
+    it('A04: database file corrupt or probe check fails records recoveryError', async () => {
+      const corruptDbPath = join(paths.databaseDirectory, 'ecdict-corrupt.sqlite3')
+      writeFileSync(corruptDbPath, 'not a sqlite database file at all', 'utf8')
+      const metadata: ActiveMetadata = {
+        version: 1,
+        activeMode: 'managed-ecdict',
+        identity: 'corrupt',
+        databaseFile: 'ecdict-corrupt.sqlite3',
+        source: {
+          name: 'ECDICT',
+          commit: PINNED_COMMIT,
+          sha256: PINNED_SHA256,
+          schemaVersion: 1,
+        },
+      }
+      await writeActiveMetadataAtomically(paths, metadata)
+      const coordinator = new ActivationCoordinator({
+        paths,
+        manager,
+        config: Config({ dictionaryMode: 'managed-ecdict' }),
+      })
+      await coordinator.recoverOnStartup()
+      const summary = coordinator.getStatusSummary()
+      expect(summary.activeMode).toBe('fixture')
+      expect(summary.installed).toBe(false)
+      expect(summary.recoveryError).toContain('Corrupt or incompatible managed database')
+    })
+
+    it('A05: config mode managed-ecdict with valid active.json and DB activates managed dictionary', async () => {
+      const dbFile = 'ecdict-a05-valid.sqlite3'
+      const fullDbPath = join(paths.databaseDirectory, dbFile)
+      createSyntheticManagedDb(fullDbPath)
+      const metadata: ActiveMetadata = {
+        version: 1,
+        activeMode: 'managed-ecdict',
+        identity: 'a05-valid',
+        databaseFile: dbFile,
+        source: {
+          name: 'ECDICT',
+          commit: PINNED_COMMIT,
+          sha256: PINNED_SHA256,
+          schemaVersion: 1,
+        },
+      }
+      await writeActiveMetadataAtomically(paths, metadata)
+      const coordinator = new ActivationCoordinator({
+        paths,
+        manager,
+        config: Config({ dictionaryMode: 'managed-ecdict' }),
+      })
+      await coordinator.recoverOnStartup()
+      const summary = coordinator.getStatusSummary()
+      expect(summary.activeMode).toBe('managed-ecdict')
+      expect(summary.installed).toBe(true)
+      expect(summary.recoveryError).toBeNull()
+      expect(manager.lookup('hello').found).toBe(true)
+    })
+
+    it('A06: priority contract - config fixture with failed settings sync recovers intentional managed activation', async () => {
+      const dbFile = 'ecdict-a06-sync-failed.sqlite3'
+      const fullDbPath = join(paths.databaseDirectory, dbFile)
+      createSyntheticManagedDb(fullDbPath)
+      const metadata: ActiveMetadata = {
+        version: 1,
+        activeMode: 'managed-ecdict',
+        identity: 'a06-sync-failed',
+        databaseFile: dbFile,
+        source: {
+          name: 'ECDICT',
+          commit: PINNED_COMMIT,
+          sha256: PINNED_SHA256,
+          schemaVersion: 1,
+        },
+        settingsSynced: false,
+        settingsSyncError: 'Settings service timeout during plugin init',
+      }
+      await writeActiveMetadataAtomically(paths, metadata)
+      const coordinator = new ActivationCoordinator({
+        paths,
+        manager,
+        config: Config({ dictionaryMode: 'fixture' }),
+      })
+      await coordinator.recoverOnStartup()
+      const summary = coordinator.getStatusSummary()
+      expect(summary.activeMode).toBe('managed-ecdict')
+      expect(summary.installed).toBe(true)
+      expect(summary.settingsSyncError).toBe('Settings service timeout during plugin init')
+      expect(manager.lookup('hello').found).toBe(true)
+    })
+
+    it('A07: priority contract - config fixture with cleanly synced settings honors explicit user choice', async () => {
+      const dbFile = 'ecdict-a07-user-fixture.sqlite3'
+      const fullDbPath = join(paths.databaseDirectory, dbFile)
+      createSyntheticManagedDb(fullDbPath)
+      const metadata: ActiveMetadata = {
+        version: 1,
+        activeMode: 'managed-ecdict',
+        identity: 'a07-user-fixture',
+        databaseFile: dbFile,
+        source: {
+          name: 'ECDICT',
+          commit: PINNED_COMMIT,
+          sha256: PINNED_SHA256,
+          schemaVersion: 1,
+        },
+        settingsSynced: true,
+        settingsSyncError: null,
+      }
+      await writeActiveMetadataAtomically(paths, metadata)
+      const coordinator = new ActivationCoordinator({
+        paths,
+        manager,
+        config: Config({ dictionaryMode: 'fixture' }),
+      })
+      await coordinator.recoverOnStartup()
+      const summary = coordinator.getStatusSummary()
+      expect(summary.activeMode).toBe('fixture')
+      expect(summary.installed).toBe(true)
+      expect(summary.installedCorpus?.name).toBe('ECDICT')
+      expect(summary.recoveryError).toBeNull()
+      expect(summary.settingsSyncError).toBeNull()
+    })
+
+    it('A08: ensureReady single-flight barrier deduplicates concurrent startup checks', async () => {
+      const coordinator = new ActivationCoordinator({
+        paths,
+        manager,
+        config: Config({ dictionaryMode: 'managed-ecdict' }),
+      })
+      const p1 = coordinator.recoverOnStartup()
+      const p2 = coordinator.recoverOnStartup()
+      const p3 = coordinator.ensureReady()
+      expect(p1).toBe(p2)
+      await Promise.all([p1, p2, p3])
+      expect(coordinator.isRecovering).toBe(false)
+    })
+  })
+
+  describe('Phase 7A.6R2 Fix B: Transaction Compensation & Rollback on Activation Failure (B01-B05)', () => {
+    it('B01: normal activation atomically commits metadata, retires prior handle, increments generation', async () => {
+      const dbFile = 'ecdict-b01.sqlite3'
+      const fullDbPath = join(paths.databaseDirectory, dbFile)
+      createSyntheticManagedDb(fullDbPath)
+      const buildResult: ManagedEcdictBuildResult = {
+        path: fullDbPath,
+        databaseFile: dbFile,
+        identity: 'b01',
+        sourceCommit: PINNED_COMMIT,
+        sourceSha256: PINNED_SHA256,
+        entryCount: 3,
+        formCount: 1,
+        exampleCount: 0,
+        ambiguousFormCount: 0,
+        rejectedRowCount: 0,
+        sourceRowCount: 3,
+        byteSize: 40960,
+        schemaVersion: 1,
+        logicalSha256: 'b'.repeat(64),
+        fileSha256: 'c'.repeat(64),
+        yieldCount: 1,
+        postPublicationCleanup: { candidateRemoved: true, sidecarsRemoved: true },
+      }
+      const coordinator = new ActivationCoordinator({ paths, manager })
+      const initialGen = manager.snapshot().generation
+      await coordinator.activateManagedDatabase(buildResult)
+      const summary = coordinator.getStatusSummary()
+      expect(summary.activeMode).toBe('managed-ecdict')
+      expect(summary.generation).toBe(initialGen + 1)
+      const committedMeta = await readActiveMetadata(paths)
+      expect(committedMeta?.identity).toBe('b01')
+    })
+
+    it('B02: activation fails during manager.activate restores previous active.json', async () => {
+      const dbFile1 = 'ecdict-b02-first.sqlite3'
+      const fullDbPath1 = join(paths.databaseDirectory, dbFile1)
+      createSyntheticManagedDb(fullDbPath1)
+      const buildResult1: ManagedEcdictBuildResult = {
+        path: fullDbPath1,
+        databaseFile: dbFile1,
+        identity: 'b02-first',
+        sourceCommit: PINNED_COMMIT,
+        sourceSha256: PINNED_SHA256,
+        entryCount: 3,
+        formCount: 1,
+        exampleCount: 0,
+        ambiguousFormCount: 0,
+        rejectedRowCount: 0,
+        sourceRowCount: 3,
+        byteSize: 40960,
+        schemaVersion: 1,
+        logicalSha256: 'b'.repeat(64),
+        fileSha256: 'c'.repeat(64),
+        yieldCount: 1,
+        postPublicationCleanup: { candidateRemoved: true, sidecarsRemoved: true },
+      }
+      const coordinator = new ActivationCoordinator({ paths, manager })
+      await coordinator.activateManagedDatabase(buildResult1)
+      expect((await readActiveMetadata(paths))?.identity).toBe('b02-first')
+
+      const dbFile2 = 'ecdict-b02-second.sqlite3'
+      const fullDbPath2 = join(paths.databaseDirectory, dbFile2)
+      createSyntheticManagedDb(fullDbPath2)
+      const buildResult2: ManagedEcdictBuildResult = {
+        path: fullDbPath2,
+        databaseFile: dbFile2,
+        identity: 'b02-second',
+        sourceCommit: PINNED_COMMIT,
+        sourceSha256: PINNED_SHA256,
+        entryCount: 3,
+        formCount: 1,
+        exampleCount: 0,
+        ambiguousFormCount: 0,
+        rejectedRowCount: 0,
+        sourceRowCount: 3,
+        byteSize: 40960,
+        schemaVersion: 1,
+        logicalSha256: 'b'.repeat(64),
+        fileSha256: 'd'.repeat(64),
+        yieldCount: 1,
+        postPublicationCleanup: { candidateRemoved: true, sidecarsRemoved: true },
+      }
+      vi.spyOn(manager, 'activate').mockImplementationOnce(() => {
+        throw new Error('Simulated activation failure in manager')
+      })
+      await expect(coordinator.activateManagedDatabase(buildResult2)).rejects.toThrow('Simulated activation failure in manager')
+
+      const restoredMeta = await readActiveMetadata(paths)
+      expect(restoredMeta?.identity).toBe('b02-first')
+    })
+
+    it('B03: first-time activation fails unlinks candidate active.json and preserves fixture', async () => {
+      const dbFile = 'ecdict-b03-fail.sqlite3'
+      const fullDbPath = join(paths.databaseDirectory, dbFile)
+      createSyntheticManagedDb(fullDbPath)
+      const buildResult: ManagedEcdictBuildResult = {
+        path: fullDbPath,
+        databaseFile: dbFile,
+        identity: 'b03-fail',
+        sourceCommit: PINNED_COMMIT,
+        sourceSha256: PINNED_SHA256,
+        entryCount: 3,
+        formCount: 1,
+        exampleCount: 0,
+        ambiguousFormCount: 0,
+        rejectedRowCount: 0,
+        sourceRowCount: 3,
+        byteSize: 40960,
+        schemaVersion: 1,
+        logicalSha256: 'b'.repeat(64),
+        fileSha256: 'c'.repeat(64),
+        yieldCount: 1,
+        postPublicationCleanup: { candidateRemoved: true, sidecarsRemoved: true },
+      }
+      const coordinator = new ActivationCoordinator({ paths, manager })
+      vi.spyOn(manager, 'activate').mockImplementationOnce(() => {
+        throw new Error('Simulated first activation failure')
+      })
+      await expect(coordinator.activateManagedDatabase(buildResult)).rejects.toThrow('Simulated first activation failure')
+      expect(existsSync(paths.activeMetadataPath)).toBe(false)
+      expect(manager.snapshot().activeMode).toBe('fixture')
+    })
+
+    it('B04: Windows SQLite handle safety - candidate dictionary handle closed on failure', async () => {
+      const dbFile = 'ecdict-b04-handle.sqlite3'
+      const fullDbPath = join(paths.databaseDirectory, dbFile)
+      createSyntheticManagedDb(fullDbPath)
+      const buildResult: ManagedEcdictBuildResult = {
+        path: fullDbPath,
+        databaseFile: dbFile,
+        identity: 'b04-handle',
+        sourceCommit: PINNED_COMMIT,
+        sourceSha256: PINNED_SHA256,
+        entryCount: 3,
+        formCount: 1,
+        exampleCount: 0,
+        ambiguousFormCount: 0,
+        rejectedRowCount: 0,
+        sourceRowCount: 3,
+        byteSize: 40960,
+        schemaVersion: 1,
+        logicalSha256: 'b'.repeat(64),
+        fileSha256: 'c'.repeat(64),
+        yieldCount: 1,
+        postPublicationCleanup: { candidateRemoved: true, sidecarsRemoved: true },
+      }
+      const coordinator = new ActivationCoordinator({ paths, manager })
+      vi.spyOn(manager, 'activate').mockImplementationOnce(() => {
+        throw new Error('Lock safety check')
+      })
+      await expect(coordinator.activateManagedDatabase(buildResult)).rejects.toThrow('Lock safety check')
+      // On Windows, if open handle remained, rmSync/unlink would throw EPERM
+      expect(() => rmSync(fullDbPath)).not.toThrow()
+    })
+
+    it('B05: double fault throws ActivationRollbackError with both original and rollback errors preserved', async () => {
+      const dbFile1 = 'ecdict-b05-first.sqlite3'
+      const fullDbPath1 = join(paths.databaseDirectory, dbFile1)
+      createSyntheticManagedDb(fullDbPath1)
+      const buildResult1: ManagedEcdictBuildResult = {
+        path: fullDbPath1,
+        databaseFile: dbFile1,
+        identity: 'b05-first',
+        sourceCommit: PINNED_COMMIT,
+        sourceSha256: PINNED_SHA256,
+        entryCount: 3,
+        formCount: 1,
+        exampleCount: 0,
+        ambiguousFormCount: 0,
+        rejectedRowCount: 0,
+        sourceRowCount: 3,
+        byteSize: 40960,
+        schemaVersion: 1,
+        logicalSha256: 'b'.repeat(64),
+        fileSha256: 'c'.repeat(64),
+        yieldCount: 1,
+        postPublicationCleanup: { candidateRemoved: true, sidecarsRemoved: true },
+      }
+      const coordinator = new ActivationCoordinator({ paths, manager })
+      await coordinator.activateManagedDatabase(buildResult1)
+
+      const dbFile2 = 'ecdict-b05-second.sqlite3'
+      const fullDbPath2 = join(paths.databaseDirectory, dbFile2)
+      createSyntheticManagedDb(fullDbPath2)
+      const buildResult2: ManagedEcdictBuildResult = {
+        path: fullDbPath2,
+        databaseFile: dbFile2,
+        identity: 'b05-second',
+        sourceCommit: PINNED_COMMIT,
+        sourceSha256: PINNED_SHA256,
+        entryCount: 3,
+        formCount: 1,
+        exampleCount: 0,
+        ambiguousFormCount: 0,
+        rejectedRowCount: 0,
+        sourceRowCount: 3,
+        byteSize: 40960,
+        schemaVersion: 1,
+        logicalSha256: 'b'.repeat(64),
+        fileSha256: 'd'.repeat(64),
+        yieldCount: 1,
+        postPublicationCleanup: { candidateRemoved: true, sidecarsRemoved: true },
+      }
+
+      vi.spyOn(manager, 'activate').mockImplementationOnce(() => {
+        _setStorageFsHooksForTesting({
+          writeFile: async () => {
+            throw new Error('EACCES: rollback write failed')
+          },
+        })
+        throw new Error('Primary activation failure')
+      })
+
+      try {
+        await expect(coordinator.activateManagedDatabase(buildResult2)).rejects.toThrow(ActivationRollbackError)
+        const summary = coordinator.getStatusSummary()
+        expect(summary.lastRollbackError).toContain('Rollback failed')
+      } finally {
+        _setStorageFsHooksForTesting(null)
+      }
+    })
   })
 })

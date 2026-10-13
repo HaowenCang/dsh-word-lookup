@@ -177,6 +177,12 @@ export interface ActiveMetadata {
   readonly databaseFile: string
   /** Source provenance details. */
   readonly source: ActiveMetadataSource
+  /** Whether host configuration settings were successfully synced. */
+  readonly settingsSynced?: boolean
+  /** Sanitized error diagnostic if host settings sync failed. */
+  readonly settingsSyncError?: string | null
+  /** ISO timestamp when activation was committed. */
+  readonly lastActivatedAt?: string
 }
 
 /**
@@ -393,6 +399,14 @@ export function validateActiveMetadata(raw: unknown): ActiveMetadata {
     throw new TypeError('Active metadata source.schemaVersion must be a positive integer >= 1')
   }
 
+  const settingsSynced = typeof record.settingsSynced === 'boolean' ? record.settingsSynced : undefined
+  const settingsSyncError = typeof record.settingsSyncError === 'string'
+    ? record.settingsSyncError.trim()
+    : record.settingsSyncError === null
+      ? null
+      : undefined
+  const lastActivatedAt = typeof record.lastActivatedAt === 'string' ? record.lastActivatedAt.trim() : undefined
+
   return {
     version: 1,
     activeMode: 'managed-ecdict',
@@ -404,6 +418,9 @@ export function validateActiveMetadata(raw: unknown): ActiveMetadata {
       sha256: source.sha256.trim().toLowerCase(),
       schemaVersion: source.schemaVersion,
     },
+    ...(settingsSynced !== undefined ? { settingsSynced } : {}),
+    ...(settingsSyncError !== undefined ? { settingsSyncError } : {}),
+    ...(lastActivatedAt !== undefined ? { lastActivatedAt } : {}),
   }
 }
 

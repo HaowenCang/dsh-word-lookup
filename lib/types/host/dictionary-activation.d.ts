@@ -26,6 +26,15 @@ import { type DictionaryMode, type HostConfig } from './config.js';
 import type { InstalledCorpusInfo, ManagementErrorCode } from '../shared/dictionary-management-protocol.js';
 import type { ManagedEcdictBuildResult } from './ecdict-importer.js';
 /**
+ * Error thrown when an activation attempt fails and rollback of previous state also fails.
+ */
+export declare class ActivationRollbackError extends Error {
+    readonly code = "ACTIVATION_ROLLBACK_FAILED";
+    readonly originalError: unknown;
+    readonly rollbackError: unknown;
+    constructor(message: string, originalError: unknown, rollbackError: unknown);
+}
+/**
  * Options for constructing {@link ActivationCoordinator}.
  */
 export interface ActivationCoordinatorOptions {
@@ -63,7 +72,9 @@ export interface ActivationStateSummary {
     readonly quarantined: boolean;
     readonly quarantineReason: string | null;
     readonly recoveryError: string | null;
+    readonly settingsSyncError: string | null;
     readonly lastRetirementError: string | null;
+    readonly lastRollbackError: string | null;
     readonly generation: number;
 }
 /**
@@ -81,6 +92,15 @@ export declare class ActivationCoordinator {
      */
     get manager(): DictionaryManager;
     /**
+     * Return whether startup recovery is currently in flight.
+     */
+    get isRecovering(): boolean;
+    /**
+     * Await completion of in-flight startup recovery, ensuring subsequent operations
+     * observe settled state and never race or interleave with recovery.
+     */
+    ensureReady(): Promise<void>;
+    /**
      * Startup recovery check: inspects active.json and managed database health.
      *
      * Rules:
@@ -90,6 +110,10 @@ export declare class ActivationCoordinator {
      * - If database exists but fails integrity/schema checks: remains on fixture, records recoveryError.
      * - If database is fully verified:
      *   - If configured dictionaryMode === 'managed-ecdict': activates managed dictionary into manager.
+     *   - If configured dictionaryMode === 'fixture' and previous settings sync failed (A02/A03):
+     *     recovers committed managed activation intent, activates managed dictionary, preserves settingsSyncError.
+     *   - If configured dictionaryMode === 'fixture' and settings was cleanly synced (A04):
+     *     honors explicit user choice, keeps fixture active, caches verified installed corpus info.
      *   - Else: caches verified installed corpus info without activating.
      */
     recoverOnStartup(): Promise<void>;

@@ -204,6 +204,8 @@ export function createStatusHandler(
         quarantined: summary.quarantined,
         quarantineReason: summary.quarantineReason,
         recoveryError: summary.recoveryError,
+        settingsSyncError: summary.settingsSyncError,
+        lastRollbackError: summary.lastRollbackError,
         lastRetirementError: summary.lastRetirementError,
         generation: summary.generation,
       }
@@ -333,15 +335,6 @@ export function createRemoveHandler(
       return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Method not allowed (expected POST)')
     }
 
-    // Concurrency check
-    if (operationManager.canCancel()) {
-      return errorResponse(
-        409,
-        'OPERATION_IN_PROGRESS',
-        'Cannot remove managed dictionary while an installation operation is in progress',
-      )
-    }
-
     // Quarantine check
     const summary = activationCoordinator.getStatusSummary()
     if (summary.quarantined) {
@@ -353,7 +346,7 @@ export function createRemoveHandler(
     }
 
     try {
-      const result = await activationCoordinator.removeManagedDatabase()
+      const result = await operationManager.remove()
       const body: DictionaryRemoveResponse = {
         ok: true,
         removed: result.removed,
@@ -362,6 +355,17 @@ export function createRemoveHandler(
       }
       return jsonResponse(body, 200)
     } catch (err) {
+      if (err instanceof OperationInProgressError) {
+        return errorResponse(
+          409,
+          'OPERATION_IN_PROGRESS',
+          'Cannot remove managed dictionary while an operation is in progress',
+          { operationId: err.operationId },
+        )
+      }
+      if (err instanceof OperationDirectoryQuarantinedError) {
+        return errorResponse(409, 'DIRECTORY_QUARANTINED', err.message)
+      }
       return errorResponse(500, 'REMOVE_FAILED', err instanceof Error ? err.message : String(err))
     }
   }

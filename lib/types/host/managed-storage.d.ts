@@ -104,6 +104,12 @@ export interface ActiveMetadata {
     readonly databaseFile: string;
     /** Source provenance details. */
     readonly source: ActiveMetadataSource;
+    /** Whether host configuration settings were successfully synced. */
+    readonly settingsSynced?: boolean;
+    /** Sanitized error diagnostic if host settings sync failed. */
+    readonly settingsSyncError?: string | null;
+    /** ISO timestamp when activation was committed. */
+    readonly lastActivatedAt?: string;
 }
 /**
  * Attempt to extract the resolved DSH home from official host context surfaces.

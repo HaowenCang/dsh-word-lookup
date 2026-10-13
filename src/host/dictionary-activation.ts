@@ -58,6 +58,33 @@ const ACTIVATION_PROBE_HEADWORDS = Object.freeze(['go', 'derive', 'wave'])
 const VALID_SQLITE_EXTENSIONS = new Set(['.sqlite3', '.sqlite', '.db'])
 
 /**
+ * Sanitize error message to prevent leaking machine-specific paths, credentials, or stack traces.
+ */
+function sanitizeErrorMessage(rawMessage: string): string {
+  if (!rawMessage || typeof rawMessage !== 'string') return 'Unknown error occurred'
+  return rawMessage
+    .replace(/[a-zA-Z]:\\[^\s"',;>)]+/g, '[local-path]')
+    .replace(/(?:\/[a-zA-Z0-9._-]+){2,}/g, '[local-path]')
+    .trim()
+}
+
+/**
+ * Error thrown when an activation attempt fails and rollback of previous state also fails.
+ */
+export class ActivationRollbackError extends Error {
+  readonly code = 'ACTIVATION_ROLLBACK_FAILED'
+  readonly originalError: unknown
+  readonly rollbackError: unknown
+
+  constructor(message: string, originalError: unknown, rollbackError: unknown) {
+    super(message)
+    this.name = 'ActivationRollbackError'
+    this.originalError = originalError
+    this.rollbackError = rollbackError
+  }
+}
+
+/**
  * Options for constructing {@link ActivationCoordinator}.
  */
 export interface ActivationCoordinatorOptions {
@@ -97,7 +124,9 @@ export interface ActivationStateSummary {
   readonly quarantined: boolean
   readonly quarantineReason: string | null
   readonly recoveryError: string | null
+  readonly settingsSyncError: string | null
   readonly lastRetirementError: string | null
+  readonly lastRollbackError: string | null
   readonly generation: number
 }
 
@@ -110,7 +139,11 @@ export class ActivationCoordinator {
   readonly #manager: DictionaryManager
   readonly #config?: HostConfig
 
+  #recoveryPromise: Promise<void> | null = null
+  #isRecovering = false
   #recoveryError: string | null = null
+  #settingsSyncError: string | null = null
+  #lastRollbackError: string | null = null
   #cachedInstalledCorpus: InstalledCorpusInfo | null = null
 
   constructor(options: ActivationCoordinatorOptions) {
@@ -135,6 +168,27 @@ export class ActivationCoordinator {
   }
 
   /**
+   * Return whether startup recovery is currently in flight.
+   */
+  get isRecovering(): boolean {
+    return this.#isRecovering
+  }
+
+  /**
+   * Await completion of in-flight startup recovery, ensuring subsequent operations
+   * observe settled state and never race or interleave with recovery.
+   */
+  async ensureReady(): Promise<void> {
+    if (this.#recoveryPromise) {
+      try {
+        await this.#recoveryPromise
+      } catch {
+        // Recovery errors are tracked in coordinator diagnostic state
+      }
+    }
+  }
+
+  /**
    * Startup recovery check: inspects active.json and managed database health.
    *
    * Rules:
@@ -144,9 +198,24 @@ export class ActivationCoordinator {
    * - If database exists but fails integrity/schema checks: remains on fixture, records recoveryError.
    * - If database is fully verified:
    *   - If configured dictionaryMode === 'managed-ecdict': activates managed dictionary into manager.
+   *   - If configured dictionaryMode === 'fixture' and previous settings sync failed (A02/A03):
+   *     recovers committed managed activation intent, activates managed dictionary, preserves settingsSyncError.
+   *   - If configured dictionaryMode === 'fixture' and settings was cleanly synced (A04):
+   *     honors explicit user choice, keeps fixture active, caches verified installed corpus info.
    *   - Else: caches verified installed corpus info without activating.
    */
-  async recoverOnStartup(): Promise<void> {
+  recoverOnStartup(): Promise<void> {
+    if (this.#recoveryPromise) {
+      return this.#recoveryPromise
+    }
+    this.#isRecovering = true
+    this.#recoveryPromise = this.#runStartupRecovery().finally(() => {
+      this.#isRecovering = false
+    })
+    return this.#recoveryPromise
+  }
+
+  async #runStartupRecovery(): Promise<void> {
     this.#recoveryError = null
     this.#cachedInstalledCorpus = null
 
@@ -165,6 +234,10 @@ export class ActivationCoordinator {
     if (!metadata) {
       // Fresh install or uninstalled: normal fixture operation
       return
+    }
+
+    if (metadata.settingsSyncError) {
+      this.#settingsSyncError = metadata.settingsSyncError
     }
 
     const dbPath = join(this.#paths.databaseDirectory, metadata.databaseFile)
@@ -220,19 +293,30 @@ export class ActivationCoordinator {
     })
 
     const userMode = readDictionaryMode(this.#config)
-    if (userMode === 'managed-ecdict') {
+
+    // Check if previous settings sync failed (A02, A03)
+    const settingsSyncFailed =
+      metadata.settingsSynced === false ||
+      (typeof metadata.settingsSyncError === 'string' && metadata.settingsSyncError.length > 0) ||
+      (this.#settingsSyncError !== null)
+
+    if (userMode === 'managed-ecdict' || (userMode === 'fixture' && settingsSyncFailed)) {
       try {
         this.#manager.activate({
           mode: 'managed-ecdict',
           identity: metadata.identity,
           dictionary: openedDict,
         })
+        // Attempt to re-sync host settings if it was previously failed
+        if (settingsSyncFailed) {
+          await this.#persistHostConfigMode('managed-ecdict')
+        }
       } catch (error) {
         openedDict.close()
         this.#recoveryError = `Activation failed during startup: ${error instanceof Error ? error.message : String(error)}`
       }
     } else {
-      // User has configured 'fixture' or 'custom': close candidate, keep fixture live
+      // User explicitly configured 'fixture' (A04) or 'custom': close candidate, keep fixture live
       openedDict.close()
     }
   }
@@ -260,6 +344,14 @@ export class ActivationCoordinator {
       throw new Error(`Published database file not found at: ${publishedPath}`)
     }
 
+    // Capture previous metadata before attempting activation
+    let previousMetadata: ActiveMetadata | null = null
+    try {
+      previousMetadata = await readActiveMetadata(this.#paths)
+    } catch {
+      // previous metadata missing or invalid
+    }
+
     // 1. Open and validate published database
     const publishedDict = openProductionDictionary({ path: publishedPath })
     try {
@@ -283,6 +375,9 @@ export class ActivationCoordinator {
         sha256: buildResult.sourceSha256,
         schemaVersion: buildResult.schemaVersion,
       },
+      lastActivatedAt: new Date().toISOString(),
+      settingsSynced: false,
+      settingsSyncError: null,
     }
 
     try {
@@ -300,12 +395,35 @@ export class ActivationCoordinator {
         dictionary: publishedDict,
       })
     } catch (error) {
-      // Compensation: remove active.json so disk does not claim activation succeeded
+      // Candidate was closed by DictionaryManager (or close it if still open)
       try {
-        await unlink(this.#paths.activeMetadataPath)
+        publishedDict.close()
       } catch {
-        // best effort
+        // ignore
       }
+
+      // Rollback compensation: restore previous active metadata
+      if (previousMetadata !== null) {
+        try {
+          await writeActiveMetadataAtomically(this.#paths, previousMetadata)
+        } catch (rollbackErr) {
+          const rollbackMsg = sanitizeErrorMessage(rollbackErr instanceof Error ? rollbackErr.message : String(rollbackErr))
+          this.#lastRollbackError = `Rollback failed: unable to restore previous active metadata: ${rollbackMsg}`
+          throw new ActivationRollbackError(
+            `Activation failed and rollback of previous active metadata also failed: ${rollbackMsg}`,
+            error,
+            rollbackErr,
+          )
+        }
+      } else {
+        // First install: remove candidate active.json
+        try {
+          await unlink(this.#paths.activeMetadataPath)
+        } catch {
+          // best effort
+        }
+      }
+
       throw error
     }
 
@@ -325,6 +443,17 @@ export class ActivationCoordinator {
 
     // 4. Best-effort Host Config persistence
     await this.#persistHostConfigMode('managed-ecdict')
+
+    // Persist final settings sync state into active.json
+    try {
+      await writeActiveMetadataAtomically(this.#paths, {
+        ...metadata,
+        settingsSynced: this.#settingsSyncError === null,
+        settingsSyncError: this.#settingsSyncError,
+      })
+    } catch {
+      // non-fatal
+    }
   }
 
   /**
@@ -350,6 +479,8 @@ export class ActivationCoordinator {
     if (!this.#paths) {
       this.#cachedInstalledCorpus = null
       this.#recoveryError = null
+      this.#settingsSyncError = null
+      this.#lastRollbackError = null
       await this.#persistHostConfigMode('fixture')
       return { removed: false }
     }
@@ -389,6 +520,8 @@ export class ActivationCoordinator {
     // Reset cached state
     this.#cachedInstalledCorpus = null
     this.#recoveryError = null
+    this.#settingsSyncError = null
+    this.#lastRollbackError = null
 
     // 5. Best-effort update Host Config to fixture
     await this.#persistHostConfigMode('fixture')
@@ -571,7 +704,9 @@ export class ActivationCoordinator {
       quarantined: quarantineRecord !== null,
       quarantineReason: quarantineRecord?.reason ?? null,
       recoveryError: this.#recoveryError,
+      settingsSyncError: this.#settingsSyncError,
       lastRetirementError: snap.lastRetirementError,
+      lastRollbackError: this.#lastRollbackError,
       generation: snap.generation,
     })
   }
@@ -580,13 +715,18 @@ export class ActivationCoordinator {
    * Best-effort persistence of dictionaryMode to Host settings.
    */
   async #persistHostConfigMode(mode: DictionaryMode): Promise<void> {
+    const settings = (this.#ctx as { get?: (s: string) => { update?: (ns: string, patch: Record<string, unknown>) => Promise<unknown> } } | undefined)?.get?.('settings')
+    if (!settings || typeof settings.update !== 'function') {
+      // Settings service not present on context; preserve existing error state if any
+      return
+    }
     try {
-      const settings = (this.#ctx as { get?: (s: string) => { update?: (ns: string, patch: Record<string, unknown>) => Promise<unknown> } } | undefined)?.get?.('settings')
-      if (settings && typeof settings.update === 'function') {
-        await settings.update('dsh-word-lookup', { dictionaryMode: mode })
-      }
-    } catch {
+      await settings.update('dsh-word-lookup', { dictionaryMode: mode })
+      this.#settingsSyncError = null
+    } catch (err) {
       // Non-fatal: settings persistence failure does not roll back active state
+      const msg = sanitizeErrorMessage(err instanceof Error ? err.message : String(err))
+      this.#settingsSyncError = `Settings update failed: ${msg}`
     }
   }
 }

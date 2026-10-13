@@ -104,6 +104,7 @@ import {
 } from './host/route.js'
 import {
   ActivationCoordinator,
+  ActivationRollbackError,
   type ActivationCoordinatorOptions,
   type ActivationStateSummary,
   type CustomDatabaseVerificationResult,
@@ -111,6 +112,8 @@ import {
 import {
   DictionaryOperationManager,
   OperationDirectoryQuarantinedError,
+  OperationDrainTimeoutError,
+  type OperationDrainSummary,
   OperationInProgressError,
   OperationNotFoundError,
   sanitizeErrorMessage,
@@ -192,11 +195,14 @@ export {
   MANAGEMENT_STATUS_PATH,
   MANAGEMENT_VERIFY_PATH,
   ActivationCoordinator,
+  ActivationRollbackError,
   type ActivationCoordinatorOptions,
   type ActivationStateSummary,
   type CustomDatabaseVerificationResult,
   DictionaryOperationManager,
   OperationDirectoryQuarantinedError,
+  OperationDrainTimeoutError,
+  type OperationDrainSummary,
   OperationInProgressError,
   OperationNotFoundError,
   sanitizeErrorMessage,

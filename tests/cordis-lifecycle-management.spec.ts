@@ -177,4 +177,30 @@ describe('Cordis Host Lifecycle Management Integration', () => {
 
     await effectDisposer!()
   })
+
+  it('D08: plugin unload disposer coordinates operation drain and throws AggregateError on multi-resource failure', async () => {
+    let effectDisposer: (() => Promise<void>) | undefined
+
+    const mockCtx = {
+      profileContext: { home: tempHome },
+      effect: vi.fn((fn: () => () => Promise<void>) => {
+        effectDisposer = fn()
+      }),
+      connection: {
+        fetch: {
+          register: vi.fn(() => {
+            return async () => {
+              throw new Error('Disposer route unregister failed')
+            }
+          }),
+        },
+      },
+    }
+
+    const config = Config({})
+    apply(mockCtx as any, config)
+
+    expect(effectDisposer).toBeDefined()
+    await expect(effectDisposer!()).rejects.toThrow(AggregateError)
+  })
 })

@@ -42,6 +42,33 @@ export declare class OperationNotFoundError extends Error {
     constructor(operationId: string);
 }
 /**
+ * Error thrown when draining in-flight operations times out during dispose.
+ */
+export declare class OperationDrainTimeoutError extends Error {
+    readonly code = "DRAIN_TIMEOUT";
+    readonly timeoutMs: number;
+    constructor(timeoutMs: number, message?: string);
+}
+/**
+ * Diagnostic summary of resource drain and worker lifecycle status upon disposal.
+ */
+export interface OperationDrainSummary {
+    /** Whether cancellation signal was dispatched. */
+    readonly requestedCancel: boolean;
+    /** Whether the operation workflow settled completely. */
+    readonly workflowSettled: boolean;
+    /** Whether worker termination was authentically confirmed. */
+    readonly workerExited: boolean;
+    /** Whether drain timed out before settlement. */
+    readonly timedOut: boolean;
+    /** Whether worker or resource status is unknown (fail-closed). */
+    readonly statusUnknown: boolean;
+    /** Whether database directory was left quarantined. */
+    readonly quarantined: boolean;
+    /** Diagnostic error explanation if drain encountered issues. */
+    readonly error?: string;
+}
+/**
  * Sanitize error message to prevent leaking machine-specific paths, credentials, or stack traces.
  */
 export declare function sanitizeErrorMessage(rawMessage: string): string;
@@ -76,15 +103,23 @@ export declare class DictionaryOperationManager {
      */
     getLastOperation(): DictionaryOperationSnapshot | null;
     /**
+     * Return diagnostic drain summary after disposal.
+     */
+    getDrainSummary(): OperationDrainSummary | null;
+    /**
      * Check whether an installation operation can currently be accepted.
      */
     canInstall(): boolean;
+    /**
+     * Check whether the managed dictionary can currently be removed.
+     */
+    canRemove(): boolean;
     /**
      * Check whether an active operation can be cancelled.
      */
     canCancel(): boolean;
     /**
-     * Check whether an operation is currently active.
+     * Check whether an operation (install or remove) is currently active.
      */
     isBusy(): boolean;
     /**
@@ -121,6 +156,19 @@ export declare class DictionaryOperationManager {
         status: 'cancelling' | 'cancelled';
         message: string;
     };
+    /**
+     * Request removal of managed ECDICT database and reversion to fixture.
+     *
+     * Executes under exclusive operation mutex:
+     * - Cannot run concurrently with installation or another removal.
+     * - Awaits startup recovery to settle before mutating state.
+     * - Releases Windows file locks prior to unlinking.
+     *
+     * @returns removal outcome.
+     */
+    remove(): Promise<{
+        removed: boolean;
+    }>;
     /**
      * Dispose operation manager and await safe drainage of in-flight tasks.
      *
