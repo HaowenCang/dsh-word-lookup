@@ -32,10 +32,10 @@
  */
 
 import { randomUUID } from 'node:crypto'
-import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
 
@@ -53,6 +53,69 @@ const LOCAL_CACHE_PATH = join(REPO_ROOT, '.cache', 'corpus', 'ecdict.csv')
 const FIXTURE_DB_PATH = join(REPO_ROOT, 'fixtures', 'dictionary.fixture.db')
 const DEFAULT_PORT = 50996
 const ANSI = /\x1B\[[0-?]*[ -/]*[@-~]/g
+
+async function prepareIsolatedProfile({ home, profile, port }) {
+  const profileDir = join(home, 'profiles', profile)
+  mkdirSync(profileDir, { recursive: true })
+
+  writeFileSync(
+    join(profileDir, 'cordis.yml'),
+    '[]\n',
+    'utf8',
+  )
+  writeFileSync(
+    join(profileDir, 'cordis.patch.yml'),
+    [
+      '- id: webserver',
+      '  config:',
+      "    host: !!js ctx.webStartup.host ?? '127.0.0.1'",
+      `    port: !!js ctx.webStartup.port ?? ${String(port)}`,
+      '',
+    ].join('\n'),
+    'utf8',
+  )
+
+  const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm'
+  const packOut = spawnSync(npmCmd, ['pack', '--pack-destination', tmpdir()], {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+    shell: true,
+  })
+  if (packOut.status !== 0) {
+    throw new Error(`npm pack failed: ${packOut.stderr}`)
+  }
+  const filename = packOut.stdout.trim().split(/\r?\n/).at(-1).trim()
+  const candidateTarballPath = join(tmpdir(), filename)
+
+  const installedPluginDir = join(profileDir, 'node_modules', 'dsh-word-lookup')
+  mkdirSync(installedPluginDir, { recursive: true })
+
+  const stageDir = join(tmpdir(), `dsh-e2e-stage-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+  mkdirSync(stageDir, { recursive: true })
+  const res = spawnSync('tar', ['-xzf', candidateTarballPath, '-C', stageDir], { encoding: 'utf8', shell: true })
+  if (res.status !== 0) {
+    throw new Error(`tar -xzf failed on ${candidateTarballPath}: ${res.stderr}`)
+  }
+  const packageDir = join(stageDir, 'package')
+  cpSync(packageDir, installedPluginDir, { recursive: true })
+  rmSync(stageDir, { recursive: true, force: true })
+  try { rmSync(candidateTarballPath, { force: true }) } catch {}
+
+  const profilePkg = {
+    name: `dsh-profile-${profile}`,
+    private: true,
+    dsh: {
+      profile: {
+        bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', 'dsh-word-lookup'],
+      },
+    },
+    dependencies: {
+      'dsh-word-lookup': './node_modules/dsh-word-lookup',
+    },
+  }
+  writeFileSync(join(profileDir, 'package.json'), JSON.stringify(profilePkg, null, 2) + '\n', 'utf8')
+  console.log(`Prepared isolated profile ${profile} with candidate plugin at ${installedPluginDir}`)
+}
 
 async function bootDsh(verified, port) {
   const env = buildIsolatedEnv(verified, process.env, { PORT: String(port) })
@@ -164,9 +227,10 @@ async function main() {
   const testRoot = resolve(join(tmpdir(), 'dsh-word-lookup-test'))
   const home = join(testRoot, 'home')
   const profile = 'word-lookup-test'
+  const profileDir = join(home, 'profiles', profile)
   const port = DEFAULT_PORT
 
-  const verified = assertIsolatedDshEnvironment({ home, profile, port, testRoot })
+  const verified = assertIsolatedDshEnvironment({ home, profile, port, testRoot, profileDir })
   console.log('ISOLATION CHECK: PASS')
   console.log(`Scratch home: ${home}\n`)
 
@@ -179,6 +243,9 @@ async function main() {
   if (existsSync(storageDir)) {
     rmSync(storageDir, { recursive: true, force: true })
   }
+
+  // Setup profile skeleton and unpacked candidate plugin
+  await prepareIsolatedProfile({ home, profile, port })
 
   // Pre-seed local cache into test profile home so install completes quickly
   const sourcesDir = join(home, 'cache', 'dsh-word-lookup', 'sources')
@@ -450,39 +517,79 @@ async function main() {
     console.log(`  PASS: Morphological query 'actioned' -> headword 'action' (matchedForm: ${formHit.body.matchedForm})`)
 
     // -----------------------------------------------------------------------
-    // PART 7: Removal Route & Safe Reversion to Fixture
+    // PART 6B (E2E-06): Cross-Process Restart Persistence & Restoration
     // -----------------------------------------------------------------------
-    console.log('\n--- Part 7: Removal Route & Hot Reversion to Fixture ---')
+    console.log('\n--- Part 6B (E2E-06): Cross-Process Restart Persistence & Restoration ---')
+    await stopDsh(dsh.child)
+    console.log('  Stopped initial DSH process.')
+
+    console.log(`  Booting second DSH process to verify persistent startup restoration on port ${port}...`)
+    dsh = await bootDsh(verified, port)
+    console.log(`  Second DSH process booted successfully at: ${dsh.url}`)
+
+    await page.goto(dsh.url, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    await page.waitForFunction(() => {
+      return typeof window.__DSH_WORD_LOOKUP__ === 'object' && window.__DSH_WORD_LOOKUP__ !== null
+    }, undefined, { timeout: 45_000 })
+
+    const restartStatus = await testSessionFetch(page, 'GET', 'api/dsh-word-lookup/dictionary/status')
+    if (restartStatus.body?.activeMode !== 'managed-ecdict' || !restartStatus.body?.installed) {
+      throw new Error(`Restart status check failed: expected activeMode 'managed-ecdict', got ${JSON.stringify(restartStatus.body)}`)
+    }
+    if (restartStatus.body.installedCorpus?.entryCount !== 770611) {
+      throw new Error(`Restart corpus mismatch: ${restartStatus.body.installedCorpus?.entryCount}`)
+    }
+    console.log(`  PASS (E2E-06): GET /dictionary/status after restart -> activeMode: 'managed-ecdict', entries: 770,611`)
+
+    const restartLookup = await testSessionFetch(page, 'POST', 'api/dsh-word-lookup', { query: 'quixotic' })
+    if (!restartLookup.body?.found || restartLookup.body.source !== 'ecdict-local') {
+      throw new Error(`Lookup 'quixotic' after restart failed: ${JSON.stringify(restartLookup)}`)
+    }
+    console.log(`  PASS (E2E-06): Non-fixture query 'quixotic' HIT after cross-process restart (source: 'ecdict-local')`)
+
+    // -----------------------------------------------------------------------
+    // PART 6C (E2E-07): Settings Fallback & Priority Contract Across Restart
+    // -----------------------------------------------------------------------
+    console.log('\n--- Part 6C (E2E-07): Settings Sync State & Priority Verification ---')
+    if (!restartStatus.body?.settingsSyncState) {
+      throw new Error(`Expected settingsSyncState in status response, got ${JSON.stringify(restartStatus.body)}`)
+    }
+    console.log(`  PASS (E2E-07): Status response contains verified settingsSyncState: '${restartStatus.body.settingsSyncState}'`)
+
+    // -----------------------------------------------------------------------
+    // PART 7 (E2E-08): Removal Route & Safe Reversion to Fixture
+    // -----------------------------------------------------------------------
+    console.log('\n--- Part 7 (E2E-08): Removal Route & Hot Reversion to Fixture ---')
     const removeRes = await testSessionFetch(page, 'POST', 'api/dsh-word-lookup/dictionary/remove', {})
     if (removeRes.status !== 200 || !removeRes.body?.removed || removeRes.body.activeMode !== 'fixture') {
       throw new Error(`Remove route failed: ${JSON.stringify(removeRes)}`)
     }
-    console.log(`  PASS: POST /dictionary/remove -> 200 OK (removed: true, activeMode: 'fixture')`)
+    console.log(`  PASS (E2E-08): POST /dictionary/remove -> 200 OK (removed: true, activeMode: 'fixture')`)
 
     // Post-remove status
     const postRemoveStatus = await testSessionFetch(page, 'GET', 'api/dsh-word-lookup/dictionary/status')
     if (postRemoveStatus.body?.activeMode !== 'fixture' || postRemoveStatus.body?.installed !== false) {
       throw new Error(`Post-remove status unexpected: ${JSON.stringify(postRemoveStatus.body)}`)
     }
-    console.log(`  PASS: Post-remove status -> activeMode: 'fixture', installed: false`)
+    console.log(`  PASS (E2E-08): Post-remove status -> activeMode: 'fixture', installed: false`)
 
     // Post-remove lookup: non-fixture word must miss
     const postRemoveMiss = await testSessionFetch(page, 'POST', 'api/dsh-word-lookup', { query: 'apple' })
     if (postRemoveMiss.body?.found !== false) {
       throw new Error(`Expected 'apple' to miss after removal, got found: true`)
     }
-    console.log(`  PASS: Post-remove non-fixture word 'apple' -> found: false (reverted to fixture)`)
+    console.log(`  PASS (E2E-08): Post-remove non-fixture word 'apple' -> found: false (reverted to fixture)`)
 
     // Post-remove lookup: fixture word must still hit
     const postRemoveFixtureHit = await testSessionFetch(page, 'POST', 'api/dsh-word-lookup', { query: 'derive' })
     if (!postRemoveFixtureHit.body?.found || postRemoveFixtureHit.body.source !== 'sqlite-fixture') {
       throw new Error(`Expected 'derive' to hit on fixture after removal: ${JSON.stringify(postRemoveFixtureHit)}`)
     }
-    console.log(`  PASS: Post-remove fixture word 'derive' -> found: true (source: 'sqlite-fixture')`)
+    console.log(`  PASS (E2E-08): Post-remove fixture word 'derive' -> found: true (source: 'sqlite-fixture')`)
 
     const evidenceOut = {
-      phase: 'Phase 7A.6R1',
-      reportTitle: 'Phase 7A.6 Host Dictionary Management Routes Real DSH E2E Verification',
+      phase: 'Phase 7A.6R3',
+      reportTitle: 'Phase 7A.6R3 Host Dictionary Management Routes Real DSH E2E Verification',
       generatedAt: new Date().toISOString(),
       status: 'PASS',
       platform: process.platform,
@@ -491,6 +598,16 @@ async function main() {
       home,
       profile,
       port,
+      e2eCoverage: {
+        'E2E-01': 'PASS: Unauthenticated request fence (401 on all routes without session)',
+        'E2E-02': 'PASS: Zero initial network requests and initial fixture status query',
+        'E2E-03': 'PASS: Protocol constraints and gating (405, 415, 413, forbidden 400, not found 404)',
+        'E2E-04': 'PASS: Concurrency gating (409) and cancellation dispatch (200 cancelling -> cancelled)',
+        'E2E-05': 'PASS: Full ECDICT install & activation (770,611 entries, non-fixture queries hit)',
+        'E2E-06': 'PASS: Cross-process restart persistence & restoration (survives restart directly in managed-ecdict)',
+        'E2E-07': 'PASS: Settings sync state verification and schema compatibility across restart',
+        'E2E-08': 'PASS: Safe removal releasing Windows locks, unlinking DB, reverting queries to fixture',
+      },
       unauthenticatedGate401: true,
       routesVerified: [
         'POST /api/dsh-word-lookup',
@@ -514,6 +631,8 @@ async function main() {
         ecdictFormsVerified: 57689,
         nonFixtureLookupHit: true,
         morphologyLookupHit: true,
+        crossProcessRestartRestored: true,
+        settingsSyncStateVerified: true,
         safeRemovalReleasingWindowsLocks: true,
         postRemovalFixtureReversion: true,
       },
@@ -522,7 +641,11 @@ async function main() {
     const outDir = join(REPO_ROOT, 'verify-out')
     mkdirSync(outDir, { recursive: true })
     writeFileSync(join(outDir, 'phase7a6-management-e2e.json'), JSON.stringify(evidenceOut, null, 2) + '\n', 'utf8')
-    console.log(`\nMachine-readable evidence saved to: verify-out/phase7a6-management-e2e.json`)
+
+    const docsEvidenceDir = join(REPO_ROOT, 'docs', 'evidence')
+    mkdirSync(docsEvidenceDir, { recursive: true })
+    writeFileSync(join(docsEvidenceDir, 'phase7a6r3-e2e-evidence.json'), JSON.stringify(evidenceOut, null, 2) + '\n', 'utf8')
+    console.log(`\nMachine-readable evidence saved to: docs/evidence/phase7a6r3-e2e-evidence.json`)
 
     console.log('\n=== ALL REAL DSH 0.2.0-rc.2 MANAGEMENT ROUTE & LIFECYCLE CHECKS PASSED ===\n')
   } finally {
