@@ -39,6 +39,7 @@ import {
   writeActiveMetadataAtomically,
   type ActiveMetadata,
   type ManagedStoragePaths,
+  type SettingsSyncState,
 } from './managed-storage.js'
 import {
   readDictionaryMode,
@@ -124,10 +125,30 @@ export interface ActivationStateSummary {
   readonly quarantined: boolean
   readonly quarantineReason: string | null
   readonly recoveryError: string | null
+  readonly settingsSyncState: SettingsSyncState
   readonly settingsSyncError: string | null
   readonly lastRetirementError: string | null
   readonly lastRollbackError: string | null
   readonly generation: number
+}
+
+/**
+ * Test-only failure injection and race orchestration hooks for activation coordinator.
+ */
+export interface ActivationHooks {
+  readonly beforeReadMetadata?: () => Promise<void>
+  readonly beforeCommitMetadata?: () => Promise<void>
+  readonly duringRollbackCompensation?: () => Promise<void>
+}
+
+let activationHooks: ActivationHooks | null = null
+
+/**
+ * Configure test-only activation hooks.
+ * @internal
+ */
+export function _setActivationHooksForTesting(hooks: ActivationHooks | null): void {
+  activationHooks = hooks
 }
 
 /**
@@ -142,6 +163,7 @@ export class ActivationCoordinator {
   #recoveryPromise: Promise<void> | null = null
   #isRecovering = false
   #recoveryError: string | null = null
+  #settingsSyncState: SettingsSyncState = 'pending'
   #settingsSyncError: string | null = null
   #lastRollbackError: string | null = null
   #cachedInstalledCorpus: InstalledCorpusInfo | null = null
@@ -239,6 +261,18 @@ export class ActivationCoordinator {
     if (metadata.settingsSyncError) {
       this.#settingsSyncError = metadata.settingsSyncError
     }
+    if (metadata.settingsSyncState) {
+      this.#settingsSyncState = metadata.settingsSyncState
+    } else if (metadata.settingsSynced === true) {
+      this.#settingsSyncState = 'synced'
+    } else if (metadata.settingsSynced === false) {
+      this.#settingsSyncState = 'failed'
+    } else if (metadata.settingsSyncError) {
+      this.#settingsSyncState = 'failed'
+    } else {
+      // Legacy metadata without settings fields: treat as confirmed synced
+      this.#settingsSyncState = 'synced'
+    }
 
     const dbPath = join(this.#paths.databaseDirectory, metadata.databaseFile)
     if (!existsSync(dbPath)) {
@@ -294,11 +328,9 @@ export class ActivationCoordinator {
 
     const userMode = readDictionaryMode(this.#config)
 
-    // Check if previous settings sync failed (A02, A03)
-    const settingsSyncFailed =
-      metadata.settingsSynced === false ||
-      (typeof metadata.settingsSyncError === 'string' && metadata.settingsSyncError.length > 0) ||
-      (this.#settingsSyncError !== null)
+    // Settings sync is verified as confirmed ONLY if recorded as 'synced', settingsSynced is not false, and no sync error
+    const isSyncConfirmed = this.#settingsSyncState === 'synced' && metadata.settingsSynced !== false && !metadata.settingsSyncError
+    const settingsSyncFailed = !isSyncConfirmed
 
     if (userMode === 'managed-ecdict' || (userMode === 'fixture' && settingsSyncFailed)) {
       try {
@@ -307,9 +339,21 @@ export class ActivationCoordinator {
           identity: metadata.identity,
           dictionary: openedDict,
         })
-        // Attempt to re-sync host settings if it was previously failed
+        // Attempt to re-sync host settings if it was previously unconfirmed
         if (settingsSyncFailed) {
-          await this.#persistHostConfigMode('managed-ecdict')
+          const retryState = await this.#persistHostConfigMode('managed-ecdict')
+          if (retryState === 'synced') {
+            try {
+              await writeActiveMetadataAtomically(this.#paths, {
+                ...metadata,
+                settingsSynced: true,
+                settingsSyncState: 'synced',
+                settingsSyncError: null,
+              })
+            } catch {
+              // non-fatal
+            }
+          }
         }
       } catch (error) {
         openedDict.close()
@@ -334,7 +378,17 @@ export class ActivationCoordinator {
    *
    * @param buildResult - verified outcome from buildManagedEcdictDatabase.
    */
-  async activateManagedDatabase(buildResult: ManagedEcdictBuildResult): Promise<void> {
+  async activateManagedDatabase(
+    buildResult: ManagedEcdictBuildResult,
+    options?: { signal?: AbortSignal; onCommitBoundary?: () => void },
+  ): Promise<void> {
+    const signal = options?.signal
+    if (signal?.aborted) {
+      const err = new Error('The operation was aborted')
+      err.name = 'AbortError'
+      throw err
+    }
+
     if (!this.#paths) {
       throw new Error('Managed storage unavailable: cannot activate database')
     }
@@ -344,12 +398,27 @@ export class ActivationCoordinator {
       throw new Error(`Published database file not found at: ${publishedPath}`)
     }
 
+    if (activationHooks?.beforeReadMetadata) {
+      await activationHooks.beforeReadMetadata()
+    }
+    if (signal?.aborted) {
+      const err = new Error('The operation was aborted')
+      err.name = 'AbortError'
+      throw err
+    }
+
     // Capture previous metadata before attempting activation
     let previousMetadata: ActiveMetadata | null = null
     try {
       previousMetadata = await readActiveMetadata(this.#paths)
     } catch {
       // previous metadata missing or invalid
+    }
+
+    if (signal?.aborted) {
+      const err = new Error('The operation was aborted')
+      err.name = 'AbortError'
+      throw err
     }
 
     // 1. Open and validate published database
@@ -362,6 +431,18 @@ export class ActivationCoordinator {
       publishedDict.close()
       throw new Error(`Candidate database probe verification failed: ${error instanceof Error ? error.message : String(error)}`, { cause: error })
     }
+
+    if (activationHooks?.beforeCommitMetadata) {
+      await activationHooks.beforeCommitMetadata()
+    }
+    if (signal?.aborted) {
+      publishedDict.close()
+      const err = new Error('The operation was aborted')
+      err.name = 'AbortError'
+      throw err
+    }
+
+    options?.onCommitBoundary?.()
 
     // 2. Commit metadata atomically
     const metadata: ActiveMetadata = {
@@ -377,6 +458,7 @@ export class ActivationCoordinator {
       },
       lastActivatedAt: new Date().toISOString(),
       settingsSynced: false,
+      settingsSyncState: 'pending',
       settingsSyncError: null,
     }
 
@@ -400,6 +482,14 @@ export class ActivationCoordinator {
         publishedDict.close()
       } catch {
         // ignore
+      }
+
+      if (activationHooks?.duringRollbackCompensation) {
+        try {
+          await activationHooks.duringRollbackCompensation()
+        } catch {
+          // ignore hook error to proceed with compensation
+        }
       }
 
       // Rollback compensation: restore previous active metadata
@@ -442,13 +532,14 @@ export class ActivationCoordinator {
     this.#recoveryError = null
 
     // 4. Best-effort Host Config persistence
-    await this.#persistHostConfigMode('managed-ecdict')
+    const syncState = await this.#persistHostConfigMode('managed-ecdict')
 
     // Persist final settings sync state into active.json
     try {
       await writeActiveMetadataAtomically(this.#paths, {
         ...metadata,
-        settingsSynced: this.#settingsSyncError === null,
+        settingsSynced: syncState === 'synced',
+        settingsSyncState: syncState,
         settingsSyncError: this.#settingsSyncError,
       })
     } catch {
@@ -479,6 +570,7 @@ export class ActivationCoordinator {
     if (!this.#paths) {
       this.#cachedInstalledCorpus = null
       this.#recoveryError = null
+      this.#settingsSyncState = 'pending'
       this.#settingsSyncError = null
       this.#lastRollbackError = null
       await this.#persistHostConfigMode('fixture')
@@ -520,6 +612,7 @@ export class ActivationCoordinator {
     // Reset cached state
     this.#cachedInstalledCorpus = null
     this.#recoveryError = null
+    this.#settingsSyncState = 'pending'
     this.#settingsSyncError = null
     this.#lastRollbackError = null
 
@@ -704,6 +797,7 @@ export class ActivationCoordinator {
       quarantined: quarantineRecord !== null,
       quarantineReason: quarantineRecord?.reason ?? null,
       recoveryError: this.#recoveryError,
+      settingsSyncState: this.#settingsSyncState,
       settingsSyncError: this.#settingsSyncError,
       lastRetirementError: snap.lastRetirementError,
       lastRollbackError: this.#lastRollbackError,
@@ -714,19 +808,24 @@ export class ActivationCoordinator {
   /**
    * Best-effort persistence of dictionaryMode to Host settings.
    */
-  async #persistHostConfigMode(mode: DictionaryMode): Promise<void> {
+  async #persistHostConfigMode(mode: DictionaryMode): Promise<SettingsSyncState> {
     const settings = (this.#ctx as { get?: (s: string) => { update?: (ns: string, patch: Record<string, unknown>) => Promise<unknown> } } | undefined)?.get?.('settings')
     if (!settings || typeof settings.update !== 'function') {
-      // Settings service not present on context; preserve existing error state if any
-      return
+      // Settings service not present on context: distinguish clearly as 'unavailable'
+      this.#settingsSyncState = 'unavailable'
+      return 'unavailable'
     }
     try {
       await settings.update('dsh-word-lookup', { dictionaryMode: mode })
+      this.#settingsSyncState = 'synced'
       this.#settingsSyncError = null
+      return 'synced'
     } catch (err) {
       // Non-fatal: settings persistence failure does not roll back active state
       const msg = sanitizeErrorMessage(err instanceof Error ? err.message : String(err))
+      this.#settingsSyncState = 'failed'
       this.#settingsSyncError = `Settings update failed: ${msg}`
+      return 'failed'
     }
   }
 }

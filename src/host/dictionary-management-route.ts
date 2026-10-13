@@ -42,6 +42,7 @@ import {
   DictionaryOperationManager,
   OperationDirectoryQuarantinedError,
   OperationInProgressError,
+  OperationNotCancellableError,
   OperationNotFoundError,
   sanitizeErrorMessage,
 } from './dictionary-operations.js'
@@ -204,6 +205,7 @@ export function createStatusHandler(
         quarantined: summary.quarantined,
         quarantineReason: summary.quarantineReason,
         recoveryError: summary.recoveryError,
+        settingsSyncState: summary.settingsSyncState,
         settingsSyncError: summary.settingsSyncError,
         lastRollbackError: summary.lastRollbackError,
         lastRetirementError: summary.lastRetirementError,
@@ -317,6 +319,11 @@ export function createCancelHandler(
     } catch (err) {
       if (err instanceof OperationNotFoundError) {
         return errorResponse(404, 'OPERATION_NOT_FOUND', err.message)
+      }
+      if (err instanceof OperationNotCancellableError) {
+        return errorResponse(409, 'OPERATION_NOT_CANCELLABLE', err.message, {
+          operationId: err.operationId,
+        })
       }
       return errorResponse(500, 'INTERNAL_ERROR', err instanceof Error ? err.message : String(err))
     }

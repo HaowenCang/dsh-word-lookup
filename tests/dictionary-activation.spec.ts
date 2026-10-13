@@ -792,4 +792,326 @@ describe('ActivationCoordinator', () => {
       }
     })
   })
+
+  describe('Phase 7A.6R3 Fix A: Settings Sync Persistent State & Schema Compatibility (A-R3-01 to A-R3-08)', () => {
+    it('A-R3-01: successful settings service update persists settingsSyncState="synced" in active.json and status summary', async () => {
+      const dbFile = 'ecdict-ar3-01.sqlite3'
+      const fullDbPath = join(paths.databaseDirectory, dbFile)
+      createSyntheticManagedDb(fullDbPath)
+      const buildResult: ManagedEcdictBuildResult = {
+        path: fullDbPath,
+        databaseFile: dbFile,
+        identity: 'ar3-01',
+        sourceCommit: PINNED_COMMIT,
+        sourceSha256: PINNED_SHA256,
+        entryCount: 3,
+        formCount: 1,
+        exampleCount: 0,
+        ambiguousFormCount: 0,
+        rejectedRowCount: 0,
+        sourceRowCount: 3,
+        byteSize: 40960,
+        schemaVersion: 1,
+        logicalSha256: 'b'.repeat(64),
+        fileSha256: 'c'.repeat(64),
+        yieldCount: 1,
+        postPublicationCleanup: { candidateRemoved: true, sidecarsRemoved: true },
+      }
+
+      const updateSpy = vi.fn().mockResolvedValue(undefined)
+      const ctx = {
+        get: (serviceName: string) => serviceName === 'settings' ? { update: updateSpy } : undefined,
+      } as any
+
+      const coordinator = new ActivationCoordinator({ paths, manager, ctx })
+      await coordinator.activateManagedDatabase(buildResult)
+
+      expect(updateSpy).toHaveBeenCalledWith('dsh-word-lookup', { dictionaryMode: 'managed-ecdict' })
+
+      const metadata = await readActiveMetadata(paths)
+      expect(metadata?.settingsSyncState).toBe('synced')
+      expect(metadata?.settingsSynced).toBe(true)
+      expect(metadata?.settingsSyncError).toBeNull()
+
+      const summary = coordinator.getStatusSummary()
+      expect(summary.settingsSyncState).toBe('synced')
+      expect(summary.settingsSyncError).toBeNull()
+    })
+
+    it('A-R3-02: absent settings service persists settingsSyncState="unavailable" in active.json and status summary', async () => {
+      const dbFile = 'ecdict-ar3-02.sqlite3'
+      const fullDbPath = join(paths.databaseDirectory, dbFile)
+      createSyntheticManagedDb(fullDbPath)
+      const buildResult: ManagedEcdictBuildResult = {
+        path: fullDbPath,
+        databaseFile: dbFile,
+        identity: 'ar3-02',
+        sourceCommit: PINNED_COMMIT,
+        sourceSha256: PINNED_SHA256,
+        entryCount: 3,
+        formCount: 1,
+        exampleCount: 0,
+        ambiguousFormCount: 0,
+        rejectedRowCount: 0,
+        sourceRowCount: 3,
+        byteSize: 40960,
+        schemaVersion: 1,
+        logicalSha256: 'b'.repeat(64),
+        fileSha256: 'c'.repeat(64),
+        yieldCount: 1,
+        postPublicationCleanup: { candidateRemoved: true, sidecarsRemoved: true },
+      }
+
+      const ctx = {
+        get: () => undefined,
+      } as any
+
+      const coordinator = new ActivationCoordinator({ paths, manager, ctx })
+      await coordinator.activateManagedDatabase(buildResult)
+
+      const metadata = await readActiveMetadata(paths)
+      expect(metadata?.settingsSyncState).toBe('unavailable')
+      expect(metadata?.settingsSynced).toBe(false)
+      expect(metadata?.settingsSyncError).toBeNull()
+
+      const summary = coordinator.getStatusSummary()
+      expect(summary.settingsSyncState).toBe('unavailable')
+      expect(summary.settingsSyncError).toBeNull()
+    })
+
+    it('A-R3-03: failed settings service update persists settingsSyncState="failed" and records sanitized error', async () => {
+      const dbFile = 'ecdict-ar3-03.sqlite3'
+      const fullDbPath = join(paths.databaseDirectory, dbFile)
+      createSyntheticManagedDb(fullDbPath)
+      const buildResult: ManagedEcdictBuildResult = {
+        path: fullDbPath,
+        databaseFile: dbFile,
+        identity: 'ar3-03',
+        sourceCommit: PINNED_COMMIT,
+        sourceSha256: PINNED_SHA256,
+        entryCount: 3,
+        formCount: 1,
+        exampleCount: 0,
+        ambiguousFormCount: 0,
+        rejectedRowCount: 0,
+        sourceRowCount: 3,
+        byteSize: 40960,
+        schemaVersion: 1,
+        logicalSha256: 'b'.repeat(64),
+        fileSha256: 'c'.repeat(64),
+        yieldCount: 1,
+        postPublicationCleanup: { candidateRemoved: true, sidecarsRemoved: true },
+      }
+
+      const updateSpy = vi.fn().mockRejectedValue(new Error('IPC pipe broken: E:\\secret\\path'))
+      const ctx = {
+        get: (serviceName: string) => serviceName === 'settings' ? { update: updateSpy } : undefined,
+      } as any
+
+      const coordinator = new ActivationCoordinator({ paths, manager, ctx })
+      await coordinator.activateManagedDatabase(buildResult)
+
+      const metadata = await readActiveMetadata(paths)
+      expect(metadata?.settingsSyncState).toBe('failed')
+      expect(metadata?.settingsSynced).toBe(false)
+      expect(metadata?.settingsSyncError).toContain('Settings update failed: IPC pipe broken: [local-path]')
+
+      const summary = coordinator.getStatusSummary()
+      expect(summary.settingsSyncState).toBe('failed')
+      expect(summary.settingsSyncError).toContain('Settings update failed: IPC pipe broken: [local-path]')
+    })
+
+    it('A-R3-04: startup recovery with config fixture and metadata settingsSyncState="unavailable" recovers managed dictionary', async () => {
+      const dbFile = 'ecdict-ar3-04.sqlite3'
+      const fullDbPath = join(paths.databaseDirectory, dbFile)
+      createSyntheticManagedDb(fullDbPath)
+      const metadata: ActiveMetadata = {
+        version: 1,
+        activeMode: 'managed-ecdict',
+        identity: 'ar3-04',
+        databaseFile: dbFile,
+        source: {
+          name: 'ECDICT',
+          commit: PINNED_COMMIT,
+          sha256: PINNED_SHA256,
+          schemaVersion: 1,
+        },
+        settingsSynced: false,
+        settingsSyncState: 'unavailable',
+        settingsSyncError: null,
+      }
+      await writeActiveMetadataAtomically(paths, metadata)
+
+      const updateSpy = vi.fn().mockResolvedValue(undefined)
+      const ctx = {
+        get: (serviceName: string) => serviceName === 'settings' ? { update: updateSpy } : undefined,
+      } as any
+
+      const coordinator = new ActivationCoordinator({
+        paths,
+        manager,
+        ctx,
+        config: Config({ dictionaryMode: 'fixture' }),
+      })
+
+      await coordinator.recoverOnStartup()
+      const summary = coordinator.getStatusSummary()
+
+      expect(summary.activeMode).toBe('managed-ecdict')
+      expect(summary.installed).toBe(true)
+      expect(updateSpy).toHaveBeenCalledWith('dsh-word-lookup', { dictionaryMode: 'managed-ecdict' })
+      expect(summary.settingsSyncState).toBe('synced')
+
+      const updatedMeta = await readActiveMetadata(paths)
+      expect(updatedMeta?.settingsSyncState).toBe('synced')
+      expect(updatedMeta?.settingsSynced).toBe(true)
+    })
+
+    it('A-R3-05: startup recovery with config fixture and metadata settingsSyncState="failed" recovers managed dictionary', async () => {
+      const dbFile = 'ecdict-ar3-05.sqlite3'
+      const fullDbPath = join(paths.databaseDirectory, dbFile)
+      createSyntheticManagedDb(fullDbPath)
+      const metadata: ActiveMetadata = {
+        version: 1,
+        activeMode: 'managed-ecdict',
+        identity: 'ar3-05',
+        databaseFile: dbFile,
+        source: {
+          name: 'ECDICT',
+          commit: PINNED_COMMIT,
+          sha256: PINNED_SHA256,
+          schemaVersion: 1,
+        },
+        settingsSynced: false,
+        settingsSyncState: 'failed',
+        settingsSyncError: 'Network unreachable on previous run',
+      }
+      await writeActiveMetadataAtomically(paths, metadata)
+
+      const updateSpy = vi.fn().mockRejectedValue(new Error('Network unreachable on previous run'))
+      const ctx = {
+        get: (serviceName: string) => serviceName === 'settings' ? { update: updateSpy } : undefined,
+      } as any
+
+      const coordinator = new ActivationCoordinator({
+        paths,
+        manager,
+        ctx,
+        config: Config({ dictionaryMode: 'fixture' }),
+      })
+
+      await coordinator.recoverOnStartup()
+      const summary = coordinator.getStatusSummary()
+
+      expect(summary.activeMode).toBe('managed-ecdict')
+      expect(summary.installed).toBe(true)
+      expect(summary.settingsSyncState).toBe('failed')
+      expect(summary.settingsSyncError).toContain('Settings update failed: Network unreachable on previous run')
+    })
+
+    it('A-R3-06: startup recovery with config fixture and metadata settingsSyncState="synced" honors fixture mode', async () => {
+      const dbFile = 'ecdict-ar3-06.sqlite3'
+      const fullDbPath = join(paths.databaseDirectory, dbFile)
+      createSyntheticManagedDb(fullDbPath)
+      const metadata: ActiveMetadata = {
+        version: 1,
+        activeMode: 'managed-ecdict',
+        identity: 'ar3-06',
+        databaseFile: dbFile,
+        source: {
+          name: 'ECDICT',
+          commit: PINNED_COMMIT,
+          sha256: PINNED_SHA256,
+          schemaVersion: 1,
+        },
+        settingsSynced: true,
+        settingsSyncState: 'synced',
+        settingsSyncError: null,
+      }
+      await writeActiveMetadataAtomically(paths, metadata)
+
+      const coordinator = new ActivationCoordinator({
+        paths,
+        manager,
+        config: Config({ dictionaryMode: 'fixture' }),
+      })
+
+      await coordinator.recoverOnStartup()
+      const summary = coordinator.getStatusSummary()
+
+      expect(summary.activeMode).toBe('fixture')
+      expect(summary.installed).toBe(true)
+      expect(summary.installedCorpus?.name).toBe('ECDICT')
+      expect(summary.settingsSyncState).toBe('synced')
+    })
+
+    it('A-R3-07: schema backward compatibility - legacy active.json without settingsSyncState is safely parsed', async () => {
+      const legacyRaw = {
+        version: 1,
+        activeMode: 'managed-ecdict',
+        identity: 'ar3-07-legacy',
+        databaseFile: 'ecdict-ar3-07-legacy.sqlite3',
+        source: {
+          name: 'ECDICT',
+          commit: PINNED_COMMIT,
+          sha256: PINNED_SHA256,
+          schemaVersion: 1,
+        },
+      }
+      const fullDbPath = join(paths.databaseDirectory, legacyRaw.databaseFile)
+      createSyntheticManagedDb(fullDbPath)
+      await writeActiveMetadataAtomically(paths, legacyRaw as any)
+
+      const coordinator = new ActivationCoordinator({
+        paths,
+        manager,
+        config: Config({ dictionaryMode: 'managed-ecdict' }),
+      })
+
+      await coordinator.recoverOnStartup()
+      const summary = coordinator.getStatusSummary()
+
+      expect(summary.activeMode).toBe('managed-ecdict')
+      expect(summary.installed).toBe(true)
+      expect(summary.settingsSyncState).toBe('synced')
+    })
+
+    it('A-R3-08: removeManagedDatabase resets coordinator settingsSyncState to synced when settings update succeeds', async () => {
+      const dbFile = 'ecdict-ar3-08.sqlite3'
+      const fullDbPath = join(paths.databaseDirectory, dbFile)
+      createSyntheticManagedDb(fullDbPath)
+      const metadata: ActiveMetadata = {
+        version: 1,
+        activeMode: 'managed-ecdict',
+        identity: 'ar3-08',
+        databaseFile: dbFile,
+        source: {
+          name: 'ECDICT',
+          commit: PINNED_COMMIT,
+          sha256: PINNED_SHA256,
+          schemaVersion: 1,
+        },
+        settingsSynced: true,
+        settingsSyncState: 'synced',
+      }
+      await writeActiveMetadataAtomically(paths, metadata)
+
+      const updateSpy = vi.fn().mockResolvedValue(undefined)
+      const ctx = {
+        get: (serviceName: string) => serviceName === 'settings' ? { update: updateSpy } : undefined,
+      } as any
+
+      const coordinator = new ActivationCoordinator({ paths, manager, ctx })
+      await coordinator.recoverOnStartup()
+
+      const removeResult = await coordinator.removeManagedDatabase()
+      expect(removeResult.removed).toBe(true)
+      expect(updateSpy).toHaveBeenCalledWith('dsh-word-lookup', { dictionaryMode: 'fixture' })
+
+      const summary = coordinator.getStatusSummary()
+      expect(summary.activeMode).toBe('fixture')
+      expect(summary.installed).toBe(false)
+      expect(summary.settingsSyncState).toBe('synced')
+    })
+  })
 })

@@ -68,6 +68,7 @@ import {
   type ActiveMetadataSource,
   type ManagedStoragePaths,
   type ResolveManagedStorageOptions,
+  type SettingsSyncState,
 } from './host/managed-storage.js'
 import {
   descriptorToActiveMetadataSource,
@@ -115,6 +116,7 @@ import {
   OperationDrainTimeoutError,
   type OperationDrainSummary,
   OperationInProgressError,
+  OperationNotCancellableError,
   OperationNotFoundError,
   sanitizeErrorMessage,
   type DictionaryOperationManagerOptions,
@@ -169,6 +171,7 @@ export {
   type ActiveMetadataSource,
   type ManagedStoragePaths,
   type ResolveManagedStorageOptions,
+  type SettingsSyncState,
   descriptorToActiveMetadataSource,
   loadPinnedEcdictSourceDescriptor,
   type EcdictSourceDescriptor,
@@ -204,6 +207,7 @@ export {
   OperationDrainTimeoutError,
   type OperationDrainSummary,
   OperationInProgressError,
+  OperationNotCancellableError,
   OperationNotFoundError,
   sanitizeErrorMessage,
   type DictionaryOperationManagerOptions,

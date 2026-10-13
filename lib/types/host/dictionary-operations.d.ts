@@ -42,6 +42,14 @@ export declare class OperationNotFoundError extends Error {
     constructor(operationId: string);
 }
 /**
+ * Error thrown when attempting to cancel an operation that has passed the commit boundary.
+ */
+export declare class OperationNotCancellableError extends Error {
+    readonly code = "OPERATION_NOT_CANCELLABLE";
+    readonly operationId: string;
+    constructor(operationId: string);
+}
+/**
  * Error thrown when draining in-flight operations times out during dispose.
  */
 export declare class OperationDrainTimeoutError extends Error {
@@ -57,7 +65,7 @@ export interface OperationDrainSummary {
     readonly requestedCancel: boolean;
     /** Whether the operation workflow settled completely. */
     readonly workflowSettled: boolean;
-    /** Whether worker termination was authentically confirmed. */
+    /** Whether worker termination was authentically confirmed via supervisor proof. */
     readonly workerExited: boolean;
     /** Whether drain timed out before settlement. */
     readonly timedOut: boolean;
@@ -65,9 +73,22 @@ export interface OperationDrainSummary {
     readonly statusUnknown: boolean;
     /** Whether database directory was left quarantined. */
     readonly quarantined: boolean;
+    /** Operation kind drained ('install' | 'remove' | 'none'). */
+    readonly operationKind?: 'install' | 'remove' | 'none';
     /** Diagnostic error explanation if drain encountered issues. */
     readonly error?: string;
 }
+/**
+ * Internal hooks interface for concurrency failure injection in tests.
+ */
+export interface OperationHooks {
+    readonly beforeRemoveDiskMutation?: () => Promise<void>;
+}
+/**
+ * Configure internal operation hooks for failure-injection testing.
+ * @internal Test-only helper. Pass `null` to reset.
+ */
+export declare function _setOperationHooksForTesting(hooks: OperationHooks | null): void;
 /**
  * Sanitize error message to prevent leaking machine-specific paths, credentials, or stack traces.
  */
@@ -160,6 +181,7 @@ export declare class DictionaryOperationManager {
      * Request removal of managed ECDICT database and reversion to fixture.
      *
      * Executes under exclusive operation mutex:
+     * - Operation ownership claimed synchronously before any await yielding execution.
      * - Cannot run concurrently with installation or another removal.
      * - Awaits startup recovery to settle before mutating state.
      * - Releases Windows file locks prior to unlinking.

@@ -21,7 +21,7 @@
  */
 import type { Context } from '@deepseek-ai/cordis';
 import { DictionaryManager } from './dictionary-manager.js';
-import { type ManagedStoragePaths } from './managed-storage.js';
+import { type ManagedStoragePaths, type SettingsSyncState } from './managed-storage.js';
 import { type DictionaryMode, type HostConfig } from './config.js';
 import type { InstalledCorpusInfo, ManagementErrorCode } from '../shared/dictionary-management-protocol.js';
 import type { ManagedEcdictBuildResult } from './ecdict-importer.js';
@@ -72,11 +72,25 @@ export interface ActivationStateSummary {
     readonly quarantined: boolean;
     readonly quarantineReason: string | null;
     readonly recoveryError: string | null;
+    readonly settingsSyncState: SettingsSyncState;
     readonly settingsSyncError: string | null;
     readonly lastRetirementError: string | null;
     readonly lastRollbackError: string | null;
     readonly generation: number;
 }
+/**
+ * Test-only failure injection and race orchestration hooks for activation coordinator.
+ */
+export interface ActivationHooks {
+    readonly beforeReadMetadata?: () => Promise<void>;
+    readonly beforeCommitMetadata?: () => Promise<void>;
+    readonly duringRollbackCompensation?: () => Promise<void>;
+}
+/**
+ * Configure test-only activation hooks.
+ * @internal
+ */
+export declare function _setActivationHooksForTesting(hooks: ActivationHooks | null): void;
 /**
  * Coordinates atomic activation, persistence consistency, recovery, and removal.
  */
@@ -130,7 +144,10 @@ export declare class ActivationCoordinator {
      *
      * @param buildResult - verified outcome from buildManagedEcdictDatabase.
      */
-    activateManagedDatabase(buildResult: ManagedEcdictBuildResult): Promise<void>;
+    activateManagedDatabase(buildResult: ManagedEcdictBuildResult, options?: {
+        signal?: AbortSignal;
+        onCommitBoundary?: () => void;
+    }): Promise<void>;
     /**
      * Safely remove the managed ECDICT database and revert active dictionary to fixture.
      *

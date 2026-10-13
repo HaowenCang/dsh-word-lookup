@@ -12,24 +12,90 @@
  */
 
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { EventEmitter } from 'node:events'
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
 
 import {
   DictionaryOperationManager,
   OperationDirectoryQuarantinedError,
   OperationDrainTimeoutError,
   OperationInProgressError,
+  OperationNotCancellableError,
   OperationNotFoundError,
   sanitizeErrorMessage,
+  _setOperationHooksForTesting,
 } from '../src/host/dictionary-operations.js'
-import { ActivationCoordinator } from '../src/host/dictionary-activation.js'
+import {
+  ActivationCoordinator,
+  _setActivationHooksForTesting,
+} from '../src/host/dictionary-activation.js'
 import { DictionaryManager } from '../src/host/dictionary-manager.js'
 import { openFixtureDictionary } from '../src/host/fixture-db.js'
 import { resolveManagedStoragePaths } from '../src/host/managed-storage.js'
+import { workerSupervisor, type WorkerLike } from '../src/host/ecdict-integrity-verifier.js'
+import { createCancelHandler } from '../src/host/dictionary-management-route.js'
 import * as downloader from '../src/host/ecdict-downloader.js'
 import * as importer from '../src/host/ecdict-importer.js'
+
+const PINNED_COMMIT = 'bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b'
+const PINNED_SHA256 = '1a6947e04785db63613a92e14903cdae7954f7e84860b10e68e5c7cbb3f9c3cf'
+
+function createSyntheticManagedDb(filePath: string): void {
+  mkdirSync(dirname(filePath), { recursive: true })
+  const db = new DatabaseSync(filePath)
+  db.exec(`
+    CREATE TABLE meta (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+    CREATE TABLE entries (
+      word TEXT PRIMARY KEY,
+      phonetic TEXT,
+      definition_en TEXT,
+      translation_zh TEXT,
+      pos TEXT,
+      exchange TEXT,
+      frequency INTEGER
+    );
+    CREATE TABLE forms (
+      form TEXT PRIMARY KEY,
+      headword TEXT NOT NULL,
+      kind TEXT
+    );
+    CREATE TABLE examples (
+      id INTEGER PRIMARY KEY,
+      headword TEXT NOT NULL,
+      english TEXT NOT NULL,
+      chinese TEXT NOT NULL,
+      source TEXT,
+      source_id TEXT,
+      score REAL
+    );
+    CREATE INDEX idx_forms_headword_raw ON forms (headword);
+    CREATE INDEX idx_examples_headword ON examples (headword);
+
+    INSERT INTO meta VALUES ('schema_version', '1');
+    INSERT INTO meta VALUES ('corpus_name', 'ECDICT');
+    INSERT INTO meta VALUES ('upstream_commit', '${PINNED_COMMIT}');
+    INSERT INTO meta VALUES ('source_sha256', '${PINNED_SHA256}');
+    INSERT INTO meta VALUES ('entry_count', '3');
+    INSERT INTO meta VALUES ('form_count', '1');
+    INSERT INTO meta VALUES ('example_count', '0');
+    INSERT INTO meta VALUES ('logical_sha256', '${'b'.repeat(64)}');
+
+    INSERT INTO entries (word, phonetic, definition_en, translation_zh, pos, exchange, frequency)
+      VALUES ('hello', 'həˈloʊ', 'used as a greeting', 'int. 你好', 'int', NULL, 100);
+    INSERT INTO entries (word, phonetic, definition_en, translation_zh, pos, exchange, frequency)
+      VALUES ('world', 'wɜːrld', 'the earth with its countries and people', 'n. 世界', 'n', NULL, 200);
+    INSERT INTO entries (word, phonetic, definition_en, translation_zh, pos, exchange, frequency)
+      VALUES ('test', 'test', 'a procedure intended to establish the quality', 'n. 测试', 'n', NULL, 300);
+    INSERT INTO forms (form, headword, kind) VALUES ('testing', 'test', 'p');
+  `)
+  db.close()
+}
 
 describe('DictionaryOperationManager', () => {
   let tempHome: string
@@ -65,6 +131,9 @@ describe('DictionaryOperationManager', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
+    _setOperationHooksForTesting(null)
+    _setActivationHooksForTesting(null)
+    workerSupervisor.resetForTesting()
   })
 
   it('sanitizes error messages removing file paths', () => {
@@ -748,6 +817,667 @@ describe('DictionaryOperationManager', () => {
       await opMan.dispose()
       expect(opMan.canInstall()).toBe(false)
       expect(opMan.canRemove()).toBe(false)
+    })
+  })
+
+  describe('Phase 7A.6R3 Fix B: Mutex Linearization & Startup Restoration (B-R3-01 to B-R3-06)', () => {
+    it('B-R3-01: calling remove() synchronously claims mutex; concurrent install() is immediately rejected with 409', async () => {
+      const paths = resolveManagedStoragePaths({ home: tempHome })
+      let releaseRemove!: () => void
+      const removePromise = new Promise<{ removed: boolean }>((resolve) => {
+        releaseRemove = () => resolve({ removed: true })
+      })
+      vi.spyOn(coordinator, 'removeManagedDatabase').mockImplementation(() => removePromise)
+
+      const opMan = new DictionaryOperationManager({ paths, activationCoordinator: coordinator })
+
+      const removeExecution = opMan.remove()
+      expect(opMan.isBusy()).toBe(true)
+
+      expect(() => opMan.install()).toThrow(OperationInProgressError)
+
+      releaseRemove()
+      await removeExecution
+      expect(opMan.isBusy()).toBe(false)
+    })
+
+    it('B-R3-02: calling remove() synchronously claims mutex; concurrent second remove() is immediately rejected with 409', async () => {
+      const paths = resolveManagedStoragePaths({ home: tempHome })
+      let releaseRemove!: () => void
+      const removePromise = new Promise<{ removed: boolean }>((resolve) => {
+        releaseRemove = () => resolve({ removed: true })
+      })
+      vi.spyOn(coordinator, 'removeManagedDatabase').mockImplementation(() => removePromise)
+
+      const opMan = new DictionaryOperationManager({ paths, activationCoordinator: coordinator })
+
+      const removeExecution = opMan.remove()
+      expect(opMan.isBusy()).toBe(true)
+
+      await expect(opMan.remove()).rejects.toThrow(OperationInProgressError)
+
+      releaseRemove()
+      await removeExecution
+      expect(opMan.isBusy()).toBe(false)
+    })
+
+    it('B-R3-03: remove() waits for coordinator startup recovery while holding mutex ownership', async () => {
+      const paths = resolveManagedStoragePaths({ home: tempHome })
+      let releaseRecovery!: () => void
+      const recoveryPromise = new Promise<void>((resolve) => {
+        releaseRecovery = resolve
+      })
+
+      vi.spyOn(coordinator, 'isRecovering', 'get').mockReturnValue(true)
+      vi.spyOn(coordinator, 'ensureReady').mockImplementation(() => recoveryPromise)
+      vi.spyOn(coordinator, 'removeManagedDatabase').mockResolvedValue({ removed: true })
+
+      const opMan = new DictionaryOperationManager({ paths, activationCoordinator: coordinator })
+
+      const removeExecution = opMan.remove()
+      expect(opMan.isBusy()).toBe(true)
+      expect(() => opMan.install()).toThrow(OperationInProgressError)
+
+      releaseRecovery()
+      const outcome = await removeExecution
+      expect(outcome.removed).toBe(true)
+      expect(opMan.isBusy()).toBe(false)
+    })
+
+    it('B-R3-04: post-recovery pre-mutation race prevention via test hook confirms mutex is held throughout', async () => {
+      const paths = resolveManagedStoragePaths({ home: tempHome })
+      let hookReached = false
+      let installRejectedAtHook = false
+
+      const opMan = new DictionaryOperationManager({ paths, activationCoordinator: coordinator })
+      vi.spyOn(coordinator, 'removeManagedDatabase').mockResolvedValue({ removed: true })
+
+      _setOperationHooksForTesting({
+        beforeRemoveDiskMutation: async () => {
+          hookReached = true
+          try {
+            opMan.install()
+          } catch (err) {
+            if (err instanceof OperationInProgressError) {
+              installRejectedAtHook = true
+            }
+          }
+        },
+      })
+
+      const outcome = await opMan.remove()
+      expect(hookReached).toBe(true)
+      expect(installRejectedAtHook).toBe(true)
+      expect(outcome.removed).toBe(true)
+      expect(opMan.isBusy()).toBe(false)
+    })
+
+    it('B-R3-05: remove failure cleans up mutex in finally block, unblocking subsequent operations', async () => {
+      const paths = resolveManagedStoragePaths({ home: tempHome })
+      vi.spyOn(coordinator, 'removeManagedDatabase').mockRejectedValue(new Error('Disk failure'))
+
+      const opMan = new DictionaryOperationManager({ paths, activationCoordinator: coordinator })
+      await expect(opMan.remove()).rejects.toThrow('Disk failure')
+
+      expect(opMan.isBusy()).toBe(false)
+
+      vi.spyOn(downloader, 'downloadPinnedEcdict').mockResolvedValue({
+        path: join(tempHome, 's.csv'),
+        sourceCommit: 'bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b',
+        sha256: 'a'.repeat(64),
+        byteSize: 100,
+        reused: false,
+        redirectCount: 0,
+      })
+      vi.spyOn(importer, 'buildManagedEcdictDatabase').mockResolvedValue({
+        path: join(tempHome, 'cand.sqlite3'),
+        databaseFile: 'cand.sqlite3',
+        identity: 'cand-id',
+        sourceCommit: 'bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b',
+        sourceSha256: 'a'.repeat(64),
+        entryCount: 1,
+        formCount: 0,
+        exampleCount: 0,
+        ambiguousFormCount: 0,
+        rejectedRowCount: 0,
+        sourceRowCount: 1,
+        byteSize: 40960,
+        schemaVersion: 1,
+        logicalSha256: 'b'.repeat(64),
+        fileSha256: 'c'.repeat(64),
+        yieldCount: 1,
+        postPublicationCleanup: { candidateRemoved: true, sidecarsRemoved: true },
+      })
+      vi.spyOn(coordinator, 'activateManagedDatabase').mockResolvedValue(undefined)
+
+      const inst = opMan.install()
+      expect(inst.status).toBe('running')
+    })
+
+    it('B-R3-06: remove settlement promise lifecycle: isBusy is true during entire execution and false after', async () => {
+      const paths = resolveManagedStoragePaths({ home: tempHome })
+      let step = 0
+      vi.spyOn(coordinator, 'removeManagedDatabase').mockImplementation(async () => {
+        step = 1
+        await new Promise((r) => setTimeout(r, 20))
+        step = 2
+        return { removed: true }
+      })
+
+      const opMan = new DictionaryOperationManager({ paths, activationCoordinator: coordinator })
+      expect(opMan.isBusy()).toBe(false)
+
+      const removePromise = opMan.remove()
+      expect(opMan.isBusy()).toBe(true)
+
+      const res = await removePromise
+      expect(step).toBe(2)
+      expect(res.removed).toBe(true)
+      expect(opMan.isBusy()).toBe(false)
+    })
+  })
+
+  describe('Phase 7A.6R3 Fix C: Cordis Dispose & Running Remove Drain, Worker Exit Provenance (C-R3-01 to C-R3-08)', () => {
+    it('C-R3-01: dispose() while remove() is running awaits remove() settlement promise and records operationKind="remove"', async () => {
+      const paths = resolveManagedStoragePaths({ home: tempHome })
+      let removeFinished = false
+      vi.spyOn(coordinator, 'removeManagedDatabase').mockImplementation(async () => {
+        await new Promise((r) => setTimeout(r, 50))
+        removeFinished = true
+        return { removed: true }
+      })
+
+      const opMan = new DictionaryOperationManager({ paths, activationCoordinator: coordinator })
+      const removePromise = opMan.remove()
+
+      await opMan.dispose(1000)
+      expect(removeFinished).toBe(true)
+      await removePromise
+
+      const drainSummary = opMan.getDrainSummary()
+      expect(drainSummary?.workflowSettled).toBe(true)
+      expect(drainSummary?.operationKind).toBe('remove')
+      expect(drainSummary?.timedOut).toBe(false)
+      expect(opMan.isDisposed).toBe(true)
+    })
+
+    it('C-R3-02: dispose() aborts running remove context and drains within timeout', async () => {
+      const paths = resolveManagedStoragePaths({ home: tempHome })
+      _setOperationHooksForTesting({
+        beforeRemoveDiskMutation: async () => {
+          await new Promise((r) => setTimeout(r, 40))
+        },
+      })
+      vi.spyOn(coordinator, 'removeManagedDatabase').mockResolvedValue({ removed: true })
+
+      const opMan = new DictionaryOperationManager({ paths, activationCoordinator: coordinator })
+      const removePromise = opMan.remove()
+
+      await opMan.dispose(1000)
+      await removePromise.catch(() => null)
+
+      expect(opMan.isDisposed).toBe(true)
+      const summary = opMan.getDrainSummary()
+      expect(summary?.workflowSettled).toBe(true)
+      expect(summary?.operationKind).toBe('remove')
+    })
+
+    it('C-R3-03: dispose() timeout while remove() is hanging throws OperationDrainTimeoutError', async () => {
+      const paths = resolveManagedStoragePaths({ home: tempHome })
+      vi.spyOn(coordinator, 'removeManagedDatabase').mockImplementation(() => new Promise(() => {
+        // never resolves
+      }))
+
+      const opMan = new DictionaryOperationManager({ paths, activationCoordinator: coordinator })
+      void opMan.remove().catch(() => null)
+
+      await expect(opMan.dispose(50)).rejects.toThrow(OperationDrainTimeoutError)
+      const summary = opMan.getDrainSummary()
+      expect(summary?.timedOut).toBe(true)
+      expect(summary?.workflowSettled).toBe(false)
+      expect(summary?.statusUnknown).toBe(true)
+      expect(summary?.operationKind).toBe('remove')
+    })
+
+    it('C-R3-04: dispose() rejects new install() calls with disposed error', async () => {
+      const paths = resolveManagedStoragePaths({ home: tempHome })
+      const opMan = new DictionaryOperationManager({ paths, activationCoordinator: coordinator })
+      await opMan.dispose()
+
+      expect(() => opMan.install()).toThrow('DictionaryOperationManager is disposed')
+    })
+
+    it('C-R3-05: dispose() rejects new remove() calls with disposed error', async () => {
+      const paths = resolveManagedStoragePaths({ home: tempHome })
+      const opMan = new DictionaryOperationManager({ paths, activationCoordinator: coordinator })
+      await opMan.dispose()
+
+      await expect(opMan.remove()).rejects.toThrow('DictionaryOperationManager is disposed')
+    })
+
+    it('C-R3-06: authentic worker exit proof required: confirms exit using authentic supervisor proof', async () => {
+      const paths = resolveManagedStoragePaths({ home: tempHome })
+
+      class AuthenticWorkerMock extends EventEmitter implements WorkerLike {
+        async terminate(): Promise<number> {
+          queueMicrotask(() => this.emit('exit', 0))
+          return 0
+        }
+      }
+      const mockWorker = new AuthenticWorkerMock()
+      workerSupervisor.registerWorker({
+        worker: mockWorker,
+        candidatePath: join(paths.databaseDirectory, 'candidate.sqlite3'),
+      })
+
+      vi.spyOn(downloader, 'downloadPinnedEcdict').mockResolvedValue({
+        path: join(tempHome, 's.csv'),
+        sourceCommit: 'bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b',
+        sha256: 'a'.repeat(64),
+        byteSize: 100,
+        reused: false,
+        redirectCount: 0,
+      })
+
+      let signalBuildStarted!: () => void
+      const buildStartedPromise = new Promise<void>((r) => {
+        signalBuildStarted = r
+      })
+
+      vi.spyOn(importer, 'buildManagedEcdictDatabase').mockImplementation(async (_paths, opts) => {
+        signalBuildStarted()
+        return new Promise((_, reject) => {
+          opts?.signal?.addEventListener('abort', async () => {
+            try {
+              await mockWorker.terminate()
+            } finally {
+              reject(new Error('Aborted by test'))
+            }
+          })
+        })
+      })
+
+      const opMan = new DictionaryOperationManager({ paths, activationCoordinator: coordinator })
+      opMan.install()
+
+      await buildStartedPromise
+      await opMan.dispose(1000)
+
+      const summary = opMan.getDrainSummary()
+      expect(summary?.workflowSettled).toBe(true)
+      expect(summary?.workerExited).toBe(true)
+      expect(summary?.statusUnknown).toBe(false)
+      expect(summary?.operationKind).toBe('install')
+    })
+
+    it('C-R3-07: unconfirmed worker exit proof during dispose leaves workerExited=false and statusUnknown=true', async () => {
+      const paths = resolveManagedStoragePaths({ home: tempHome })
+
+      class HangingWorkerMock extends EventEmitter implements WorkerLike {
+        async terminate(): Promise<number> {
+          throw new Error('Worker cannot be killed')
+        }
+      }
+      const mockWorker = new HangingWorkerMock()
+      workerSupervisor.registerWorker({
+        worker: mockWorker,
+        candidatePath: join(paths.databaseDirectory, 'candidate.sqlite3'),
+      })
+
+      vi.spyOn(downloader, 'downloadPinnedEcdict').mockResolvedValue({
+        path: join(tempHome, 's.csv'),
+        sourceCommit: 'bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b',
+        sha256: 'a'.repeat(64),
+        byteSize: 100,
+        reused: false,
+        redirectCount: 0,
+      })
+
+      vi.spyOn(importer, 'buildManagedEcdictDatabase').mockImplementation(async () => {
+        await new Promise((r) => setTimeout(r, 200))
+        throw new Error('Aborted by test')
+      })
+
+      const opMan = new DictionaryOperationManager({ paths, activationCoordinator: coordinator })
+      opMan.install()
+
+      await opMan.dispose(300).catch(() => null)
+
+      const summary = opMan.getDrainSummary()
+      expect(summary?.workerExited).toBe(false)
+      expect(summary?.statusUnknown).toBe(true)
+      expect(summary?.operationKind).toBe('install')
+    })
+
+    it('C-R3-08: drain summary reports operationKind="none" when manager is disposed while idle', async () => {
+      const paths = resolveManagedStoragePaths({ home: tempHome })
+      const opMan = new DictionaryOperationManager({ paths, activationCoordinator: coordinator })
+      await opMan.dispose()
+
+      const summary = opMan.getDrainSummary()
+      expect(summary?.workflowSettled).toBe(true)
+      expect(summary?.operationKind).toBe('none')
+      expect(summary?.workerExited).toBe(false)
+      expect(summary?.timedOut).toBe(false)
+    })
+  })
+
+  describe('Phase 7A.6R3 Fix D: Cancellation Commit Boundaries & State Machine Alignment (D-R3-01 to D-R3-07)', () => {
+    it('D-R3-01: pre-commit cancellation during download aborts operation cleanly before build', async () => {
+      const paths = resolveManagedStoragePaths({ home: tempHome })
+
+      vi.spyOn(downloader, 'downloadPinnedEcdict').mockImplementation(async (_paths, opts) => {
+        return new Promise((_, reject) => {
+          opts?.signal?.addEventListener('abort', () => {
+            const err = new Error('The operation was aborted')
+            err.name = 'AbortError'
+            reject(err)
+          })
+        })
+      })
+
+      const buildSpy = vi.spyOn(importer, 'buildManagedEcdictDatabase')
+
+      const opMan = new DictionaryOperationManager({ paths, activationCoordinator: coordinator })
+      const op = opMan.install()
+
+      const cancelResult = opMan.cancel(op.operationId)
+      expect(cancelResult.status).toBe('cancelling')
+
+      let settled = false
+      while (!settled) {
+        if (!opMan.getCurrentOperation()) settled = true
+        await new Promise((r) => setTimeout(r, 10))
+      }
+
+      expect(buildSpy).not.toHaveBeenCalled()
+      expect(opMan.getLastOperation()?.status).toBe('cancelled')
+      expect(opMan.getLastOperation()?.phase).toBe('cancelled')
+    })
+
+    it('D-R3-02: pre-commit cancellation during build phase aborts cleanly before activation', async () => {
+      const paths = resolveManagedStoragePaths({ home: tempHome })
+
+      vi.spyOn(downloader, 'downloadPinnedEcdict').mockResolvedValue({
+        path: join(tempHome, 's.csv'),
+        sourceCommit: 'bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b',
+        sha256: 'a'.repeat(64),
+        byteSize: 100,
+        reused: false,
+        redirectCount: 0,
+      })
+
+      vi.spyOn(importer, 'buildManagedEcdictDatabase').mockImplementation(async (_paths, opts) => {
+        return new Promise((_, reject) => {
+          opts?.signal?.addEventListener('abort', () => {
+            const err = new Error('The operation was aborted')
+            err.name = 'AbortError'
+            reject(err)
+          })
+        })
+      })
+
+      const activateSpy = vi.spyOn(coordinator, 'activateManagedDatabase')
+
+      const opMan = new DictionaryOperationManager({ paths, activationCoordinator: coordinator })
+      const op = opMan.install()
+
+      await new Promise((r) => setTimeout(r, 20))
+      const cancelResult = opMan.cancel(op.operationId)
+      expect(cancelResult.status).toBe('cancelling')
+
+      let settled = false
+      while (!settled) {
+        if (!opMan.getCurrentOperation()) settled = true
+        await new Promise((r) => setTimeout(r, 10))
+      }
+
+      expect(activateSpy).not.toHaveBeenCalled()
+      expect(opMan.getLastOperation()?.status).toBe('cancelled')
+    })
+
+    it('D-R3-03: pre-commit cancellation during probe verification aborts before writeActiveMetadataAtomically', async () => {
+      const paths = resolveManagedStoragePaths({ home: tempHome })
+
+      vi.spyOn(downloader, 'downloadPinnedEcdict').mockResolvedValue({
+        path: join(tempHome, 's.csv'),
+        sourceCommit: 'bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b',
+        sha256: 'a'.repeat(64),
+        byteSize: 100,
+        reused: false,
+        redirectCount: 0,
+      })
+
+      const dummyCand = join(paths.databaseDirectory, 'ecdict-cand-r3.sqlite3')
+      createSyntheticManagedDb(dummyCand)
+      vi.spyOn(importer, 'buildManagedEcdictDatabase').mockResolvedValue({
+        path: dummyCand,
+        databaseFile: 'ecdict-cand-r3.sqlite3',
+        identity: 'cand-r3',
+        sourceCommit: 'bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b',
+        sourceSha256: 'a'.repeat(64),
+        entryCount: 1,
+        formCount: 0,
+        exampleCount: 0,
+        ambiguousFormCount: 0,
+        rejectedRowCount: 0,
+        sourceRowCount: 1,
+        byteSize: 40960,
+        schemaVersion: 1,
+        logicalSha256: 'b'.repeat(64),
+        fileSha256: 'c'.repeat(64),
+        yieldCount: 1,
+        postPublicationCleanup: { candidateRemoved: true, sidecarsRemoved: true },
+      })
+
+      const opMan = new DictionaryOperationManager({ paths, activationCoordinator: coordinator })
+
+      _setActivationHooksForTesting({
+        beforeCommitMetadata: async () => {
+          opMan.cancel(opMan.getCurrentOperation()!.operationId)
+        },
+      })
+
+      opMan.install()
+
+      let settled = false
+      while (!settled) {
+        if (!opMan.getCurrentOperation()) settled = true
+        await new Promise((r) => setTimeout(r, 10))
+      }
+
+      expect(opMan.getLastOperation()?.status).toBe('cancelled')
+    })
+
+    it('D-R3-04: post-commit boundary: cancel() throws OperationNotCancellableError once commit point is reached', async () => {
+      const paths = resolveManagedStoragePaths({ home: tempHome })
+
+      vi.spyOn(downloader, 'downloadPinnedEcdict').mockResolvedValue({
+        path: join(tempHome, 's.csv'),
+        sourceCommit: 'bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b',
+        sha256: 'a'.repeat(64),
+        byteSize: 100,
+        reused: false,
+        redirectCount: 0,
+      })
+
+      vi.spyOn(importer, 'buildManagedEcdictDatabase').mockResolvedValue({
+        path: join(tempHome, 'cand.sqlite3'),
+        databaseFile: 'cand.sqlite3',
+        identity: 'cand-id',
+        sourceCommit: 'bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b',
+        sourceSha256: 'a'.repeat(64),
+        entryCount: 10,
+        formCount: 5,
+        exampleCount: 0,
+        ambiguousFormCount: 0,
+        rejectedRowCount: 0,
+        sourceRowCount: 10,
+        byteSize: 40960,
+        schemaVersion: 1,
+        logicalSha256: 'b'.repeat(64),
+        fileSha256: 'c'.repeat(64),
+        yieldCount: 1,
+        postPublicationCleanup: { candidateRemoved: true, sidecarsRemoved: true },
+      })
+
+      let cancelError: unknown = null
+      let opId = ''
+
+      vi.spyOn(coordinator, 'activateManagedDatabase').mockImplementation(async (_buildResult, opts) => {
+        opts?.onCommitBoundary?.()
+        try {
+          opMan.cancel(opId)
+        } catch (err) {
+          cancelError = err
+        }
+      })
+
+      const opMan = new DictionaryOperationManager({ paths, activationCoordinator: coordinator })
+      const op = opMan.install()
+      opId = op.operationId
+
+      let settled = false
+      while (!settled) {
+        if (!opMan.getCurrentOperation()) settled = true
+        await new Promise((r) => setTimeout(r, 10))
+      }
+
+      expect(cancelError).toBeInstanceOf(OperationNotCancellableError)
+      expect((cancelError as OperationNotCancellableError).code).toBe('OPERATION_NOT_CANCELLABLE')
+      expect(opMan.getLastOperation()?.status).toBe('completed')
+    })
+
+    it('D-R3-05: post-commit cancellation attempt preserves completed status with 100% progress', async () => {
+      const paths = resolveManagedStoragePaths({ home: tempHome })
+
+      vi.spyOn(downloader, 'downloadPinnedEcdict').mockResolvedValue({
+        path: join(tempHome, 's.csv'),
+        sourceCommit: 'bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b',
+        sha256: 'a'.repeat(64),
+        byteSize: 100,
+        reused: false,
+        redirectCount: 0,
+      })
+
+      vi.spyOn(importer, 'buildManagedEcdictDatabase').mockResolvedValue({
+        path: join(tempHome, 'cand.sqlite3'),
+        databaseFile: 'cand.sqlite3',
+        identity: 'cand-id',
+        sourceCommit: 'bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b',
+        sourceSha256: 'a'.repeat(64),
+        entryCount: 50,
+        formCount: 10,
+        exampleCount: 0,
+        ambiguousFormCount: 0,
+        rejectedRowCount: 0,
+        sourceRowCount: 50,
+        byteSize: 40960,
+        schemaVersion: 1,
+        logicalSha256: 'b'.repeat(64),
+        fileSha256: 'c'.repeat(64),
+        yieldCount: 1,
+        postPublicationCleanup: { candidateRemoved: true, sidecarsRemoved: true },
+      })
+
+      vi.spyOn(coordinator, 'activateManagedDatabase').mockImplementation(async (_res, opts) => {
+        opts?.onCommitBoundary?.()
+      })
+
+      const opMan = new DictionaryOperationManager({ paths, activationCoordinator: coordinator })
+      opMan.install()
+
+      let settled = false
+      while (!settled) {
+        if (!opMan.getCurrentOperation()) settled = true
+        await new Promise((r) => setTimeout(r, 10))
+      }
+
+      const last = opMan.getLastOperation()
+      expect(last?.status).toBe('completed')
+      expect(last?.progress.percent).toBe(100)
+    })
+
+    it('D-R3-06: route mapping: POST /api/dsh-word-lookup/dictionary/cancel returns HTTP 409 OPERATION_NOT_CANCELLABLE', async () => {
+      const paths = resolveManagedStoragePaths({ home: tempHome })
+      const opMan = new DictionaryOperationManager({ paths, activationCoordinator: coordinator })
+
+      vi.spyOn(opMan, 'cancel').mockImplementation(() => {
+        throw new OperationNotCancellableError('test-op-123')
+      })
+
+      const cancelHandler = createCancelHandler(opMan)
+      const req = new Request('http://localhost/api/dsh-word-lookup/dictionary/cancel', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ operationId: 'test-op-123' }),
+      })
+
+      const res = await cancelHandler(req)
+      expect(res.status).toBe(409)
+      const data = await res.json()
+      expect(data.ok).toBe(false)
+      expect(data.error).toBe('OPERATION_NOT_CANCELLABLE')
+      expect(data.details?.operationId).toBe('test-op-123')
+    })
+
+    it('D-R3-07: canCancel() returns true before commit point and false once nonCancellable', async () => {
+      const paths = resolveManagedStoragePaths({ home: tempHome })
+
+      vi.spyOn(downloader, 'downloadPinnedEcdict').mockImplementation(async () => {
+        await new Promise((r) => setTimeout(r, 50))
+        return {
+          path: join(tempHome, 's.csv'),
+          sourceCommit: 'bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b',
+          sha256: 'a'.repeat(64),
+          byteSize: 100,
+          reused: false,
+          redirectCount: 0,
+        }
+      })
+
+      vi.spyOn(importer, 'buildManagedEcdictDatabase').mockResolvedValue({
+        path: join(tempHome, 'c.sqlite3'),
+        databaseFile: 'c.sqlite3',
+        identity: 'cid',
+        sourceCommit: 'bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b',
+        sourceSha256: 'a'.repeat(64),
+        entryCount: 1,
+        formCount: 0,
+        exampleCount: 0,
+        ambiguousFormCount: 0,
+        rejectedRowCount: 0,
+        sourceRowCount: 1,
+        byteSize: 40960,
+        schemaVersion: 1,
+        logicalSha256: 'b'.repeat(64),
+        fileSha256: 'c'.repeat(64),
+        yieldCount: 1,
+        postPublicationCleanup: { candidateRemoved: true, sidecarsRemoved: true },
+      })
+
+      let canCancelDuringCommit = true
+      vi.spyOn(coordinator, 'activateManagedDatabase').mockImplementation(async (_buildResult, opts) => {
+        opts?.onCommitBoundary?.()
+        canCancelDuringCommit = opMan.canCancel()
+      })
+
+      const opMan = new DictionaryOperationManager({ paths, activationCoordinator: coordinator })
+      opMan.install()
+
+      // Before commit boundary
+      expect(opMan.canCancel()).toBe(true)
+
+      let settled = false
+      while (!settled) {
+        if (!opMan.getCurrentOperation()) settled = true
+        await new Promise((r) => setTimeout(r, 10))
+      }
+
+      // During commit boundary, canCancel() must be false
+      expect(canCancelDuringCommit).toBe(false)
+      // Once finished, canCancel() must be false
+      expect(opMan.canCancel()).toBe(false)
     })
   })
 })

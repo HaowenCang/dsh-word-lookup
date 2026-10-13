@@ -164,6 +164,11 @@ export interface ActiveMetadataSource {
 }
 
 /**
+ * Settings synchronization state descriptor.
+ */
+export type SettingsSyncState = 'synced' | 'failed' | 'unavailable' | 'pending'
+
+/**
  * Schema of persisted `active.json` metadata.
  */
 export interface ActiveMetadata {
@@ -179,6 +184,8 @@ export interface ActiveMetadata {
   readonly source: ActiveMetadataSource
   /** Whether host configuration settings were successfully synced. */
   readonly settingsSynced?: boolean
+  /** Distinct verifiable persistence state for host settings synchronization. */
+  readonly settingsSyncState?: SettingsSyncState
   /** Sanitized error diagnostic if host settings sync failed. */
   readonly settingsSyncError?: string | null
   /** ISO timestamp when activation was committed. */
@@ -400,6 +407,23 @@ export function validateActiveMetadata(raw: unknown): ActiveMetadata {
   }
 
   const settingsSynced = typeof record.settingsSynced === 'boolean' ? record.settingsSynced : undefined
+  const validSyncStates = new Set(['synced', 'failed', 'unavailable', 'pending'])
+  let settingsSyncState: SettingsSyncState | undefined =
+    typeof record.settingsSyncState === 'string' && validSyncStates.has(record.settingsSyncState)
+      ? (record.settingsSyncState as SettingsSyncState)
+      : undefined
+
+  // Schema compatibility: infer settingsSyncState from legacy metadata if absent
+  if (settingsSyncState === undefined) {
+    if (settingsSynced === true) {
+      settingsSyncState = 'synced'
+    } else if (settingsSynced === false) {
+      settingsSyncState = 'failed'
+    } else if (typeof record.settingsSyncError === 'string' && record.settingsSyncError.trim().length > 0) {
+      settingsSyncState = 'failed'
+    }
+  }
+
   const settingsSyncError = typeof record.settingsSyncError === 'string'
     ? record.settingsSyncError.trim()
     : record.settingsSyncError === null
@@ -419,6 +443,7 @@ export function validateActiveMetadata(raw: unknown): ActiveMetadata {
       schemaVersion: source.schemaVersion,
     },
     ...(settingsSynced !== undefined ? { settingsSynced } : {}),
+    ...(settingsSyncState !== undefined ? { settingsSyncState } : {}),
     ...(settingsSyncError !== undefined ? { settingsSyncError } : {}),
     ...(lastActivatedAt !== undefined ? { lastActivatedAt } : {}),
   }

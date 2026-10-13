@@ -91,6 +91,10 @@ export interface ActiveMetadataSource {
     readonly schemaVersion: number;
 }
 /**
+ * Settings synchronization state descriptor.
+ */
+export type SettingsSyncState = 'synced' | 'failed' | 'unavailable' | 'pending';
+/**
  * Schema of persisted `active.json` metadata.
  */
 export interface ActiveMetadata {
@@ -106,6 +110,8 @@ export interface ActiveMetadata {
     readonly source: ActiveMetadataSource;
     /** Whether host configuration settings were successfully synced. */
     readonly settingsSynced?: boolean;
+    /** Distinct verifiable persistence state for host settings synchronization. */
+    readonly settingsSyncState?: SettingsSyncState;
     /** Sanitized error diagnostic if host settings sync failed. */
     readonly settingsSyncError?: string | null;
     /** ISO timestamp when activation was committed. */

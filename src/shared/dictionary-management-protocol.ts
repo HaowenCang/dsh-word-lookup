@@ -161,6 +161,8 @@ export interface DictionaryStatusResponse {
   readonly quarantineReason: string | null
   /** Startup recovery or disk anomaly message if degraded. */
   readonly recoveryError: string | null
+  /** Settings synchronization state if managed corpus is installed. */
+  readonly settingsSyncState?: 'synced' | 'failed' | 'unavailable' | 'pending'
   /** Settings update synchronization error if persistence failed. */
   readonly settingsSyncError?: string | null
   /** Last activation rollback error message, if any. */
@@ -257,6 +259,7 @@ export type ManagementErrorCode =
   | 'BODY_TOO_LARGE'
   | 'OPERATION_IN_PROGRESS'
   | 'OPERATION_NOT_RUNNING'
+  | 'OPERATION_NOT_CANCELLABLE'
   | 'OPERATION_NOT_FOUND'
   | 'DIRECTORY_QUARANTINED'
   | 'INVALID_OPERATION_ID'
