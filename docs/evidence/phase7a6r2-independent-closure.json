@@ -1,0 +1,209 @@
+{
+  "phase": "Phase 7A.6R2",
+  "reportTitle": "Phase 7A.6R2 Activation Durability, Operation Serialization & Safe Drain Closure",
+  "generatedAt": "2026-10-13T12:00:00.000Z",
+  "approvedBaselineGitSha": "0cb531ddfb9aca10cc82567a18bc02f1af1b1f56",
+  "testedCodeGitSha": "39fe3d1cd878c8a3318c6de267ea7655dcd2ee18",
+  "targetVersion": "0.2.0",
+  "targetStatus": "UNRELEASED",
+  "platform": "win32",
+  "arch": "x64",
+  "nodeVersion": "v24.13.0",
+  "targetEnvironment": {
+    "dshVersion": "0.2.0-rc.2",
+    "dshUpstreamCommit": "639ed015397290b3745d163aafe02ffee4aa3f84",
+    "platform": "win32",
+    "arch": "x64",
+    "nodeVersion": "v24.13.0",
+    "osRelease": "Windows 11 (NT 10.0.26220.0)"
+  },
+  "status": "ACCEPTED",
+  "auditFindingsRemediated": {
+    "fixA_ActivationAndRestartRecoveryConsistency": {
+      "description": "Comprehensive contract differentiating installed, configured, active, and durability states across startup recovery and live execution.",
+      "stateMatrix": {
+        "freshInstall": "active.json absent -> manager defaults to fixture, installed=false, zero network calls, canInstall=true",
+        "corruptMetadata": "active.json corrupt/malformed -> manager defaults to fixture, active.json preserved for forensics, recoveryError recorded",
+        "missingDatabase": "active.json present but SQLite file missing -> manager defaults to fixture, recoveryError recorded, zero auto-downloads",
+        "corruptDatabase": "SQLite file fails schema or probe verification -> manager defaults to fixture, candidate handle closed, recoveryError recorded",
+        "configuredManaged": "Valid database and configuredMode='managed-ecdict' -> manager activates managed dictionary, installed=true",
+        "configuredFixtureExplicit": "Valid database, configuredMode='fixture', and settings was cleanly synced (settingsSynced=true) -> honors explicit user choice, manager remains on fixture, installedCorpus cached",
+        "configuredFixtureFailedSync": "Valid database, configuredMode='fixture', but settings sync previously failed (settingsSynced=false or settingsSyncError present) -> recognizes intentional user activation, reactivates managed dictionary, retries settings sync"
+      },
+      "verifiedTests": ["A01", "A02", "A03", "A04", "A05", "A06", "A07", "A08"]
+    },
+    "fixB_FailedActivationTransactionCompensation": {
+      "description": "Compensation rollback on activation failure without losing prior active metadata or leaking Windows SQLite handles.",
+      "mechanisms": {
+        "priorMetadataPreservation": "Captures previousMetadata before activation attempt; if DictionaryManager.activate fails, previousMetadata is atomically restored via writeActiveMetadataAtomically",
+        "firstInstallCompensation": "If first-time install activation fails, candidate active.json is safely unlinked to prevent false durability claims",
+        "sqliteHandleSafety": "Candidate DatabaseSync handle is reliably closed in all error branches, preventing Windows file locking (EPERM)",
+        "doubleFaultHandling": "Throws ActivationRollbackError preserving both original cause and rollback cause when both primary activation and rollback restoration fail",
+        "explicitCommitPoints": {
+          "preCommit": "Cancellation during download or building aborts gracefully, unlinks candidate, leaves active database untouched",
+          "inCommit": "Pre-commit check right before activateManagedDatabase refuses activation if cancellation or disposal was signalled",
+          "postCommit": "Cancellation signal arriving after database activation has committed is settled as completed without corrupting database"
+        }
+      },
+      "verifiedTests": ["B01", "B02", "B03", "B04", "B05", "B06", "B07"]
+    },
+    "fixC_OperationSerialization": {
+      "description": "Strict asynchronous mutex gating preventing concurrent or interleaved execution of install and remove operations.",
+      "rules": {
+        "concurrencyRefusal": "Returns 409 OperationInProgressError on concurrent install while install runs, remove while install runs, install while remove runs, or remove while remove runs",
+        "promiseBarrier": "Awaits settle of previous operation before accepting new operations; remove() claims exclusive lock during execution",
+        "recoveryCoordination": "Both install and remove handlers await activationCoordinator.ensureReady() before initiating mutations",
+        "lifecycleSequentiality": "Full install -> remove -> install lifecycle executes sequentially without state pollution"
+      },
+      "verifiedTests": ["C01", "C02", "C03", "C04", "C05", "C06"]
+    },
+    "fixD_CordisDisposeTimeoutSafetyAndDrainClosure": {
+      "description": "Bounded safe drainage of in-flight operations on plugin unload with Cordis dispose timeout safety and quarantine preservation.",
+      "guarantees": {
+        "boundedDrain": "Awaits in-flight operation settlement up to timeoutMs; throws OperationDrainTimeoutError on timeout without hanging unload",
+        "quarantinePreservation": "Dispose never unlinks quarantined directories or bypasses quarantine checks; preserves statusUnknown fail-closed state",
+        "idempotentDispose": "Multiple dispose() calls do not re-abort or throw; subsequent install() and remove() calls are rejected immediately",
+        "aggregateErrorHandling": "Host plugin unload aggregates disposal errors across route unregistration, operation manager disposal, and manager closing into AggregateError"
+      },
+      "verifiedTests": ["D01", "D02", "D03", "D04", "D05", "D06", "D07", "D08"]
+    }
+  },
+  "regressionVerification": {
+    "framework": "Vitest v3.2.4",
+    "totalTestFiles": 45,
+    "totalTests": 782,
+    "passed": 782,
+    "failed": 0,
+    "skipped": 0,
+    "passRate": "100%",
+    "addedPhase7A6R2Tests": {
+      "ActivationAndStartupRecoverySuite": 8,
+      "TransactionCompensationAndCommitPointsSuite": 7,
+      "OperationSerializationSuite": 6,
+      "CordisDisposeAndDrainClosureSuite": 8,
+      "totalAdded": 29
+    }
+  },
+  "ecdictBenchmarkRounds": {
+    "canonicalArtifact": {
+      "source": "ECDICT",
+      "commit": "bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b",
+      "sourceSha256": "1a6947e04785db63613a92e14903cdae7954f7e84860b10e68e5c7cbb3f9c3cf",
+      "entryCount": 770611,
+      "formCount": 57689,
+      "ambiguousFormCount": 463,
+      "rejectedRows": 0,
+      "logicalSha256": "591e53bdd8e3d227fd92c21ce2cfe7d375fffcd90f97a9f6a64f7d26e7c78bd9"
+    },
+    "rounds": [
+      {
+        "round": 1,
+        "durationMs": 5800,
+        "rowsPerSec": 132864,
+        "peakRssMiB": 383,
+        "eventLoop": {
+          "p50Ms": 20.77,
+          "p95Ms": 27.48,
+          "p99Ms": 30.95,
+          "maxMs": 67.96
+        },
+        "heartbeat": {
+          "p95DriftMs": 8,
+          "maxDriftMs": 48
+        },
+        "gatesPassed": true
+      },
+      {
+        "round": 2,
+        "durationMs": 5846,
+        "rowsPerSec": 131819,
+        "peakRssMiB": 386.5,
+        "eventLoop": {
+          "p50Ms": 20.87,
+          "p95Ms": 28.95,
+          "p99Ms": 31.44,
+          "maxMs": 74.65
+        },
+        "heartbeat": {
+          "p95DriftMs": 8,
+          "maxDriftMs": 55
+        },
+        "gatesPassed": true
+      },
+      {
+        "round": 3,
+        "durationMs": 5896,
+        "rowsPerSec": 130701,
+        "peakRssMiB": 387,
+        "eventLoop": {
+          "p50Ms": 21.07,
+          "p95Ms": 28.28,
+          "p99Ms": 31.56,
+          "maxMs": 55.9
+        },
+        "heartbeat": {
+          "p95DriftMs": 8,
+          "maxDriftMs": 36
+        },
+        "gatesPassed": true
+      }
+    ],
+    "slaCompliance": {
+      "peakRssCeilingMiB": {
+        "observedMax": 387,
+        "limit": 512,
+        "pass": true
+      },
+      "eventLoopP99CeilingMs": {
+        "observedMax": 31.56,
+        "limit": 100,
+        "pass": true
+      },
+      "eventLoopMaxCeilingMs": {
+        "observedMax": 74.65,
+        "limit": 500,
+        "pass": true
+      },
+      "heartbeatMaxStallMs": {
+        "observedMax": 55,
+        "limit": 1000,
+        "pass": true
+      }
+    }
+  },
+  "realDshManagementE2E": {
+    "dshVersion": "0.2.0-rc.2",
+    "testRunner": "scripts/test-phase7a6-management-e2e.mjs",
+    "isolatedProfile": "word-lookup-test",
+    "status": "PASS",
+    "verifiedInvariants": {
+      "unauthenticated401Fence": "All 6 routes return 401 when requested anonymously without DSH session",
+      "zeroNetworkRequestsOnBoot": "Boot and status check make 0 external requests",
+      "methodMismatch405Or404": "Verified non-POST/GET methods properly rejected",
+      "contentType415": "Verified non-JSON content-type rejected with 415 UNSUPPORTED_MEDIA_TYPE",
+      "payloadSizeLimit413": "Payloads > 64 KiB rejected with 413 BODY_TOO_LARGE",
+      "forbiddenOverrides400": "Custom downloadUrl/source parameters rejected with 400 BAD_REQUEST",
+      "invalidCancelOperationId400_404": "Invalid operationId returns 400; unknown operationId returns 404",
+      "concurrencyConflict409": "Concurrent install or remove requests return 409 OPERATION_IN_PROGRESS",
+      "lookupResponsiveDuringInstall": "GET lookup queries remain fully responsive while install runs in background",
+      "cancellationSettlement": "Cancellation dispatch smoothly transitions operation to 'cancelled'",
+      "fullInstallationSettlement": "ECDICT imports 770,611 entries, activates into live manager without restart",
+      "nonFixtureHitsInEcdict": "Probed non-fixture words ('apple', 'hello', 'ephemeral', 'quixotic') hit in ecdict-local",
+      "morphologyHitsInEcdict": "Probed form 'actioned' resolves to headword 'action'",
+      "safeRemovalWithWindowsLockRelease": "Removal hot-switches to fixture, closes DatabaseSync handle, and unlinks file cleanly",
+      "postRemovalReversion": "Non-fixture words miss after removal; fixture words continue hitting"
+    }
+  },
+  "qualityGateSummary": {
+    "buildFixtureDb": "PASS",
+    "typecheck": "PASS",
+    "unitTests": "PASS (45 files, 782 tests, 0 failures)",
+    "buildArtifacts": "PASS",
+    "bundleStaticChecks": "PASS (101/101 checks passed)",
+    "credentialScan": "PASS (0 leaks, 504 files scanned)",
+    "verifyStoreContract": "PASS",
+    "ecdictBenchmarkRounds": "PASS (3/3 rounds meeting all SLAs)",
+    "realDshManagementE2E": "PASS",
+    "overallStatus": "READY_FOR_DELIVERY"
+  }
+}
