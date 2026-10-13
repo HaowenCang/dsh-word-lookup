@@ -1,0 +1,196 @@
+{
+  "phase": "Phase 7A.6R3",
+  "reportTitle": "Phase 7A.6R3 Settings Sync State, Mutex Linearization, Worker Provenance & Non-Cancellable Boundary Closure",
+  "generatedAt": "2026-10-13T14:15:00.000Z",
+  "approvedBaselineGitSha": "632bff3d0ccf59c0f49975603aad780bec249187",
+  "testedCodeGitSha": "9b881f3af1dc384a118e715f8ff4bc74170bf08f",
+  "targetVersion": "0.2.0",
+  "targetStatus": "UNRELEASED",
+  "platform": "win32",
+  "arch": "x64",
+  "nodeVersion": "v24.13.0",
+  "targetEnvironment": {
+    "dshVersion": "0.2.0-rc.2",
+    "dshUpstreamCommit": "639ed015397290b3745d163aafe02ffee4aa3f84",
+    "platform": "win32",
+    "arch": "x64",
+    "nodeVersion": "v24.13.0",
+    "osRelease": "Windows 11 (NT 10.0.26220.0)"
+  },
+  "status": "ACCEPTED",
+  "auditFindingsRemediated": {
+    "fixA_SettingsSyncPersistentStateAndSchemaCompatibility": {
+      "description": "Comprehensive SettingsSyncState representation and backward-compatible metadata validation preserving user preference across restarts and failures.",
+      "mechanisms": {
+        "syncStateTyping": "SettingsSyncState = 'synced' | 'failed' | 'unavailable' | 'pending'",
+        "activeMetadataPersistence": "writeActiveMetadataAtomically persists settingsSyncState alongside boolean settingsSynced and optional settingsSyncError",
+        "schemaCompatibility": "validateActiveMetadata accepts both modern (settingsSyncState) and legacy metadata, accurately reconstructing settingsSyncState without dropping fields during serialization roundtrips",
+        "statusSummaryExposure": "ActivationCoordinator.getStatusSummary() and GET /dictionary/status expose verified settingsSyncState",
+        "recoveryConvergence": "Startup recovery and removal correctly reconcile unconfirmed settings sync states, attempting retry when appropriate"
+      },
+      "verifiedTests": ["A-R3-01", "A-R3-02", "A-R3-03", "A-R3-04", "A-R3-05", "A-R3-06", "A-R3-07", "A-R3-08"]
+    },
+    "fixB_StartupRestorationAndOperationSerializationMutex": {
+      "description": "Linearized ownership acquisition before first await in both install and remove workflows, closing async interleaving windows.",
+      "mechanisms": {
+        "synchronousMutexAcquisition": "install() and remove() atomically acquire in-flight ownership synchronously prior to any async operation",
+        "removeSettlementTracking": "ActiveRemoveContext tracks in-flight remove() settlement promise (#activeRemove), allowing concurrent calls to immediately reject with 409 OperationInProgressError",
+        "startupRecoveryCoordination": "Both install and remove synchronize on activationCoordinator.ensureReady() before initiating storage mutations",
+        "lifecycleSequentiality": "Full sequential install -> remove -> install lifecycles proceed without lock contamination or abandoned handles"
+      },
+      "verifiedTests": ["B-R3-01", "B-R3-02", "B-R3-03", "B-R3-04", "B-R3-05", "B-R3-06"]
+    },
+    "fixC_CordisDisposeAndRunningRemoveDrainWorkerProvenance": {
+      "description": "Complete Cordis lifecycle disposal draining both active install and active remove operations with authentic worker exit proof verification.",
+      "mechanisms": {
+        "dualWorkflowDrain": "opMan.dispose(timeoutMs) handles both active install and active remove contexts, awaiting their settlement promises under timeout guard",
+        "workerExitProofVerification": "Verifies authentic worker exit proofs using WorkerSupervisor.isExitProofAuthentic and branded exit proof tokens",
+        "drainTimeoutSafety": "Throws OperationDrainTimeoutError when drain fails to complete within timeout, recording workerExited=false, timedOut=true, and statusUnknown=true",
+        "disposedStateInvariants": "Once disposed, manager rejects subsequent install() and remove() calls immediately with OperationManagerDisposedError and reports canInstall=false, canRemove=false"
+      },
+      "verifiedTests": ["C-R3-01", "C-R3-02", "C-R3-03", "C-R3-04", "C-R3-05", "C-R3-06", "C-R3-07", "C-R3-08"]
+    },
+    "fixD_CancellationCommitBoundariesAndStateMachineAlignment": {
+      "description": "Linearized commit boundary at atomic metadata write, rejecting post-commit cancellation with 409 OPERATION_NOT_CANCELLABLE.",
+      "mechanisms": {
+        "commitBoundaryLinearization": "Activation coordinator invokes onCommitBoundary immediately before writeActiveMetadataAtomically, locking the operation as non-cancellable",
+        "preCommitCancellation": "Cancellations arriving prior to commit point abort gracefully, cleanly clean up candidate artifacts, and settle as 'cancelled'",
+        "postCommitCancellationRefusal": "cancel() throws OperationNotCancellableError if requested after commit boundary, returning HTTP 409 OPERATION_NOT_CANCELLABLE and preserving committed active database",
+        "canCancelAlignment": "opMan.canCancel() synchronously reflects whether the active operation can still be cancelled"
+      },
+      "verifiedTests": ["D-R3-01", "D-R3-02", "D-R3-03", "D-R3-04", "D-R3-05", "D-R3-06", "D-R3-07"]
+    }
+  },
+  "regressionVerification": {
+    "framework": "Vitest v3.2.4",
+    "totalTestFiles": 45,
+    "totalTests": 811,
+    "passed": 811,
+    "failed": 0,
+    "skipped": 0,
+    "passRate": "100%",
+    "addedPhase7A6R3Tests": {
+      "SettingsSyncPersistentStateSuite": 8,
+      "OperationSerializationMutexSuite": 6,
+      "CordisDisposeDrainAndWorkerExitSuite": 8,
+      "CancellationCommitBoundarySuite": 7,
+      "totalAdded": 29
+    }
+  },
+  "ecdictBenchmarkRounds": {
+    "canonicalArtifact": {
+      "source": "ECDICT",
+      "commit": "bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b",
+      "sourceSha256": "1a6947e04785db63613a92e14903cdae7954f7e84860b10e68e5c7cbb3f9c3cf",
+      "entryCount": 770611,
+      "formCount": 57689,
+      "ambiguousFormCount": 463,
+      "rejectedRows": 0,
+      "logicalSha256": "591e53bdd8e3d227fd92c21ce2cfe7d375fffcd90f97a9f6a64f7d26e7c78bd9"
+    },
+    "rounds": [
+      {
+        "round": 1,
+        "durationMs": 5976,
+        "rowsPerSec": 128951,
+        "peakRssMiB": 379.7,
+        "eventLoop": {
+          "p50Ms": 21.23,
+          "p95Ms": 30.62,
+          "p99Ms": 32.00,
+          "maxMs": 69.40
+        },
+        "heartbeat": {
+          "p95DriftMs": 11,
+          "maxDriftMs": 50
+        },
+        "gatesPassed": true
+      },
+      {
+        "round": 2,
+        "durationMs": 6275,
+        "rowsPerSec": 122807,
+        "peakRssMiB": 390.1,
+        "eventLoop": {
+          "p50Ms": 21.48,
+          "p95Ms": 30.54,
+          "p99Ms": 33.31,
+          "maxMs": 56.30
+        },
+        "heartbeat": {
+          "p95DriftMs": 10,
+          "maxDriftMs": 36
+        },
+        "gatesPassed": true
+      },
+      {
+        "round": 3,
+        "durationMs": 5968,
+        "rowsPerSec": 129124,
+        "peakRssMiB": 389.8,
+        "eventLoop": {
+          "p50Ms": 21.27,
+          "p95Ms": 30.64,
+          "p99Ms": 32.13,
+          "maxMs": 56.00
+        },
+        "heartbeat": {
+          "p95DriftMs": 11,
+          "maxDriftMs": 36
+        },
+        "gatesPassed": true
+      }
+    ],
+    "slaCompliance": {
+      "peakRssCeilingMiB": {
+        "observedMax": 390.1,
+        "limit": 512,
+        "pass": true
+      },
+      "eventLoopP99CeilingMs": {
+        "observedMax": 33.31,
+        "limit": 100,
+        "pass": true
+      },
+      "eventLoopMaxCeilingMs": {
+        "observedMax": 69.40,
+        "limit": 500,
+        "pass": true
+      },
+      "heartbeatMaxStallMs": {
+        "observedMax": 50,
+        "limit": 1000,
+        "pass": true
+      }
+    }
+  },
+  "realDshManagementE2E": {
+    "dshVersion": "0.2.0-rc.2",
+    "testRunner": "scripts/test-phase7a6-management-e2e.mjs",
+    "isolatedProfile": "word-lookup-test",
+    "status": "PASS",
+    "verifiedInvariants": {
+      "E2E-01": "Unauthenticated route fence returning 401 on all management routes without DSH session",
+      "E2E-02": "Zero external network requests on initial boot, initial GET status query returning activeMode: 'fixture'",
+      "E2E-03": "Protocol gating enforcing 405/404 method, 415 content-type, 413 body size <= 64 KiB, 400 forbidden parameters",
+      "E2E-04": "Concurrency mutex rejecting overlapping install/remove with 409, cancellation dispatch smoothly settling to 'cancelled'",
+      "E2E-05": "Full streaming installation and live activation (770,611 entries, 57,689 forms) with non-fixture words hitting in ecdict-local",
+      "E2E-06": "Cross-process restart restoration verifying that subsequent DSH process restarts directly into managed-ecdict without re-download",
+      "E2E-07": "Settings sync state verification and schema compatibility across restart (settingsSyncState: 'synced')",
+      "E2E-08": "Safe removal releasing Windows SQLite locks, unlinking managed database, and hot-reverting queries to fixture"
+    }
+  },
+  "qualityGateSummary": {
+    "buildFixtureDb": "PASS",
+    "typecheck": "PASS",
+    "unitTests": "PASS (45 files, 811 tests, 0 failures, 0 skips)",
+    "buildArtifacts": "PASS",
+    "bundleStaticChecks": "PASS (101/101 checks passed)",
+    "credentialScan": "PASS (0 leaks, 505 files scanned)",
+    "verifyStoreContract": "PASS",
+    "storeLifecycle": "PASS (Install, Start, Uninstall, Rollback)",
+    "ecdictBenchmarkRounds": "PASS (3/3 rounds meeting all SLAs)",
+    "realDshManagementE2E": "PASS (E2E-01 through E2E-08)",
+    "overallStatus": "READY_FOR_DELIVERY"
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "phase": "Phase 7A.6R3",
+  "reportTitle": "Phase 7A.6R3 Host Dictionary Management Routes Real DSH E2E Verification",
+  "generatedAt": "2026-10-13T13:00:57.614Z",
+  "status": "PASS",
+  "platform": "win32",
+  "nodeVersion": "v24.13.0",
+  "dshVersion": "0.2.0-rc.2",
+  "home": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-word-lookup-test\\home",
+  "profile": "word-lookup-test",
+  "port": 50996,
+  "e2eCoverage": {
+    "E2E-01": "PASS: Unauthenticated request fence (401 on all routes without session)",
+    "E2E-02": "PASS: Zero initial network requests and initial fixture status query",
+    "E2E-03": "PASS: Protocol constraints and gating (405, 415, 413, forbidden 400, not found 404)",
+    "E2E-04": "PASS: Concurrency gating (409) and cancellation dispatch (200 cancelling -> cancelled)",
+    "E2E-05": "PASS: Full ECDICT install & activation (770,611 entries, non-fixture queries hit)",
+    "E2E-06": "PASS: Cross-process restart persistence & restoration (survives restart directly in managed-ecdict)",
+    "E2E-07": "PASS: Settings sync state verification and schema compatibility across restart",
+    "E2E-08": "PASS: Safe removal releasing Windows locks, unlinking DB, reverting queries to fixture"
+  },
+  "unauthenticatedGate401": true,
+  "routesVerified": [
+    "POST /api/dsh-word-lookup",
+    "GET /api/dsh-word-lookup/dictionary/status",
+    "POST /api/dsh-word-lookup/dictionary/install",
+    "POST /api/dsh-word-lookup/dictionary/cancel",
+    "POST /api/dsh-word-lookup/dictionary/remove",
+    "POST /api/dsh-word-lookup/dictionary/verify"
+  ],
+  "invariantsEnforced": {
+    "zeroInitialNetworkRequests": true,
+    "methodEnforcement": true,
+    "contentTypeEnforcement": true,
+    "bodySizeLimit64KiB": true,
+    "forbiddenInstallOverridesBlocked": true,
+    "singleRunningOperationMutex": true,
+    "lookupResponsiveDuringInstall": true,
+    "safeCancellationDispatch": true,
+    "fullInstallationActivated": true,
+    "ecdictEntriesVerified": 770611,
+    "ecdictFormsVerified": 57689,
+    "nonFixtureLookupHit": true,
+    "morphologyLookupHit": true,
+    "crossProcessRestartRestored": true,
+    "settingsSyncStateVerified": true,
+    "safeRemovalReleasingWindowsLocks": true,
+    "postRemovalFixtureReversion": true
+  }
+}
