@@ -364,8 +364,8 @@ export function apply(ctx: Context, config: HostConfig): void {
         void operationManager.whenSettled().finally(() => {
           try {
             manager.close()
-          } catch {
-            // ignore deferred cleanup errors
+          } catch (deferredErr) {
+            console.warn('[dsh-word-lookup] Deferred dictionary manager close failed:', deferredErr)
           }
         })
       }

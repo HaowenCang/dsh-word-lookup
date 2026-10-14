@@ -51,6 +51,8 @@ import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client
 
 import { WordLookupCard } from './card.js'
 import type { ClientContext } from './contracts.js'
+import { DictionaryManagementStore } from './settings/dictionary-management-store.js'
+import { DictionarySettingsSection } from './settings/dictionary-settings-section.js'
 import {
   classificationOf,
   gestureSnapshot,
@@ -115,6 +117,15 @@ export const CARD_ENTRY_ID = 'dsh-word-lookup:card'
  * notification — while staying well below a modal's z-index.
  */
 export const CARD_ORDER = 900
+
+/** Registration id of the dictionary settings section in DSH settings. */
+export const SETTINGS_SECTION_ID = 'dictionary'
+
+/**
+ * Ascending render order inside `settings.section`.
+ * Placed at 80 to appear naturally in the settings nav list.
+ */
+export const SETTINGS_SECTION_ORDER = 80
 
 /**
  * Regions the manual command is available in: the page and editable surfaces.
@@ -219,6 +230,14 @@ export interface WordLookupDiagnostics {
     readonly order: number
     readonly declarationSeen: boolean
     readonly registrationCount: number
+  }
+  /** The settings section contribution's progress. */
+  settingsSection(): {
+    readonly entryId: string
+    readonly order: number
+    readonly declarationSeen: boolean
+    readonly registrationCount: number
+    readonly store: DictionaryManagementStore
   }
   /** This plugin's row in the live shortcut catalog. */
   catalog(): {
@@ -359,6 +378,8 @@ function createRuntime(ctx: ClientContext): () => void {
     let lastCapture: TriggerSelection = EMPTY_SELECTION
 
     const lookup = new LookupController({ store, request: requestLookup })
+    const mgmtStore = new DictionaryManagementStore()
+    disposer.add(() => mgmtStore.dispose())
 
     const form = ctx.configForms.get<HostSettings>(namespace)
 
@@ -418,6 +439,36 @@ function createRuntime(ctx: ClientContext): () => void {
         overlayRegistrationCount += 1
         return () => {
           overlayRegistrationCount -= 1
+          unregister()
+        }
+      }),
+    )
+
+    // --- native settings section ------------------------------------------
+    let settingsSectionDeclarationSeen = false
+    let settingsSectionRegistrationCount = 0
+    disposer.add(
+      ctx.slots.inject('settings.section', () => {
+        settingsSectionDeclarationSeen = true
+        const unregister = ctx.slots.register(
+          {
+            name: 'settings.section',
+            id: SETTINGS_SECTION_ID,
+            order: SETTINGS_SECTION_ORDER,
+            label: () => {
+              const lang =
+                (typeof document !== 'undefined' && document.documentElement?.lang) ||
+                (typeof navigator !== 'undefined' && (navigator.language || navigator.languages?.[0])) ||
+                'zh'
+              return lang.toLowerCase().startsWith('en') ? 'Dictionary' : '词典'
+            },
+            inject: () => ({ store: mgmtStore, form }),
+          },
+          DictionarySettingsSection,
+        )
+        settingsSectionRegistrationCount += 1
+        return () => {
+          settingsSectionRegistrationCount -= 1
           unregister()
         }
       }),
@@ -636,6 +687,13 @@ function createRuntime(ctx: ClientContext): () => void {
         order: CARD_ORDER,
         declarationSeen: overlayDeclarationSeen,
         registrationCount: overlayRegistrationCount,
+      }),
+      settingsSection: () => ({
+        entryId: SETTINGS_SECTION_ID,
+        order: SETTINGS_SECTION_ORDER,
+        declarationSeen: settingsSectionDeclarationSeen,
+        registrationCount: settingsSectionRegistrationCount,
+        store: mgmtStore,
       }),
       catalog: () => {
         const catalog = ctx.shortcuts.catalog.getSnapshot()

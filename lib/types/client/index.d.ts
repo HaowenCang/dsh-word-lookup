@@ -48,6 +48,7 @@
  */
 import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client';
 import type { ClientContext } from './contracts.js';
+import { DictionaryManagementStore } from './settings/dictionary-management-store.js';
 import { type GestureCounters, type GestureSnapshot } from './gesture.js';
 import { type LookupCounts } from './lookup.js';
 import { type SelectionRect } from './selection.js';
@@ -82,6 +83,13 @@ export declare const CARD_ENTRY_ID = "dsh-word-lookup:card";
  * notification — while staying well below a modal's z-index.
  */
 export declare const CARD_ORDER = 900;
+/** Registration id of the dictionary settings section in DSH settings. */
+export declare const SETTINGS_SECTION_ID = "dictionary";
+/**
+ * Ascending render order inside `settings.section`.
+ * Placed at 80 to appear naturally in the settings nav list.
+ */
+export declare const SETTINGS_SECTION_ORDER = 80;
 /**
  * The two switches as the browser sees them.
  *
@@ -169,6 +177,14 @@ export interface WordLookupDiagnostics {
         readonly order: number;
         readonly declarationSeen: boolean;
         readonly registrationCount: number;
+    };
+    /** The settings section contribution's progress. */
+    settingsSection(): {
+        readonly entryId: string;
+        readonly order: number;
+        readonly declarationSeen: boolean;
+        readonly registrationCount: number;
+        readonly store: DictionaryManagementStore;
     };
     /** This plugin's row in the live shortcut catalog. */
     catalog(): {
