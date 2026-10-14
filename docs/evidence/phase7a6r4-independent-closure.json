@@ -1,0 +1,194 @@
+{
+  "phase": "Phase 7A.6R4",
+  "reportTitle": "Phase 7A.6R4 Failure Settlement Classification & Drain Timeout Resource Safety Closure",
+  "generatedAt": "2026-10-14T10:25:53.367Z",
+  "approvedBaselineGitSha": "389d58e7abc80d6d8a1b9461c7d0a643ceca61d0",
+  "testedCodeGitSha": "1b0aac33825f48fd57a7f7eaba31799df97af93c",
+  "targetVersion": "0.2.0",
+  "targetStatus": "UNRELEASED",
+  "platform": "win32",
+  "arch": "x64",
+  "nodeVersion": "v24.13.0",
+  "targetEnvironment": {
+    "dshVersion": "0.2.0-rc.2",
+    "dshUpstreamCommit": "639ed015397290b3745d163aafe02ffee4aa3f84",
+    "platform": "win32",
+    "arch": "x64",
+    "nodeVersion": "v24.13.0",
+    "osRelease": "Windows 11 (NT 10.0.26220.0)"
+  },
+  "status": "ACCEPTED",
+  "auditFindingsRemediated": {
+    "fixF1_FailureSettlementMisclassification": {
+      "description": "Strict separation of non-cancellability from commit completion in DictionaryOperationManager and ActivationCoordinator, ensuring activation and metadata write failures settle as failed instead of misclassifying as completed.",
+      "mechanisms": {
+        "commitBoundaryNonCancellableOnly": "onCommitBoundary hook exclusively sets ctx.nonCancellable = true; committed = true is deferred until activateManagedDatabase() fully resolves without exception.",
+        "catchBlockClassification": "Failure catch block settles as cancelled only when !committed && !ctx.nonCancellable && (signal.aborted || this.#isAbortError(error)); all post-commit and critical-section failures settle as failed.",
+        "rollbackPreservation": "ActivationRollbackError preserves and logs both the primary activation error and secondary rollback failure messages without masking.",
+        "progressPercentIntegrity": "Failed operations never report progress.percent = 100 or successful installation messages, guaranteeing GET /dictionary/status and lastOperation fidelity."
+      },
+      "verifiedTests": [
+        "F1-01",
+        "F1-02",
+        "F1-03",
+        "F1-04",
+        "F1-05",
+        "F1-06",
+        "F1-07",
+        "F1-08"
+      ]
+    },
+    "fixF2_UnsafeManagerClosureAfterDrainTimeout": {
+      "description": "Fail-closed concurrency serialization during Cordis plugin disposal, preventing premature DictionaryManager closure while background operations remain in flight.",
+      "mechanisms": {
+        "synchronousClosureGuarded": "Plugin unload disposer checks drained && !operationManager.isBusy() before synchronously calling manager.close().",
+        "deferredClosureOnTimeout": "When drain times out or operations remain busy, manager closure is deferred via void operationManager.whenSettled().finally(() => manager.close()), keeping dependencies open until settlement.",
+        "coordinatorDisposalGuard": "ActivationCoordinator tracks #disposed state; activateManagedDatabase throws AbortError if coordinator is disposed or manager is closed.",
+        "reDisposeTimeoutConsistency": "DictionaryOperationManager.dispose() re-validates isBusy() and drainSummary.workflowSettled on repeated calls, throwing OperationDrainTimeoutError consistently rather than returning void.",
+        "aggregateErrorCollection": "Independent disposer failures across routes and operations are aggregated into standard AggregateError."
+      },
+      "verifiedTests": [
+        "F2-01",
+        "F2-02",
+        "F2-03",
+        "F2-04",
+        "F2-05",
+        "F2-06",
+        "F2-07",
+        "F2-08",
+        "F2-09",
+        "F2-10"
+      ]
+    }
+  },
+  "regressionVerification": {
+    "framework": "Vitest v3.2.4",
+    "totalTestFiles": 45,
+    "totalTests": 829,
+    "passed": 829,
+    "failed": 0,
+    "skipped": 0,
+    "passRate": "100%",
+    "addedPhase7A6R4Tests": {
+      "FailureSettlementSuite": 8,
+      "CordisDisposeDrainSafetySuite": 10,
+      "totalAdded": 18
+    }
+  },
+  "ecdictBenchmarkRounds": {
+    "canonicalArtifact": {
+      "source": "ECDICT",
+      "commit": "bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b",
+      "sourceSha256": "1a6947e04785db63613a92e14903cdae7954f7e84860b10e68e5c7cbb3f9c3cf",
+      "entryCount": 770611,
+      "formCount": 57689,
+      "ambiguousFormCount": 463,
+      "rejectedRows": 0,
+      "logicalSha256": "591e53bdd8e3d227fd92c21ce2cfe7d375fffcd90f97a9f6a64f7d26e7c78bd9"
+    },
+    "rounds": [
+      {
+        "round": 1,
+        "durationMs": 6755,
+        "rowsPerSec": 114080,
+        "peakRssMiB": 377.1,
+        "eventLoop": {
+          "p50Ms": 21.81,
+          "p95Ms": 31.24,
+          "p99Ms": 34.83,
+          "maxMs": 43.29
+        },
+        "heartbeat": {
+          "p95DriftMs": 11,
+          "maxDriftMs": 23
+        },
+        "gatesPassed": true
+      },
+      {
+        "round": 2,
+        "durationMs": 6824,
+        "rowsPerSec": 112927,
+        "peakRssMiB": 390.4,
+        "eventLoop": {
+          "p50Ms": 21.86,
+          "p95Ms": 31.51,
+          "p99Ms": 34.11,
+          "maxMs": 49.91
+        },
+        "heartbeat": {
+          "p95DriftMs": 12,
+          "maxDriftMs": 30
+        },
+        "gatesPassed": true
+      },
+      {
+        "round": 3,
+        "durationMs": 6803,
+        "rowsPerSec": 113275,
+        "peakRssMiB": 381.9,
+        "eventLoop": {
+          "p50Ms": 21.71,
+          "p95Ms": 31.41,
+          "p99Ms": 33.21,
+          "maxMs": 52.07
+        },
+        "heartbeat": {
+          "p95DriftMs": 11,
+          "maxDriftMs": 43
+        },
+        "gatesPassed": true
+      }
+    ],
+    "slaCompliance": {
+      "peakRssCeilingMiB": {
+        "observedMax": 390.4,
+        "limit": 512,
+        "pass": true
+      },
+      "eventLoopP99CeilingMs": {
+        "observedMax": 34.83,
+        "limit": 100,
+        "pass": true
+      },
+      "eventLoopMaxCeilingMs": {
+        "observedMax": 52.07,
+        "limit": 500,
+        "pass": true
+      },
+      "heartbeatMaxStallMs": {
+        "observedMax": 43,
+        "limit": 1000,
+        "pass": true
+      }
+    }
+  },
+  "realDshManagementE2E": {
+    "dshVersion": "0.2.0-rc.2",
+    "testRunner": "scripts/test-phase7a6-management-e2e.mjs",
+    "isolatedProfile": "word-lookup-test",
+    "status": "PASS",
+    "verifiedInvariants": {
+      "E2E-01": "Unauthenticated route fence returning 401 on all management routes without DSH session",
+      "E2E-02": "Zero external network requests on initial boot, initial GET status query returning activeMode: fixture",
+      "E2E-03": "Protocol gating enforcing 405/404 method, 415 content-type, 413 body size <= 64 KiB, 400 forbidden parameters",
+      "E2E-04": "Concurrency mutex rejecting overlapping install/remove with 409, cancellation dispatch smoothly settling to cancelled",
+      "E2E-05": "Full streaming installation and live activation (770,611 entries, 57,689 forms) with non-fixture words hitting in ecdict-local",
+      "E2E-06": "Cross-process restart restoration verifying that subsequent DSH process restarts directly into managed-ecdict without re-download",
+      "E2E-07": "Settings sync state verification and schema compatibility across restart (settingsSyncState: synced)",
+      "E2E-08": "Safe removal releasing Windows SQLite locks, unlinking managed database, and hot-reverting queries to fixture"
+    }
+  },
+  "qualityGateSummary": {
+    "buildFixtureDb": "PASS",
+    "typecheck": "PASS",
+    "unitTests": "PASS (45 files, 829 tests, 0 failures, 0 skips)",
+    "buildArtifacts": "PASS",
+    "bundleStaticChecks": "PASS (101/101 checks passed)",
+    "credentialScan": "PASS (0 leaks, 510 files scanned)",
+    "verifyStoreContract": "PASS",
+    "storeLifecycle": "PASS (Install, Start, Uninstall, Rollback)",
+    "ecdictBenchmarkRounds": "PASS (3/3 rounds meeting all SLAs)",
+    "realDshManagementE2E": "PASS (E2E-01 through E2E-08)",
+    "overallStatus": "READY_FOR_DELIVERY"
+  }
+}

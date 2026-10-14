@@ -1,0 +1,99 @@
+{
+  "ok": true,
+  "platform": "win32",
+  "nodeVersion": "v24.13.0",
+  "sourceProvenance": {
+    "sourceName": "ECDICT",
+    "sourceCommit": "bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b",
+    "sourcePath": "ecdict.csv",
+    "sourceByteSize": 65933428,
+    "sourceSha256": "1a6947e04785db63613a92e14903cdae7954f7e84860b10e68e5c7cbb3f9c3cf",
+    "acquisitionMethod": "local-verified-copy"
+  },
+  "databaseResult": {
+    "identity": "s1-bc015ed2e24a-1a6947e04785-bdeeb735119c",
+    "databaseFile": "ecdict-s1-bc015ed2e24a-1a6947e04785-bdeeb735119c.sqlite3",
+    "byteSize": 88354816,
+    "fileSha256": "5f2e9cc1abad6f88090628b052cdf439bc52e882ed9a9e7a43dbb91736a1f142",
+    "logicalSha256": "591e53bdd8e3d227fd92c21ce2cfe7d375fffcd90f97a9f6a64f7d26e7c78bd9",
+    "schemaVersion": 1,
+    "entryCount": 770611,
+    "formCount": 57689,
+    "exampleCount": 0,
+    "ambiguousFormCount": 463,
+    "rejectedRowCount": 0,
+    "sourceRowCount": 770611,
+    "postPublicationCleanup": {
+      "candidateRemoved": true,
+      "sidecarsRemoved": true
+    }
+  },
+  "timing": {
+    "durationMs": 6803,
+    "durationSec": 6.803,
+    "rowsPerSec": 113275,
+    "cooperativeYields": 1372,
+    "integrityCheckDurationMs": 536,
+    "phaseTimings": {
+      "entryImport": 2389,
+      "formResolution": 41,
+      "formInsertion": 70,
+      "indexCreation": 13,
+      "logicalHashing": 3377,
+      "metadata": 0,
+      "integrityCheck": 536,
+      "fileSync": 41,
+      "productValidation": 5,
+      "physicalDigest": 146,
+      "publication": 2
+    }
+  },
+  "memory": {
+    "peakRssMiB": 381.9,
+    "peakRssBytes": 400478208
+  },
+  "responsiveness": {
+    "eventLoop": {
+      "minMs": 19.22,
+      "meanMs": 23.51,
+      "p50Ms": 21.71,
+      "p95Ms": 31.41,
+      "p99Ms": 33.21,
+      "maxMs": 52.07
+    },
+    "heartbeat": {
+      "intervalMs": 20,
+      "samples": 288,
+      "p95DriftMs": 11,
+      "maxDriftMs": 43
+    },
+    "gates": {
+      "peakRss": {
+        "value": 381.9,
+        "limit": 512,
+        "pass": true
+      },
+      "eventLoopP99": {
+        "value": 33.21,
+        "limit": 100,
+        "pass": true
+      },
+      "eventLoopMax": {
+        "value": 52.07,
+        "limit": 500,
+        "pass": true
+      },
+      "heartbeatMaxStall": {
+        "value": 43,
+        "limit": 1000,
+        "pass": true
+      }
+    }
+  },
+  "cleanup": {
+    "candidateRemoved": true,
+    "sidecarsRemoved": true,
+    "cleanupComplete": true,
+    "unlinkedCleanly": true
+  }
+}
