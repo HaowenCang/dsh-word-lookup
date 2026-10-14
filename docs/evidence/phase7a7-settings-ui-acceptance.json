@@ -1,0 +1,120 @@
+{
+  "timestamp": "2026-10-14T12:12:20.199Z",
+  "baseSha": "d277b5b7965f401ebb5487e5aec10b0d403ba779",
+  "targetDsh": "0.2.0-rc.2 (639ed015397290b3745d163aafe02ffee4aa3f84)",
+  "nodeVersion": "v24.13.0",
+  "platform": "win32",
+  "port": 50998,
+  "profile": "word-lookup-settings-e2e",
+  "scenarios": {
+    "S01": {
+      "pass": true,
+      "label": "Dictionary"
+    },
+    "S02": {
+      "pass": true,
+      "activeMode": "fixture",
+      "installed": false
+    },
+    "S16": {
+      "pass": true,
+      "autoDoubleClick": true,
+      "autoSelection": true
+    },
+    "S03": {
+      "pass": true,
+      "operationId": "install-1791979910837-ed01dd39"
+    },
+    "S10": {
+      "pass": true,
+      "singleOperation": true
+    },
+    "S11": {
+      "pass": true,
+      "httpStatus": 409,
+      "code": "OPERATION_IN_PROGRESS"
+    },
+    "S04": {
+      "pass": true,
+      "observed": true
+    },
+    "S05": {
+      "pass": true,
+      "observed": true
+    },
+    "S08": {
+      "pass": true,
+      "entryCount": 770611,
+      "formCount": 57689,
+      "queryHit": true,
+      "querySource": "ecdict-local"
+    },
+    "S17": {
+      "pass": true,
+      "dark": true,
+      "light": true,
+      "narrow": true
+    },
+    "S13": {
+      "pass": true,
+      "preserved": true
+    },
+    "S14": {
+      "pass": true,
+      "recovered": true
+    },
+    "S12": {
+      "pass": true,
+      "revertedToFixture": true,
+      "postRemoveMiss": true
+    },
+    "S06": {
+      "pass": true,
+      "cancelled": true
+    },
+    "S07": {
+      "pass": true,
+      "commitGateDisabled": true
+    },
+    "S09": {
+      "pass": true,
+      "sanitizedError": true,
+      "retryable": true
+    },
+    "S19": {
+      "pass": true,
+      "statusCodesHandled": [
+        401,
+        404,
+        409,
+        413,
+        415,
+        500
+      ]
+    },
+    "S20": {
+      "pass": true,
+      "quarantineResilient": true
+    },
+    "S15": {
+      "pass": true,
+      "persistedAfterRestart": true,
+      "mode": "fixture"
+    },
+    "S18": {
+      "pass": true,
+      "zeroResidue": true
+    }
+  },
+  "screenshots": [
+    "s01-initial-uninstalled.png",
+    "s04-downloading.png",
+    "s05-building.png",
+    "s08-installed-ecdict.png",
+    "s09-failed.png",
+    "s17-dark-theme.png",
+    "s17-light-theme.png",
+    "s17-narrow-screen.png"
+  ],
+  "verdict": "PASS"
+}
