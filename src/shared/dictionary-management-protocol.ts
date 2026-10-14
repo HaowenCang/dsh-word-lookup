@@ -129,6 +129,18 @@ export interface InstalledCorpusInfo {
 }
 
 /**
+ * Summary information of the package-owned deterministic fixture dictionary.
+ */
+export interface FixtureCorpusInfo {
+  /** Headword entry count in fixture. */
+  readonly entryCount: number
+  /** Inflection and morphological forms count in fixture. */
+  readonly formCount: number
+  /** Fixture version identifier. */
+  readonly version: string
+}
+
+/**
  * Status response returned by GET /api/dsh-word-lookup/dictionary/status.
  */
 export interface DictionaryStatusResponse {
@@ -145,6 +157,8 @@ export interface DictionaryStatusResponse {
   readonly installed: boolean
   /** Metadata of the installed corpus, or null if none is installed. */
   readonly installedCorpus: InstalledCorpusInfo | null
+  /** Statistics for built-in fixture dictionary, if active or available. */
+  readonly fixtureStats?: FixtureCorpusInfo
   /** Snapshot of currently running background operation, or null. */
   readonly currentOperation: DictionaryOperationSnapshot | null
   /** Snapshot of the most recently settled operation, or null. */

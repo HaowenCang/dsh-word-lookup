@@ -259,6 +259,16 @@ export function Switch({ checked, disabled = false, onChange, label, id }: Switc
   const height = 22
   const thumbSize = 16
 
+  const lastToggleTimeRef = React.useRef(0)
+
+  const toggle = () => {
+    if (disabled) return
+    const now = Date.now()
+    if (now - lastToggleTimeRef.current < 80) return
+    lastToggleTimeRef.current = now
+    onChange(!checked)
+  }
+
   const trackStyle: CSSProperties = {
     position: 'relative',
     display: 'inline-block',
@@ -291,10 +301,11 @@ export function Switch({ checked, disabled = false, onChange, label, id }: Switc
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (disabled) return
-    if (e.key === ' ' || e.key === 'Enter') {
+    if (e.key === ' ') {
       e.preventDefault()
-      onChange(!checked)
+      toggle()
     }
+    // Enter key triggers native button onClick automatically. Do not handle Enter here to prevent double-toggle.
   }
 
   return (
@@ -306,9 +317,7 @@ export function Switch({ checked, disabled = false, onChange, label, id }: Switc
       aria-label={label}
       disabled={disabled}
       style={trackStyle}
-      onClick={() => {
-        if (!disabled) onChange(!checked)
-      }}
+      onClick={toggle}
       onKeyDown={handleKeyDown}
     >
       <span style={thumbStyle} aria-hidden="true" />
@@ -503,6 +512,81 @@ export function ModalConfirm({
   onConfirm,
   onCancel,
 }: ModalConfirmProps) {
+  const dialogRef = React.useRef<HTMLDivElement>(null)
+  const previousActiveElementRef = React.useRef<HTMLElement | null>(null)
+
+  React.useEffect(() => {
+    if (typeof document !== 'undefined') {
+      previousActiveElementRef.current = document.activeElement as HTMLElement | null
+    }
+
+    const timer = setTimeout(() => {
+      if (dialogRef.current) {
+        const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        )
+        if (focusable.length > 0) {
+          focusable[0]?.focus()
+        } else {
+          dialogRef.current.focus()
+        }
+      }
+    }, 10)
+
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        e.stopPropagation()
+        onCancel()
+        return
+      }
+
+      if (e.key === 'Tab' && dialogRef.current) {
+        const focusable = Array.from(
+          dialogRef.current.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+          ),
+        )
+        if (focusable.length === 0) {
+          e.preventDefault()
+          return
+        }
+        const first = focusable[0]
+        const last = focusable[focusable.length - 1]
+
+        if (e.shiftKey) {
+          if (document.activeElement === first || !dialogRef.current.contains(document.activeElement)) {
+            e.preventDefault()
+            last?.focus()
+          }
+        } else {
+          if (document.activeElement === last || !dialogRef.current.contains(document.activeElement)) {
+            e.preventDefault()
+            first?.focus()
+          }
+        }
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('keydown', handleGlobalKeyDown, true)
+    }
+
+    return () => {
+      clearTimeout(timer)
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('keydown', handleGlobalKeyDown, true)
+      }
+      if (previousActiveElementRef.current && typeof previousActiveElementRef.current.focus === 'function') {
+        try {
+          previousActiveElementRef.current.focus()
+        } catch {
+          // ignore error during unmount
+        }
+      }
+    }
+  }, [onCancel])
+
   const backdropStyle: CSSProperties = {
     position: 'fixed',
     top: 0,
@@ -526,6 +610,7 @@ export function ModalConfirm({
     padding: '20px 22px',
     boxShadow: '0 12px 32px rgba(0, 0, 0, 0.5)',
     boxSizing: 'border-box',
+    outline: 'none',
   }
 
   const titleStyle: CSSProperties = {
@@ -551,6 +636,8 @@ export function ModalConfirm({
   return (
     <div style={backdropStyle} role="presentation" onClick={onCancel}>
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         style={dialogStyle}
         role="dialog"
         aria-modal="true"

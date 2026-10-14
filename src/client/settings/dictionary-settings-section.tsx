@@ -12,9 +12,9 @@
  * @module dsh-word-lookup/client/settings/dictionary-settings-section
  */
 
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { ConfigForm, ConfigFormSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client'
 
 import {
   ActionButton,
@@ -70,12 +70,21 @@ export function DictionarySettingsSection({
   const store = externalStore ?? internalStore!
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      ;(window as unknown as { __DSH_WL_SETTINGS_STORE__?: DictionaryManagementStore }).__DSH_WL_SETTINGS_STORE__ = store
+    }
     return () => {
+      if (typeof window !== 'undefined') {
+        const win = window as unknown as { __DSH_WL_SETTINGS_STORE__?: DictionaryManagementStore }
+        if (win.__DSH_WL_SETTINGS_STORE__ === store) {
+          delete win.__DSH_WL_SETTINGS_STORE__
+        }
+      }
       if (internalStore) {
         internalStore.dispose()
       }
     }
-  }, [internalStore])
+  }, [internalStore, store])
 
   const storeState: DictionaryManagementStoreState = useSyncExternalStore(
     store.subscribe,
@@ -84,39 +93,73 @@ export function DictionarySettingsSection({
   )
 
   // ConfigForms integration for gesture switches
-  const [formValues, setFormValues] = useState<{ autoDoubleClick: boolean; autoSelection: boolean }>(() => {
-    if (!form) return { autoDoubleClick: false, autoSelection: false }
-    const snap = form.getSnapshot().value
-    return {
-      autoDoubleClick: snap?.autoDoubleClick === true,
-      autoSelection: snap?.autoSelection === true,
+  const isMountedRef = useRef(true)
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false
     }
+  }, [])
+
+  const [formSnapshot, setFormSnapshot] = useState<ConfigFormSnapshot<DictionaryHostSettings> | null>(() => {
+    return form ? form.getSnapshot() : null
   })
 
   useEffect(() => {
     if (!form) return
-    const read = () => {
-      const snap = form.getSnapshot().value
-      setFormValues({
-        autoDoubleClick: snap?.autoDoubleClick === true,
-        autoSelection: snap?.autoSelection === true,
-      })
-    }
-    read()
-    return form.subscribe(read)
+    setFormSnapshot(form.getSnapshot())
+    return form.subscribe(() => {
+      if (isMountedRef.current) {
+        setFormSnapshot(form.getSnapshot())
+      }
+    })
   }, [form])
 
-  const handleToggleDoubleClick = (next: boolean) => {
-    setFormValues((prev) => ({ ...prev, autoDoubleClick: next }))
-    if (form) {
-      void form.set('autoDoubleClick', next)
+  const isFormWritable = Boolean(form && formSnapshot && formSnapshot.status === 'ready' && formSnapshot.writable)
+  const [pendingDoubleClick, setPendingDoubleClick] = useState(false)
+  const [pendingSelection, setPendingSelection] = useState(false)
+  const [configError, setConfigError] = useState<string | null>(null)
+  const doubleClickSeqRef = useRef(0)
+  const selectionSeqRef = useRef(0)
+
+  const handleToggleDoubleClick = async (next: boolean) => {
+    if (!isFormWritable || !form || pendingDoubleClick) return
+    setConfigError(null)
+    setPendingDoubleClick(true)
+    const seq = ++doubleClickSeqRef.current
+    try {
+      const ok = await form.set('autoDoubleClick', next)
+      if (!isMountedRef.current || seq !== doubleClickSeqRef.current) return
+      if (!ok) {
+        setConfigError('保存双击查词设置失败：Host 拒绝了修改，已恢复原有配置')
+      }
+    } catch (err) {
+      if (!isMountedRef.current || seq !== doubleClickSeqRef.current) return
+      setConfigError(`保存双击查词设置异常: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      if (isMountedRef.current && seq === doubleClickSeqRef.current) {
+        setPendingDoubleClick(false)
+      }
     }
   }
 
-  const handleToggleSelection = (next: boolean) => {
-    setFormValues((prev) => ({ ...prev, autoSelection: next }))
-    if (form) {
-      void form.set('autoSelection', next)
+  const handleToggleSelection = async (next: boolean) => {
+    if (!isFormWritable || !form || pendingSelection) return
+    setConfigError(null)
+    setPendingSelection(true)
+    const seq = ++selectionSeqRef.current
+    try {
+      const ok = await form.set('autoSelection', next)
+      if (!isMountedRef.current || seq !== selectionSeqRef.current) return
+      if (!ok) {
+        setConfigError('保存框选查词设置失败：Host 拒绝了修改，已恢复原有配置')
+      }
+    } catch (err) {
+      if (!isMountedRef.current || seq !== selectionSeqRef.current) return
+      setConfigError(`保存框选查词设置异常: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      if (isMountedRef.current && seq === selectionSeqRef.current) {
+        setPendingSelection(false)
+      }
     }
   }
 
@@ -265,11 +308,15 @@ export function DictionarySettingsSection({
                 color: 'var(--wl-set-text-main, #f2f2f7)',
               }}
             >
-              {status?.activeMode === 'managed-ecdict'
-                ? 'ECDICT 本地全量词典'
-                : status?.activeMode === 'custom'
-                  ? '自定义 SQLite 词典'
-                  : '内置离线基础词典 (Fixture)'}
+              {status === null
+                ? '加载中...'
+                : status.quarantined
+                  ? '存储已隔离保护'
+                  : status.activeMode === 'managed-ecdict'
+                    ? 'ECDICT 本地全量词典'
+                    : status.activeMode === 'custom'
+                      ? '自定义 SQLite 词典'
+                      : '内置离线基础词典 (Fixture)'}
             </span>
           }
         />
@@ -286,9 +333,17 @@ export function DictionarySettingsSection({
                 color: 'var(--wl-set-text-main, #f2f2f7)',
               }}
             >
-              {status?.activeMode === 'managed-ecdict'
-                ? (status.installedCorpus?.entryCount ?? 770611).toLocaleString()
-                : '12 词条'}
+              {status === null
+                ? '暂无统计'
+                : status.activeMode === 'managed-ecdict'
+                  ? status.installedCorpus?.entryCount !== undefined
+                    ? `${status.installedCorpus.entryCount.toLocaleString()} 词条`
+                    : '暂无统计'
+                  : status.activeMode === 'fixture'
+                    ? status.fixtureStats?.entryCount !== undefined
+                      ? `${status.fixtureStats.entryCount} 词条`
+                      : '暂无统计'
+                    : '暂无统计'}
             </span>
           }
         />
@@ -305,9 +360,17 @@ export function DictionarySettingsSection({
                 color: 'var(--wl-set-text-main, #f2f2f7)',
               }}
             >
-              {status?.activeMode === 'managed-ecdict'
-                ? (status.installedCorpus?.formCount ?? 57689).toLocaleString()
-                : '12 记录'}
+              {status === null
+                ? '暂无统计'
+                : status.activeMode === 'managed-ecdict'
+                  ? status.installedCorpus?.formCount !== undefined
+                    ? `${status.installedCorpus.formCount.toLocaleString()} 记录`
+                    : '暂无统计'
+                  : status.activeMode === 'fixture'
+                    ? status.fixtureStats?.formCount !== undefined
+                      ? `${status.fixtureStats.formCount} 记录`
+                      : '暂无统计'
+                    : '暂无统计'}
             </span>
           }
         />
@@ -324,7 +387,17 @@ export function DictionarySettingsSection({
                 fontFamily: 'monospace',
               }}
             >
-              {status?.activeMode === 'managed-ecdict' ? 'ECDICT @ bc015ed' : '内置 Fixture v1.0'}
+              {status === null
+                ? '暂无数据'
+                : status.activeMode === 'managed-ecdict'
+                  ? status.installedCorpus?.commit
+                    ? `ECDICT @ ${status.installedCorpus.commit.slice(0, 7)}`
+                    : 'ECDICT (版本未知)'
+                  : status.activeMode === 'fixture'
+                    ? status.fixtureStats?.version
+                      ? `内置 Fixture (${status.fixtureStats.version})`
+                      : '内置 Fixture'
+                    : (status.activeIdentity ?? '自定义版本')}
             </span>
           }
         />
@@ -450,15 +523,23 @@ export function DictionarySettingsSection({
               style={{
                 padding: '14px 16px',
                 borderRadius: '8px',
-                background: 'rgba(34, 197, 94, 0.08)',
-                border: '1px solid rgba(34, 197, 94, 0.25)',
+                background:
+                  status.activeMode === 'managed-ecdict'
+                    ? 'rgba(34, 197, 94, 0.08)'
+                    : 'rgba(245, 158, 11, 0.08)',
+                border:
+                  status.activeMode === 'managed-ecdict'
+                    ? '1px solid rgba(34, 197, 94, 0.25)'
+                    : '1px solid rgba(245, 158, 11, 0.25)',
                 marginBottom: '16px',
                 fontSize: '13px',
                 lineHeight: '1.5',
                 color: 'var(--wl-set-text-main, #f2f2f7)',
               }}
             >
-              ECDICT 本地全量数据库已就绪（770,611 词条，57,689 形态学记录）。当前运行状态稳定，查词请求直接命中本地只读 SQLite 数据库。
+              {status.activeMode === 'managed-ecdict'
+                ? `ECDICT 本地全量数据库已就绪${status.installedCorpus?.entryCount !== undefined ? `（${status.installedCorpus.entryCount.toLocaleString()} 词条${status.installedCorpus?.formCount !== undefined ? `，${status.installedCorpus.formCount.toLocaleString()} 形态学记录` : ''}）` : ''}。当前运行状态稳定，查词请求直接命中本地只读 SQLite 数据库。`
+                : `ECDICT 本地全量数据库已安装在磁盘，但当前活动词典模式为「${status.activeMode === 'fixture' ? '内置基础词典 (Fixture)' : status.activeMode}」。查词请求尚未命中 ECDICT。`}
             </div>
 
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -572,7 +653,8 @@ export function DictionarySettingsSection({
             <Switch
               id="switch-auto-double-click"
               label="双击自动查词"
-              checked={formValues.autoDoubleClick}
+              checked={formSnapshot?.value?.autoDoubleClick === true}
+              disabled={!isFormWritable || pendingDoubleClick}
               onChange={handleToggleDoubleClick}
             />
           }
@@ -586,11 +668,47 @@ export function DictionarySettingsSection({
             <Switch
               id="switch-auto-selection"
               label="拖拽框选自动查词"
-              checked={formValues.autoSelection}
+              checked={formSnapshot?.value?.autoSelection === true}
+              disabled={!isFormWritable || pendingSelection}
               onChange={handleToggleSelection}
             />
           }
         />
+
+        {configError && (
+          <div
+            role="alert"
+            style={{
+              marginTop: '12px',
+              padding: '8px 12px',
+              borderRadius: '6px',
+              background: 'rgba(239, 68, 68, 0.12)',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              color: 'var(--wl-set-error, #ef4444)',
+              fontSize: '12px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <span>{configError}</span>
+            <ActionButton size="small" variant="ghost" onClick={() => setConfigError(null)}>
+              忽略
+            </ActionButton>
+          </div>
+        )}
+
+        {form && !isFormWritable && (
+          <div
+            style={{
+              marginTop: '8px',
+              fontSize: '11.5px',
+              color: 'var(--wl-set-text-muted, #6c6c7a)',
+            }}
+          >
+            提示：当前设置处于只读模式或不可写入，开关已禁用。
+          </div>
+        )}
       </SectionCard>
 
       {/* Section D: Shortcuts & Advanced Features (Informational) */}

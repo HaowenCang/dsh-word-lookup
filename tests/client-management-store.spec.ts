@@ -356,4 +356,39 @@ describe('DictionaryManagementStore', () => {
     store.dispose()
     expect(vi.getTimerCount()).toBe(0)
   })
+
+  it('concurrent refresh aborts older in-flight poll request signal', async () => {
+    const signals: AbortSignal[] = []
+    vi.spyOn(transport, 'fetchDictionaryStatus').mockImplementation(async (signal) => {
+      if (signal) signals.push(signal)
+      return { ok: true, data: sampleStatus() }
+    })
+
+    const store = new DictionaryManagementStore({ autoStart: false })
+    const p1 = store.refresh()
+    const p2 = store.refresh()
+    await Promise.all([p1, p2])
+
+    expect(signals.length).toBe(2)
+    expect(signals[0]?.aborted).toBe(true)
+    expect(signals[1]?.aborted).toBe(false)
+    store.dispose()
+  })
+
+  it('disposal aborts in-flight action controllers', async () => {
+    let capturedSignal: AbortSignal | undefined
+    vi.spyOn(transport, 'installManagedDictionary').mockImplementation(async (signal) => {
+      capturedSignal = signal
+      return new Promise(() => {}) // never resolves
+    })
+
+    const store = new DictionaryManagementStore({ autoStart: false })
+    void store.install()
+
+    expect(capturedSignal).toBeDefined()
+    expect(capturedSignal?.aborted).toBe(false)
+
+    store.dispose()
+    expect(capturedSignal?.aborted).toBe(true)
+  })
 })

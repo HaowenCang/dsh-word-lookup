@@ -23,7 +23,7 @@ import type { Context } from '@deepseek-ai/cordis';
 import { DictionaryManager } from './dictionary-manager.js';
 import { type ManagedStoragePaths, type SettingsSyncState } from './managed-storage.js';
 import { type DictionaryMode, type HostConfig } from './config.js';
-import type { InstalledCorpusInfo, ManagementErrorCode } from '../shared/dictionary-management-protocol.js';
+import type { FixtureCorpusInfo, InstalledCorpusInfo, ManagementErrorCode } from '../shared/dictionary-management-protocol.js';
 import type { ManagedEcdictBuildResult } from './ecdict-importer.js';
 /**
  * Error thrown when an activation attempt fails and rollback of previous state also fails.
@@ -69,6 +69,7 @@ export interface ActivationStateSummary {
     readonly activeIdentity: string;
     readonly installed: boolean;
     readonly installedCorpus: InstalledCorpusInfo | null;
+    readonly fixtureStats: FixtureCorpusInfo;
     readonly quarantined: boolean;
     readonly quarantineReason: string | null;
     readonly recoveryError: string | null;

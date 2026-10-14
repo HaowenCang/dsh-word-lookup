@@ -66,7 +66,8 @@ export class DictionaryManagementStore {
   readonly #idleIntervalMs: number
 
   #timer: ReturnType<typeof setTimeout> | null = null
-  #abortController: AbortController | null = null
+  #pollAbortController: AbortController | null = null
+  readonly #actionControllers = new Set<AbortController>()
   #requestId = 0
   #disposed = false
 
@@ -137,8 +138,12 @@ export class DictionaryManagementStore {
   async #poll(): Promise<void> {
     if (this.#disposed) return
     const id = ++this.#requestId
+    if (this.#pollAbortController !== null) {
+      this.#pollAbortController.abort()
+      this.#pollAbortController = null
+    }
     const controller = new AbortController()
-    this.#abortController = controller
+    this.#pollAbortController = controller
 
     try {
       const result = await fetchDictionaryStatus(controller.signal)
@@ -166,11 +171,15 @@ export class DictionaryManagementStore {
         }
       }
       this.#emit()
+    } catch {
+      // Aborted or transport error
     } finally {
-      if (this.#abortController === controller) {
-        this.#abortController = null
+      if (this.#pollAbortController === controller) {
+        this.#pollAbortController = null
       }
-      this.#scheduleNextPoll()
+      if (!this.#disposed && id === this.#requestId) {
+        this.#scheduleNextPoll()
+      }
     }
   }
 
@@ -196,6 +205,7 @@ export class DictionaryManagementStore {
     this.#emit()
 
     const controller = new AbortController()
+    this.#actionControllers.add(controller)
     try {
       const result = await installManagedDictionary(controller.signal)
       if (this.#disposed) return false
@@ -217,6 +227,7 @@ export class DictionaryManagementStore {
       this.#emit()
       return false
     } finally {
+      this.#actionControllers.delete(controller)
       if (!this.#disposed) {
         this.#state = { ...this.#state, isActing: false }
         this.#emit()
@@ -241,6 +252,7 @@ export class DictionaryManagementStore {
     this.#emit()
 
     const controller = new AbortController()
+    this.#actionControllers.add(controller)
     try {
       const result = await cancelDictionaryOperation(opId, controller.signal)
       if (this.#disposed) return false
@@ -261,6 +273,7 @@ export class DictionaryManagementStore {
       this.#emit()
       return false
     } finally {
+      this.#actionControllers.delete(controller)
       if (!this.#disposed) {
         this.#state = { ...this.#state, isActing: false }
         this.#emit()
@@ -278,6 +291,7 @@ export class DictionaryManagementStore {
     this.#emit()
 
     const controller = new AbortController()
+    this.#actionControllers.add(controller)
     try {
       const result = await removeManagedDictionary(controller.signal)
       if (this.#disposed) return false
@@ -298,6 +312,7 @@ export class DictionaryManagementStore {
       this.#emit()
       return false
     } finally {
+      this.#actionControllers.delete(controller)
       if (!this.#disposed) {
         this.#state = { ...this.#state, isActing: false }
         this.#emit()
@@ -327,10 +342,15 @@ export class DictionaryManagementStore {
       this.#timer = null
     }
 
-    if (this.#abortController !== null) {
-      this.#abortController.abort()
-      this.#abortController = null
+    if (this.#pollAbortController !== null) {
+      this.#pollAbortController.abort()
+      this.#pollAbortController = null
     }
+
+    for (const controller of this.#actionControllers) {
+      controller.abort()
+    }
+    this.#actionControllers.clear()
 
     if (typeof window !== 'undefined') {
       window.removeEventListener('focus', this.#onWindowFocus)

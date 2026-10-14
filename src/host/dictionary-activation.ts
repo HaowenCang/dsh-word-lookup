@@ -30,6 +30,7 @@ import { openProductionDictionary } from './corpus-db.js'
 import type { Dictionary } from './dictionary.js'
 import { DictionaryManager } from './dictionary-manager.js'
 import { openFixtureDictionary } from './fixture-db.js'
+import { FIXTURE_ENTRIES, FIXTURE_FORMS, FIXTURE_VERSION } from './fixture.js'
 import {
   getQuarantineRecord,
 } from './ecdict-importer.js'
@@ -47,6 +48,7 @@ import {
   type HostConfig,
 } from './config.js'
 import type {
+  FixtureCorpusInfo,
   InstalledCorpusInfo,
   ManagementErrorCode,
 } from '../shared/dictionary-management-protocol.js'
@@ -122,6 +124,7 @@ export interface ActivationStateSummary {
   readonly activeIdentity: string
   readonly installed: boolean
   readonly installedCorpus: InstalledCorpusInfo | null
+  readonly fixtureStats: FixtureCorpusInfo
   readonly quarantined: boolean
   readonly quarantineReason: string | null
   readonly recoveryError: string | null
@@ -817,6 +820,11 @@ export class ActivationCoordinator {
       activeIdentity: snap.identity,
       installed: isInstalled,
       installedCorpus: this.#cachedInstalledCorpus,
+      fixtureStats: Object.freeze({
+        entryCount: FIXTURE_ENTRIES.length,
+        formCount: FIXTURE_FORMS.length,
+        version: FIXTURE_VERSION,
+      }),
       quarantined: quarantineRecord !== null,
       quarantineReason: quarantineRecord?.reason ?? null,
       recoveryError: this.#recoveryError,

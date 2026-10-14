@@ -197,6 +197,7 @@ export function createStatusHandler(
         activeIdentity: summary.activeIdentity,
         installed: summary.installed,
         installedCorpus: summary.installedCorpus,
+        fixtureStats: summary.fixtureStats,
         currentOperation: currentOp,
         lastOperation: lastOp,
         canInstall,
