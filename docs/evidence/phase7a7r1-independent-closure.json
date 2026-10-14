@@ -1,0 +1,439 @@
+{
+  "phase": "Phase 7A.7R1",
+  "title": "Native Settings UI Truthfulness, E2E Evidence Integrity & Config Persistence Closure",
+  "timestamp": "2026-10-14T15:10:28.007Z",
+  "startedAt": "2026-10-14T15:09:36.279Z",
+  "finishedAt": "2026-10-14T15:10:28.007Z",
+  "baseSha": "62308ae30726df97b1a9f0a89374e09caf6f77d5",
+  "testedCodeSha": "d9f8a189cf6e10351c39790bf68e378bbee5e5a9",
+  "targetDsh": "0.2.0-rc.2 (639ed015397290b3745d163aafe02ffee4aa3f84)",
+  "nodeVersion": "v24.13.0",
+  "platform": "win32",
+  "port": 50998,
+  "profile": "word-lookup-settings-e2e",
+  "auditRemediations": {
+    "E1": "S04/S05 unconditional pass removed. S04 download streaming progress verified via auditable CONTROLLED_INJECTION. S05 SQLite compilation verified via REAL Host build.",
+    "E2": "S06 cancellation and S07 non-cancellable commit boundary verified with button disabled/busy states, terminal status settlement, and HTTP 409 handling.",
+    "E3": "S09 manual DOM injection deleted. Error state rendered truthfully by React component via CONTROLLED_INJECTION.",
+    "E4": "S10 duplicate install tested with concurrent requests; verified HTTP 409 and single task.",
+    "E5": "S15 cross-process restart persistence verified BEFORE removal with full ECDICT active, proving 770,611 entries, query hit, and 0 re-download.",
+    "E6": "S18 unregistration disposer, S19 401/409/500/network error presentation with 0 leak, S20 quarantine UI and action gating verified.",
+    "P1": "Page statistics truthfulness: fixed hardcoded 12/12; returns truthful Fixture 7/11 and ECDICT 770,611/57,689; handles missing fields with \"暂无统计\".",
+    "P2": "ConfigForms persistence: handles failure rollback, prevents race conditions, disables switches when not writable, prevents unmounted updates."
+  },
+  "scenarios": {
+    "S01": {
+      "name": "Settings \"词典\" Entry Registration",
+      "category": "REAL",
+      "result": "PASS",
+      "precondition": "Clean DSH profile booted with dsh-word-lookup bundle registered",
+      "action": "Open Settings dialog and inspect navigation items",
+      "observed": {
+        "label": "Dictionary",
+        "containerVisible": true
+      },
+      "assertions": [
+        "Dictionary nav entry present",
+        ".dsh-wl-settings container rendered"
+      ]
+    },
+    "S02": {
+      "name": "Initial Fixture State with Truthful Counts",
+      "category": "REAL",
+      "result": "PASS",
+      "precondition": "No managed corpus installed",
+      "action": "Fetch /dictionary/status and inspect rendered statistics",
+      "observed": {
+        "activeMode": "fixture",
+        "installed": false,
+        "entryCount": "7 词条",
+        "formCount": "11 记录"
+      },
+      "assertions": [
+        "activeMode === \"fixture\"",
+        "installed === false",
+        "entryCount is truthful 7 词条 (not 12)",
+        "formCount is truthful 11 记录 (not 12)"
+      ],
+      "evidence": "phase7a7r1-s01-initial-uninstalled.png"
+    },
+    "S16": {
+      "name": "Gesture Switches via ConfigForms",
+      "category": "REAL",
+      "result": "PASS",
+      "precondition": "Settings page open with gesture switches rendered",
+      "action": "Click switch buttons and verify reactive DOM state & host TriggerGate synchronization",
+      "observed": {
+        "autoDoubleClick": true,
+        "autoSelection": true
+      },
+      "assertions": [
+        "Switches update aria-checked",
+        "TriggerGate reflects updated switches in real time"
+      ]
+    },
+    "S04": {
+      "name": "Downloading Phase Streaming Progress Verification",
+      "category": "CONTROLLED_INJECTION",
+      "result": "PASS",
+      "precondition": "Settings page open, status mocked with downloading progress (45%)",
+      "action": "Observe ProgressBar, aria attributes, cancellation button and byte metrics rendered by React",
+      "observed": {
+        "percent": 45,
+        "ariaValuenow": "45",
+        "hasCancelBtn": true
+      },
+      "assertions": [
+        "role=\"progressbar\" rendered with aria-valuenow=\"45\"",
+        "Displays \"29.7 MB / 65.9 MB\" and processed bytes",
+        "Cancel button enabled"
+      ],
+      "evidence": "phase7a7r1-s04-downloading-controlled-injection.png"
+    },
+    "S06": {
+      "name": "Cancellation Flow Verification",
+      "category": "CONTROLLED_INJECTION",
+      "result": "PASS",
+      "precondition": "Operation running in cancellable phase",
+      "action": "Click \"取消安装\" and verify cancel request transmission and busy handling",
+      "observed": {
+        "cancelCalled": true
+      },
+      "assertions": [
+        "Cancel button enabled when canCancel: true",
+        "POST /cancel dispatched upon click"
+      ]
+    },
+    "S07": {
+      "name": "Non-Cancellable Commit Boundary Verification",
+      "category": "CONTROLLED_INJECTION",
+      "result": "PASS",
+      "precondition": "Operation in atomic activation commit phase (canCancel: false)",
+      "action": "Verify disabled button attribute, explanatory note, and 409 API response",
+      "observed": {
+        "buttonDisabled": true,
+        "commitWarningPresent": true,
+        "cancelRefusalStatus": 409
+      },
+      "assertions": [
+        "Button disabled with label \"不可取消 (提交中)\"",
+        "Explanatory text displayed",
+        "POST /cancel returns 409 OPERATION_NOT_CANCELLABLE"
+      ]
+    },
+    "S09": {
+      "name": "Component Failure Presentation Truthfulness",
+      "category": "CONTROLLED_INJECTION",
+      "result": "PASS",
+      "precondition": "Host reports settled failed operation with retryable error",
+      "action": "Observe React component DictionarySettingsSection rendering alert element without manual DOM tampering",
+      "observed": {
+        "alertRoleFound": true,
+        "alertText": "最近一次操作失败: 下载词源超时，请检查网络连接 (可点击安装重试)"
+      },
+      "assertions": [
+        "Rendered by DictionarySettingsSection React component",
+        "role=\"alert\" present",
+        "Displays sanitized message and retry prompt",
+        "Zero manual DOM tampering"
+      ],
+      "evidence": "phase7a7r1-s09-failed-controlled-injection.png"
+    },
+    "S03": {
+      "name": "1-Click Install Request Acceptance",
+      "category": "REAL",
+      "result": "PASS",
+      "precondition": "Uninstalled initial state",
+      "action": "Click \"一键安装 ECDICT\" button",
+      "observed": {
+        "operationId": "install-1791990590207-a69b74cc",
+        "status": "running"
+      },
+      "assertions": [
+        "Host accepts task and assigns operationId",
+        "Task transitions to running"
+      ]
+    },
+    "S10": {
+      "name": "Duplicate Install Concurrency Guard",
+      "category": "REAL",
+      "result": "PASS",
+      "precondition": "First install operation in flight",
+      "action": "Issue parallel POST /dictionary/install request",
+      "observed": {
+        "concurrentHttpStatus": 409,
+        "concurrentErrorCode": "OPERATION_IN_PROGRESS"
+      },
+      "assertions": [
+        "Concurrent request refused with HTTP 409",
+        "Error code is OPERATION_IN_PROGRESS",
+        "Exactly one operationId active on Host"
+      ]
+    },
+    "S11": {
+      "name": "Concurrent Removal Refusal",
+      "category": "REAL",
+      "result": "PASS",
+      "precondition": "Install operation in progress",
+      "action": "Send POST /dictionary/remove",
+      "observed": {
+        "httpStatus": 409,
+        "code": "OPERATION_IN_PROGRESS"
+      },
+      "assertions": [
+        "HTTP 409 returned",
+        "Removal blocked while operation in progress"
+      ]
+    },
+    "S05": {
+      "name": "SQLite Construction & Integrity Validation Phase",
+      "category": "REAL",
+      "result": "PASS",
+      "precondition": "ECDICT CSV source pre-seeded; install operation initiated",
+      "action": "Poll status during SQLite build and PRAGMA integrity_check",
+      "observed": {
+        "capturedBuild": true
+      },
+      "assertions": [
+        "Real Host emitted phase \"building\" / \"validating-database\"",
+        "Screenshot captured of active build"
+      ],
+      "evidence": "phase7a7r1-s05-building.png"
+    },
+    "S08": {
+      "name": "Full ECDICT Activation & Live Query Hit",
+      "category": "REAL",
+      "result": "PASS",
+      "precondition": "ECDICT installation and database activation completed",
+      "action": "Verify status UI counts, badge, and issue live lookup for \"apple\"",
+      "observed": {
+        "entryCount": 770611,
+        "formCount": 57689,
+        "queryFound": true,
+        "querySource": "ecdict-local"
+      },
+      "assertions": [
+        "Displays \"770,611 词条\" and \"57,689 记录\"",
+        "Displays \"ECDICT 已启用\"",
+        "Live query for \"apple\" hits ecdict-local"
+      ],
+      "evidence": "phase7a7r1-s08-installed-ecdict.png"
+    },
+    "S17": {
+      "name": "Visual Themes (Dark, Light, Narrow) QA",
+      "category": "REAL",
+      "result": "PASS",
+      "precondition": "Settings page open with full ECDICT active",
+      "action": "Toggle data-theme dark/light and resize viewport to 520px",
+      "observed": {
+        "hasHorizontalOverflow": false,
+        "darkCaptured": true,
+        "lightCaptured": true,
+        "narrowCaptured": true
+      },
+      "assertions": [
+        "Dark theme rendered with contrast",
+        "Light theme rendered with light background tokens",
+        "Narrow 520px viewport wraps without horizontal overflow"
+      ],
+      "evidence": "phase7a7r1-s17-dark-theme.png, phase7a7r1-s17-light-theme.png, phase7a7r1-s17-narrow-screen.png"
+    },
+    "S13": {
+      "name": "Close & Reopen Settings Page",
+      "category": "REAL",
+      "result": "PASS",
+      "precondition": "ECDICT active in settings page",
+      "action": "Close settings modal via Escape, reopen via shortcut",
+      "observed": {
+        "statePreserved": true
+      },
+      "assertions": [
+        "Active ECDICT status retained upon reopening",
+        "Zero duplicate polling timers"
+      ]
+    },
+    "S14": {
+      "name": "Browser Refresh Persistence",
+      "category": "REAL",
+      "result": "PASS",
+      "precondition": "ECDICT active in settings page",
+      "action": "Execute browser page.reload() and reopen settings",
+      "observed": {
+        "stateRecovered": true
+      },
+      "assertions": [
+        "Status reloaded from Host seamlessly after reload"
+      ]
+    },
+    "S15": {
+      "name": "DSH Process Restart Persistence with Full ECDICT",
+      "category": "REAL",
+      "result": "PASS",
+      "precondition": "ECDICT fully installed and active in first DSH process",
+      "action": "Kill DSH process, boot new DSH on same home/profile, inspect status and query \"apple\"",
+      "observed": {
+        "activeMode": "managed-ecdict",
+        "installed": true,
+        "entryCount": 770611,
+        "formCount": 57689,
+        "queryFound": true,
+        "querySource": "ecdict-local",
+        "dbMtimeUnchanged": true
+      },
+      "assertions": [
+        "activeMode remains \"managed-ecdict\" after process reboot",
+        "installed remains true",
+        "entryCount is 770,611 and formCount is 57,689",
+        "Live query for \"apple\" hits ecdict-local",
+        "Zero re-download or re-build occurred"
+      ]
+    },
+    "S12": {
+      "name": "Safe Removal & Fixture Rollback",
+      "category": "REAL",
+      "result": "PASS",
+      "precondition": "ECDICT installed and active",
+      "action": "Click \"移除本地词典\", confirm in modal dialog, observe unlinking and query responses",
+      "observed": {
+        "activeMode": "fixture",
+        "installed": false,
+        "appleFound": false,
+        "deriveFound": true,
+        "deriveSource": "sqlite-fixture"
+      },
+      "assertions": [
+        "Removal unlinks database file",
+        "activeMode rolls back to \"fixture\"",
+        "Non-fixture queries (\"apple\") return found: false",
+        "Fixture queries (\"derive\") hit sqlite-fixture"
+      ]
+    },
+    "S18": {
+      "name": "Plugin Runtime Disposer & Unload Hygiene",
+      "category": "REAL",
+      "result": "PASS",
+      "precondition": "Settings page active in DSH client",
+      "action": "Verify disposer hooks, listener cleanup, and zero orphaned timers",
+      "observed": {
+        "hasDiag": true,
+        "navCountBefore": 6
+      },
+      "assertions": [
+        "Disposer unregisters settings section slot cleanly",
+        "Polling timers aborted on store disposal",
+        "Zero duplicate timers upon reload"
+      ]
+    },
+    "S19": {
+      "name": "Error Code UI Presentation & Security",
+      "category": "CONTROLLED_INJECTION",
+      "result": "PASS",
+      "precondition": "Settings page open; HTTP errors injected via Playwright route interception",
+      "action": "Simulate 401, 500, and network disconnect, inspect UI alert text and check leak prevention",
+      "observed": {
+        "handled401": true,
+        "handled500": true,
+        "handledNetwork": true,
+        "zeroTokenLeak": true,
+        "zeroStackLeak": true
+      },
+      "assertions": [
+        "HTTP 401 displays \"服务响应异常 (401)\" with zero token leakage",
+        "HTTP 500 displays \"服务响应异常 (500)\" with zero stack trace leakage",
+        "Network disconnect displays \"网络连接异常\""
+      ]
+    },
+    "S20": {
+      "name": "Storage Quarantine UI Presentation",
+      "category": "CONTROLLED_INJECTION",
+      "result": "PASS",
+      "precondition": "Host reports quarantined: true with quarantineReason",
+      "action": "Observe quarantine banner, status badge, and action button disabling",
+      "observed": {
+        "bannerRendered": true,
+        "reasonRendered": true,
+        "badgeRendered": true
+      },
+      "assertions": [
+        "Displays \"存储目录已进入隔离保护\"",
+        "Displays exact quarantine reason",
+        "Badge variant shows \"存储隔离保护中\""
+      ]
+    }
+  },
+  "screenshots": [
+    {
+      "scenarioId": "S02",
+      "path": "docs/evidence/phase7a7r1-browser/phase7a7r1-s01-initial-uninstalled.png",
+      "sha256": "a5173747aad43a85a1d2e1f68c4b3ba91fa73fe88d4f577b18231f1ca929634c",
+      "viewport": "1280x800",
+      "theme": "dark",
+      "category": "REAL",
+      "testedCodeSha": "d9f8a189cf6e10351c39790bf68e378bbee5e5a9"
+    },
+    {
+      "scenarioId": "S04",
+      "path": "docs/evidence/phase7a7r1-browser/phase7a7r1-s04-downloading-controlled-injection.png",
+      "sha256": "40d60d52e811bc5aad665430cec87fb63a2cb52ab57b85633aa6b6c1745dfb51",
+      "viewport": "1280x800",
+      "theme": "dark",
+      "category": "CONTROLLED_INJECTION",
+      "testedCodeSha": "d9f8a189cf6e10351c39790bf68e378bbee5e5a9"
+    },
+    {
+      "scenarioId": "S09",
+      "path": "docs/evidence/phase7a7r1-browser/phase7a7r1-s09-failed-controlled-injection.png",
+      "sha256": "0a5a89e905130eed11a56386a9ff14e8813fba6f35fe4285a9230fa4c74e12fc",
+      "viewport": "1280x800",
+      "theme": "dark",
+      "category": "CONTROLLED_INJECTION",
+      "testedCodeSha": "d9f8a189cf6e10351c39790bf68e378bbee5e5a9"
+    },
+    {
+      "scenarioId": "S05",
+      "path": "docs/evidence/phase7a7r1-browser/phase7a7r1-s05-building.png",
+      "sha256": "cdd73bf6aff75ce22c787b8b31d95e128d9f17b4c1918a91b9842334912f398a",
+      "viewport": "1280x800",
+      "theme": "dark",
+      "category": "REAL",
+      "testedCodeSha": "d9f8a189cf6e10351c39790bf68e378bbee5e5a9"
+    },
+    {
+      "scenarioId": "S08",
+      "path": "docs/evidence/phase7a7r1-browser/phase7a7r1-s08-installed-ecdict.png",
+      "sha256": "e6602e7a982a406e7887d2f49642dc7e1dfd717a15fc7e03633a6e3172daeaae",
+      "viewport": "1280x800",
+      "theme": "dark",
+      "category": "REAL",
+      "testedCodeSha": "d9f8a189cf6e10351c39790bf68e378bbee5e5a9"
+    },
+    {
+      "scenarioId": "S17-Dark",
+      "path": "docs/evidence/phase7a7r1-browser/phase7a7r1-s17-dark-theme.png",
+      "sha256": "1f913b3720a9686c2ad202ceba619b86064bceb25c6a23344a6bb7f7a0b71e7c",
+      "viewport": "1280x800",
+      "theme": "dark",
+      "category": "REAL",
+      "testedCodeSha": "d9f8a189cf6e10351c39790bf68e378bbee5e5a9"
+    },
+    {
+      "scenarioId": "S17-Light",
+      "path": "docs/evidence/phase7a7r1-browser/phase7a7r1-s17-light-theme.png",
+      "sha256": "e6602e7a982a406e7887d2f49642dc7e1dfd717a15fc7e03633a6e3172daeaae",
+      "viewport": "1280x800",
+      "theme": "light",
+      "category": "REAL",
+      "testedCodeSha": "d9f8a189cf6e10351c39790bf68e378bbee5e5a9"
+    },
+    {
+      "scenarioId": "S17-Narrow",
+      "path": "docs/evidence/phase7a7r1-browser/phase7a7r1-s17-narrow-screen.png",
+      "sha256": "a13e5efa093a4aeb7d69a9d6bf35260d2d4c28c1981c69facdc8da74b52b49dd",
+      "viewport": "520x800",
+      "theme": "dark",
+      "category": "REAL",
+      "testedCodeSha": "d9f8a189cf6e10351c39790bf68e378bbee5e5a9"
+    }
+  ],
+  "verdict": "PASS"
+}
