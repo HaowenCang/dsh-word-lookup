@@ -162,6 +162,7 @@ export class ActivationCoordinator {
 
   #recoveryPromise: Promise<void> | null = null
   #isRecovering = false
+  #disposed = false
   #recoveryError: string | null = null
   #settingsSyncState: SettingsSyncState = 'pending'
   #settingsSyncError: string | null = null
@@ -187,6 +188,20 @@ export class ActivationCoordinator {
    */
   get manager(): DictionaryManager {
     return this.#manager
+  }
+
+  /**
+   * Return whether the coordinator has been disposed.
+   */
+  get isDisposed(): boolean {
+    return this.#disposed
+  }
+
+  /**
+   * Mark coordinator as disposed, preventing future activations or mutations.
+   */
+  dispose(): void {
+    this.#disposed = true
   }
 
   /**
@@ -435,9 +450,13 @@ export class ActivationCoordinator {
     if (activationHooks?.beforeCommitMetadata) {
       await activationHooks.beforeCommitMetadata()
     }
-    if (signal?.aborted) {
+    if (signal?.aborted || this.#disposed || this.#manager.snapshot().lifecycle === 'closed') {
       publishedDict.close()
-      const err = new Error('The operation was aborted')
+      const err = new Error(
+        this.#disposed || this.#manager.snapshot().lifecycle === 'closed'
+          ? 'Activation cancelled: coordinator is disposed or manager is closed'
+          : 'The operation was aborted',
+      )
       err.name = 'AbortError'
       throw err
     }
@@ -471,6 +490,9 @@ export class ActivationCoordinator {
 
     // 3. Atomically activate in DictionaryManager
     try {
+      if (this.#disposed || this.#manager.snapshot().lifecycle === 'closed') {
+        throw new Error('Activation cancelled: coordinator is disposed or manager is closed')
+      }
       this.#manager.activate({
         mode: 'managed-ecdict',
         identity: buildResult.identity,
@@ -497,10 +519,11 @@ export class ActivationCoordinator {
         try {
           await writeActiveMetadataAtomically(this.#paths, previousMetadata)
         } catch (rollbackErr) {
+          const origMsg = sanitizeErrorMessage(error instanceof Error ? error.message : String(error))
           const rollbackMsg = sanitizeErrorMessage(rollbackErr instanceof Error ? rollbackErr.message : String(rollbackErr))
           this.#lastRollbackError = `Rollback failed: unable to restore previous active metadata: ${rollbackMsg}`
           throw new ActivationRollbackError(
-            `Activation failed and rollback of previous active metadata also failed: ${rollbackMsg}`,
+            `Activation failed (${origMsg}) and rollback of previous active metadata also failed: ${rollbackMsg}`,
             error,
             rollbackErr,
           )

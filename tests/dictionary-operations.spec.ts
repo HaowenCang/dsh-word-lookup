@@ -13,7 +13,7 @@
 
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { EventEmitter } from 'node:events'
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
@@ -28,15 +28,22 @@ import {
   sanitizeErrorMessage,
   _setOperationHooksForTesting,
 } from '../src/host/dictionary-operations.js'
+import { Config } from '../src/host/config.js'
 import {
   ActivationCoordinator,
   _setActivationHooksForTesting,
 } from '../src/host/dictionary-activation.js'
 import { DictionaryManager } from '../src/host/dictionary-manager.js'
 import { openFixtureDictionary } from '../src/host/fixture-db.js'
-import { resolveManagedStoragePaths } from '../src/host/managed-storage.js'
+import {
+  resolveManagedStoragePaths,
+  readActiveMetadata,
+  writeActiveMetadataAtomically,
+  _setStorageFsHooksForTesting,
+} from '../src/host/managed-storage.js'
 import { workerSupervisor, type WorkerLike } from '../src/host/ecdict-integrity-verifier.js'
-import { createCancelHandler } from '../src/host/dictionary-management-route.js'
+import { createCancelHandler, createStatusHandler } from '../src/host/dictionary-management-route.js'
+import { MANAGEMENT_STATUS_PATH } from '../src/host/route.js'
 import * as downloader from '../src/host/ecdict-downloader.js'
 import * as importer from '../src/host/ecdict-importer.js'
 
@@ -92,6 +99,12 @@ function createSyntheticManagedDb(filePath: string): void {
       VALUES ('world', 'wɜːrld', 'the earth with its countries and people', 'n. 世界', 'n', NULL, 200);
     INSERT INTO entries (word, phonetic, definition_en, translation_zh, pos, exchange, frequency)
       VALUES ('test', 'test', 'a procedure intended to establish the quality', 'n. 测试', 'n', NULL, 300);
+    INSERT INTO entries (word, phonetic, definition_en, translation_zh, pos, exchange, frequency)
+      VALUES ('go', 'ɡoʊ', 'to move or travel', 'v. 去', 'v', NULL, 10);
+    INSERT INTO entries (word, phonetic, definition_en, translation_zh, pos, exchange, frequency)
+      VALUES ('derive', 'dɪˈraɪv', 'obtain something from', 'v. 源于', 'v', NULL, 20);
+    INSERT INTO entries (word, phonetic, definition_en, translation_zh, pos, exchange, frequency)
+      VALUES ('wave', 'weɪv', 'move one hand to and fro', 'n. 波浪', 'n', NULL, 30);
     INSERT INTO forms (form, headword, kind) VALUES ('testing', 'test', 'p');
   `)
   db.close()
@@ -1478,6 +1491,368 @@ describe('DictionaryOperationManager', () => {
       expect(canCancelDuringCommit).toBe(false)
       // Once finished, canCancel() must be false
       expect(opMan.canCancel()).toBe(false)
+    })
+  })
+
+  describe('Phase 7A.6R4 Fix F1: Failure Settlement & Commit Boundary Classification (F1-01 to F1-08)', () => {
+    let f1Home: string
+    let f1Paths: ReturnType<typeof resolveManagedStoragePaths>
+    let f1Manager: DictionaryManager
+    let f1Coordinator: ActivationCoordinator
+
+    function createF1SyntheticCandidate(identity = 'f1-test-id'): importer.ManagedEcdictBuildResult {
+      const dbFile = `ecdict-${identity}.sqlite3`
+      const fullDbPath = join(f1Paths.databaseDirectory, dbFile)
+      createSyntheticManagedDb(fullDbPath)
+      return {
+        path: fullDbPath,
+        databaseFile: dbFile,
+        identity,
+        sourceCommit: PINNED_COMMIT,
+        sourceSha256: PINNED_SHA256,
+        entryCount: 6,
+        formCount: 1,
+        exampleCount: 0,
+        ambiguousFormCount: 0,
+        rejectedRowCount: 0,
+        sourceRowCount: 6,
+        byteSize: statSync(fullDbPath).size,
+        schemaVersion: 1,
+        logicalSha256: 'b'.repeat(64),
+        fileSha256: 'c'.repeat(64),
+        yieldCount: 1,
+        postPublicationCleanup: { candidateRemoved: true, sidecarsRemoved: true },
+      }
+    }
+
+    beforeEach(() => {
+      f1Home = mkdtempSync(join(tmpdir(), 'dsh-f1-test-'))
+      f1Paths = resolveManagedStoragePaths({ home: f1Home })
+      mkdirSync(f1Paths.databaseDirectory, { recursive: true })
+      mkdirSync(f1Paths.sourceCacheDirectory, { recursive: true })
+
+      f1Manager = new DictionaryManager({
+        mode: 'fixture',
+        identity: 'fixture',
+        dictionary: openFixtureDictionary(),
+      })
+
+      f1Coordinator = new ActivationCoordinator({
+        paths: f1Paths,
+        manager: f1Manager,
+      })
+
+      vi.spyOn(downloader, 'downloadPinnedEcdict').mockResolvedValue({
+        path: join(f1Home, 'source.csv'),
+        sourceCommit: PINNED_COMMIT,
+        sha256: PINNED_SHA256,
+        byteSize: 100,
+        reused: false,
+        redirectCount: 0,
+      })
+    })
+
+    afterEach(() => {
+      _setStorageFsHooksForTesting(null)
+      _setActivationHooksForTesting(null)
+      _setOperationHooksForTesting(null)
+      try {
+        f1Manager.close()
+      } catch {
+        // ignore
+      }
+      try {
+        rmSync(f1Home, { recursive: true, force: true })
+      } catch {
+        // ignore
+      }
+    })
+
+    it('F1-01: active.json 写入前取消，任务终态为 cancelled', async () => {
+      const candidate = createF1SyntheticCandidate('f1-01')
+      vi.spyOn(importer, 'buildManagedEcdictDatabase').mockResolvedValue(candidate)
+
+      const opMan = new DictionaryOperationManager({ paths: f1Paths, activationCoordinator: f1Coordinator })
+
+      let cancelOutcome: ReturnType<typeof opMan.cancel> | null = null
+      _setActivationHooksForTesting({
+        beforeCommitMetadata: async () => {
+          const current = opMan.getCurrentOperation()
+          if (current) {
+            cancelOutcome = opMan.cancel(current.operationId)
+          }
+        },
+      })
+
+      const op = opMan.install()
+      await opMan.whenSettled()
+
+      expect(cancelOutcome).not.toBeNull()
+      expect(cancelOutcome!.status).toBe('cancelling')
+
+      const last = opMan.getLastOperation()
+      expect(last?.status).toBe('cancelled')
+      expect(last?.phase).toBe('cancelled')
+      expect(last?.operationId).toBe(op.operationId)
+      expect(existsSync(f1Paths.activeMetadataPath)).toBe(false)
+      expect(f1Coordinator.getStatusSummary().activeMode).toBe('fixture')
+    })
+
+    it('F1-02: 已进入 onCommitBoundary，但 active.json 写入失败，任务终态必须为 failed，而非 completed', async () => {
+      const candidate = createF1SyntheticCandidate('f1-02')
+      vi.spyOn(importer, 'buildManagedEcdictDatabase').mockResolvedValue(candidate)
+
+      _setStorageFsHooksForTesting({
+        writeFile: async (filePath) => {
+          if (filePath.includes('active.json')) {
+            throw new Error('EACCES: permission denied writing active metadata')
+          }
+        },
+      })
+
+      const opMan = new DictionaryOperationManager({ paths: f1Paths, activationCoordinator: f1Coordinator })
+      const op = opMan.install()
+      await opMan.whenSettled()
+
+      const last = opMan.getLastOperation()
+      expect(last?.operationId).toBe(op.operationId)
+      expect(last?.status).toBe('failed')
+      expect(last?.phase).toBe('failed')
+      expect(last?.progress.percent).toBeUndefined()
+      expect(last?.error?.message).toContain('Failed to commit active metadata')
+      expect(f1Coordinator.getStatusSummary().installed).toBe(false)
+      expect(f1Coordinator.getStatusSummary().activeMode).toBe('fixture')
+    })
+
+    it('F1-03: active.json 写入成功，但 DictionaryManager.activate 抛错，旧元数据补偿成功，任务终态为 failed', async () => {
+      // 1. Establish initial active metadata with initial database
+      const initialCandidate = createF1SyntheticCandidate('initial-id')
+      await writeActiveMetadataAtomically(f1Paths, {
+        version: 1,
+        activeMode: 'managed-ecdict',
+        identity: 'initial-id',
+        databaseFile: initialCandidate.databaseFile,
+        source: {
+          name: 'ECDICT',
+          commit: PINNED_COMMIT,
+          sha256: PINNED_SHA256,
+          schemaVersion: 1,
+        },
+        lastActivatedAt: new Date().toISOString(),
+        settingsSynced: false,
+        settingsSyncState: 'pending',
+        settingsSyncError: null,
+      })
+
+      const newCandidate = createF1SyntheticCandidate('f1-03')
+      vi.spyOn(importer, 'buildManagedEcdictDatabase').mockResolvedValue(newCandidate)
+
+      // Spy on manager.activate to throw during atomic switch
+      vi.spyOn(f1Manager, 'activate').mockImplementation(() => {
+        throw new Error('Simulated memory fault during manager.activate')
+      })
+
+      const opMan = new DictionaryOperationManager({ paths: f1Paths, activationCoordinator: f1Coordinator })
+      const op = opMan.install()
+      await opMan.whenSettled()
+
+      const last = opMan.getLastOperation()
+      expect(last?.operationId).toBe(op.operationId)
+      expect(last?.status).toBe('failed')
+      expect(last?.phase).toBe('failed')
+      expect(last?.progress.percent).toBeUndefined()
+      expect(last?.error?.message).toContain('Simulated memory fault')
+
+      // Rollback compensation verified: initial metadata restored cleanly
+      const currentMeta = await readActiveMetadata(f1Paths)
+      expect(currentMeta?.identity).toBe('initial-id')
+      expect(f1Coordinator.getStatusSummary().lastRollbackError).toBeNull()
+    })
+
+    it('F1-04: 上述情况中旧元数据补偿也失败，抛出 ActivationRollbackError，任务终态为 failed，保留两个错误原因', async () => {
+      // 1. Establish initial active metadata
+      const initialCandidate = createF1SyntheticCandidate('initial-id-2')
+      await writeActiveMetadataAtomically(f1Paths, {
+        version: 1,
+        activeMode: 'managed-ecdict',
+        identity: 'initial-id-2',
+        databaseFile: initialCandidate.databaseFile,
+        source: {
+          name: 'ECDICT',
+          commit: PINNED_COMMIT,
+          sha256: PINNED_SHA256,
+          schemaVersion: 1,
+        },
+        lastActivatedAt: new Date().toISOString(),
+        settingsSynced: false,
+        settingsSyncState: 'pending',
+        settingsSyncError: null,
+      })
+
+      const newCandidate = createF1SyntheticCandidate('f1-04')
+      vi.spyOn(importer, 'buildManagedEcdictDatabase').mockResolvedValue(newCandidate)
+
+      vi.spyOn(f1Manager, 'activate').mockImplementation(() => {
+        // When activate throws, also inject disk fault for rollback write
+        _setStorageFsHooksForTesting({
+          writeFile: async () => {
+            throw new Error('EIO: secondary disk failure during rollback')
+          },
+        })
+        throw new Error('Primary manager activation failure')
+      })
+
+      const opMan = new DictionaryOperationManager({ paths: f1Paths, activationCoordinator: f1Coordinator })
+      const op = opMan.install()
+      await opMan.whenSettled()
+
+      const last = opMan.getLastOperation()
+      expect(last?.operationId).toBe(op.operationId)
+      expect(last?.status).toBe('failed')
+      expect(last?.phase).toBe('failed')
+      expect(last?.error?.code).toBe('ACTIVATION_ROLLBACK_FAILED')
+      expect(last?.error?.message).toContain('Primary manager activation failure')
+      expect(last?.error?.message).toContain('secondary disk failure during rollback')
+
+      const summary = f1Coordinator.getStatusSummary()
+      expect(summary.lastRollbackError).toContain('Rollback failed')
+    })
+
+    it('F1-05: 正常提交成功，随后调用取消，不能破坏已提交状态', async () => {
+      const candidate = createF1SyntheticCandidate('f1-05')
+      vi.spyOn(importer, 'buildManagedEcdictDatabase').mockResolvedValue(candidate)
+
+      const opMan = new DictionaryOperationManager({ paths: f1Paths, activationCoordinator: f1Coordinator })
+      const op = opMan.install()
+      await opMan.whenSettled()
+
+      expect(opMan.getLastOperation()?.status).toBe('completed')
+      expect(f1Coordinator.getStatusSummary().activeMode).toBe('managed-ecdict')
+      expect(f1Coordinator.getStatusSummary().installed).toBe(true)
+
+      // Attempt cancel after completion
+      const cancelRes = opMan.cancel(op.operationId)
+      expect(cancelRes.status).toBe('cancelling')
+      expect(cancelRes.message).toContain('already finished with status: completed')
+
+      // Assert committed state is fully preserved
+      const last = opMan.getLastOperation()
+      expect(last?.status).toBe('completed')
+      expect(last?.progress.percent).toBe(100)
+      expect(f1Coordinator.getStatusSummary().activeMode).toBe('managed-ecdict')
+      expect(f1Coordinator.getStatusSummary().installed).toBe(true)
+    })
+
+    it('F1-06: 进入不可取消阶段但最终失败，查询 lastOperation 不得出现 progress.percent=100 的成功声明', async () => {
+      const candidate = createF1SyntheticCandidate('f1-06')
+      vi.spyOn(importer, 'buildManagedEcdictDatabase').mockResolvedValue(candidate)
+
+      _setStorageFsHooksForTesting({
+        writeFile: async (filePath) => {
+          if (filePath.includes('active.json')) {
+            throw new Error('ENOSPC: no space left on device')
+          }
+        },
+      })
+
+      const opMan = new DictionaryOperationManager({ paths: f1Paths, activationCoordinator: f1Coordinator })
+      opMan.install()
+      await opMan.whenSettled()
+
+      const last = opMan.getLastOperation()!
+      expect(last.status).toBe('failed')
+      expect(last.phase).toBe('failed')
+      expect(last.progress.percent).toBeUndefined()
+      expect(last.progress.percent).not.toBe(100)
+      expect(last.progress.message).not.toContain('successfully installed')
+      expect(last.progress.message).toContain('ENOSPC')
+    })
+
+    it('F1-07: 通过真实管理路由模拟提交后失败，状态 API 不得将 failed 报为 completed', async () => {
+      const candidate = createF1SyntheticCandidate('f1-07')
+      vi.spyOn(importer, 'buildManagedEcdictDatabase').mockResolvedValue(candidate)
+
+      _setStorageFsHooksForTesting({
+        writeFile: async (filePath) => {
+          if (filePath.includes('active.json')) {
+            throw new Error('EACCES: permission denied')
+          }
+        },
+      })
+
+      const opMan = new DictionaryOperationManager({ paths: f1Paths, activationCoordinator: f1Coordinator })
+      opMan.install()
+      await opMan.whenSettled()
+
+      const statusHandler = createStatusHandler(opMan, f1Coordinator)
+      const res = await statusHandler(new Request('http://localhost' + MANAGEMENT_STATUS_PATH, { method: 'GET' }))
+      expect(res.status).toBe(200)
+
+      const body = await res.json()
+      expect(body.ok).toBe(true)
+      expect(body.lastOperation).not.toBeNull()
+      expect(body.lastOperation.status).toBe('failed')
+      expect(body.lastOperation.status).not.toBe('completed')
+      expect(body.installed).toBe(false)
+      expect(body.activeMode).toBe('fixture')
+    })
+
+    it('F1-08: 失败后的模拟重启，确认实际恢复状态与 metadata 相符', async () => {
+      // 1. First scenario: failure with rollback restoring previous metadata
+      const initialCandidate = createF1SyntheticCandidate('f1-08-initial')
+      await writeActiveMetadataAtomically(f1Paths, {
+        version: 1,
+        activeMode: 'managed-ecdict',
+        identity: 'f1-08-initial',
+        databaseFile: initialCandidate.databaseFile,
+        source: {
+          name: 'ECDICT',
+          commit: PINNED_COMMIT,
+          sha256: PINNED_SHA256,
+          schemaVersion: 1,
+        },
+        lastActivatedAt: new Date().toISOString(),
+        settingsSynced: true,
+        settingsSyncState: 'synced',
+        settingsSyncError: null,
+      })
+
+      const failCandidate = createF1SyntheticCandidate('f1-08-fail')
+      vi.spyOn(importer, 'buildManagedEcdictDatabase').mockResolvedValue(failCandidate)
+      vi.spyOn(f1Manager, 'activate').mockImplementation(() => {
+        throw new Error('Simulated activation error for reboot test')
+      })
+
+      const opMan = new DictionaryOperationManager({ paths: f1Paths, activationCoordinator: f1Coordinator })
+      opMan.install()
+      await opMan.whenSettled()
+
+      expect(opMan.getLastOperation()?.status).toBe('failed')
+
+      // 2. Simulate process reboot with fresh manager and fresh coordinator on same storage
+      const rebootManager = new DictionaryManager({
+        mode: 'fixture',
+        identity: 'fixture',
+        dictionary: openFixtureDictionary(),
+      })
+      try {
+        const rebootCoordinator = new ActivationCoordinator({
+          paths: f1Paths,
+          manager: rebootManager,
+          config: Config({ dictionaryMode: 'managed-ecdict' }),
+        })
+
+        await rebootCoordinator.recoverOnStartup()
+        const rebootSummary = rebootCoordinator.getStatusSummary()
+
+        // Restored metadata correctly recovered upon reboot
+        expect(rebootSummary.activeMode).toBe('managed-ecdict')
+        expect(rebootSummary.activeIdentity).toBe('f1-08-initial')
+        expect(rebootSummary.installed).toBe(true)
+        expect(rebootSummary.recoveryError).toBeNull()
+      } finally {
+        rebootManager.close()
+      }
     })
   })
 })

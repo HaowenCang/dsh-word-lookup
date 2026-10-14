@@ -106,6 +106,14 @@ export declare class ActivationCoordinator {
      */
     get manager(): DictionaryManager;
     /**
+     * Return whether the coordinator has been disposed.
+     */
+    get isDisposed(): boolean;
+    /**
+     * Mark coordinator as disposed, preventing future activations or mutations.
+     */
+    dispose(): void;
+    /**
      * Return whether startup recovery is currently in flight.
      */
     get isRecovering(): boolean;

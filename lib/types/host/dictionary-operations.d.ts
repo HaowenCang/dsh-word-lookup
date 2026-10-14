@@ -128,6 +128,11 @@ export declare class DictionaryOperationManager {
      */
     getDrainSummary(): OperationDrainSummary | null;
     /**
+     * Return a promise that settles when all current in-flight operations (install and remove) settle.
+     * Resolves immediately if no operations are active.
+     */
+    whenSettled(): Promise<void>;
+    /**
      * Check whether an installation operation can currently be accepted.
      */
     canInstall(): boolean;

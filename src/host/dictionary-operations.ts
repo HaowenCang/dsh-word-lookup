@@ -251,6 +251,22 @@ export class DictionaryOperationManager {
   }
 
   /**
+   * Return a promise that settles when all current in-flight operations (install and remove) settle.
+   * Resolves immediately if no operations are active.
+   */
+  async whenSettled(): Promise<void> {
+    const promises: Promise<unknown>[] = []
+    if (this.#currentOp) {
+      promises.push(this.#currentOp.promise)
+    }
+    if (this.#activeRemove) {
+      promises.push(this.#activeRemove.promise)
+    }
+    if (promises.length === 0) return
+    await Promise.allSettled(promises)
+  }
+
+  /**
    * Check whether an installation operation can currently be accepted.
    */
   canInstall(): boolean {
@@ -530,8 +546,33 @@ export class DictionaryOperationManager {
    * @param timeoutMs - maximum wait duration for active worker/download drainage (defaults to 5000ms).
    */
   async dispose(timeoutMs = 5000): Promise<void> {
-    if (this.#disposed) return
+    if (this.#disposed) {
+      if (this.isBusy() || (this.#drainSummary && !this.#drainSummary.workflowSettled)) {
+        if (this.isBusy()) {
+          let retryTimer: NodeJS.Timeout | undefined
+          const retryTimeoutPromise = new Promise<'timeout'>((resolve) => {
+            retryTimer = setTimeout(() => resolve('timeout'), timeoutMs)
+          })
+          try {
+            const outcome = await Promise.race([
+              this.whenSettled().then(() => 'settled' as const),
+              retryTimeoutPromise,
+            ])
+            if (outcome === 'timeout') {
+              throw new OperationDrainTimeoutError(timeoutMs, this.#drainSummary?.error)
+            }
+          } finally {
+            if (retryTimer) clearTimeout(retryTimer)
+          }
+        }
+        if (this.#drainSummary && !this.#drainSummary.workflowSettled) {
+          throw new OperationDrainTimeoutError(timeoutMs, this.#drainSummary?.error)
+        }
+      }
+      return
+    }
     this.#disposed = true
+    this.#activationCoordinator.dispose?.()
 
     const isQuar = this.#paths ? isDatabaseDirectoryQuarantined(this.#paths.databaseDirectory) : false
 
@@ -719,7 +760,6 @@ export class DictionaryOperationManager {
         signal,
         onCommitBoundary: () => {
           ctx.nonCancellable = true
-          committed = true
         },
       })
       committed = true
@@ -732,19 +772,11 @@ export class DictionaryOperationManager {
         message: `ECDICT corpus successfully installed (${buildResult.entryCount.toLocaleString()} entries)`,
       })
     } catch (error) {
-      if (!committed && (signal.aborted || this.#isAbortError(error))) {
+      if (!committed && !ctx.nonCancellable && (signal.aborted || this.#isAbortError(error))) {
         this.#settleOperation(ctx, 'cancelled', 'cancelled', {
           phase: 'cancelled',
           unit: 'steps',
           message: 'Operation cancelled by user before commit point',
-        })
-      } else if (committed) {
-        // Committed before cancellation was processed: remains completed
-        this.#settleOperation(ctx, 'completed', 'completed', {
-          phase: 'completed',
-          percent: 100,
-          unit: 'steps',
-          message: `ECDICT corpus successfully installed (${buildResult?.entryCount ?? 0} entries)`,
         })
       } else {
         const errorRecord = this.#formatError(error)

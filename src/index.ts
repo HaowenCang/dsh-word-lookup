@@ -281,6 +281,14 @@ export function apply(ctx: Context, config: HostConfig): void {
       logger: (ctx as { logger?: DictionaryOperationManagerOptions['logger'] }).logger,
     })
 
+    if ((ctx as { _testInstances?: unknown })._testInstances) {
+      Object.assign((ctx as unknown as { _testInstances: Record<string, unknown> })._testInstances, {
+        manager,
+        coordinator,
+        operationManager,
+      })
+    }
+
     // Initiate startup recovery check
     const recoveryPromise = coordinator.recoverOnStartup().catch(() => {
       // Recovery errors are tracked inside coordinator diagnostic state
@@ -304,6 +312,7 @@ export function apply(ctx: Context, config: HostConfig): void {
       try { void disposeManagement?.() } catch { /* ignore */ }
       try { void disposeLookup?.() } catch { /* ignore */ }
       void operationManager.dispose()
+      coordinator.dispose()
       manager.close()
       throw error
     }
@@ -326,15 +335,39 @@ export function apply(ctx: Context, config: HostConfig): void {
       } catch (err) {
         errors.push(err)
       }
+
+      let drained = false
       try {
-        await operationManager.dispose()
+        const drainTimeoutMs = (ctx as { drainTimeoutMs?: number }).drainTimeoutMs ?? 5000
+        await operationManager.dispose(drainTimeoutMs)
+        drained = true
       } catch (err) {
         errors.push(err)
       }
+
       try {
-        manager.close()
+        coordinator.dispose()
       } catch (err) {
         errors.push(err)
+      }
+
+      if (drained && !operationManager.isBusy()) {
+        try {
+          manager.close()
+        } catch (err) {
+          errors.push(err)
+        }
+      } else {
+        // Drain timed out or operations are still in flight.
+        // DO NOT close manager now: in-flight operations may still be referencing or dependent on manager.
+        // Premature manager closure is avoided, and deferred closure runs once in-flight tasks settle.
+        void operationManager.whenSettled().finally(() => {
+          try {
+            manager.close()
+          } catch {
+            // ignore deferred cleanup errors
+          }
+        })
       }
 
       if (errors.length > 0) {
