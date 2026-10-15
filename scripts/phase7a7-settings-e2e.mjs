@@ -844,24 +844,19 @@ async function main() {
     console.log('Testing UI rapid double-click on "一键安装 ECDICT"...')
     let secondClickBlocked = false
     try {
-      const click1 = installBtn.click({ timeout: 2500 })
-      const click2 = installBtn.click({ timeout: 2500, force: false })
-      await Promise.all([click1, click2])
+      await installBtn.dblclick({ timeout: 2000 })
     } catch (err) {
       secondClickBlocked = true
-      console.log('Second click was rejected or blocked by UI disabled state:', err.message)
+      console.log('Rapid double click handled:', err.message)
     }
 
-    // Wait briefly for network activity to settle
-    await page.waitForTimeout(600)
-    console.log(`UI button rapid clicks resulted in ${uiInstallRequests.length} outgoing POST request(s)`)
-    expectTrue(uiInstallRequests.length <= 1, `UI prevented duplicate task submission (dispatched ${uiInstallRequests.length} POSTs)`)
+    // Wait briefly for UI click request to register
+    await page.waitForTimeout(100)
+    const uiDispatchedCount = uiInstallRequests.length
+    console.log(`UI button rapid clicks resulted in ${uiDispatchedCount} outgoing POST request(s)`)
+    expectTrue(uiDispatchedCount === 1, `UI prevented duplicate task submission (dispatched exactly 1 POST, got ${uiDispatchedCount})`)
 
-    // Verify button became disabled / busy in the React UI
-    const isBtnDisabled = await installBtn.isDisabled().catch(() => true)
-    console.log(`Button disabled state during action: ${isBtnDisabled}`)
-
-    // Now while the install is running, test Host concurrency guard via parallel POST to verify Host HTTP 409
+    // Immediately test Host concurrency mutex while operation is in flight
     console.log('Testing Host-level concurrency guard via parallel POST request...')
     const concurrentPostResult = await page.evaluate(async () => {
       const res = await fetch('api/dsh-word-lookup/dictionary/install', { method: 'POST' })
@@ -870,6 +865,10 @@ async function main() {
     console.log(`Concurrent POST result: ${concurrentPostResult.status}, error=${concurrentPostResult.body?.error}`)
     expectTrue(concurrentPostResult.status === 409, 'Concurrent duplicate request refused by Host with HTTP 409')
     expectTrue(concurrentPostResult.body?.error === 'OPERATION_IN_PROGRESS', 'Refusal code is OPERATION_IN_PROGRESS')
+
+    // Verify UI entered running state (install button unmounted or disabled, progress displayed)
+    const installBtnVisible = await page.locator('button:has-text("一键安装 ECDICT")').isVisible().catch(() => false)
+    expectTrue(!installBtnVisible, 'Install button replaced by active progress UI')
 
     page.off('request', installRequestListener)
 
