@@ -333,6 +333,10 @@ export interface WordLookupDiagnostics {
   lastOutcome(): string | null
   /** Write one switch through the same form the settings UI uses. */
   set(field: keyof HostSettings, value: unknown): Promise<boolean>
+  /** Dispose all client registrations and release all resources (equivalent to Cordis plugin unload). */
+  unload?(): void
+  /** Unload and re-apply client plugin runtime, proving reload idempotence and zero duplicate state. */
+  reload?(): void
 }
 
 /** The global slot the diagnostics object occupies. */
@@ -743,6 +747,19 @@ function createRuntime(ctx: ClientContext): () => void {
         lastContext: lastShortcutContext,
       }),
       set: (field, value) => form.set(field, value),
+      unload: () => {
+        lookup.dispose()
+        store.clear()
+        disposer.disposeAll()
+      },
+      reload: () => {
+        lookup.dispose()
+        store.clear()
+        disposer.disposeAll()
+        if (lastClientContext) {
+          apply(lastClientContext)
+        }
+      },
     }
     Reflect.set(globalThis, DIAGNOSTICS_KEY, diagnostics)
     disposer.add(() => {
@@ -762,6 +779,8 @@ function createRuntime(ctx: ClientContext): () => void {
   }
 }
 
+let lastClientContext: ClientContext | null = null
+
 /**
  * Apply the plugin's browser contributions.
  *
@@ -771,5 +790,6 @@ function createRuntime(ctx: ClientContext): () => void {
  * @param ctx - the client root context DSH hands to a browser plugin.
  */
 export function apply(ctx: ClientContext): void {
+  lastClientContext = ctx
   ctx.effect(() => createRuntime(ctx), 'dsh-word-lookup: client runtime')
 }

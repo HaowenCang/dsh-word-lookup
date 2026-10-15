@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 /**
  * Component and visual hierarchy unit tests for DictionarySettingsSection.
  *
@@ -11,7 +12,10 @@
  * - Zero undefined, null, or [object Object] artifacts in rendered output.
  */
 
-import React from 'react'
+;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+
+import React, { act } from 'react'
+import { createRoot } from 'react-dom/client'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -58,6 +62,13 @@ function createMockForm(initial: DictionaryHostSettings = {}) {
   let value = { ...initial }
   const listeners = new Set<() => void>()
   return {
+    get value() {
+      return value
+    },
+    set value(v: DictionaryHostSettings) {
+      value = v
+    },
+    listeners,
     getSnapshot: () => ({
       status: 'ready' as const,
       mode: 'normal' as const,
@@ -75,6 +86,51 @@ function createMockForm(initial: DictionaryHostSettings = {}) {
       return () => listeners.delete(fn)
     },
   }
+}
+
+function mountSection(props: {
+  storeState?: Partial<DictionaryStatusResponse>
+  store?: DictionaryManagementStore
+  form?: ReturnType<typeof createMockForm>
+  platform?: 'windows' | 'macos' | 'linux'
+}) {
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+
+  const mockStore = props.store ?? new DictionaryManagementStore({ autoStart: false })
+  if (!props.store) {
+    const status = createStatus(props.storeState)
+    vi.spyOn(mockStore, 'getSnapshot').mockReturnValue({
+      status,
+      isLoading: false,
+      isActing: false,
+      actionError: null,
+      connectionError: null,
+      lastRefreshedAt: 1000,
+    })
+  }
+
+  const render = async () => {
+    await act(async () => {
+      root.render(
+        React.createElement(DictionarySettingsSection, {
+          store: mockStore,
+          form: props.form as never,
+          testPlatform: props.platform ?? 'windows',
+        }),
+      )
+    })
+  }
+
+  const unmount = async () => {
+    await act(async () => {
+      root.unmount()
+    })
+    container.remove()
+  }
+
+  return { container, root, render, unmount, store: mockStore }
 }
 
 function renderSection(props: {
@@ -401,22 +457,76 @@ describe('DictionarySettingsSection Rendering', () => {
   })
 
   describe('P2 — ConfigForms Persistence & Robustness', () => {
-    it('P2-01: Successful write updates page and syncs with ConfigForms snapshot', () => {
-      const form = createMockForm({ autoDoubleClick: true, autoSelection: false })
-      const html = renderSection({ form })
-      expect(html).toContain('id="switch-auto-double-click"')
-      expect(html).toContain('id="switch-auto-selection"')
-      // Double click is checked
-      expect(html).toMatch(/id="switch-auto-double-click"[^>]*aria-checked="true"/)
-      expect(html).toMatch(/id="switch-auto-selection"[^>]*aria-checked="false"/)
+    it('P2-01: Successful write updates page and syncs with ConfigForms snapshot', async () => {
+      const form = createMockForm({ autoDoubleClick: false, autoSelection: false })
+      const { container, render, unmount } = mountSection({ form })
+      await render()
+
+      const switchDbl = container.querySelector('#switch-auto-double-click') as HTMLButtonElement
+      const switchSel = container.querySelector('#switch-auto-selection') as HTMLButtonElement
+      expect(switchDbl).toBeTruthy()
+      expect(switchSel).toBeTruthy()
+      expect(switchDbl.getAttribute('aria-checked')).toBe('false')
+      expect(switchSel.getAttribute('aria-checked')).toBe('false')
+
+      // Trigger interactive switch toggle
+      await act(async () => {
+        switchDbl.click()
+      })
+
+      // Form set called with new value and snapshot updated
+      expect(form.set).toHaveBeenCalledWith('autoDoubleClick', true)
+      expect(form.getSnapshot().value.autoDoubleClick).toBe(true)
+      expect(switchDbl.getAttribute('aria-checked')).toBe('true')
+
+      await unmount()
     })
 
-    it('P2-02: Form set refusal or throw displays error notice without faking saved state', () => {
+    it('P2-02: Form set refusal or throw displays error notice without faking saved state', async () => {
       const form = createMockForm({ autoDoubleClick: false })
+      // Case A: Host returns false (write refused by Host)
       form.set = vi.fn().mockResolvedValue(false)
-      const html = renderSection({ form })
-      // Switches remain false when set refuses
-      expect(html).toMatch(/id="switch-auto-double-click"[^>]*aria-checked="false"/)
+
+      const { container, render, unmount } = mountSection({ form })
+      await render()
+
+      const switchBtn = container.querySelector('#switch-auto-double-click') as HTMLButtonElement
+      expect(switchBtn).toBeTruthy()
+      expect(switchBtn.getAttribute('aria-checked')).toBe('false')
+
+      // Click switch to trigger toggle interaction
+      await act(async () => {
+        switchBtn.click()
+      })
+
+      // form.set was actively called with intended target state
+      expect(form.set).toHaveBeenCalledWith('autoDoubleClick', true)
+
+      // Switch must remain false because Host refused modification
+      expect(switchBtn.getAttribute('aria-checked')).toBe('false')
+
+      // Error alert must be rendered in UI and visible to user
+      let alertEl = container.querySelector('[role="alert"]')
+      expect(alertEl).toBeTruthy()
+      expect(alertEl?.textContent).toContain('保存双击查词设置失败：Host 拒绝了修改，已恢复原有配置')
+
+      // Form snapshot remains authoritative false
+      expect(form.getSnapshot().value.autoDoubleClick).toBe(false)
+
+      // Case B: Host throws exception during save
+      // Wait >80ms so Switch throttle does not drop the click
+      await new Promise((r) => setTimeout(r, 100))
+      form.set = vi.fn().mockRejectedValue(new Error('IPC transport disconnected'))
+      await act(async () => {
+        switchBtn.click()
+      })
+
+      // Switch still false, not faking saved state
+      expect(switchBtn.getAttribute('aria-checked')).toBe('false')
+      alertEl = container.querySelector('[role="alert"]')
+      expect(alertEl?.textContent).toContain('保存双击查词设置异常: IPC transport disconnected')
+
+      await unmount()
     })
 
     it('P2-03: Switch is disabled when ConfigForms is unavailable or not writable', () => {
@@ -435,21 +545,69 @@ describe('DictionarySettingsSection Rendering', () => {
     })
 
     it('P2-04: Rapid toggle ordering rejects stale out-of-order write settlement', async () => {
-      const form = createMockForm({ autoDoubleClick: false })
-      let resolveFirst: (v: boolean) => void = () => {}
-      const firstPromise = new Promise<boolean>((res) => {
-        resolveFirst = res
-      })
+      let virtualNow = 1000
+      const dateSpy = vi.spyOn(Date, 'now').mockImplementation(() => virtualNow)
 
-      form.set = vi
-        .fn()
-        .mockImplementationOnce(() => firstPromise)
-        .mockResolvedValueOnce(true)
+      try {
+        const form = createMockForm({ autoDoubleClick: false })
 
-      // Initial render
-      const html = renderSection({ form })
-      expect(html).toContain('id="switch-auto-double-click"')
-      resolveFirst(true)
+        let resolveFirst: (v: boolean) => void = () => {}
+        const firstPromise = new Promise<boolean>((res) => {
+          resolveFirst = res
+        })
+
+        // First call hangs; second call resolves immediately with true
+        form.set = vi
+          .fn()
+          .mockImplementationOnce(() => firstPromise)
+          .mockImplementationOnce(async (key, val) => {
+            form.value = { ...form.value, [key]: val }
+            for (const l of form.listeners) l()
+            return true
+          })
+
+        const { container, render, unmount } = mountSection({ form })
+        await render()
+
+        const switchBtn = container.querySelector('#switch-auto-double-click') as HTMLButtonElement
+        expect(switchBtn.getAttribute('aria-checked')).toBe('false')
+
+        // Trigger two rapid toggles before the React state update settles
+        // Both clicks fired in one act block before microtasks flush
+        act(() => {
+          switchBtn.click()
+          virtualNow += 100
+          switchBtn.click()
+        })
+
+        // Verify form.set was called twice with out-of-order sequence
+        expect(form.set).toHaveBeenCalledTimes(2)
+
+        // Allow microtasks for write 2 to process
+        await act(async () => {
+          await new Promise((r) => setTimeout(r, 10))
+        })
+
+        // UI reflects the second write
+        expect(form.getSnapshot().value.autoDoubleClick).toBe(true)
+        expect(switchBtn.getAttribute('aria-checked')).toBe('true')
+
+        // Now write 1 (seq = 1) resolves late with failure/refusal
+        await act(async () => {
+          resolveFirst(false)
+        })
+
+        // Out-of-order stale settlement from write 1 must be dropped by doubleClickSeqRef:
+        // No alert error should appear and UI must remain consistent with write 2's snapshot
+        const alertEl = container.querySelector('[role="alert"]')
+        expect(alertEl).toBeNull()
+        expect(switchBtn.getAttribute('aria-checked')).toBe('true')
+        expect(form.getSnapshot().value.autoDoubleClick).toBe(true)
+
+        await unmount()
+      } finally {
+        dateSpy.mockRestore()
+      }
     })
 
     it('P2-05: Preserves persisted config across snapshot reloads', () => {
@@ -459,13 +617,69 @@ describe('DictionarySettingsSection Rendering', () => {
       expect(html).toMatch(/id="switch-auto-selection"[^>]*aria-checked="true"/)
     })
 
-    it('P2-06: Unmounted component ignores late async form response without unhandled rejections', () => {
-      const form = createMockForm({ autoDoubleClick: false })
-      form.set = vi.fn().mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve(true), 100)),
-      )
-      const html = renderSection({ form })
-      expect(html).toBeDefined()
+    it('P2-06: Unmounted component ignores late async form response without unhandled rejections', async () => {
+      let unhandledRejection: unknown = null
+      const onUnhandled = (event: PromiseRejectionEvent | { reason: unknown }) => {
+        unhandledRejection = 'reason' in event ? event.reason : event
+      }
+      window.addEventListener('unhandledrejection', onUnhandled as EventListener)
+
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+      try {
+        const form = createMockForm({ autoDoubleClick: false })
+        let rejectWrite: (err: unknown) => void = () => {}
+        const delayedPromise = new Promise<boolean>((_resolve, reject) => {
+          rejectWrite = reject
+        })
+
+        form.set = vi.fn().mockImplementation(() => delayedPromise)
+
+        const { container, render, unmount } = mountSection({ form })
+        await render()
+
+        // Verify listener was registered on the form
+        expect(form.listeners.size).toBe(1)
+        expect((window as unknown as { __DSH_WL_SETTINGS_STORE__?: unknown }).__DSH_WL_SETTINGS_STORE__).toBeDefined()
+
+        // Submit write by clicking the switch
+        const switchBtn = container.querySelector('#switch-auto-double-click') as HTMLButtonElement
+        expect(switchBtn).toBeTruthy()
+        await act(async () => {
+          switchBtn.click()
+        })
+        expect(form.set).toHaveBeenCalledWith('autoDoubleClick', true)
+
+        // Unmount the component while the write is still in flight!
+        await unmount()
+
+        // Verify subscription and global store cleaned up on unmount
+        expect(form.listeners.size).toBe(0)
+        expect((window as unknown as { __DSH_WL_SETTINGS_STORE__?: unknown }).__DSH_WL_SETTINGS_STORE__).toBeUndefined()
+
+        // Settle the delayed promise with a rejection to verify catch block is safe after unmount
+        await act(async () => {
+          rejectWrite(new Error('Late network error after unmount'))
+        })
+
+        // Allow microtasks to complete
+        await new Promise((r) => setTimeout(r, 20))
+
+        // Assert: zero unhandled promise rejections
+        expect(unhandledRejection).toBeNull()
+
+        // Assert: no React state update on unmounted component warning
+        const reactWarnings = consoleErrorSpy.mock.calls.filter((call) =>
+          call.some((arg) => typeof arg === 'string' && arg.includes('unmounted component')),
+        )
+        expect(reactWarnings).toHaveLength(0)
+
+        // Assert: zero lingering subscriptions or listeners
+        expect(form.listeners.size).toBe(0)
+      } finally {
+        window.removeEventListener('unhandledrejection', onUnhandled as EventListener)
+        consoleErrorSpy.mockRestore()
+      }
     })
   })
 

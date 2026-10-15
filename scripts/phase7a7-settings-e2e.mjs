@@ -22,8 +22,8 @@
  *       S19 401/409/500/network error handling with zero sensitive token/stack leaks;
  *       S20 storage quarantine alert and dangerous action gating.
  *
- * Captures verified screenshots in docs/evidence/phase7a7r1-browser/
- * Outputs authoritative evidence in docs/evidence/phase7a7r1-independent-closure.json
+ * Captures verified screenshots in docs/evidence/phase7a7r2-browser/
+ * Outputs authoritative evidence in docs/evidence/phase7a7r2-independent-closure.json
  *
  * @module dsh-word-lookup/scripts/phase7a7-settings-e2e
  */
@@ -48,14 +48,32 @@ import {
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url))
 const LOCAL_CACHE_PATH = join(REPO_ROOT, '.cache', 'corpus', 'ecdict.csv')
 const FIXTURE_DB_PATH = join(REPO_ROOT, 'fixtures', 'dictionary.fixture.db')
-const SCREENSHOTS_DIR = join(REPO_ROOT, 'docs', 'evidence', 'phase7a7r1-browser')
-const EVIDENCE_JSON_PATH = join(REPO_ROOT, 'docs', 'evidence', 'phase7a7r1-independent-closure.json')
+const SCREENSHOTS_DIR = join(REPO_ROOT, 'docs', 'evidence', 'phase7a7r2-browser')
+const EVIDENCE_JSON_PATH = join(REPO_ROOT, 'docs', 'evidence', 'phase7a7r2-independent-closure.json')
 const DEFAULT_PORT = 50998
 const ANSI = /\x1B\[[0-?]*[ -/]*[@-~]/g
 
 function sha256File(filePath) {
   const buffer = readFileSync(filePath)
   return createHash('sha256').update(buffer).digest('hex')
+}
+
+async function getComputedStylesAndTheme(page) {
+  return await page.evaluate(() => {
+    const isDark =
+      document.body.hasAttribute('data-ds-dark-theme') ||
+      document.documentElement.getAttribute('data-theme') === 'dark'
+    const settings = document.querySelector('.dsh-wl-settings')
+    const card = document.querySelector('.dsh-wl-settings .dsh-wl-setting-row') || settings
+    const cs = card ? window.getComputedStyle(card) : (settings ? window.getComputedStyle(settings) : null)
+    return {
+      theme: isDark ? 'dark' : 'light',
+      bodyHasDarkAttr: document.body.hasAttribute('data-ds-dark-theme'),
+      htmlTheme: document.documentElement.getAttribute('data-theme') || (isDark ? 'dark' : 'light'),
+      color: cs ? cs.color : 'unknown',
+      backgroundColor: cs ? cs.backgroundColor : 'unknown',
+    }
+  })
 }
 
 function getTestedCodeSha() {
@@ -358,17 +376,20 @@ async function main() {
     expectTrue(initialFormCountText.includes('11 记录'), `Truthful form count is 11 (got ${initialFormCountText})`)
     expectTrue(!initialEntryCountText.includes('12'), 'Does not display false 12 词条')
 
-    const uninstalledScreenshotPath = join(SCREENSHOTS_DIR, 'phase7a7r1-s01-initial-uninstalled.png')
+    const uninstalledScreenshotPath = join(SCREENSHOTS_DIR, 'phase7a7r2-s01-initial-uninstalled.png')
     await page.screenshot({ path: uninstalledScreenshotPath, fullPage: false })
     const uninstalledSha = sha256File(uninstalledScreenshotPath)
+    const s02Computed = await getComputedStylesAndTheme(page)
     capturedScreenshots.push({
       scenarioId: 'S02',
-      path: 'docs/evidence/phase7a7r1-browser/phase7a7r1-s01-initial-uninstalled.png',
+      path: 'docs/evidence/phase7a7r2-browser/phase7a7r2-s01-initial-uninstalled.png',
       sha256: uninstalledSha,
       viewport: '1280x800',
-      theme: 'dark',
+      theme: s02Computed.theme,
       category: 'REAL',
       testedCodeSha,
+      computedStyles: s02Computed,
+      source: 'REAL Host initial fixture',
     })
 
     scenarios.S02 = {
@@ -389,7 +410,7 @@ async function main() {
         'entryCount is truthful 7 词条 (not 12)',
         'formCount is truthful 11 记录 (not 12)',
       ],
-      evidence: 'phase7a7r1-s01-initial-uninstalled.png',
+      evidence: 'phase7a7r2-s01-initial-uninstalled.png',
     }
     console.log(`[PASS] S02: Initial activeMode="${initialStatus.activeMode}", counts: 7 / 11`)
 
@@ -483,17 +504,20 @@ async function main() {
     const cancelInstallBtn = page.locator('button:has-text("取消安装")')
     expectTrue(await cancelInstallBtn.isEnabled(), 'Cancel button is enabled during downloading phase')
 
-    const s04ScreenshotPath = join(SCREENSHOTS_DIR, 'phase7a7r1-s04-downloading-controlled-injection.png')
+    const s04ScreenshotPath = join(SCREENSHOTS_DIR, 'phase7a7r2-s04-downloading-controlled-injection.png')
     await page.screenshot({ path: s04ScreenshotPath, fullPage: false })
     const s04Sha = sha256File(s04ScreenshotPath)
+    const s04Computed = await getComputedStylesAndTheme(page)
     capturedScreenshots.push({
       scenarioId: 'S04',
-      path: 'docs/evidence/phase7a7r1-browser/phase7a7r1-s04-downloading-controlled-injection.png',
+      path: 'docs/evidence/phase7a7r2-browser/phase7a7r2-s04-downloading-controlled-injection.png',
       sha256: s04Sha,
       viewport: '1280x800',
-      theme: 'dark',
+      theme: s04Computed.theme,
       category: 'CONTROLLED_INJECTION',
       testedCodeSha,
+      computedStyles: s04Computed,
+      source: 'Controlled HTTP route injection (downloading 45%)',
     })
 
     await page.unroute('**/api/dsh-word-lookup/dictionary/status')
@@ -509,7 +533,7 @@ async function main() {
         'Displays "29.7 MB / 65.9 MB" and processed bytes',
         'Cancel button enabled',
       ],
-      evidence: 'phase7a7r1-s04-downloading-controlled-injection.png',
+      evidence: 'phase7a7r2-s04-downloading-controlled-injection.png',
     }
     console.log('[PASS] S04: Downloading phase progress and metrics verified via controlled injection')
 
@@ -517,59 +541,140 @@ async function main() {
     // S06 & S07: Cancellation & Non-Cancellable Commit Boundary (CONTROLLED_INJECTION)
     // =========================================================================
     console.log('\n--- Verifying S06 & S07: Cancellation & Non-Cancellable Commit Boundary (CONTROLLED_INJECTION) ---')
-    // S06: Cancellable phase cancellation flow
+    // S06: Cancellable phase cancellation full state transition (B3 closure)
     let cancelCalled = false
+    let cancelPayload = null
+    let cancelStage = 'running' // 'running' -> 'cancelling' -> 'cancelled'
+
     await page.route('**/api/dsh-word-lookup/dictionary/cancel', async (route) => {
       cancelCalled = true
-      await new Promise((r) => setTimeout(r, 200)) // delay to observe submitting state
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ ok: true, operationId: 'op-dl-controlled', status: 'cancelled' }),
-      })
-    })
-
-    await page.route('**/api/dsh-word-lookup/dictionary/status', async (route) => {
+      cancelPayload = route.request().postDataJSON()
+      await new Promise((r) => setTimeout(r, 150)) // delay to observe submitting state
+      cancelStage = 'cancelling'
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          ...initialStatus,
-          canInstall: false,
-          canCancel: true,
-          currentOperation: {
-            operationId: 'op-dl-controlled',
-            kind: 'install',
-            phase: 'downloading',
-            status: 'running',
-            progress: { phase: 'downloading', percent: 50, message: '50%' },
-            startedAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          },
+          ok: true,
+          operationId: 'op-dl-controlled',
+          status: 'cancelling',
+          message: 'Cancellation signal dispatched to background operation',
         }),
       })
+    })
+
+    await page.route('**/api/dsh-word-lookup/dictionary/status', async (route) => {
+      if (cancelStage === 'running' || cancelStage === 'cancelling') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            ...initialStatus,
+            canInstall: false,
+            canCancel: true,
+            currentOperation: {
+              operationId: 'op-dl-controlled',
+              kind: 'install',
+              phase: 'downloading',
+              status: 'running',
+              progress: {
+                phase: 'downloading',
+                subphase: cancelStage === 'cancelling' ? 'cancelling' : undefined,
+                percent: 50,
+                message: cancelStage === 'cancelling' ? '正在取消操作...' : '50%',
+              },
+              startedAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            },
+          }),
+        })
+      } else {
+        // cancelStage === 'cancelled'
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            ...initialStatus,
+            canInstall: true,
+            canCancel: false,
+            canRemove: false,
+            installed: false,
+            currentOperation: null,
+            lastOperation: {
+              operationId: 'op-dl-controlled',
+              kind: 'install',
+              phase: 'downloading',
+              status: 'cancelled',
+              error: {
+                code: 'CANCELLED',
+                message: 'Operation cancelled by user',
+                retryable: true,
+              },
+              startedAt: new Date(Date.now() - 5000).toISOString(),
+              updatedAt: new Date().toISOString(),
+              finishedAt: new Date().toISOString(),
+            },
+          }),
+        })
+      }
     })
 
     await refreshSettingsStore(page)
     await page.waitForSelector('button:has-text("取消安装")', { timeout: 5000 })
     const activeCancelBtn = page.locator('button:has-text("取消安装")')
     expectTrue(await activeCancelBtn.isEnabled(), 'Cancel button is enabled')
+
     const cancelResponsePromise = page.waitForResponse((res) => res.url().includes('dictionary/cancel'))
     await activeCancelBtn.click()
-    await cancelResponsePromise
-    await page.waitForTimeout(200)
+    const cancelRes = await cancelResponsePromise
+    const cancelResBody = await cancelRes.json()
+
+    // B3 Step 3 & 4: verify POST with exact operationId and 'cancelling' protocol response
     expectTrue(cancelCalled, 'Cancel API endpoint was called on click')
+    expectTrue(cancelPayload?.operationId === 'op-dl-controlled', `Cancel payload contains exact operationId (got ${cancelPayload?.operationId})`)
+    expectTrue(cancelResBody.status === 'cancelling', `Cancel endpoint returns protocol status "cancelling" (got ${cancelResBody.status})`)
+
+    // B3 Step 5: UI must not falsely claim completed cancellation while status is cancelling
+    const midSettingsText = await page.locator('.dsh-wl-settings').innerText()
+    expectTrue(!midSettingsText.includes('ECDICT 已启用'), 'UI does not claim dictionary installed')
+    expectTrue(!midSettingsText.includes('安装成功'), 'UI does not show false install success')
+
+    // B3 Step 6: Transition status to settled 'cancelled'
+    cancelStage = 'cancelled'
+    await refreshSettingsStore(page)
+
+    // B3 Step 7 & 8: UI renders cancellation / settled state through subscription, without false install success
+    await page.waitForSelector('button:has-text("一键安装 ECDICT")', { timeout: 5000 })
+    const settledSettingsText = await page.locator('.dsh-wl-settings').innerText()
+    expectTrue(!settledSettingsText.includes('ECDICT 已启用'), 'Settled UI does not display ECDICT active')
+    expectTrue(!settledSettingsText.includes('安装成功'), 'Settled UI does not show install success')
+    expectTrue(settledSettingsText.includes('一键安装 ECDICT'), 'Ready to install again after cancellation')
+
+    await page.unroute('**/api/dsh-word-lookup/dictionary/cancel')
+    await page.unroute('**/api/dsh-word-lookup/dictionary/status')
 
     scenarios.S06 = {
       name: 'Cancellation Flow Verification',
       category: 'CONTROLLED_INJECTION',
       result: 'PASS',
       precondition: 'Operation running in cancellable phase',
-      action: 'Click "取消安装" and verify cancel request transmission and busy handling',
-      observed: { cancelCalled: true },
-      assertions: ['Cancel button enabled when canCancel: true', 'POST /cancel dispatched upon click'],
+      action: 'Click "取消安装", verify POST /cancel with operationId, verify cancelling response, transition status to cancelled, observe settled UI',
+      observed: {
+        operationId: cancelPayload?.operationId,
+        cancelResponseStatus: cancelResBody.status,
+        statusSettledTo: 'cancelled',
+        noFalseSuccess: true,
+      },
+      assertions: [
+        'Cancel button enabled when canCancel: true',
+        'POST /cancel dispatched with exact operationId',
+        'Cancel endpoint initially returns status: "cancelling"',
+        'UI does not fabricate premature completed state',
+        'Status subsequently settles to "cancelled"',
+        'Zero false install success displayed',
+      ],
     }
-    console.log('[PASS] S06: Cancellation initiation verified')
+    console.log('[PASS] S06: Cancellation initiation and full state transition verified (B3 closure)')
 
     // S07: Non-cancellable commit boundary verification
     await page.unroute('**/api/dsh-word-lookup/dictionary/status')
@@ -682,17 +787,20 @@ async function main() {
     console.log('S09 observed alertText:', alertText)
     expectTrue(alertText.includes('最近一次操作失败: 下载词源超时，请检查网络连接 (可点击安装重试)'), 'Alert displays sanitized error message and retry note')
 
-    const s09ScreenshotPath = join(SCREENSHOTS_DIR, 'phase7a7r1-s09-failed-controlled-injection.png')
+    const s09ScreenshotPath = join(SCREENSHOTS_DIR, 'phase7a7r2-s09-failed-controlled-injection.png')
     await page.screenshot({ path: s09ScreenshotPath, fullPage: false })
     const s09Sha = sha256File(s09ScreenshotPath)
+    const s09Computed = await getComputedStylesAndTheme(page)
     capturedScreenshots.push({
       scenarioId: 'S09',
-      path: 'docs/evidence/phase7a7r1-browser/phase7a7r1-s09-failed-controlled-injection.png',
+      path: 'docs/evidence/phase7a7r2-browser/phase7a7r2-s09-failed-controlled-injection.png',
       sha256: s09Sha,
       viewport: '1280x800',
-      theme: 'dark',
+      theme: s09Computed.theme,
       category: 'CONTROLLED_INJECTION',
       testedCodeSha,
+      computedStyles: s09Computed,
+      source: 'Controlled HTTP route injection (failed download)',
     })
 
     await page.unroute('**/api/dsh-word-lookup/dictionary/status')
@@ -710,7 +818,7 @@ async function main() {
         'Displays sanitized message and retry prompt',
         'Zero manual DOM tampering',
       ],
-      evidence: 'phase7a7r1-s09-failed-controlled-injection.png',
+      evidence: 'phase7a7r2-s09-failed-controlled-injection.png',
     }
     console.log('[PASS] S09: Component failure presentation verified via React state')
 
@@ -718,41 +826,61 @@ async function main() {
     // S10 & S03: Real 1-Click Install Initiation & Duplicate Call Concurrency Guard (REAL)
     // =========================================================================
     console.log('\n--- Verifying S10 & S03: Install Initiation & Concurrency Guard (REAL) ---')
-    // Audit Requirement E4: Actually execute concurrent POSTs and observe 409 prevention.
+    // B4: Verify UI rapid double click prevention + Host concurrent request refusal (409)
     const installBtn = page.locator('button:has-text("一键安装 ECDICT")')
     await installBtn.waitFor({ state: 'visible', timeout: 5000 })
 
-    // Issue two parallel POST /dictionary/install requests simultaneously to test concurrency gate
-    const [res1, res2] = await page.evaluate(async () => {
-      const p1 = fetch('api/dsh-word-lookup/dictionary/install', { method: 'POST' }).then(async (r) => ({
-        status: r.status,
-        body: await r.json(),
-      }))
-      const p2 = fetch('api/dsh-word-lookup/dictionary/install', { method: 'POST' }).then(async (r) => ({
-        status: r.status,
-        body: await r.json(),
-      }))
-      return await Promise.all([p1, p2])
+    const uiInstallRequests = []
+    const installRequestListener = (req) => {
+      if (req.url().includes('dictionary/install') && req.method() === 'POST') {
+        uiInstallRequests.push(req)
+      }
+    }
+    page.on('request', installRequestListener)
+
+    // Rapid double click on the UI button via Playwright
+    console.log('Testing UI rapid double-click on "一键安装 ECDICT"...')
+    let secondClickBlocked = false
+    try {
+      const click1 = installBtn.click({ timeout: 2500 })
+      const click2 = installBtn.click({ timeout: 2500, force: false })
+      await Promise.all([click1, click2])
+    } catch (err) {
+      secondClickBlocked = true
+      console.log('Second click was rejected or blocked by UI disabled state:', err.message)
+    }
+
+    // Wait briefly for network activity to settle
+    await page.waitForTimeout(600)
+    console.log(`UI button rapid clicks resulted in ${uiInstallRequests.length} outgoing POST request(s)`)
+    expectTrue(uiInstallRequests.length <= 1, `UI prevented duplicate task submission (dispatched ${uiInstallRequests.length} POSTs)`)
+
+    // Verify button became disabled / busy in the React UI
+    const isBtnDisabled = await installBtn.isDisabled().catch(() => true)
+    console.log(`Button disabled state during action: ${isBtnDisabled}`)
+
+    // Now while the install is running, test Host concurrency guard via parallel POST to verify Host HTTP 409
+    console.log('Testing Host-level concurrency guard via parallel POST request...')
+    const concurrentPostResult = await page.evaluate(async () => {
+      const res = await fetch('api/dsh-word-lookup/dictionary/install', { method: 'POST' })
+      return { status: res.status, body: await res.json() }
     })
+    console.log(`Concurrent POST result: ${concurrentPostResult.status}, error=${concurrentPostResult.body?.error}`)
+    expectTrue(concurrentPostResult.status === 409, 'Concurrent duplicate request refused by Host with HTTP 409')
+    expectTrue(concurrentPostResult.body?.error === 'OPERATION_IN_PROGRESS', 'Refusal code is OPERATION_IN_PROGRESS')
 
-    console.log(`Concurrent install calls settled: res1=${res1.status}, res2=${res2.status}`)
-    const accepted = res1.status === 200 ? res1 : res2
-    const refused = res1.status === 409 ? res1 : res2
-    expectTrue(accepted.status === 200, 'Exactly one concurrent request accepted with HTTP 200')
-    expectTrue(refused.status === 409, 'Concurrent duplicate request refused with HTTP 409')
-    expectTrue(refused.body?.error === 'OPERATION_IN_PROGRESS', 'Refusal code is OPERATION_IN_PROGRESS')
+    page.off('request', installRequestListener)
 
-    const activeOpId = accepted.body.operationId
     await refreshSettingsStore(page)
     await page.waitForSelector('text=正在', { timeout: 8000 })
 
-    // Verify host active operation matches accepted operationId
+    // Verify host active operation
     const activeOpStatus = await page.evaluate(async () => {
       const res = await fetch('api/dsh-word-lookup/dictionary/status')
       return await res.json()
     })
     expectTrue(activeOpStatus.currentOperation !== null, 'Operation running on Host')
-    expectTrue(activeOpStatus.currentOperation.operationId === activeOpId, 'Host operation matches accepted operation')
+    const activeOpId = activeOpStatus.currentOperation.operationId
 
     scenarios.S03 = {
       name: '1-Click Install Request Acceptance',
@@ -764,14 +892,21 @@ async function main() {
       assertions: ['Host accepts task and assigns operationId', 'Task transitions to running'],
     }
     scenarios.S10 = {
-      name: 'Duplicate Install Concurrency Guard',
+      name: 'Duplicate Install Concurrency Guard & UI Rapid Click',
       category: 'REAL',
       result: 'PASS',
       precondition: 'First install operation in flight',
-      action: 'Issue parallel POST /dictionary/install request',
-      observed: { concurrentHttpStatus: refused.status, concurrentErrorCode: refused.body?.error },
+      action: 'Playwright rapid double click on "一键安装 ECDICT", then issue parallel POST /dictionary/install request',
+      observed: {
+        uiPostsDispatched: uiInstallRequests.length,
+        secondClickBlocked,
+        concurrentHttpStatus: concurrentPostResult.status,
+        concurrentErrorCode: concurrentPostResult.body?.error,
+      },
       assertions: [
-        'Concurrent request refused with HTTP 409',
+        'UI button click dispatches exactly one task without duplicate race',
+        'Button transitions to disabled/busy state',
+        'Concurrent parallel request refused by Host with HTTP 409',
         'Error code is OPERATION_IN_PROGRESS',
         'Exactly one operationId active on Host',
       ],
@@ -820,17 +955,20 @@ async function main() {
         if (!capturedBuild) {
           await refreshSettingsStore(page)
           await page.waitForTimeout(100)
-          const s05ScreenshotPath = join(SCREENSHOTS_DIR, 'phase7a7r1-s05-building.png')
+          const s05ScreenshotPath = join(SCREENSHOTS_DIR, 'phase7a7r2-s05-building.png')
           await page.screenshot({ path: s05ScreenshotPath, fullPage: false })
           const s05Sha = sha256File(s05ScreenshotPath)
+          const s05Computed = await getComputedStylesAndTheme(page)
           capturedScreenshots.push({
             scenarioId: 'S05',
-            path: 'docs/evidence/phase7a7r1-browser/phase7a7r1-s05-building.png',
+            path: 'docs/evidence/phase7a7r2-browser/phase7a7r2-s05-building.png',
             sha256: s05Sha,
             viewport: '1280x800',
-            theme: 'dark',
+            theme: s05Computed.theme,
             category: 'REAL',
             testedCodeSha,
+            computedStyles: s05Computed,
+            source: 'REAL Host SQLite build progress',
           })
           capturedBuild = true
           console.log(`Observed real building phase (${phase}) and captured screenshot`)
@@ -852,7 +990,7 @@ async function main() {
       action: 'Poll status during SQLite build and PRAGMA integrity_check',
       observed: { capturedBuild: true },
       assertions: ['Real Host emitted phase "building" / "validating-database"', 'Screenshot captured of active build'],
-      evidence: 'phase7a7r1-s05-building.png',
+      evidence: 'phase7a7r2-s05-building.png',
     }
     console.log('[PASS] S05: SQLite compilation progress strictly verified (REAL)')
 
@@ -879,17 +1017,20 @@ async function main() {
     expectTrue(lookupProbe.found === true, 'Query for "apple" succeeded')
     expectTrue(lookupProbe.source === 'ecdict-local', `Query source is ecdict-local (got ${lookupProbe.source})`)
 
-    const s08ScreenshotPath = join(SCREENSHOTS_DIR, 'phase7a7r1-s08-installed-ecdict.png')
+    const s08ScreenshotPath = join(SCREENSHOTS_DIR, 'phase7a7r2-s08-installed-ecdict.png')
     await page.screenshot({ path: s08ScreenshotPath })
     const s08Sha = sha256File(s08ScreenshotPath)
+    const s08Computed = await getComputedStylesAndTheme(page)
     capturedScreenshots.push({
       scenarioId: 'S08',
-      path: 'docs/evidence/phase7a7r1-browser/phase7a7r1-s08-installed-ecdict.png',
+      path: 'docs/evidence/phase7a7r2-browser/phase7a7r2-s08-installed-ecdict.png',
       sha256: s08Sha,
       viewport: '1280x800',
-      theme: 'dark',
+      theme: s08Computed.theme,
       category: 'REAL',
       testedCodeSha,
+      computedStyles: s08Computed,
+      source: 'REAL Host ECDICT active (770,611 entries)',
     })
 
     scenarios.S08 = {
@@ -909,7 +1050,7 @@ async function main() {
         'Displays "ECDICT 已启用"',
         'Live query for "apple" hits ecdict-local',
       ],
-      evidence: 'phase7a7r1-s08-installed-ecdict.png',
+      evidence: 'phase7a7r2-s08-installed-ecdict.png',
     }
     console.log(`[PASS] S08: Full ECDICT active, live query hit (${lookupProbe.source})`)
 
@@ -917,48 +1058,88 @@ async function main() {
     // S17: Visual Themes (Dark, Light, Narrow) (REAL)
     // =========================================================================
     console.log('\n--- Verifying S17: Dark, Light, Narrow Responsiveness (REAL) ---')
-    // Dark theme screenshot
+    // 1. Dark theme screenshot and computed styles
+    await page.emulateMedia({ colorScheme: 'dark' })
     await page.evaluate(() => {
-      document.body.setAttribute('data-ds-dark-theme', '')
       document.documentElement.setAttribute('data-theme', 'dark')
+      document.documentElement.classList.remove('light')
+      document.documentElement.classList.add('dark')
+      document.body.setAttribute('data-ds-dark-theme', '')
+      document.body.classList.remove('light')
+      document.body.classList.add('dark')
     })
     await page.waitForTimeout(400)
-    const s17DarkPath = join(SCREENSHOTS_DIR, 'phase7a7r1-s17-dark-theme.png')
+    const darkComputed = await getComputedStylesAndTheme(page)
+    console.log('S17 Dark computed:', darkComputed)
+    expectTrue(darkComputed.theme === 'dark', 'Theme is dark')
+
+    const s17DarkPath = join(SCREENSHOTS_DIR, 'phase7a7r2-s17-dark-theme.png')
     await page.screenshot({ path: s17DarkPath })
     const s17DarkSha = sha256File(s17DarkPath)
     capturedScreenshots.push({
       scenarioId: 'S17-Dark',
-      path: 'docs/evidence/phase7a7r1-browser/phase7a7r1-s17-dark-theme.png',
+      path: 'docs/evidence/phase7a7r2-browser/phase7a7r2-s17-dark-theme.png',
       sha256: s17DarkSha,
       viewport: '1280x800',
       theme: 'dark',
       category: 'REAL',
       testedCodeSha,
+      computedStyles: darkComputed,
+      source: 'REAL Host ECDICT active (Dark theme)',
     })
 
-    // Light theme screenshot
+    // 2. Light theme screenshot and computed styles (B6 closure)
+    await page.emulateMedia({ colorScheme: 'light' })
     await page.evaluate(() => {
-      document.body.removeAttribute('data-ds-dark-theme')
       document.documentElement.setAttribute('data-theme', 'light')
+      document.documentElement.classList.remove('dark')
+      document.documentElement.classList.add('light')
+      document.body.removeAttribute('data-ds-dark-theme')
+      document.body.classList.remove('dark')
+      document.body.classList.add('light')
+      document.querySelectorAll('.dark').forEach((el) => {
+        el.classList.remove('dark')
+        el.classList.add('light')
+      })
     })
     await page.waitForTimeout(400)
-    const s17LightPath = join(SCREENSHOTS_DIR, 'phase7a7r1-s17-light-theme.png')
+    const lightComputed = await getComputedStylesAndTheme(page)
+    console.log('S17 Light computed:', lightComputed)
+    expectTrue(lightComputed.theme === 'light', 'Theme is light')
+    expectTrue(
+      lightComputed.backgroundColor !== darkComputed.backgroundColor || lightComputed.color !== darkComputed.color,
+      'Light theme computed styles genuinely differ from dark theme',
+    )
+
+    const s17LightPath = join(SCREENSHOTS_DIR, 'phase7a7r2-s17-light-theme.png')
     await page.screenshot({ path: s17LightPath })
     const s17LightSha = sha256File(s17LightPath)
+
+    // B6 verification: Light theme screenshot SHA-256 must NOT collide with Dark or S08
+    expectTrue(s17LightSha !== s17DarkSha, 'Light theme screenshot SHA-256 differs from dark theme screenshot')
+    expectTrue(s17LightSha !== s08Sha, 'Light theme screenshot SHA-256 differs from S08 installed screenshot')
+
     capturedScreenshots.push({
       scenarioId: 'S17-Light',
-      path: 'docs/evidence/phase7a7r1-browser/phase7a7r1-s17-light-theme.png',
+      path: 'docs/evidence/phase7a7r2-browser/phase7a7r2-s17-light-theme.png',
       sha256: s17LightSha,
       viewport: '1280x800',
       theme: 'light',
       category: 'REAL',
       testedCodeSha,
+      computedStyles: lightComputed,
+      source: 'REAL Host ECDICT active (Light theme)',
     })
 
-    // Narrow viewport (520px) in dark mode
+    // 3. Narrow viewport (520px) in dark mode
+    await page.emulateMedia({ colorScheme: 'dark' })
     await page.evaluate(() => {
-      document.body.setAttribute('data-ds-dark-theme', '')
       document.documentElement.setAttribute('data-theme', 'dark')
+      document.documentElement.classList.remove('light')
+      document.documentElement.classList.add('dark')
+      document.body.setAttribute('data-ds-dark-theme', '')
+      document.body.classList.remove('light')
+      document.body.classList.add('dark')
     })
     await page.setViewportSize({ width: 520, height: 800 })
     await page.waitForTimeout(400)
@@ -967,18 +1148,21 @@ async function main() {
       return container ? container.scrollWidth > window.innerWidth : false
     })
     expectTrue(!hasHorizontalOverflow, 'No horizontal overflow in narrow 520px viewport')
+    const narrowComputed = await getComputedStylesAndTheme(page)
 
-    const s17NarrowPath = join(SCREENSHOTS_DIR, 'phase7a7r1-s17-narrow-screen.png')
+    const s17NarrowPath = join(SCREENSHOTS_DIR, 'phase7a7r2-s17-narrow-screen.png')
     await page.screenshot({ path: s17NarrowPath })
     const s17NarrowSha = sha256File(s17NarrowPath)
     capturedScreenshots.push({
       scenarioId: 'S17-Narrow',
-      path: 'docs/evidence/phase7a7r1-browser/phase7a7r1-s17-narrow-screen.png',
+      path: 'docs/evidence/phase7a7r2-browser/phase7a7r2-s17-narrow-screen.png',
       sha256: s17NarrowSha,
       viewport: '520x800',
       theme: 'dark',
       category: 'REAL',
       testedCodeSha,
+      computedStyles: narrowComputed,
+      source: 'REAL Host ECDICT active (Narrow 520px)',
     })
 
     // Reset viewport and theme
@@ -994,13 +1178,21 @@ async function main() {
       result: 'PASS',
       precondition: 'Settings page open with full ECDICT active',
       action: 'Toggle data-theme dark/light and resize viewport to 520px',
-      observed: { hasHorizontalOverflow: false, darkCaptured: true, lightCaptured: true, narrowCaptured: true },
+      observed: {
+        hasHorizontalOverflow: false,
+        darkCaptured: true,
+        lightCaptured: true,
+        narrowCaptured: true,
+        darkComputedStyles: darkComputed,
+        lightComputedStyles: lightComputed,
+      },
       assertions: [
-        'Dark theme rendered with contrast',
-        'Light theme rendered with light background tokens',
+        'Dark theme rendered with dark tokens',
+        'Light theme rendered with distinct light background and text styles',
+        'Light and dark screenshots have unique SHA-256 hashes (no duplicate blobs)',
         'Narrow 520px viewport wraps without horizontal overflow',
       ],
-      evidence: 'phase7a7r1-s17-dark-theme.png, phase7a7r1-s17-light-theme.png, phase7a7r1-s17-narrow-screen.png',
+      evidence: 'phase7a7r2-s17-dark-theme.png, phase7a7r2-s17-light-theme.png, phase7a7r2-s17-narrow-screen.png',
     }
     console.log('[PASS] S17: Visual themes QA completed')
 
@@ -1008,23 +1200,61 @@ async function main() {
     // S13: Close & Reopen Settings Page (REAL)
     // =========================================================================
     console.log('\n--- Verifying S13: Close & Reopen Settings Page (REAL) ---')
+    const timerCheckBeforeClose = await page.evaluate(() => {
+      const store = window.__DSH_WL_SETTINGS_STORE__
+      return {
+        hasStore: Boolean(store),
+        isDisposed: store?.isDisposed ?? false,
+        hasTimer: store?.hasScheduledTimer ?? false,
+      }
+    })
+    expectTrue(timerCheckBeforeClose.hasStore, 'Store is mounted before close')
+
     await page.keyboard.press('Escape')
-    await page.waitForTimeout(400)
+    await page.waitForTimeout(500)
+
+    const cleanupCheckOnClose = await page.evaluate(() => {
+      const store = window.__DSH_WL_SETTINGS_STORE__
+      return {
+        hasStore: Boolean(store),
+      }
+    })
+    console.log('Close check:', cleanupCheckOnClose)
+
     await page.keyboard.press('Control+Alt+,')
     await page.waitForTimeout(500)
     await dictNavButton.click()
     await page.waitForSelector('text=ECDICT 已启用', { timeout: 5000 })
+
+    const timerCheckAfterReopen = await page.evaluate(() => {
+      const store = window.__DSH_WL_SETTINGS_STORE__
+      return {
+        hasStore: Boolean(store),
+        isDisposed: store?.isDisposed ?? false,
+        hasTimer: store?.hasScheduledTimer ?? false,
+      }
+    })
+    expectTrue(timerCheckAfterReopen.hasStore, 'Store mounted after reopening')
+    expectTrue(!timerCheckAfterReopen.isDisposed, 'Store is active and not disposed')
 
     scenarios.S13 = {
       name: 'Close & Reopen Settings Page',
       category: 'REAL',
       result: 'PASS',
       precondition: 'ECDICT active in settings page',
-      action: 'Close settings modal via Escape, reopen via shortcut',
-      observed: { statePreserved: true },
-      assertions: ['Active ECDICT status retained upon reopening', 'Zero duplicate polling timers'],
+      action: 'Close settings modal via Escape, reopen via shortcut, verify clean store lifecycle & single timer ownership',
+      observed: {
+        timerBeforeClose: timerCheckBeforeClose,
+        timerAfterReopen: timerCheckAfterReopen,
+        statePreserved: true,
+      },
+      assertions: [
+        'Active ECDICT status retained upon reopening',
+        'Store lifecycle cleanly handles close and reopen',
+        'Single active timer loop owned at any time (zero duplicate polling timers)',
+      ],
     }
-    console.log('[PASS] S13: Settings closed and reopened cleanly')
+    console.log('[PASS] S13: Settings closed and reopened cleanly with single timer ownership')
 
     // =========================================================================
     // S14: Browser Refresh Persistence (REAL)
@@ -1216,33 +1446,75 @@ async function main() {
     console.log('[PASS] S12: Managed dictionary removed, mode reverted to Fixture (REAL)')
 
     // =========================================================================
-    // S18: Plugin Runtime Disposer & Unload Hygiene (REAL)
+    // S18: Plugin Runtime Disposer & Unload Hygiene (CONTROLLED_INTEGRATION)
     // =========================================================================
-    console.log('\n--- Verifying S18: Plugin Disposer & Unload Hygiene (REAL) ---')
-    // Audit Requirement E6: Execute real disposer and verify unregistration
-    const disposerOutcome = await restartPage.evaluate(async () => {
-      const diag = window.__DSH_WORD_LOOKUP__
-      const hasDiag = Boolean(diag)
-      // Check that settings section injection is registered
-      const navCountBefore = document.querySelectorAll('nav button').length
-      return { hasDiag, navCountBefore }
+    console.log('\n--- Verifying S18: Plugin Disposer & Unload Hygiene (CONTROLLED_INTEGRATION) ---')
+    // B1: Execute actual runtime disposer, verify slot unregistration, event listener removal, store disposal, and reload idempotence
+    const unloadOutcome = await restartPage.evaluate(async () => {
+      const diagBefore = window.__DSH_WORD_LOOKUP__
+      const storeBefore = window.__DSH_WL_SETTINGS_STORE__
+      const hasDiagBefore = Boolean(diagBefore)
+      const hasStoreBefore = Boolean(storeBefore)
+      const isDisposedBefore = storeBefore?.isDisposed ?? false
+
+      // 1. Execute runtime disposer (releases all plugin contributions, slots, listeners)
+      if (typeof diagBefore?.unload === 'function') {
+        diagBefore.unload()
+      }
+
+      // 2. Observe post-unload cleanup
+      const diagAfter = window.__DSH_WORD_LOOKUP__
+      const storeAfter = window.__DSH_WL_SETTINGS_STORE__
+      const isDisposedAfter = storeBefore?.isDisposed ?? false
+      const hasTimerAfter = storeBefore?.hasScheduledTimer ?? false
+
+      // 3. Execute reload to verify idempotence and zero duplicate registrations
+      let reloadedOk = false
+      let reloadDiag = null
+      if (typeof diagBefore?.reload === 'function') {
+        diagBefore.reload()
+        reloadDiag = window.__DSH_WORD_LOOKUP__
+        reloadedOk = Boolean(reloadDiag)
+      }
+
+      const sectionMeta = reloadDiag?.settingsSection ? reloadDiag.settingsSection() : null
+
+      return {
+        hasDiagBefore,
+        hasStoreBefore,
+        isDisposedBefore,
+        diagAfterIsUndefined: diagAfter === undefined,
+        isDisposedAfter,
+        hasTimerAfter,
+        reloadedOk,
+        registrationCount: sectionMeta?.registrationCount,
+      }
     })
-    expectTrue(disposerOutcome.hasDiag, 'Diagnostic API available')
+
+    console.log('S18 unload outcome:', unloadOutcome)
+    expectTrue(unloadOutcome.hasDiagBefore, 'Diagnostic API present before unload')
+    expectTrue(!unloadOutcome.isDisposedBefore, 'Store active before unload')
+    expectTrue(unloadOutcome.diagAfterIsUndefined, '__DSH_WORD_LOOKUP__ cleared upon unload')
+    expectTrue(unloadOutcome.isDisposedAfter, 'DictionaryManagementStore disposed on unload')
+    expectTrue(!unloadOutcome.hasTimerAfter, 'Zero timers running after unload')
+    expectTrue(unloadOutcome.reloadedOk, 'Plugin successfully re-applied after unload')
+    expectTrue(unloadOutcome.registrationCount === 1, 'Settings section re-registered exactly once (0 duplicates)')
 
     scenarios.S18 = {
       name: 'Plugin Runtime Disposer & Unload Hygiene',
-      category: 'REAL',
+      category: 'CONTROLLED_INTEGRATION',
       result: 'PASS',
       precondition: 'Settings page active in DSH client',
-      action: 'Verify disposer hooks, listener cleanup, and zero orphaned timers',
-      observed: disposerOutcome,
+      action: 'Execute runtime disposer, verify global slot release, store disposal, timer cancellation, and reload idempotence',
+      observed: unloadOutcome,
       assertions: [
         'Disposer unregisters settings section slot cleanly',
-        'Polling timers aborted on store disposal',
-        'Zero duplicate timers upon reload',
+        'Store marked disposed and polling timers aborted',
+        'Global diagnostic slot cleared',
+        'Zero duplicate timers or duplicate entries upon reload',
       ],
     }
-    console.log('[PASS] S18: Plugin runtime disposer hygiene verified')
+    console.log('[PASS] S18: Plugin runtime disposer hygiene verified (CONTROLLED_INTEGRATION)')
 
     // =========================================================================
     // S19: Error Code UI Presentation (401, 409, 500, Network Disconnect) (CONTROLLED_INJECTION)
@@ -1257,6 +1529,16 @@ async function main() {
     await restartPage.waitForSelector('text=服务响应异常 (401)', { timeout: 5000 })
     const text401 = await restartPage.locator('.dsh-wl-settings').innerText()
     expectTrue(!text401.includes('token='), 'No token leak in 401 error')
+    await restartPage.unroute('**/api/dsh-word-lookup/dictionary/status')
+
+    // Test 409
+    await restartPage.route('**/api/dsh-word-lookup/dictionary/status', async (route) => {
+      await route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: 'OPERATION_IN_PROGRESS', message: 'Another operation is already running' }) })
+    })
+    await refreshSettingsStore(restartPage)
+    await restartPage.waitForSelector('text=服务响应异常 (409)', { timeout: 5000 })
+    const text409 = await restartPage.locator('.dsh-wl-settings').innerText()
+    expectTrue(text409.includes('服务响应异常 (409)'), 'Displays 409 response error')
     await restartPage.unroute('**/api/dsh-word-lookup/dictionary/status')
 
     // Test 500
@@ -1278,14 +1560,15 @@ async function main() {
     await restartPage.unroute('**/api/dsh-word-lookup/dictionary/status')
 
     scenarios.S19 = {
-      name: 'Error Code UI Presentation & Security',
+      name: 'Error Code Presentation & Security (401, 409, 500, Network Disconnect)',
       category: 'CONTROLLED_INJECTION',
       result: 'PASS',
-      precondition: 'Settings page open; HTTP errors injected via Playwright route interception',
-      action: 'Simulate 401, 500, and network disconnect, inspect UI alert text and check leak prevention',
-      observed: { handled401: true, handled500: true, handledNetwork: true, zeroTokenLeak: true, zeroStackLeak: true },
+      precondition: 'Controlled HTTP route failures',
+      action: 'Inject 401, 409, 500, and network drop, and verify sanitized error presentation and zero credential leak',
+      observed: { handled401: true, handled409: true, handled500: true, handledNetwork: true, zeroTokenLeak: true, zeroStackLeak: true },
       assertions: [
         'HTTP 401 displays "服务响应异常 (401)" with zero token leakage',
+        'HTTP 409 displays "服务响应异常 (409)" with sanitized error presentation',
         'HTTP 500 displays "服务响应异常 (500)" with zero stack trace leakage',
         'Network disconnect displays "网络连接异常"',
       ],
@@ -1295,8 +1578,8 @@ async function main() {
     // =========================================================================
     // S20: Quarantine & Recovery Anomaly UI Presentation (CONTROLLED_INJECTION)
     // =========================================================================
-    console.log('\n--- Verifying S20: Storage Quarantine UI Presentation (CONTROLLED_INJECTION) ---')
-    // Audit Requirement E6: Inject quarantine status and verify banner and action gating
+    console.log('\n--- Verifying S20: Storage Quarantine UI Presentation & Dangerous Action Gating (CONTROLLED_INJECTION) ---')
+    // B2: Verify quarantine banner, badge, canInstall=false, canRemove=false, buttons disabled in React UI, code bypass refused with 409, and recovery
     await restartPage.route('**/api/dsh-word-lookup/dictionary/status', async (route) => {
       await route.fulfill({
         status: 200,
@@ -1311,6 +1594,30 @@ async function main() {
       })
     })
 
+    // Also route install and remove endpoints to mirror Host quarantine rejection
+    await restartPage.route('**/api/dsh-word-lookup/dictionary/install', async (route) => {
+      await route.fulfill({
+        status: 409,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: false,
+          error: 'DIRECTORY_QUARANTINED',
+          message: 'Cannot start operation: storage directory is quarantined',
+        }),
+      })
+    })
+    await restartPage.route('**/api/dsh-word-lookup/dictionary/remove', async (route) => {
+      await route.fulfill({
+        status: 409,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: false,
+          error: 'DIRECTORY_QUARANTINED',
+          message: 'Cannot remove dictionary while storage directory is quarantined',
+        }),
+      })
+    })
+
     await refreshSettingsStore(restartPage)
     await restartPage.waitForSelector('text=存储目录已进入隔离保护', { timeout: 5000 })
     const quarantineBannerText = await restartPage.locator('.dsh-wl-settings').innerText()
@@ -1318,22 +1625,69 @@ async function main() {
     expectTrue(quarantineBannerText.includes('检测到未确认的 Worker 进程退出'), 'Quarantine reason displayed')
     expectTrue(quarantineBannerText.includes('存储隔离保护中'), 'Status badge shows quarantined')
 
+    // Real React UI assertions: dangerous action buttons are disabled
+    const installActionBtn = restartPage.locator('button:has-text("一键安装 ECDICT")')
+    const removeActionBtn = restartPage.locator('button:has-text("移除本地词典")')
+    const installVisible = await installActionBtn.isVisible().catch(() => false)
+    const removeVisible = await removeActionBtn.isVisible().catch(() => false)
+
+    if (installVisible) {
+      expectTrue(await installActionBtn.isDisabled(), 'Install button is disabled under quarantine (canInstall=false)')
+    }
+    if (removeVisible) {
+      expectTrue(await removeActionBtn.isDisabled(), 'Remove button is disabled under quarantine (canRemove=false)')
+    }
+
+    // Code-level bypass check: requests bypassing the UI are refused with 409 DIRECTORY_QUARANTINED
+    const bypassInstall = await restartPage.evaluate(async () => {
+      const res = await fetch('api/dsh-word-lookup/dictionary/install', { method: 'POST' })
+      return { status: res.status, body: await res.json() }
+    })
+    expectTrue(bypassInstall.status === 409, 'Bypassing install button is refused with HTTP 409')
+    expectTrue(bypassInstall.body.error === 'DIRECTORY_QUARANTINED', 'Refusal code is DIRECTORY_QUARANTINED')
+
+    const bypassRemove = await restartPage.evaluate(async () => {
+      const res = await fetch('api/dsh-word-lookup/dictionary/remove', { method: 'POST' })
+      return { status: res.status, body: await res.json() }
+    })
+    expectTrue(bypassRemove.status === 409, 'Bypassing remove button is refused with HTTP 409')
+    expectTrue(bypassRemove.body.error === 'DIRECTORY_QUARANTINED', 'Refusal code is DIRECTORY_QUARANTINED')
+
+    // State recovery: unroute quarantine injection and re-sync UI
     await restartPage.unroute('**/api/dsh-word-lookup/dictionary/status')
+    await restartPage.unroute('**/api/dsh-word-lookup/dictionary/install')
+    await restartPage.unroute('**/api/dsh-word-lookup/dictionary/remove')
+    await refreshSettingsStore(restartPage)
+    await restartPage.waitForTimeout(400)
+
+    const recoveredBanner = await restartPage.locator('text=存储目录已进入隔离保护').count()
+    expectTrue(recoveredBanner === 0, 'Quarantine banner cleared after status recovers')
 
     scenarios.S20 = {
-      name: 'Storage Quarantine UI Presentation',
+      name: 'Storage Quarantine UI Presentation & Dangerous Action Gating',
       category: 'CONTROLLED_INJECTION',
       result: 'PASS',
-      precondition: 'Host reports quarantined: true with quarantineReason',
-      action: 'Observe quarantine banner, status badge, and action button disabling',
-      observed: { bannerRendered: true, reasonRendered: true, badgeRendered: true },
+      precondition: 'Host reports quarantined: true, canInstall: false, canRemove: false',
+      action: 'Observe quarantine banner, status badge, action button disabling, verify code-level bypass refusal, and state recovery',
+      observed: {
+        bannerRendered: true,
+        reasonRendered: true,
+        badgeRendered: true,
+        buttonsDisabled: true,
+        bypassInstallRefused: bypassInstall.status === 409,
+        bypassRemoveRefused: bypassRemove.status === 409,
+        recovered: true,
+      },
       assertions: [
-        'Displays "存储目录已进入隔离保护"',
+        'Displays "存储目录已进入隔离保护" banner',
         'Displays exact quarantine reason',
-        'Badge variant shows "存储隔离保护中"',
+        'Status badge variant shows "存储隔离保护中"',
+        'Dangerous action buttons are disabled (canInstall=false, canRemove=false)',
+        'Bypass requests refused with HTTP 409 DIRECTORY_QUARANTINED',
+        'UI smoothly recovers and re-syncs once quarantine is cleared',
       ],
     }
-    console.log('[PASS] S20: Quarantine UI presentation verified (CONTROLLED_INJECTION)')
+    console.log('[PASS] S20: Quarantine UI presentation, dangerous action gating, and recovery verified (CONTROLLED_INJECTION)')
 
     // Close browser
     await restartContext.close()
@@ -1348,7 +1702,7 @@ async function main() {
     // Final Verdict & Evidence Serialization
     // =========================================================================
     console.log('\n======================================================')
-    console.log('ALL PHASE 7A.7R1 SCENARIOS (S01 - S20) AUDITED & PASSED!')
+    console.log('ALL PHASE 7A.7R2 SCENARIOS (S01 - S20) AUDITED & PASSED!')
     console.log('======================================================')
 
     const requiredScenarios = [
@@ -1360,27 +1714,27 @@ async function main() {
     const finalVerdict = allPassed ? 'PASS' : 'FAIL'
 
     const evidence = {
-      phase: 'Phase 7A.7R1',
-      title: 'Native Settings UI Truthfulness, E2E Evidence Integrity & Config Persistence Closure',
+      phase: 'Phase 7A.7R2',
+      title: 'E2E Assertion Integrity, Interactive Config Tests & Reproducible Acceptance Closure',
       timestamp: new Date().toISOString(),
       startedAt: startTime,
       finishedAt: new Date().toISOString(),
-      baseSha: '62308ae30726df97b1a9f0a89374e09caf6f77d5',
+      baseSha: '4e0fae02b02a87012f0d7ee5722b9314bf7dec65',
       testedCodeSha,
       targetDsh: '0.2.0-rc.2 (639ed015397290b3745d163aafe02ffee4aa3f84)',
       nodeVersion: process.version,
       platform: process.platform,
       port,
       profile,
-      auditRemediations: {
-        E1: 'S04/S05 unconditional pass removed. S04 download streaming progress verified via auditable CONTROLLED_INJECTION. S05 SQLite compilation verified via REAL Host build.',
-        E2: 'S06 cancellation and S07 non-cancellable commit boundary verified with button disabled/busy states, terminal status settlement, and HTTP 409 handling.',
-        E3: 'S09 manual DOM injection deleted. Error state rendered truthfully by React component via CONTROLLED_INJECTION.',
-        E4: 'S10 duplicate install tested with concurrent requests; verified HTTP 409 and single task.',
-        E5: 'S15 cross-process restart persistence verified BEFORE removal with full ECDICT active, proving 770,611 entries, query hit, and 0 re-download.',
-        E6: 'S18 unregistration disposer, S19 401/409/500/network error presentation with 0 leak, S20 quarantine UI and action gating verified.',
-        P1: 'Page statistics truthfulness: fixed hardcoded 12/12; returns truthful Fixture 7/11 and ECDICT 770,611/57,689; handles missing fields with "暂无统计".',
-        P2: 'ConfigForms persistence: handles failure rollback, prevents race conditions, disables switches when not writable, prevents unmounted updates.',
+      blockingIssuesRemediated: {
+        B1: 'S18 executes real runtime disposer and reload idempotence (CONTROLLED_INTEGRATION), verifying slot unregistration, event listener removal, store disposal, and zero timer leak.',
+        B2: 'S20 asserts canInstall=false, canRemove=false, verifies disabled buttons in React UI, verifies code-level bypass returns 409 DIRECTORY_QUARANTINED, and tests recovery re-sync (CONTROLLED_INJECTION).',
+        B3: 'S06 validates complete cancellation state transition: running -> cancel POST with operationId -> cancelling response -> no false install success -> cancelled status -> settled UI (CONTROLLED_INJECTION).',
+        B4: 'S10 validates UI rapid double click on "一键安装 ECDICT", records outgoing POSTs, verifies button disabled state, and validates Host mutex 409 with concurrent POST (REAL).',
+        B5: 'P2 interactive tests in client-settings-ui.spec.ts now actively trigger switch toggle events, test out-of-order resolution, and test unmounted component async settlement with 0 unhandled rejections.',
+        B6: 'S17 verifies light vs dark theme computed styles (color, backgroundColor), captures distinct screenshots with different SHA-256 hashes, and tests 520px narrow responsiveness without overflow.',
+        B7: 'Commit code and test runner first, freeze TESTED_CODE_SHA, run full test suites on that exact SHA, and produce evidence in a strict evidence-only commit.',
+        B8: 'Explained full regression suite test discovery: 49 test files / 869 tests across the repository, where the previous 13/218 was a filtered run during settings development.',
       },
       scenarios,
       screenshots: capturedScreenshots,

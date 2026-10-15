@@ -330,6 +330,16 @@ export class DictionaryManagementStore {
     }
   }
 
+  /** Whether this store has been disposed. */
+  get isDisposed(): boolean {
+    return this.#disposed
+  }
+
+  /** Whether a background polling timer is currently scheduled. */
+  get hasScheduledTimer(): boolean {
+    return this.#timer !== null
+  }
+
   /**
    * Dispose store, stop all timers and abort outstanding requests.
    */

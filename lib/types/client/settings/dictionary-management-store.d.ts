@@ -69,6 +69,10 @@ export declare class DictionaryManagementStore {
      * Clear any outstanding action errors.
      */
     clearActionError(): void;
+    /** Whether this store has been disposed. */
+    get isDisposed(): boolean;
+    /** Whether a background polling timer is currently scheduled. */
+    get hasScheduledTimer(): boolean;
     /**
      * Dispose store, stop all timers and abort outstanding requests.
      */

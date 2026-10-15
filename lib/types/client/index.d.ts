@@ -284,6 +284,10 @@ export interface WordLookupDiagnostics {
     lastOutcome(): string | null;
     /** Write one switch through the same form the settings UI uses. */
     set(field: keyof HostSettings, value: unknown): Promise<boolean>;
+    /** Dispose all client registrations and release all resources (equivalent to Cordis plugin unload). */
+    unload?(): void;
+    /** Unload and re-apply client plugin runtime, proving reload idempotence and zero duplicate state. */
+    reload?(): void;
 }
 /**
  * Apply the plugin's browser contributions.
