@@ -637,7 +637,7 @@ async function main() {
     // B3 Step 5: UI must not falsely claim completed cancellation while status is cancelling
     const midSettingsText = await page.locator('.dsh-wl-settings').innerText()
     expectTrue(!midSettingsText.includes('ECDICT 已启用'), 'UI does not claim dictionary installed')
-    expectTrue(!midSettingsText.includes('安装成功'), 'UI does not show false install success')
+    expectTrue(!midSettingsText.includes('移除本地词典'), 'UI does not show remove button')
 
     // B3 Step 6: Transition status to settled 'cancelled'
     cancelStage = 'cancelled'
@@ -647,8 +647,10 @@ async function main() {
     await page.waitForSelector('button:has-text("一键安装 ECDICT")', { timeout: 5000 })
     const settledSettingsText = await page.locator('.dsh-wl-settings').innerText()
     expectTrue(!settledSettingsText.includes('ECDICT 已启用'), 'Settled UI does not display ECDICT active')
-    expectTrue(!settledSettingsText.includes('安装成功'), 'Settled UI does not show install success')
+    expectTrue(!settledSettingsText.includes('移除本地词典'), 'Settled UI does not display remove button')
     expectTrue(settledSettingsText.includes('一键安装 ECDICT'), 'Ready to install again after cancellation')
+    const cancelBtnCount = await page.locator('button:has-text("取消安装")').count()
+    expectTrue(cancelBtnCount === 0, 'Cancel button is no longer present after cancellation settles')
 
     await page.unroute('**/api/dsh-word-lookup/dictionary/cancel')
     await page.unroute('**/api/dsh-word-lookup/dictionary/status')
