@@ -20,9 +20,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 
+import { EventEmitter } from 'node:events'
+import { appendFileSync, symlinkSync } from 'node:fs'
 import {
   CustomDictionaryValidator,
+  SnapshotTamperingError,
   ValidatorCancelledError,
+  ValidatorCrashError,
   ValidatorTimeoutError,
 } from '../src/host/custom-dictionary-validator.js'
 import {
@@ -34,6 +38,7 @@ import {
 } from '../src/host/managed-storage.js'
 import { DictionaryManager } from '../src/host/dictionary-manager.js'
 import { computeFileSha256 } from '../src/host/custom-dictionary-worker.js'
+import { spawnIntegrityWorker } from '../src/host/ecdict-integrity-verifier.js'
 
 function createTempDir(prefix = 'dsh-custom-test-'): string {
   const dir = join(tmpdir(), `${prefix}${randomUUID()}`)
@@ -346,12 +351,13 @@ describe('Phase 7A.8.1A: Custom SQLite Secure Snapshot & Validation Matrix (C01�
     const manager = new CustomSnapshotManager({ paths })
     try {
       const record = await manager.createAndPublishSnapshot(srcDb, { identity: 'wal-consistent' })
-      expect(record.state).toBe('PUBLISHED')
+      expect(record.state).toBe('PUBLISHED_INACTIVE')
       expect(record.entryCount).toBe(2) // Both commita AND commitb captured!
       expect(record.publishedPath).toBeDefined()
 
       // Open snapshot as dictionary and verify both words resolve
       const dict = manager.openSnapshotDictionary(record.id)
+      expect(manager.getSnapshot(record.id)?.state).toBe('ACTIVE')
       const hitA = dict.lookup('commita')
       const hitB = dict.lookup('commitb')
       expect(hitA.found).toBe(true)
@@ -359,6 +365,7 @@ describe('Phase 7A.8.1A: Custom SQLite Secure Snapshot & Validation Matrix (C01�
       if (hitA.found) expect(hitA.headword).toBe('commita')
       if (hitB.found) expect(hitB.headword).toBe('commitb')
       dict.close()
+      expect(manager.getSnapshot(record.id)?.state).toBe('PUBLISHED_INACTIVE')
 
       // Verify published file is standalone SQLite (no sidecars needed)
       expect(existsSync(record.publishedPath! + '-wal')).toBe(false)
@@ -375,27 +382,84 @@ describe('Phase 7A.8.1A: Custom SQLite Secure Snapshot & Validation Matrix (C01�
     const homeDir = join(tmp, 'home')
     const paths = resolveManagedStoragePaths({ home: homeDir })
     const srcDb = join(tmp, 'concurrent-src.sqlite3')
-    buildValidTestDatabase(srcDb, { journalMode: 'WAL' })
+
+    // Construct database with VERSION_A
+    const initDb = new DatabaseSync(srcDb)
+    initDb.exec('PRAGMA journal_mode = WAL;')
+    initDb.exec('CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);')
+    initDb.exec("INSERT INTO meta (key, value) VALUES ('schema_version', '1');")
+    initDb.exec("INSERT INTO meta (key, value) VALUES ('version_marker', 'VERSION_A');")
+    initDb.exec(`
+      CREATE TABLE entries (
+        word TEXT PRIMARY KEY, phonetic TEXT, definition_en TEXT,
+        translation_zh TEXT, pos TEXT, exchange TEXT, frequency INTEGER
+      );
+      CREATE TABLE forms (form TEXT PRIMARY KEY, headword TEXT NOT NULL, kind TEXT);
+      CREATE INDEX idx_forms_headword ON forms (headword);
+      CREATE TABLE examples (id INTEGER PRIMARY KEY AUTOINCREMENT, headword TEXT NOT NULL, english TEXT NOT NULL, chinese TEXT, source TEXT, source_id TEXT, score REAL);
+      CREATE INDEX idx_examples_headword ON examples (headword);
+    `)
+    initDb.exec("INSERT INTO entries VALUES ('word_a1', null, 'Word A1', '词A1', 'n.', null, 1);")
+    initDb.exec("INSERT INTO entries VALUES ('word_a2', null, 'Word A2', '词A2', 'n.', null, 1);")
+    initDb.exec("INSERT INTO forms VALUES ('word_a1_s', 'word_a1', 'plural');")
+    initDb.close()
 
     const writer = new DatabaseSync(srcDb)
     writer.exec('PRAGMA journal_mode = WAL;')
 
     const manager = new CustomSnapshotManager({ paths })
+    const timestamps = {
+      snapshotStart: 0,
+      writerStart: 0,
+      writerCommit: 0,
+      snapshotEnd: 0,
+    }
+
     try {
-      // Start snapshot creation and concurrently perform writes on writer connection
+      timestamps.snapshotStart = Date.now()
       const snapshotPromise = manager.createAndPublishSnapshot(srcDb, { identity: 'concurrent-snap' })
 
-      // Concurrently insert row into source
-      writer.exec("INSERT INTO entries VALUES ('concurrent_write', null, 'Concurrent', '并发', 'n.', null, 1);")
+      // Controlled writer writes VERSION_B during snapshot creation
+      timestamps.writerStart = Date.now()
+      writer.exec('BEGIN IMMEDIATE;')
+      writer.exec("UPDATE meta SET value = 'VERSION_B' WHERE key = 'version_marker';")
+      writer.exec("INSERT INTO entries VALUES ('word_b1', null, 'Word B1', '词B1', 'n.', null, 2);")
+      writer.exec("INSERT INTO entries VALUES ('word_b2', null, 'Word B2', '词B2', 'n.', null, 2);")
+      writer.exec('COMMIT;')
+      timestamps.writerCommit = Date.now()
 
       const record = await snapshotPromise
-      expect(record.state).toBe('PUBLISHED')
+      timestamps.snapshotEnd = Date.now()
 
-      // Snapshot must be structurally intact and verified
+      expect(record.state).toBe('PUBLISHED_INACTIVE')
+      expect(timestamps.writerStart).toBeGreaterThanOrEqual(timestamps.snapshotStart)
+      expect(timestamps.snapshotEnd).toBeGreaterThanOrEqual(timestamps.writerCommit)
+
+      // Verify transaction consistency: snapshot must be strictly all-A or all-B
       const dict = manager.openSnapshotDictionary(record.id)
-      const hitApple = dict.lookup('apple')
-      expect(hitApple.found).toBe(true)
+      const hitA1 = dict.lookup('word_a1')
+      const hitA2 = dict.lookup('word_a2')
+      const hitB1 = dict.lookup('word_b1')
+      const hitB2 = dict.lookup('word_b2')
       dict.close()
+
+      // Read marker from snapshot database directly
+      const snapDb = new DatabaseSync(record.publishedPath!)
+      const markerRow = snapDb.prepare("SELECT value FROM meta WHERE key = 'version_marker'").get() as { value: string }
+      snapDb.close()
+
+      expect(['VERSION_A', 'VERSION_B']).toContain(markerRow.value)
+      if (markerRow.value === 'VERSION_A') {
+        expect(hitA1.found).toBe(true)
+        expect(hitA2.found).toBe(true)
+        expect(hitB1.found).toBe(false)
+        expect(hitB2.found).toBe(false)
+      } else {
+        expect(hitA1.found).toBe(true)
+        expect(hitA2.found).toBe(true)
+        expect(hitB1.found).toBe(true)
+        expect(hitB2.found).toBe(true)
+      }
     } finally {
       writer.close()
       await manager.dispose()
@@ -403,26 +467,38 @@ describe('Phase 7A.8.1A: Custom SQLite Secure Snapshot & Validation Matrix (C01�
     }
   })
 
-  // C11: 源文件中途替换 (CORE GATE)
+  // C11: 源文件在生成期间变化 (CORE GATE)
   it('C11: prevents source file modification from contaminating staged snapshot', async () => {
     const tmp = createTempDir('c11-')
     const homeDir = join(tmp, 'home')
     const paths = resolveManagedStoragePaths({ home: homeDir })
     const srcDb = join(tmp, 'replace-src.sqlite3')
-    buildValidTestDatabase(srcDb)
+    buildValidTestDatabase(srcDb, { journalMode: 'WAL' })
+
+    const writer = new DatabaseSync(srcDb)
+    writer.exec('PRAGMA journal_mode = WAL;')
 
     const manager = new CustomSnapshotManager({ paths })
     try {
-      const record = await manager.createAndPublishSnapshot(srcDb, { identity: 'anti-replace' })
-      expect(record.state).toBe('PUBLISHED')
+      const snapPromise = manager.createAndPublishSnapshot(srcDb, { identity: 'anti-replace' })
 
-      // Replace source file completely with another file
-      writeFileSync(srcDb, 'COMPLETELY_NEW_AND_CORRUPTED_SOURCE_FILE')
+      // Concurrently insert row during creation
+      writer.exec("INSERT INTO entries VALUES ('concurrent_c11', null, 'C11', '并发C11', 'n.', null, 1);")
 
-      // Published snapshot remains unaffected and fully functional
+      const record = await snapPromise
+      expect(record.state).toBe('PUBLISHED_INACTIVE')
+
+      // Verify snapshot is valid
       const dict = manager.openSnapshotDictionary(record.id)
       expect(dict.lookup('apple').found).toBe(true)
       dict.close()
+
+      // Mutate raw source file after snapshot published to prove published snapshot is unaffected
+      writer.close()
+      writeFileSync(srcDb, 'CORRUPTED_RAW_SOURCE')
+      const dictAfter = manager.openSnapshotDictionary(record.id)
+      expect(dictAfter.lookup('apple').found).toBe(true)
+      dictAfter.close()
     } finally {
       await manager.dispose()
       rmSync(tmp, { recursive: true, force: true })
@@ -466,7 +542,7 @@ describe('Phase 7A.8.1A: Custom SQLite Secure Snapshot & Validation Matrix (C01�
     const manager = new CustomSnapshotManager({ paths })
     try {
       const record = await manager.createAndPublishSnapshot(srcDb, { identity: 'independent-test' })
-      expect(record.state).toBe('PUBLISHED')
+      expect(record.state).toBe('PUBLISHED_INACTIVE')
 
       // Mutate source database by adding new row
       const mutator = new DatabaseSync(srcDb)
@@ -540,13 +616,66 @@ describe('Phase 7A.8.1A: Custom SQLite Secure Snapshot & Validation Matrix (C01�
 
   // C16: Worker 异常退出
   it('C16: handles worker abnormal termination and preserves supervisor robustness', async () => {
-    const validator = new CustomDictionaryValidator()
+    const tmp = createTempDir('c16-')
+    const srcDb = join(tmp, 'crash-src.sqlite3')
+    const stagingDb = join(tmp, 'staging.sqlite3')
+    buildValidTestDatabase(srcDb)
+
+    // Subcase 1: Worker exits with non-zero code without sending message
+    const mockWorkerCrash = () => {
+      const emitter = new EventEmitter() as any
+      emitter.terminate = async () => 0
+      setTimeout(() => {
+        emitter.emit('exit', 1)
+      }, 10)
+      return emitter
+    }
+
+    const validator1 = new CustomDictionaryValidator({
+      workerAdapter: mockWorkerCrash,
+    })
+
     try {
-      // Non-existent path fails gracefully
-      await expect(validator.validateSnapshot('non-existent-file-path.sqlite3')).rejects.toThrow()
-      expect(validator.runningCount).toBe(0)
+      await expect(
+        validator1.createSnapshot(srcDb, stagingDb),
+      ).rejects.toThrowError(ValidatorCrashError)
+      expect(validator1.runningCount).toBe(0)
     } finally {
-      await validator.dispose()
+      await validator1.dispose()
+    }
+
+    // Subcase 2: Worker exits with code 0 without sending message
+    const mockWorkerExitZero = () => {
+      const emitter = new EventEmitter() as any
+      emitter.terminate = async () => 0
+      setTimeout(() => {
+        emitter.emit('exit', 0)
+      }, 10)
+      return emitter
+    }
+
+    const validator2 = new CustomDictionaryValidator({
+      workerAdapter: mockWorkerExitZero,
+    })
+
+    try {
+      await expect(
+        validator2.validateSnapshot(srcDb),
+      ).rejects.toThrowError(ValidatorCrashError)
+      expect(validator2.runningCount).toBe(0)
+    } finally {
+      await validator2.dispose()
+    }
+
+    // Subcase 3: Queue robustness: subsequent normal task succeeds and runningCount settles to 0
+    const validator3 = new CustomDictionaryValidator()
+    try {
+      const res = await validator3.validateSnapshot(srcDb)
+      expect(res.success).toBe(true)
+      expect(validator3.runningCount).toBe(0)
+    } finally {
+      await validator3.dispose()
+      rmSync(tmp, { recursive: true, force: true })
     }
   })
 
@@ -585,10 +714,11 @@ describe('Phase 7A.8.1A: Custom SQLite Secure Snapshot & Validation Matrix (C01�
     try {
       // Create and publish
       const rec = await manager.createAndPublishSnapshot(userSrc, { identity: 'safe-user-file' })
-      expect(rec.state).toBe('PUBLISHED')
+      expect(rec.state).toBe('PUBLISHED_INACTIVE')
 
       // Cleanup snapshot
       await manager.cleanupSnapshot(rec.id)
+      expect(manager.getSnapshot(rec.id)?.state).toBe('DELETED')
 
       // User file must exist and have identical bytes!
       expect(existsSync(userSrc)).toBe(true)
@@ -605,7 +735,10 @@ describe('Phase 7A.8.1A: Custom SQLite Secure Snapshot & Validation Matrix (C01�
     const tmp = createTempDir('c19-')
     const homeDir = join(tmp, 'home')
     const paths = resolveManagedStoragePaths({ home: homeDir })
+    const { mkdir } = await import('node:fs/promises')
+    await mkdir(paths.customSnapshotDirectory, { recursive: true })
 
+    // 1. Path traversal and illegal naming
     await expect(
       validateCustomSnapshotPath(join(paths.customSnapshotDirectory, '..', 'evil.sqlite3'), paths.customSnapshotDirectory),
     ).rejects.toThrow()
@@ -613,6 +746,47 @@ describe('Phase 7A.8.1A: Custom SQLite Secure Snapshot & Validation Matrix (C01�
     await expect(
       validateCustomSnapshotPath(join(paths.customSnapshotDirectory, 'not-a-snapshot.txt'), paths.customSnapshotDirectory),
     ).rejects.toThrow()
+
+    // 2. Real symlink inspection
+    const externalDir = join(tmp, 'external')
+    mkdirSync(externalDir, { recursive: true })
+    const externalFile = join(externalDir, 'external.sqlite3')
+    buildValidTestDatabase(externalFile)
+
+    const symlinkStaging = join(paths.customSnapshotDirectory, `staging-${randomUUID()}.sqlite3`)
+    let symlinkCreated = false
+    try {
+      symlinkSync(externalFile, symlinkStaging, 'file')
+      symlinkCreated = true
+    } catch {
+      // Permission restricted
+    }
+
+    if (symlinkCreated) {
+      await expect(
+        validateCustomSnapshotPath(symlinkStaging, paths.customSnapshotDirectory),
+      ).rejects.toThrow(/must not be a symbolic link|escapes managed/i)
+      try { unlinkSync(symlinkStaging) } catch {}
+    }
+
+    // 3. User source database is symlink
+    const symlinkSource = join(tmp, 'symlink-source.sqlite3')
+    let sourceSymlinkCreated = false
+    try {
+      symlinkSync(externalFile, symlinkSource, 'file')
+      sourceSymlinkCreated = true
+    } catch {
+      // Permission restricted
+    }
+
+    if (sourceSymlinkCreated) {
+      const manager = new CustomSnapshotManager({ paths })
+      try {
+        await expect(manager.createAndPublishSnapshot(symlinkSource)).rejects.toThrow(/must not be a symbolic link/i)
+      } finally {
+        await manager.dispose()
+      }
+    }
 
     rmSync(tmp, { recursive: true, force: true })
   })
@@ -646,16 +820,45 @@ describe('Phase 7A.8.1A: Custom SQLite Secure Snapshot & Validation Matrix (C01�
     const srcDb = join(tmp, 'tamper-src.sqlite3')
     buildValidTestDatabase(srcDb)
 
-    // Mock validator that tampered with staging file right after validating
-    const validator = new CustomDictionaryValidator()
-    const manager = new CustomSnapshotManager({ paths, validator })
+    const origSourceHash = computeFileSha256(srcDb)
+    let interceptedStaging: string | null = null
+
+    // Inject tampering: tamper with staging file right after validateSnapshot succeeds
+    const tamperingValidator = new CustomDictionaryValidator({
+      workerAdapter: (req) => {
+        const worker = spawnIntegrityWorker(req)
+        if ((req as any).action === 'CUSTOM_SNAPSHOT_VALIDATE') {
+          interceptedStaging = (req as any).snapshotPath
+          worker.on('message', (msg: any) => {
+            if (msg?.success === true && interceptedStaging && existsSync(interceptedStaging)) {
+              appendFileSync(interceptedStaging, Buffer.from([0xff, 0xee, 0xdd]))
+            }
+          })
+        }
+        return worker as any
+      },
+    })
+
+    const manager = new CustomSnapshotManager({ paths, validator: tamperingValidator })
 
     try {
-      // Normal publish succeeds
-      const record = await manager.createAndPublishSnapshot(srcDb, { identity: 'tamper-precheck' })
-      expect(record.state).toBe('PUBLISHED')
+      await expect(
+        manager.createAndPublishSnapshot(srcDb, { identity: 'tamper-test' }),
+      ).rejects.toThrowError(SnapshotTamperingError)
+
+      // Verify failure states and zero residue
+      if (interceptedStaging) {
+        expect(existsSync(interceptedStaging)).toBe(false)
+      }
+      expect(manager.listSnapshots()[0]?.state).toBe('CLEANUP_PENDING')
+      expect(manager.listSnapshots()[0]?.publishedPath).toBeNull()
+
+      // Source database must be untouched
+      expect(existsSync(srcDb)).toBe(true)
+      expect(computeFileSha256(srcDb)).toBe(origSourceHash)
     } finally {
       await manager.dispose()
+      await tamperingValidator.dispose()
       rmSync(tmp, { recursive: true, force: true })
     }
   })
@@ -681,7 +884,7 @@ describe('Phase 7A.8.1A: Custom SQLite Secure Snapshot & Validation Matrix (C01�
 
     try {
       const record = await manager.createAndPublishSnapshot(srcDb, { identity: 'perf-check' })
-      expect(record.state).toBe('PUBLISHED')
+      expect(record.state).toBe('PUBLISHED_INACTIVE')
 
       const peakRss = process.memoryUsage().rss
       expect(peakRss).toBeLessThan(512 * 1024 * 1024) // < 512 MiB
@@ -704,8 +907,11 @@ describe('Phase 7A.8.1A: Custom SQLite Secure Snapshot & Validation Matrix (C01�
     const manager = new CustomSnapshotManager({ paths })
     try {
       const record = await manager.createAndPublishSnapshot(srcDb, { identity: 'source-contract' })
+      expect(record.state).toBe('PUBLISHED_INACTIVE')
+
       const customDict = manager.openSnapshotDictionary(record.id)
       expect(customDict.source).toBe('custom-local')
+      expect(manager.getSnapshot(record.id)?.state).toBe('ACTIVE')
 
       // Verify in DictionaryManager
       const dictManager = new DictionaryManager({
@@ -722,6 +928,7 @@ describe('Phase 7A.8.1A: Custom SQLite Secure Snapshot & Validation Matrix (C01�
       expect(hit.found).toBe(true)
 
       dictManager.close()
+      expect(manager.getSnapshot(record.id)?.state).toBe('PUBLISHED_INACTIVE')
     } finally {
       await manager.dispose()
       rmSync(tmp, { recursive: true, force: true })

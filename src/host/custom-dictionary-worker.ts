@@ -60,9 +60,30 @@ export interface CustomSnapshotValidateSuccessResponse {
   readonly durationMs: number
 }
 
+/** Request payload for pre-publish integrity and digest verification. */
+export interface CustomSnapshotPrePublishCheckRequest {
+  readonly action: 'CUSTOM_SNAPSHOT_PRE_PUBLISH_CHECK'
+  readonly requestId: string
+  readonly stagingPath: string
+  readonly expectedSha256: string
+  readonly expectedByteSize: number
+  readonly maxSizeBytes?: number
+}
+
+/** Success response payload for pre-publish check. */
+export interface CustomSnapshotPrePublishCheckSuccessResponse {
+  readonly action: 'CUSTOM_SNAPSHOT_PRE_PUBLISH_CHECK'
+  readonly requestId: string
+  readonly success: true
+  readonly sha256: string
+  readonly byteSize: number
+  readonly matches: boolean
+  readonly durationMs: number
+}
+
 /** Generic failure response payload for custom worker operations. */
 export interface CustomWorkerFailureResponse {
-  readonly action: 'CUSTOM_SNAPSHOT_CREATE' | 'CUSTOM_SNAPSHOT_VALIDATE'
+  readonly action: 'CUSTOM_SNAPSHOT_CREATE' | 'CUSTOM_SNAPSHOT_VALIDATE' | 'CUSTOM_SNAPSHOT_PRE_PUBLISH_CHECK'
   readonly requestId: string
   readonly success: false
   readonly errorCode: string
@@ -73,6 +94,7 @@ export interface CustomWorkerFailureResponse {
 export type CustomWorkerResponse =
   | CustomSnapshotCreateSuccessResponse
   | CustomSnapshotValidateSuccessResponse
+  | CustomSnapshotPrePublishCheckSuccessResponse
   | CustomWorkerFailureResponse
 
 /** Compute full SHA-256 digest of a file in 64 KB chunks to minimize RSS. */
@@ -658,12 +680,112 @@ export function executeCustomSnapshotValidate(
 
 // Standalone execution if started directly as workerData
 if (parentPort && workerData && typeof workerData === 'object' && 'action' in workerData) {
-  const req = workerData as CustomSnapshotCreateRequest | CustomSnapshotValidateRequest
+  const req = workerData as
+    | CustomSnapshotCreateRequest
+    | CustomSnapshotValidateRequest
+    | CustomSnapshotPrePublishCheckRequest
   if (req.action === 'CUSTOM_SNAPSHOT_CREATE') {
     const res = executeCustomSnapshotCreate(req)
     parentPort.postMessage(res)
   } else if (req.action === 'CUSTOM_SNAPSHOT_VALIDATE') {
     const res = executeCustomSnapshotValidate(req)
     parentPort.postMessage(res)
+  } else if (req.action === 'CUSTOM_SNAPSHOT_PRE_PUBLISH_CHECK') {
+    const res = executeCustomSnapshotPrePublishCheck(req)
+    parentPort.postMessage(res)
+  }
+}
+
+/**
+ * Execute pre-publish hash and size verification in the isolated worker thread.
+ */
+export function executeCustomSnapshotPrePublishCheck(
+  request: CustomSnapshotPrePublishCheckRequest,
+): CustomSnapshotPrePublishCheckSuccessResponse | CustomWorkerFailureResponse {
+  const startNs = process.hrtime.bigint()
+  const { requestId, stagingPath, expectedSha256, expectedByteSize } = request
+  const maxSizeBytes = request.maxSizeBytes ?? 2 * 1024 * 1024 * 1024
+
+  if (typeof stagingPath !== 'string' || stagingPath.trim().length === 0) {
+    return {
+      action: 'CUSTOM_SNAPSHOT_PRE_PUBLISH_CHECK',
+      requestId,
+      success: false,
+      errorCode: 'INVALID_PATH',
+      message: 'Staging snapshot path must be a non-empty string',
+      durationMs: 0,
+    }
+  }
+
+  try {
+    if (!existsSync(stagingPath)) {
+      return {
+        action: 'CUSTOM_SNAPSHOT_PRE_PUBLISH_CHECK',
+        requestId,
+        success: false,
+        errorCode: 'FILE_NOT_FOUND',
+        message: 'Staging file does not exist for pre-publish check',
+        durationMs: 0,
+      }
+    }
+
+    const st = statSync(stagingPath)
+    if (!st.isFile()) {
+      return {
+        action: 'CUSTOM_SNAPSHOT_PRE_PUBLISH_CHECK',
+        requestId,
+        success: false,
+        errorCode: 'NOT_A_FILE',
+        message: 'Staging path is not a regular file',
+        durationMs: 0,
+      }
+    }
+
+    if (st.size > maxSizeBytes) {
+      return {
+        action: 'CUSTOM_SNAPSHOT_PRE_PUBLISH_CHECK',
+        requestId,
+        success: false,
+        errorCode: 'FILE_TOO_LARGE',
+        message: `Staging snapshot file size (${st.size} bytes) exceeds limit (${maxSizeBytes} bytes)`,
+        durationMs: 0,
+      }
+    }
+
+    const sha256 = computeFileSha256(stagingPath)
+    const endNs = process.hrtime.bigint()
+    const durationMs = Math.round(Number(endNs - startNs) / 1e6)
+
+    if (sha256 !== expectedSha256 || st.size !== expectedByteSize) {
+      return {
+        action: 'CUSTOM_SNAPSHOT_PRE_PUBLISH_CHECK',
+        requestId,
+        success: false,
+        errorCode: 'SNAPSHOT_TAMPERING_DETECTED',
+        message: `Snapshot file was altered between verification and publishing (expected SHA-256 ${expectedSha256}, got ${sha256}; expected size ${expectedByteSize}, got ${st.size})`,
+        durationMs,
+      }
+    }
+
+    return {
+      action: 'CUSTOM_SNAPSHOT_PRE_PUBLISH_CHECK',
+      requestId,
+      success: true,
+      sha256,
+      byteSize: st.size,
+      matches: true,
+      durationMs,
+    }
+  } catch (err: unknown) {
+    const endNs = process.hrtime.bigint()
+    const durationMs = Math.round(Number(endNs - startNs) / 1e6)
+    return {
+      action: 'CUSTOM_SNAPSHOT_PRE_PUBLISH_CHECK',
+      requestId,
+      success: false,
+      errorCode: 'VERIFICATION_FAILED',
+      message: sanitizeWorkerError(err instanceof Error ? err.message : String(err)),
+      durationMs,
+    }
   }
 }

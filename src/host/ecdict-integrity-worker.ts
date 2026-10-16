@@ -20,10 +20,13 @@ import { DatabaseSync } from 'node:sqlite'
 import {
   executeCustomSnapshotCreate,
   executeCustomSnapshotValidate,
+  executeCustomSnapshotPrePublishCheck,
   type CustomSnapshotCreateRequest,
   type CustomSnapshotCreateSuccessResponse,
   type CustomSnapshotValidateRequest,
   type CustomSnapshotValidateSuccessResponse,
+  type CustomSnapshotPrePublishCheckRequest,
+  type CustomSnapshotPrePublishCheckSuccessResponse,
   type CustomWorkerFailureResponse,
   type CustomWorkerResponse,
 } from './custom-dictionary-worker.js'
@@ -33,6 +36,8 @@ export type {
   CustomSnapshotCreateSuccessResponse,
   CustomSnapshotValidateRequest,
   CustomSnapshotValidateSuccessResponse,
+  CustomSnapshotPrePublishCheckRequest,
+  CustomSnapshotPrePublishCheckSuccessResponse,
   CustomWorkerFailureResponse,
   CustomWorkerResponse,
 }
@@ -42,6 +47,7 @@ export type CompanionWorkerRequest =
   | IntegrityRequest
   | CustomSnapshotCreateRequest
   | CustomSnapshotValidateRequest
+  | CustomSnapshotPrePublishCheckRequest
 
 /** Unified companion worker response payload. */
 export type CompanionWorkerResponse =
@@ -108,6 +114,11 @@ function runIntegrityWorker(): void {
     }
     if (action === 'CUSTOM_SNAPSHOT_VALIDATE') {
       const res = executeCustomSnapshotValidate(workerData as CustomSnapshotValidateRequest)
+      parentPort.postMessage(res)
+      return
+    }
+    if (action === 'CUSTOM_SNAPSHOT_PRE_PUBLISH_CHECK') {
+      const res = executeCustomSnapshotPrePublishCheck(workerData as CustomSnapshotPrePublishCheckRequest)
       parentPort.postMessage(res)
       return
     }

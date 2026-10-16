@@ -13,7 +13,12 @@
  */
 import type { URL } from 'node:url';
 import { type WorkerLike } from './ecdict-integrity-verifier.js';
-import type { CompanionWorkerRequest, CustomSnapshotCreateSuccessResponse, CustomSnapshotValidateSuccessResponse } from './ecdict-integrity-worker.js';
+import type { CompanionWorkerRequest, CustomSnapshotCreateSuccessResponse, CustomSnapshotValidateSuccessResponse, CustomSnapshotPrePublishCheckSuccessResponse } from './ecdict-integrity-worker.js';
+/** Error thrown when TOCTOU tampering or file modification is detected during verification or publishing. */
+export declare class SnapshotTamperingError extends Error {
+    readonly code = "SNAPSHOT_TAMPERING_DETECTED";
+    constructor(message: string);
+}
 /** Error thrown when a validation worker times out. */
 export declare class ValidatorTimeoutError extends Error {
     readonly code = "TIMEOUT";
@@ -84,6 +89,10 @@ export declare class CustomDictionaryValidator {
      * Execute comprehensive snapshot validation using worker thread.
      */
     validateSnapshot(snapshotPath: string, options?: CustomValidatorTaskOptions): Promise<CustomSnapshotValidateSuccessResponse>;
+    /**
+     * Execute pre-publish hash and size verification using worker thread.
+     */
+    prePublishCheck(stagingPath: string, expectedSha256: string, expectedByteSize: number, options?: CustomValidatorTaskOptions): Promise<CustomSnapshotPrePublishCheckSuccessResponse>;
     /**
      * Dispose supervisor, aborting in-flight workers and rejecting queued tasks.
      */

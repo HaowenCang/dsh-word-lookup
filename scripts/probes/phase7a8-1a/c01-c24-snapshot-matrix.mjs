@@ -483,7 +483,7 @@ export async function runC01ToC24Matrix() {
       dict.close()
 
       const passed =
-        recordSnap.state === 'PUBLISHED' &&
+        recordSnap.state === 'PUBLISHED_INACTIVE' &&
         recordSnap.entryCount === 2 &&
         hitA.found === true &&
         hitB.found === true
@@ -495,7 +495,7 @@ export async function runC01ToC24Matrix() {
         precondition: 'Database in WAL mode with commit A checkpointed and commit B residing in -wal file only',
         action: 'Create snapshot using VACUUM INTO on read-only connection and verify contents',
         observedResult: `Snapshot captured both commits: entryCount=${recordSnap.entryCount}, hitA=${hitA.found}, hitB=${hitB.found}`,
-        assertions: 'recordSnap.entryCount === 2 && hitA.found === true && hitB.found === true',
+        assertions: 'recordSnap.state === "PUBLISHED_INACTIVE" && recordSnap.entryCount === 2 && hitA.found === true && hitB.found === true',
         exitCode: 0,
         evidenceClass: 'RUNTIME_CONFIRMED',
         verdict: passed ? 'PASS' : 'FAIL',
@@ -529,7 +529,7 @@ export async function runC01ToC24Matrix() {
       const appleHit = dict.lookup('apple')
       dict.close()
 
-      const passed = recordSnap.state === 'PUBLISHED' && appleHit.found === true
+      const passed = recordSnap.state === 'PUBLISHED_INACTIVE' && appleHit.found === true
 
       record({
         id: 'C10',
@@ -538,7 +538,7 @@ export async function runC01ToC24Matrix() {
         precondition: 'Active writer executing concurrent INSERT queries while snapshot is being taken',
         action: 'Execute snapshot creation in parallel with concurrent writer',
         observedResult: `Snapshot completed without deadlock or corruption: state=${recordSnap.state}, appleHit=${appleHit.found}`,
-        assertions: 'recordSnap.state === "PUBLISHED" && appleHit.found === true',
+        assertions: 'recordSnap.state === "PUBLISHED_INACTIVE" && appleHit.found === true',
         exitCode: 0,
         evidenceClass: 'RUNTIME_CONFIRMED',
         verdict: passed ? 'PASS' : 'FAIL',
@@ -569,7 +569,7 @@ export async function runC01ToC24Matrix() {
       const hit = dict.lookup('apple')
       dict.close()
 
-      const passed = recordSnap.state === 'PUBLISHED' && hit.found === true
+      const passed = recordSnap.state === 'PUBLISHED_INACTIVE' && hit.found === true
 
       record({
         id: 'C11',
@@ -578,7 +578,7 @@ export async function runC01ToC24Matrix() {
         precondition: 'Snapshot created and verified in staging',
         action: 'Overwrite source file with corrupt bytes and verify snapshot dictionary integrity',
         observedResult: `Snapshot remains isolated and intact: hit.found=${hit.found}`,
-        assertions: 'hit.found === true',
+        assertions: 'recordSnap.state === "PUBLISHED_INACTIVE" && hit.found === true',
         exitCode: 0,
         evidenceClass: 'RUNTIME_CONFIRMED',
         verdict: passed ? 'PASS' : 'FAIL',
@@ -946,7 +946,7 @@ export async function runC01ToC24Matrix() {
       const publishedExists = existsSync(rec.publishedPath)
       const stagingExists = existsSync(rec.stagingPath)
 
-      const passed = rec.state === 'PUBLISHED' && publishedExists && !stagingExists
+      const passed = rec.state === 'PUBLISHED_INACTIVE' && publishedExists && !stagingExists
 
       record({
         id: 'C21',
@@ -955,7 +955,7 @@ export async function runC01ToC24Matrix() {
         precondition: 'Staging snapshot verified by worker',
         action: 'Re-verify SHA-256 pre-publish and atomically rename staging to published',
         observedResult: `Atomic publish succeeded: state=${rec.state}, publishedExists=${publishedExists}, stagingExists=${stagingExists}`,
-        assertions: 'rec.state === "PUBLISHED" && publishedExists === true && stagingExists === false',
+        assertions: 'rec.state === "PUBLISHED_INACTIVE" && publishedExists === true && stagingExists === false',
         exitCode: 0,
         evidenceClass: 'RUNTIME_CONFIRMED',
         verdict: passed ? 'PASS' : 'FAIL',
@@ -989,7 +989,7 @@ export async function runC01ToC24Matrix() {
     try {
       const rec = await manager.createAndPublishSnapshot(srcDb, { identity: 'perf-bound' })
       const peakRss = process.memoryUsage().rss
-      const passed = rec.state === 'PUBLISHED' && peakRss < 512 * 1024 * 1024 && maxLagMs < 200
+      const passed = rec.state === 'PUBLISHED_INACTIVE' && peakRss < 512 * 1024 * 1024 && maxLagMs < 200
 
       record({
         id: 'C22',

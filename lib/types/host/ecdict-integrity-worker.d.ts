@@ -13,10 +13,10 @@
  *
  * @module dsh-word-lookup/host/ecdict-integrity-worker
  */
-import { type CustomSnapshotCreateRequest, type CustomSnapshotCreateSuccessResponse, type CustomSnapshotValidateRequest, type CustomSnapshotValidateSuccessResponse, type CustomWorkerFailureResponse, type CustomWorkerResponse } from './custom-dictionary-worker.js';
-export type { CustomSnapshotCreateRequest, CustomSnapshotCreateSuccessResponse, CustomSnapshotValidateRequest, CustomSnapshotValidateSuccessResponse, CustomWorkerFailureResponse, CustomWorkerResponse, };
+import { type CustomSnapshotCreateRequest, type CustomSnapshotCreateSuccessResponse, type CustomSnapshotValidateRequest, type CustomSnapshotValidateSuccessResponse, type CustomSnapshotPrePublishCheckRequest, type CustomSnapshotPrePublishCheckSuccessResponse, type CustomWorkerFailureResponse, type CustomWorkerResponse } from './custom-dictionary-worker.js';
+export type { CustomSnapshotCreateRequest, CustomSnapshotCreateSuccessResponse, CustomSnapshotValidateRequest, CustomSnapshotValidateSuccessResponse, CustomSnapshotPrePublishCheckRequest, CustomSnapshotPrePublishCheckSuccessResponse, CustomWorkerFailureResponse, CustomWorkerResponse, };
 /** Unified companion worker request payload. */
-export type CompanionWorkerRequest = IntegrityRequest | CustomSnapshotCreateRequest | CustomSnapshotValidateRequest;
+export type CompanionWorkerRequest = IntegrityRequest | CustomSnapshotCreateRequest | CustomSnapshotValidateRequest | CustomSnapshotPrePublishCheckRequest;
 /** Unified companion worker response payload. */
 export type CompanionWorkerResponse = IntegrityResponse | CustomWorkerResponse;
 /** Request payload sent to this worker. */

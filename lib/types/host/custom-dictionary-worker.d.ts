@@ -50,16 +50,35 @@ export interface CustomSnapshotValidateSuccessResponse {
     readonly byteSize: number;
     readonly durationMs: number;
 }
+/** Request payload for pre-publish integrity and digest verification. */
+export interface CustomSnapshotPrePublishCheckRequest {
+    readonly action: 'CUSTOM_SNAPSHOT_PRE_PUBLISH_CHECK';
+    readonly requestId: string;
+    readonly stagingPath: string;
+    readonly expectedSha256: string;
+    readonly expectedByteSize: number;
+    readonly maxSizeBytes?: number;
+}
+/** Success response payload for pre-publish check. */
+export interface CustomSnapshotPrePublishCheckSuccessResponse {
+    readonly action: 'CUSTOM_SNAPSHOT_PRE_PUBLISH_CHECK';
+    readonly requestId: string;
+    readonly success: true;
+    readonly sha256: string;
+    readonly byteSize: number;
+    readonly matches: boolean;
+    readonly durationMs: number;
+}
 /** Generic failure response payload for custom worker operations. */
 export interface CustomWorkerFailureResponse {
-    readonly action: 'CUSTOM_SNAPSHOT_CREATE' | 'CUSTOM_SNAPSHOT_VALIDATE';
+    readonly action: 'CUSTOM_SNAPSHOT_CREATE' | 'CUSTOM_SNAPSHOT_VALIDATE' | 'CUSTOM_SNAPSHOT_PRE_PUBLISH_CHECK';
     readonly requestId: string;
     readonly success: false;
     readonly errorCode: string;
     readonly message: string;
     readonly durationMs?: number;
 }
-export type CustomWorkerResponse = CustomSnapshotCreateSuccessResponse | CustomSnapshotValidateSuccessResponse | CustomWorkerFailureResponse;
+export type CustomWorkerResponse = CustomSnapshotCreateSuccessResponse | CustomSnapshotValidateSuccessResponse | CustomSnapshotPrePublishCheckSuccessResponse | CustomWorkerFailureResponse;
 /** Compute full SHA-256 digest of a file in 64 KB chunks to minimize RSS. */
 export declare function computeFileSha256(filePath: string): string;
 /** Sanitize worker error messages to prevent leaking local paths or credentials. */
@@ -76,3 +95,7 @@ export declare function executeCustomSnapshotCreate(request: CustomSnapshotCreat
  * Execute comprehensive schema, integrity, query plan, and compatibility validation on a snapshot database.
  */
 export declare function executeCustomSnapshotValidate(request: CustomSnapshotValidateRequest): CustomSnapshotValidateSuccessResponse | CustomWorkerFailureResponse;
+/**
+ * Execute pre-publish hash and size verification in the isolated worker thread.
+ */
+export declare function executeCustomSnapshotPrePublishCheck(request: CustomSnapshotPrePublishCheckRequest): CustomSnapshotPrePublishCheckSuccessResponse | CustomWorkerFailureResponse;

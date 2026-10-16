@@ -155,6 +155,10 @@ export async function validateCustomSnapshotPath(
     throw new Error('Path contains null bytes')
   }
 
+  const isWin = process.platform === 'win32'
+  const arePathsEqual = (p1: string, p2: string): boolean =>
+    isWin ? p1.toLowerCase() === p2.toLowerCase() : p1 === p2
+
   const normalizedDir = resolve(customSnapshotDirectory)
   const resolvedSnapshot = resolve(snapshotPath)
 
@@ -168,13 +172,27 @@ export async function validateCustomSnapshotPath(
 
   // 2. Directory containment check (pre-realpath)
   const snapshotDir = resolve(resolvedSnapshot, '..')
-  if (snapshotDir !== normalizedDir) {
+  if (!arePathsEqual(snapshotDir, normalizedDir)) {
     throw new Error(
       `Snapshot database path "${resolvedSnapshot}" escapes managed custom snapshot directory "${normalizedDir}"`,
     )
   }
 
-  // 3. Symlink and junction protection (post-creation inspection)
+  // 3. Parent directory symlink & junction inspection (even if snapshot file does not exist yet)
+  let realSnapDir = normalizedDir
+  try {
+    const dirStat = await lstat(normalizedDir)
+    if (dirStat.isSymbolicLink()) {
+      throw new Error(`Custom snapshot directory "${normalizedDir}" must not be a symbolic link or junction`)
+    }
+    realSnapDir = await realpath(normalizedDir)
+  } catch (err: any) {
+    if (err?.code !== 'ENOENT') {
+      throw err
+    }
+  }
+
+  // 4. Target file symlink and junction protection (post-creation inspection)
   try {
     const fileStat = await lstat(resolvedSnapshot)
     if (fileStat.isSymbolicLink()) {
@@ -182,10 +200,15 @@ export async function validateCustomSnapshotPath(
     }
 
     const realSnapshotPath = await realpath(resolvedSnapshot)
-    const realSnapDir = await realpath(normalizedDir)
-
     const realParentDir = resolve(realSnapshotPath, '..')
-    if (realParentDir !== realSnapDir || basename(realSnapshotPath) !== snapshotName) {
+    const realBaseName = basename(realSnapshotPath)
+
+    const parentMatches = arePathsEqual(realParentDir, realSnapDir)
+    const baseMatches = isWin
+      ? realBaseName.toLowerCase() === snapshotName.toLowerCase()
+      : realBaseName === snapshotName
+
+    if (!parentMatches || !baseMatches) {
       throw new Error(
         `Snapshot database realpath "${realSnapshotPath}" escapes managed custom snapshot realpath "${realSnapDir}"`,
       )

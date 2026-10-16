@@ -24,8 +24,20 @@ import type {
   CustomSnapshotCreateSuccessResponse,
   CustomSnapshotValidateRequest,
   CustomSnapshotValidateSuccessResponse,
+  CustomSnapshotPrePublishCheckRequest,
+  CustomSnapshotPrePublishCheckSuccessResponse,
   CustomWorkerFailureResponse,
 } from './ecdict-integrity-worker.js'
+
+/** Error thrown when TOCTOU tampering or file modification is detected during verification or publishing. */
+export class SnapshotTamperingError extends Error {
+  readonly code = 'SNAPSHOT_TAMPERING_DETECTED'
+
+  constructor(message: string) {
+    super(message)
+    this.name = 'SnapshotTamperingError'
+  }
+}
 
 /** Error thrown when a validation worker times out. */
 export class ValidatorTimeoutError extends Error {
@@ -187,6 +199,28 @@ export class CustomDictionaryValidator {
   }
 
   /**
+   * Execute pre-publish hash and size verification using worker thread.
+   */
+  async prePublishCheck(
+    stagingPath: string,
+    expectedSha256: string,
+    expectedByteSize: number,
+    options?: CustomValidatorTaskOptions,
+  ): Promise<CustomSnapshotPrePublishCheckSuccessResponse> {
+    const requestId = randomUUID()
+    const request: CustomSnapshotPrePublishCheckRequest = {
+      action: 'CUSTOM_SNAPSHOT_PRE_PUBLISH_CHECK',
+      requestId,
+      stagingPath,
+      expectedSha256,
+      expectedByteSize,
+      maxSizeBytes: options?.maxSizeBytes,
+    }
+
+    return this.#scheduleTask(request, options) as Promise<CustomSnapshotPrePublishCheckSuccessResponse>
+  }
+
+  /**
    * Dispose supervisor, aborting in-flight workers and rejecting queued tasks.
    */
   async dispose(): Promise<void> {
@@ -323,9 +357,18 @@ export class CustomDictionaryValidator {
           signal.removeEventListener('abort', onAbort)
         }
         if (worker) {
-          void worker.terminate().finally(() => {
+          try {
+            const termRes = worker.terminate()
+            if (termRes && typeof (termRes as Promise<any>).finally === 'function') {
+              void (termRes as Promise<any>).finally(() => {
+                finalize()
+              })
+            } else {
+              finalize()
+            }
+          } catch {
             finalize()
-          })
+          }
         } else {
           finalize()
         }
@@ -393,13 +436,17 @@ export class CustomDictionaryValidator {
               })
             } else {
               const failResp = receivedResponse as CustomWorkerFailureResponse
+              const err =
+                failResp.errorCode === 'SNAPSHOT_TAMPERING_DETECTED'
+                  ? new SnapshotTamperingError(failResp.message || 'Snapshot tampering detected')
+                  : new ValidatorExecutionError(
+                      failResp.message || 'Worker operation failed',
+                      failResp.errorCode || 'VALIDATION_FAILED',
+                      failResp.durationMs,
+                    )
               initiateTermination({
                 success: false,
-                error: new ValidatorExecutionError(
-                  failResp.message || 'Worker operation failed',
-                  failResp.errorCode || 'VALIDATION_FAILED',
-                  failResp.durationMs,
-                ),
+                error: err,
               })
             }
             return
