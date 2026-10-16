@@ -1,0 +1,81 @@
+{
+  "phase": "6R.1a",
+  "testedCodeGitSha": "492a92f68e17018339ca653c0841cf5bd33dcc8f",
+  "workingTreeCleanAtPack": true,
+  "candidatePackageVersion": "0.2.0",
+  "selectedPort": 50993,
+  "finalIsolationCheckPassed": true,
+  "candidateTarballSha256": "6e24c17e5cff6b113ceb72e9cdce46115b6960d32f9d0f1659750ac086820591",
+  "candidateTarball": {
+    "filename": "dsh-word-lookup-0.2.0.tgz",
+    "path": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-word-lookup-0.2.0.tgz",
+    "sha256": "6e24c17e5cff6b113ceb72e9cdce46115b6960d32f9d0f1659750ac086820591"
+  },
+  "isolation": {
+    "passed": true,
+    "finalIsolationCheckPassed": true,
+    "mechanism": "assertIsolatedDshEnvironment preflight path and port assertions",
+    "selectedPort": 50993,
+    "banner": "ISOLATION CHECK: PASS",
+    "home": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-word-lookup-test\\home",
+    "profile": "word-lookup-test",
+    "profileDir": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-word-lookup-test\\home\\profiles\\word-lookup-test",
+    "port": 50993,
+    "assertedByHarnessInvariant": {
+      "productionPortTouched": false,
+      "productionDshHomeTouched": false,
+      "productionProfileTouched": false,
+      "productionSessionTouched": false,
+      "unknownProcessKilled": false
+    }
+  },
+  "operations": {
+    "install": {
+      "passed": true,
+      "details": {
+        "tarballFilename": "dsh-word-lookup-0.2.0.tgz",
+        "tarball": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-word-lookup-0.2.0.tgz",
+        "sha256": "6e24c17e5cff6b113ceb72e9cdce46115b6960d32f9d0f1659750ac086820591",
+        "installedPath": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-word-lookup-test\\home\\profiles\\word-lookup-test\\node_modules\\dsh-word-lookup",
+        "isSymbolicLinkOrJunction": false,
+        "notRepoRoot": true,
+        "version": "0.2.0",
+        "bundleListedOnce": true,
+        "cordisPatchPresent": true,
+        "runtimeBundlesExist": true
+      }
+    },
+    "start": {
+      "passed": true,
+      "details": {
+        "unauthenticatedFenceStatus": 401,
+        "hostRouteStatus": 200,
+        "fixtureLookupResult": "derive",
+        "clientBundleLoaded": true,
+        "cardRendered": true,
+        "renderedHeadword": "derive"
+      }
+    },
+    "uninstall": {
+      "passed": true,
+      "details": {
+        "packageDirectoryRemoved": true,
+        "routeAbsent404": true,
+        "clientModuleAbsent": true
+      }
+    },
+    "rollback": {
+      "passed": true,
+      "details": {
+        "targetTarball": "dsh-word-lookup-0.1.0.tgz",
+        "verifiedSha256": "22d3cdffd9f73790adebb707cf36a258453a4813db981d19d9d5cffb249458cc",
+        "sha256Match": true,
+        "hostRouteOk": true,
+        "clientLoaded": true,
+        "cardVisible": true,
+        "renderedHeadword": "derive"
+      }
+    }
+  },
+  "allPassed": true
+}
