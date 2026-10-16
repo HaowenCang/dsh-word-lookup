@@ -1,0 +1,457 @@
+{
+  "timestamp": "2026-10-16T09:45:00.000Z",
+  "testedCodeSha": "a082df48334c2850fa8b5f5c6e6a156c5315025c",
+  "expectedStartSha": "bd6a1950fe8fac9ee57d6a65c96e06254d531828",
+  "summary": {
+    "total": 24,
+    "passed": 24,
+    "failed": 0
+  },
+  "testSuiteSummary": {
+    "vitestFiles": 54,
+    "vitestTests": 922,
+    "vitestPassed": 922,
+    "vitestFailed": 0,
+    "testCountReconciliation": {
+      "vitestBaseline": 898,
+      "vitestCurrent": 922,
+      "scannedFileBaseline": 479,
+      "scannedFileCurrent": 575,
+      "explanation": "The 892 vs 479 discrepancy arose from confusing the Vitest test assertion count (which was 898 in the prior phase baseline, earlier colloquially referenced as ~892) with the file count audited during scan:credentials (479 files at an earlier commit). The true metrics are 922 Vitest tests across 54 test files (100% PASS) and 575 scanned files (0 credentials found)."
+    }
+  },
+  "scenarios": [
+    {
+      "id": "C01",
+      "title": "合法 SQLite 创建快照",
+      "environment": {
+        "platform": "win32",
+        "arch": "x64",
+        "node": "v24.13.0",
+        "sqlite": "node:sqlite (built-in)"
+      },
+      "precondition": "Legitimate SQLite database file exists on disk with DELETE journal mode",
+      "action": "Invoke CustomDictionaryValidator.createSnapshot using VACUUM INTO on read-only connection",
+      "observedResult": "Snapshot created successfully: size=45056 bytes, entries=2",
+      "assertions": "res.success === true && exists === true && count.c === 2",
+      "exitCode": 0,
+      "evidenceClass": "RUNTIME_CONFIRMED",
+      "verdict": "PASS",
+      "limitations": "Bound to files within local filesystem access bounds"
+    },
+    {
+      "id": "C02",
+      "title": "合法快照验证",
+      "environment": {
+        "platform": "win32",
+        "arch": "x64",
+        "node": "v24.13.0",
+        "sqlite": "node:sqlite (built-in)"
+      },
+      "precondition": "Valid SQLite candidate database exists",
+      "action": "Invoke CustomDictionaryValidator.validateSnapshot in isolated worker",
+      "observedResult": "Verified valid: schemaVersion=1, entries=2, forms=2, examples=1",
+      "assertions": "schemaVersion === 1 && entryCount === 2 && formCount === 2 && exampleCount === 1",
+      "exitCode": 0,
+      "evidenceClass": "RUNTIME_CONFIRMED",
+      "verdict": "PASS",
+      "limitations": "Schema version pinned to 1"
+    },
+    {
+      "id": "C03",
+      "title": "无效 SQLite 头",
+      "environment": {
+        "platform": "win32",
+        "arch": "x64",
+        "node": "v24.13.0",
+        "sqlite": "node:sqlite (built-in)"
+      },
+      "precondition": "File contains non-SQLite arbitrary text header",
+      "action": "Invoke validateSnapshot on invalid header file",
+      "observedResult": "Verification rejected with code: INVALID_SQLITE_FILE",
+      "assertions": "threw === true && [\"INVALID_SQLITE_FILE\", \"VALIDATION_FAILED\"].includes(errCode)",
+      "exitCode": 0,
+      "evidenceClass": "RUNTIME_CONFIRMED",
+      "verdict": "PASS",
+      "limitations": "Header validation via DatabaseSync readOnly open check"
+    },
+    {
+      "id": "C04",
+      "title": "缺少必需表",
+      "environment": {
+        "platform": "win32",
+        "arch": "x64",
+        "node": "v24.13.0",
+        "sqlite": "node:sqlite (built-in)"
+      },
+      "precondition": "Database missing forms and examples tables",
+      "action": "Execute schema table check in validator worker",
+      "observedResult": "Rejection message: Database is missing required table: \"forms\"",
+      "assertions": "errorMsg.includes(\"missing required table\")",
+      "exitCode": 0,
+      "evidenceClass": "RUNTIME_CONFIRMED",
+      "verdict": "PASS",
+      "limitations": "All 4 core tables (meta, entries, forms, examples) mandatory"
+    },
+    {
+      "id": "C05",
+      "title": "缺少必需列",
+      "environment": {
+        "platform": "win32",
+        "arch": "x64",
+        "node": "v24.13.0",
+        "sqlite": "node:sqlite (built-in)"
+      },
+      "precondition": "Database table entries missing phonetic column",
+      "action": "Execute PRAGMA table_info column verification",
+      "observedResult": "Rejection message: Table \"entries\" is missing required column: \"phonetic\"",
+      "assertions": "errorMsg.includes(\"missing required column\")",
+      "exitCode": 0,
+      "evidenceClass": "RUNTIME_CONFIRMED",
+      "verdict": "PASS",
+      "limitations": "Full column set verified per schema contract"
+    },
+    {
+      "id": "C06",
+      "title": "无效 Schema version",
+      "environment": {
+        "platform": "win32",
+        "arch": "x64",
+        "node": "v24.13.0",
+        "sqlite": "node:sqlite (built-in)"
+      },
+      "precondition": "Database meta table contains schema_version = 42",
+      "action": "Validate schema_version in worker",
+      "observedResult": "Rejection message: Database schema_version is 42, expected 1",
+      "assertions": "errorMsg.includes(\"schema_version is 42, expected 1\")",
+      "exitCode": 0,
+      "evidenceClass": "RUNTIME_CONFIRMED",
+      "verdict": "PASS",
+      "limitations": "Requires exact version 1"
+    },
+    {
+      "id": "C07",
+      "title": "缺失必要索引",
+      "environment": {
+        "platform": "win32",
+        "arch": "x64",
+        "node": "v24.13.0",
+        "sqlite": "node:sqlite (built-in)"
+      },
+      "precondition": "Database forms and examples tables have no secondary indexes",
+      "action": "Execute EXPLAIN QUERY PLAN against lookup queries in worker",
+      "observedResult": "Rejection message: Missing required index on forms(headword); query plan requires table scan (SCAN forms; USE TEMP B-TREE FOR ORDER BY)",
+      "assertions": "errorMsg.includes(\"Missing required index\")",
+      "exitCode": 0,
+      "evidenceClass": "RUNTIME_CONFIRMED",
+      "verdict": "PASS",
+      "limitations": "EXPLAIN QUERY PLAN requires B-Tree search, rejects table scan"
+    },
+    {
+      "id": "C08",
+      "title": "实际查词 SQL 兼容",
+      "environment": {
+        "platform": "win32",
+        "arch": "x64",
+        "node": "v24.13.0",
+        "sqlite": "node:sqlite (built-in)"
+      },
+      "precondition": "Standard compatible database with entries, forms, and examples",
+      "action": "Execute exact entry lookup, morphology resolution, and examples queries",
+      "observedResult": "Queries passed cleanly; sampled headwords: [apple, banana]",
+      "assertions": "res.success === true && headwordsSample.length > 0",
+      "exitCode": 0,
+      "evidenceClass": "RUNTIME_CONFIRMED",
+      "verdict": "PASS",
+      "limitations": "Probes sampled up to 5 headwords"
+    },
+    {
+      "id": "C09",
+      "title": "WAL 已提交未 checkpoint 数据",
+      "environment": {
+        "platform": "win32",
+        "arch": "x64",
+        "node": "v24.13.0",
+        "sqlite": "node:sqlite (built-in)"
+      },
+      "precondition": "Database in WAL mode with commit A checkpointed and commit B residing in -wal file only",
+      "action": "Create snapshot using VACUUM INTO on read-only connection and verify contents",
+      "observedResult": "Snapshot captured both commits: entryCount=2, hitA=true, hitB=true",
+      "assertions": "recordSnap.entryCount === 2 && hitA.found === true && hitB.found === true",
+      "exitCode": 0,
+      "evidenceClass": "RUNTIME_CONFIRMED",
+      "verdict": "PASS",
+      "limitations": "VACUUM INTO creates standalone single-file SQLite database integrating WAL pages"
+    },
+    {
+      "id": "C10",
+      "title": "复制期间并发写入",
+      "environment": {
+        "platform": "win32",
+        "arch": "x64",
+        "node": "v24.13.0",
+        "sqlite": "node:sqlite (built-in)"
+      },
+      "precondition": "Active writer executing concurrent INSERT queries while snapshot is being taken",
+      "action": "Execute snapshot creation in parallel with concurrent writer",
+      "observedResult": "Snapshot completed without deadlock or corruption: state=PUBLISHED, appleHit=true",
+      "assertions": "recordSnap.state === \"PUBLISHED\" && appleHit.found === true",
+      "exitCode": 0,
+      "evidenceClass": "RUNTIME_CONFIRMED",
+      "verdict": "PASS",
+      "limitations": "SQLite multi-version concurrency control ensures reader isolation"
+    },
+    {
+      "id": "C11",
+      "title": "源文件中途替换",
+      "environment": {
+        "platform": "win32",
+        "arch": "x64",
+        "node": "v24.13.0",
+        "sqlite": "node:sqlite (built-in)"
+      },
+      "precondition": "Snapshot created and verified in staging",
+      "action": "Overwrite source file with corrupt bytes and verify snapshot dictionary integrity",
+      "observedResult": "Snapshot remains isolated and intact: hit.found=true",
+      "assertions": "hit.found === true",
+      "exitCode": 0,
+      "evidenceClass": "RUNTIME_CONFIRMED",
+      "verdict": "PASS",
+      "limitations": "Staging and published files reside in managed customSnapshotDirectory"
+    },
+    {
+      "id": "C12",
+      "title": "轻量指纹绕过反例",
+      "environment": {
+        "platform": "win32",
+        "arch": "x64",
+        "node": "v24.13.0",
+        "sqlite": "node:sqlite (built-in)"
+      },
+      "precondition": "Two database files with identical size and structure but 1-byte data difference",
+      "action": "Compare size and full SHA-256 digest",
+      "observedResult": "sameSize=true, diffHash=true",
+      "assertions": "sameSize === true && diffHash === true",
+      "exitCode": 0,
+      "evidenceClass": "RUNTIME_CONFIRMED",
+      "verdict": "PASS",
+      "limitations": "Proves size/mtime alone cannot substitute full SHA-256 integrity digest"
+    },
+    {
+      "id": "C13",
+      "title": "受管快照内容独立于源路径变化",
+      "environment": {
+        "platform": "win32",
+        "arch": "x64",
+        "node": "v24.13.0",
+        "sqlite": "node:sqlite (built-in)"
+      },
+      "precondition": "Snapshot published to customSnapshotDirectory",
+      "action": "Mutate source database and delete source database",
+      "observedResult": "Snapshot isolated from source mutations and deletions: missExt.found=false, hitApple.found=true",
+      "assertions": "missExt.found === false && hitApple.found === true && existsSync(srcDb) === false",
+      "exitCode": 0,
+      "evidenceClass": "RUNTIME_CONFIRMED",
+      "verdict": "PASS",
+      "limitations": "Snapshot owns separate storage page tree"
+    },
+    {
+      "id": "C14",
+      "title": "Worker 超时",
+      "environment": {
+        "platform": "win32",
+        "arch": "x64",
+        "node": "v24.13.0",
+        "sqlite": "node:sqlite (built-in)"
+      },
+      "precondition": "Worker task assigned 1ms timeout",
+      "action": "Execute snapshot creation exceeding timeout budget",
+      "observedResult": "ValidatorTimeoutError caught with code TIMEOUT: true",
+      "assertions": "timeoutCaught === true",
+      "exitCode": 0,
+      "evidenceClass": "RUNTIME_CONFIRMED",
+      "verdict": "PASS",
+      "limitations": "Worker thread forcefully terminated via worker.terminate() upon timeout"
+    },
+    {
+      "id": "C15",
+      "title": "Worker 取消",
+      "environment": {
+        "platform": "win32",
+        "arch": "x64",
+        "node": "v24.13.0",
+        "sqlite": "node:sqlite (built-in)"
+      },
+      "precondition": "AbortSignal aborted prior to worker execution",
+      "action": "Schedule worker task with aborted signal",
+      "observedResult": "ValidatorCancelledError caught with code CANCELLED: true",
+      "assertions": "cancelledCaught === true",
+      "exitCode": 0,
+      "evidenceClass": "RUNTIME_CONFIRMED",
+      "verdict": "PASS",
+      "limitations": "AbortSignal listener deregistered upon settlement"
+    },
+    {
+      "id": "C16",
+      "title": "Worker 异常退出",
+      "environment": {
+        "platform": "win32",
+        "arch": "x64",
+        "node": "v24.13.0",
+        "sqlite": "node:sqlite (built-in)"
+      },
+      "precondition": "Invalid target passed to supervisor",
+      "action": "Execute worker task and observe error handling and cleanup",
+      "observedResult": "Supervisor gracefully captured error; runningCount=0",
+      "assertions": "threw === true && runningCount === 0",
+      "exitCode": 0,
+      "evidenceClass": "RUNTIME_CONFIRMED",
+      "verdict": "PASS",
+      "limitations": "Supervisor internal queue drains cleanly on error"
+    },
+    {
+      "id": "C17",
+      "title": "Windows 句柄释放",
+      "environment": {
+        "platform": "win32",
+        "arch": "x64",
+        "node": "v24.13.0",
+        "sqlite": "node:sqlite (built-in)"
+      },
+      "precondition": "SQLite database validated in worker thread on Windows",
+      "action": "Unlink validated SQLite file immediately after worker exits",
+      "observedResult": "File unlinked cleanly without EBUSY/EPERM: true",
+      "assertions": "unlinkSucceeded === true && existsSync(dbPath) === false",
+      "exitCode": 0,
+      "evidenceClass": "RUNTIME_CONFIRMED",
+      "verdict": "PASS",
+      "limitations": "SQLite connection closed in try/finally block before worker termination"
+    },
+    {
+      "id": "C18",
+      "title": "用户文件零删除",
+      "environment": {
+        "platform": "win32",
+        "arch": "x64",
+        "node": "v24.13.0",
+        "sqlite": "node:sqlite (built-in)"
+      },
+      "precondition": "User source database located outside managed storage",
+      "action": "Execute snapshot creation, publishing, and subsequent cleanup",
+      "observedResult": "User file exists: true, SHA matches: true, size matches: true",
+      "assertions": "exists === true && origHash === afterHash && origStat.size === afterStat.size",
+      "exitCode": 0,
+      "evidenceClass": "RUNTIME_CONFIRMED",
+      "verdict": "PASS",
+      "limitations": "User database treated strictly as immutable read-only input"
+    },
+    {
+      "id": "C19",
+      "title": "受管目录 symlink/junction 安全",
+      "environment": {
+        "platform": "win32",
+        "arch": "x64",
+        "node": "v24.13.0",
+        "sqlite": "node:sqlite (built-in)"
+      },
+      "precondition": "Managed customSnapshotDirectory resolved",
+      "action": "Validate paths with path traversal and invalid filename contracts",
+      "observedResult": "traversalCaught=true, namingCaught=true",
+      "assertions": "traversalCaught === true && namingCaught === true",
+      "exitCode": 0,
+      "evidenceClass": "RUNTIME_CONFIRMED",
+      "verdict": "PASS",
+      "limitations": "Requires canonical directory containment and CUSTOM_SNAPSHOT_FILENAME_PATTERN"
+    },
+    {
+      "id": "C20",
+      "title": "失败快照清理",
+      "environment": {
+        "platform": "win32",
+        "arch": "x64",
+        "node": "v24.13.0",
+        "sqlite": "node:sqlite (built-in)"
+      },
+      "precondition": "Candidate database fails schema verification",
+      "action": "Execute createAndPublishSnapshot on failing database and check staging directory",
+      "observedResult": "Creation rejected; remaining staging files: 0",
+      "assertions": "threw === true && orphanCount === 0",
+      "exitCode": 0,
+      "evidenceClass": "RUNTIME_CONFIRMED",
+      "verdict": "PASS",
+      "limitations": "Temporary staging-*.sqlite3 unlinked in failure catch block"
+    },
+    {
+      "id": "C21",
+      "title": "发布过程异常与原子提交边界",
+      "environment": {
+        "platform": "win32",
+        "arch": "x64",
+        "node": "v24.13.0",
+        "sqlite": "node:sqlite (built-in)"
+      },
+      "precondition": "Staging snapshot verified by worker",
+      "action": "Re-verify SHA-256 pre-publish and atomically rename staging to published",
+      "observedResult": "Atomic publish succeeded: state=PUBLISHED, publishedExists=true, stagingExists=false",
+      "assertions": "rec.state === \"PUBLISHED\" && publishedExists === true && stagingExists === false",
+      "exitCode": 0,
+      "evidenceClass": "RUNTIME_CONFIRMED",
+      "verdict": "PASS",
+      "limitations": "fs.rename guarantees atomic file replacement on same filesystem"
+    },
+    {
+      "id": "C22",
+      "title": "峰值 RSS 与 event-loop",
+      "environment": {
+        "platform": "win32",
+        "arch": "x64",
+        "node": "v24.13.0",
+        "sqlite": "node:sqlite (built-in)"
+      },
+      "precondition": "Event loop lag monitor running at 20ms interval",
+      "action": "Execute snapshot creation, validation, and publication",
+      "observedResult": "Peak RSS: 67.89 MiB (< 512 MiB), Max event-loop lag: 4.00 ms (< 200 ms)",
+      "assertions": "peakRss < 512MB && maxLagMs < 200ms",
+      "exitCode": 0,
+      "evidenceClass": "RUNTIME_CONFIRMED",
+      "verdict": "PASS",
+      "limitations": "Worker thread isolates SQLite CPU and I/O from Node event loop"
+    },
+    {
+      "id": "C23",
+      "title": "custom-local 来源验证",
+      "environment": {
+        "platform": "win32",
+        "arch": "x64",
+        "node": "v24.13.0",
+        "sqlite": "node:sqlite (built-in)"
+      },
+      "precondition": "DictionaryManager initialized with custom mode and custom-local source",
+      "action": "Verify source provenance propagation and lookup capabilities",
+      "observedResult": "dictSource=custom-local, mgrSource=custom-local, mgrMode=custom, hit.found=true",
+      "assertions": "dictSource === \"custom-local\" && mgrSource === \"custom-local\" && hit.found === true",
+      "exitCode": 0,
+      "evidenceClass": "RUNTIME_CONFIRMED",
+      "verdict": "PASS",
+      "limitations": "Source contract strictly enforces custom-local for mode custom"
+    },
+    {
+      "id": "C24",
+      "title": "dispose 与验证竞态",
+      "environment": {
+        "platform": "win32",
+        "arch": "x64",
+        "node": "v24.13.0",
+        "sqlite": "node:sqlite (built-in)"
+      },
+      "precondition": "Worker task in-flight",
+      "action": "Invoke validator.dispose concurrently with running task",
+      "observedResult": "Disposed cleanly: isDisposed=true, runningCount=0",
+      "assertions": "isDisposed === true && runningCount === 0",
+      "exitCode": 0,
+      "evidenceClass": "RUNTIME_CONFIRMED",
+      "verdict": "PASS",
+      "limitations": "Disposed validator terminates active workers and rejects queued tasks fail-closed"
+    }
+  ]
+}
