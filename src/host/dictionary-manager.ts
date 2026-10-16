@@ -117,9 +117,13 @@ function validateDescriptor(descriptor: DictionaryActivation): {
     if (dictionary.source !== 'sqlite-fixture') {
       throw new Error(`mode "fixture" requires dictionary source "sqlite-fixture", received "${dictionary.source}"`)
     }
-  } else if (mode === 'managed-ecdict' || mode === 'custom') {
+  } else if (mode === 'managed-ecdict') {
     if (dictionary.source !== 'ecdict-local') {
-      throw new Error(`mode "${mode}" requires dictionary source "ecdict-local", received "${dictionary.source}"`)
+      throw new Error(`mode "managed-ecdict" requires dictionary source "ecdict-local", received "${dictionary.source}"`)
+    }
+  } else if (mode === 'custom') {
+    if (dictionary.source !== 'custom-local') {
+      throw new Error(`mode "custom" requires dictionary source "custom-local", received "${dictionary.source}"`)
     }
   } else {
     throw new Error(`unsupported dictionary mode: "${String(mode)}"`)

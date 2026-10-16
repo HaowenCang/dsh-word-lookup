@@ -45,8 +45,9 @@ export type LookupFailureCode = 'method-not-allowed' | 'unsupported-content-type
  *
  * - `'sqlite-fixture'` — built-in deterministic test fixture.
  * - `'ecdict-local'` — local production ECDICT database build.
+ * - `'custom-local'` — local custom user SQLite database build.
  */
-export type LookupSource = 'sqlite-fixture' | 'ecdict-local';
+export type LookupSource = 'sqlite-fixture' | 'ecdict-local' | 'custom-local';
 /**
  * One sense of a headword.
  *

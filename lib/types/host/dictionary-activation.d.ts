@@ -20,6 +20,7 @@
  * @module dsh-word-lookup/host/dictionary-activation
  */
 import type { Context } from '@deepseek-ai/cordis';
+import type { DictionarySource } from './dictionary.js';
 import { DictionaryManager } from './dictionary-manager.js';
 import { type ManagedStoragePaths, type SettingsSyncState } from './managed-storage.js';
 import { type DictionaryMode, type HostConfig } from './config.js';
@@ -65,7 +66,7 @@ export interface CustomDatabaseVerificationResult {
 export interface ActivationStateSummary {
     readonly activeMode: DictionaryMode;
     readonly configuredMode: DictionaryMode;
-    readonly activeSource: 'sqlite-fixture' | 'ecdict-local';
+    readonly activeSource: DictionarySource;
     readonly activeIdentity: string;
     readonly installed: boolean;
     readonly installedCorpus: InstalledCorpusInfo | null;

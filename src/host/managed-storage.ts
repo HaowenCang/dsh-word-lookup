@@ -44,10 +44,19 @@ export const SAFE_IDENTITY_PATTERN = /^[a-zA-Z0-9._-]{1,64}$/
 export const MANAGED_DATABASE_FILENAME_PATTERN = /^ecdict-[a-zA-Z0-9._-]{1,64}\.sqlite3$/
 
 /** Recognized temporary artifact pattern for safe cleanup. */
-export const STALE_TEMPORARY_ARTIFACT_PATTERN = /^(?:active\.json\.tmp-[a-zA-Z0-9_-]+|.*\.tmp-[a-zA-Z0-9_-]+|.*\.part)$/
+export const STALE_TEMPORARY_ARTIFACT_PATTERN = /^(?:active\.json\.tmp-[a-zA-Z0-9_-]+|.*\.tmp-[a-zA-Z0-9_-]+|.*\.part|staging-[0-9a-fA-F-]{36}\.sqlite3)$/
 
 /** Candidate temporary database filename pattern during build (`ecdict-<identity>.sqlite3.tmp-<candidateId>`). */
 export const CANDIDATE_DATABASE_FILENAME_PATTERN = /^ecdict-[a-zA-Z0-9._-]{1,64}\.sqlite3\.tmp-[a-zA-Z0-9_-]{1,64}$/
+
+/** Staging custom snapshot temporary database filename pattern (`staging-<uuid>.sqlite3`). */
+export const STAGING_SNAPSHOT_FILENAME_PATTERN = /^staging-[0-9a-fA-F-]{36}\.sqlite3$/
+
+/** Published custom snapshot filename pattern (`custom-<identity>.sqlite3`). */
+export const PUBLISHED_SNAPSHOT_FILENAME_PATTERN = /^custom-[a-zA-Z0-9._-]{1,64}\.sqlite3$/
+
+/** Recognized snapshot filename pattern for custom database directory. */
+export const CUSTOM_SNAPSHOT_FILENAME_PATTERN = /^(?:staging-[0-9a-fA-F-]{36}\.sqlite3|custom-[a-zA-Z0-9._-]{1,64}\.sqlite3)$/
 
 /**
  * Check whether a filename matches the candidate temporary database contract.
@@ -124,6 +133,73 @@ export async function validateCandidateDatabasePath(
 }
 
 /**
+ * Validate that a custom snapshot path resides strictly within the managed custom-snapshots directory,
+ * conforms to the staging or published snapshot filename pattern, and does not escape via traversal, symlinks, or junctions.
+ *
+ * @param snapshotPath - snapshot database path.
+ * @param customSnapshotDirectory - expected managed custom-snapshots directory.
+ * @returns normalized resolved snapshot path.
+ */
+export async function validateCustomSnapshotPath(
+  snapshotPath: string,
+  customSnapshotDirectory: string,
+): Promise<string> {
+  if (typeof snapshotPath !== 'string' || snapshotPath.trim().length === 0) {
+    throw new TypeError('Snapshot database path must be a non-empty string')
+  }
+  if (typeof customSnapshotDirectory !== 'string' || customSnapshotDirectory.trim().length === 0) {
+    throw new TypeError('Custom snapshot directory must be a non-empty string')
+  }
+
+  if (snapshotPath.includes('\0') || customSnapshotDirectory.includes('\0')) {
+    throw new Error('Path contains null bytes')
+  }
+
+  const normalizedDir = resolve(customSnapshotDirectory)
+  const resolvedSnapshot = resolve(snapshotPath)
+
+  // 1. Filename contract
+  const snapshotName = basename(resolvedSnapshot)
+  if (!CUSTOM_SNAPSHOT_FILENAME_PATTERN.test(snapshotName)) {
+    throw new Error(
+      `Snapshot database filename "${snapshotName}" violates snapshot naming contract (${CUSTOM_SNAPSHOT_FILENAME_PATTERN.source})`,
+    )
+  }
+
+  // 2. Directory containment check (pre-realpath)
+  const snapshotDir = resolve(resolvedSnapshot, '..')
+  if (snapshotDir !== normalizedDir) {
+    throw new Error(
+      `Snapshot database path "${resolvedSnapshot}" escapes managed custom snapshot directory "${normalizedDir}"`,
+    )
+  }
+
+  // 3. Symlink and junction protection (post-creation inspection)
+  try {
+    const fileStat = await lstat(resolvedSnapshot)
+    if (fileStat.isSymbolicLink()) {
+      throw new Error(`Snapshot database path "${resolvedSnapshot}" must not be a symbolic link`)
+    }
+
+    const realSnapshotPath = await realpath(resolvedSnapshot)
+    const realSnapDir = await realpath(normalizedDir)
+
+    const realParentDir = resolve(realSnapshotPath, '..')
+    if (realParentDir !== realSnapDir || basename(realSnapshotPath) !== snapshotName) {
+      throw new Error(
+        `Snapshot database realpath "${realSnapshotPath}" escapes managed custom snapshot realpath "${realSnapDir}"`,
+      )
+    }
+  } catch (err: any) {
+    if (err?.code !== 'ENOENT') {
+      throw err
+    }
+  }
+
+  return resolvedSnapshot
+}
+
+/**
  * Resolved directory and file paths for managed dictionary storage.
  */
 export interface ManagedStoragePaths {
@@ -135,6 +211,8 @@ export interface ManagedStoragePaths {
   readonly storageDirectory: string
   /** Directory for versioned SQLite databases (`<home>/storages/dsh-word-lookup/databases`). */
   readonly databaseDirectory: string
+  /** Directory for custom SQLite snapshots (`<home>/storages/dsh-word-lookup/custom-snapshots`). */
+  readonly customSnapshotDirectory: string
   /** Path to the active metadata file (`<home>/storages/dsh-word-lookup/active.json`). */
   readonly activeMetadataPath: string
 }
@@ -262,6 +340,7 @@ export function resolveManagedStoragePaths(options?: ResolveManagedStorageOption
   const sourceCacheDirectory = join(home, 'cache', 'dsh-word-lookup', 'sources')
   const storageDirectory = join(home, 'storages', 'dsh-word-lookup')
   const databaseDirectory = join(storageDirectory, 'databases')
+  const customSnapshotDirectory = join(storageDirectory, 'custom-snapshots')
   const activeMetadataPath = join(storageDirectory, 'active.json')
 
   return Object.freeze({
@@ -269,6 +348,7 @@ export function resolveManagedStoragePaths(options?: ResolveManagedStorageOption
     sourceCacheDirectory,
     storageDirectory,
     databaseDirectory,
+    customSnapshotDirectory,
     activeMetadataPath,
   })
 }
@@ -279,12 +359,14 @@ export function resolveManagedStoragePaths(options?: ResolveManagedStorageOption
  * Creates:
  * - `<home>/cache/dsh-word-lookup/sources`
  * - `<home>/storages/dsh-word-lookup/databases`
+ * - `<home>/storages/dsh-word-lookup/custom-snapshots`
  *
  * @param paths - resolved managed storage paths.
  */
 export async function ensureManagedStorageDirectories(paths: ManagedStoragePaths): Promise<void> {
   await mkdir(paths.sourceCacheDirectory, { recursive: true })
   await mkdir(paths.databaseDirectory, { recursive: true })
+  await mkdir(paths.customSnapshotDirectory, { recursive: true })
 }
 
 /**
@@ -564,7 +646,7 @@ export async function writeActiveMetadataAtomically(
  */
 export async function removeStaleTemporaryArtifacts(paths: ManagedStoragePaths): Promise<{ removed: string[] }> {
   const removed: string[] = []
-  const targetDirs = [paths.storageDirectory, paths.databaseDirectory, paths.sourceCacheDirectory]
+  const targetDirs = [paths.storageDirectory, paths.databaseDirectory, paths.sourceCacheDirectory, paths.customSnapshotDirectory]
 
   for (const dir of targetDirs) {
     let entries: string[]

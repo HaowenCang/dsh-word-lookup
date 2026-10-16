@@ -17,6 +17,37 @@
 import { parentPort, workerData } from 'node:worker_threads'
 import { DatabaseSync } from 'node:sqlite'
 
+import {
+  executeCustomSnapshotCreate,
+  executeCustomSnapshotValidate,
+  type CustomSnapshotCreateRequest,
+  type CustomSnapshotCreateSuccessResponse,
+  type CustomSnapshotValidateRequest,
+  type CustomSnapshotValidateSuccessResponse,
+  type CustomWorkerFailureResponse,
+  type CustomWorkerResponse,
+} from './custom-dictionary-worker.js'
+
+export type {
+  CustomSnapshotCreateRequest,
+  CustomSnapshotCreateSuccessResponse,
+  CustomSnapshotValidateRequest,
+  CustomSnapshotValidateSuccessResponse,
+  CustomWorkerFailureResponse,
+  CustomWorkerResponse,
+}
+
+/** Unified companion worker request payload. */
+export type CompanionWorkerRequest =
+  | IntegrityRequest
+  | CustomSnapshotCreateRequest
+  | CustomSnapshotValidateRequest
+
+/** Unified companion worker response payload. */
+export type CompanionWorkerResponse =
+  | IntegrityResponse
+  | CustomWorkerResponse
+
 /** Request payload sent to this worker. */
 export interface IntegrityRequest {
   readonly requestId: string
@@ -65,6 +96,21 @@ function isValidIntegrityRequest(data: unknown): data is IntegrityRequest {
 function runIntegrityWorker(): void {
   if (!parentPort) {
     throw new Error('ecdict-integrity-worker must be executed as a Worker thread with parentPort')
+  }
+
+  // Handle custom snapshot actions if present
+  if (typeof workerData === 'object' && workerData !== null && 'action' in workerData) {
+    const action = (workerData as Record<string, unknown>).action
+    if (action === 'CUSTOM_SNAPSHOT_CREATE') {
+      const res = executeCustomSnapshotCreate(workerData as CustomSnapshotCreateRequest)
+      parentPort.postMessage(res)
+      return
+    }
+    if (action === 'CUSTOM_SNAPSHOT_VALIDATE') {
+      const res = executeCustomSnapshotValidate(workerData as CustomSnapshotValidateRequest)
+      parentPort.postMessage(res)
+      return
+    }
   }
 
   if (!isValidIntegrityRequest(workerData)) {

@@ -15,8 +15,8 @@
  */
 import { type Stats } from 'node:fs';
 import { Worker } from 'node:worker_threads';
-import type { IntegrityRequest, IntegrityResponse } from './ecdict-integrity-worker.js';
-export type { IntegrityRequest, IntegrityResponse, };
+import type { CompanionWorkerRequest, IntegrityRequest, IntegrityResponse } from './ecdict-integrity-worker.js';
+export type { CompanionWorkerRequest, IntegrityRequest, IntegrityResponse, };
 /**
  * Worker termination status distinguishing confirmed exit from unconfirmed/failed termination.
  */
@@ -236,7 +236,7 @@ export interface VerifyCandidateOptions {
  * @param request - verified request payload.
  * @param options - optional test options (dev/test only).
  */
-export declare function spawnIntegrityWorker(request: IntegrityRequest, options?: SpawnIntegrityWorkerOptions): Worker;
+export declare function spawnIntegrityWorker(request: CompanionWorkerRequest, options?: SpawnIntegrityWorkerOptions): Worker;
 /**
  * Execute full PRAGMA integrity_check against a candidate SQLite database in a dedicated Worker.
  *

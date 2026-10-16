@@ -13,6 +13,12 @@
  *
  * @module dsh-word-lookup/host/ecdict-integrity-worker
  */
+import { type CustomSnapshotCreateRequest, type CustomSnapshotCreateSuccessResponse, type CustomSnapshotValidateRequest, type CustomSnapshotValidateSuccessResponse, type CustomWorkerFailureResponse, type CustomWorkerResponse } from './custom-dictionary-worker.js';
+export type { CustomSnapshotCreateRequest, CustomSnapshotCreateSuccessResponse, CustomSnapshotValidateRequest, CustomSnapshotValidateSuccessResponse, CustomWorkerFailureResponse, CustomWorkerResponse, };
+/** Unified companion worker request payload. */
+export type CompanionWorkerRequest = IntegrityRequest | CustomSnapshotCreateRequest | CustomSnapshotValidateRequest;
+/** Unified companion worker response payload. */
+export type CompanionWorkerResponse = IntegrityResponse | CustomWorkerResponse;
 /** Request payload sent to this worker. */
 export interface IntegrityRequest {
     readonly requestId: string;

@@ -40,6 +40,12 @@ export declare const MANAGED_DATABASE_FILENAME_PATTERN: RegExp;
 export declare const STALE_TEMPORARY_ARTIFACT_PATTERN: RegExp;
 /** Candidate temporary database filename pattern during build (`ecdict-<identity>.sqlite3.tmp-<candidateId>`). */
 export declare const CANDIDATE_DATABASE_FILENAME_PATTERN: RegExp;
+/** Staging custom snapshot temporary database filename pattern (`staging-<uuid>.sqlite3`). */
+export declare const STAGING_SNAPSHOT_FILENAME_PATTERN: RegExp;
+/** Published custom snapshot filename pattern (`custom-<identity>.sqlite3`). */
+export declare const PUBLISHED_SNAPSHOT_FILENAME_PATTERN: RegExp;
+/** Recognized snapshot filename pattern for custom database directory. */
+export declare const CUSTOM_SNAPSHOT_FILENAME_PATTERN: RegExp;
 /**
  * Check whether a filename matches the candidate temporary database contract.
  */
@@ -54,6 +60,15 @@ export declare function isCandidateDatabaseFileName(fileName: string): boolean;
  */
 export declare function validateCandidateDatabasePath(candidatePath: string, databaseDirectory: string): Promise<string>;
 /**
+ * Validate that a custom snapshot path resides strictly within the managed custom-snapshots directory,
+ * conforms to the staging or published snapshot filename pattern, and does not escape via traversal, symlinks, or junctions.
+ *
+ * @param snapshotPath - snapshot database path.
+ * @param customSnapshotDirectory - expected managed custom-snapshots directory.
+ * @returns normalized resolved snapshot path.
+ */
+export declare function validateCustomSnapshotPath(snapshotPath: string, customSnapshotDirectory: string): Promise<string>;
+/**
  * Resolved directory and file paths for managed dictionary storage.
  */
 export interface ManagedStoragePaths {
@@ -65,6 +80,8 @@ export interface ManagedStoragePaths {
     readonly storageDirectory: string;
     /** Directory for versioned SQLite databases (`<home>/storages/dsh-word-lookup/databases`). */
     readonly databaseDirectory: string;
+    /** Directory for custom SQLite snapshots (`<home>/storages/dsh-word-lookup/custom-snapshots`). */
+    readonly customSnapshotDirectory: string;
     /** Path to the active metadata file (`<home>/storages/dsh-word-lookup/active.json`). */
     readonly activeMetadataPath: string;
 }
@@ -147,6 +164,7 @@ export declare function resolveManagedStoragePaths(options?: ResolveManagedStora
  * Creates:
  * - `<home>/cache/dsh-word-lookup/sources`
  * - `<home>/storages/dsh-word-lookup/databases`
+ * - `<home>/storages/dsh-word-lookup/custom-snapshots`
  *
  * @param paths - resolved managed storage paths.
  */

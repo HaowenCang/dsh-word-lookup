@@ -823,7 +823,8 @@ export async function runActivationLifecycleProbes() {
 
       const canRemoveAfterInstall = opManager.canRemove() // true, ECDICT status installed
 
-      // Verify that DictionaryManager currently enforces source === 'ecdict-local'
+      // Verify that DictionaryManager enforces correct mode/source alignment:
+      // Passing an invalid source for mode "custom" (e.g. 'sqlite-fixture') must throw fail-closed
       let customManagerActivationThrew = false
       let customManagerSourceReq = null
       try {
@@ -831,7 +832,7 @@ export async function runActivationLifecycleProbes() {
           mode: 'custom',
           identity: 'custom-active',
           dictionary: {
-            source: 'custom-local',
+            source: 'sqlite-fixture',
             lookup: () => ({ found: false, query: '' }),
             close: () => {},
           },
@@ -848,7 +849,7 @@ export async function runActivationLifecycleProbes() {
         initialCanRemove === false &&
         canRemoveAfterInstall === true &&
         customManagerActivationThrew === true &&
-        customManagerSourceReq.includes('requires dictionary source "ecdict-local"')
+        customManagerSourceReq.includes('requires dictionary source')
 
       record(
         'P12',

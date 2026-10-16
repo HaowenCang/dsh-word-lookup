@@ -125,7 +125,7 @@ export interface DictionaryStatusResponse {
     /** Mode currently configured in host settings. */
     readonly configuredMode: 'fixture' | 'managed-ecdict' | 'custom';
     /** Provenance source of active dictionary. */
-    readonly activeSource: 'sqlite-fixture' | 'ecdict-local';
+    readonly activeSource: 'sqlite-fixture' | 'ecdict-local' | 'custom-local';
     /** Active dictionary identity token (or 'fixture'). */
     readonly activeIdentity: string;
     /** Whether a valid managed ECDICT corpus is installed and verified on disk. */

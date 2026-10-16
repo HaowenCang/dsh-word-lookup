@@ -21,8 +21,9 @@
  *
  * - `'sqlite-fixture'` — built-in deterministic test fixture.
  * - `'ecdict-local'` — local production ECDICT database build.
+ * - `'custom-local'` — local custom user SQLite database build.
  */
-export type DictionarySource = 'sqlite-fixture' | 'ecdict-local';
+export type DictionarySource = 'sqlite-fixture' | 'ecdict-local' | 'custom-local';
 /** One sense of a headword, as stored. */
 export interface DictionarySense {
     /** Part of speech, e.g. `verb`. */

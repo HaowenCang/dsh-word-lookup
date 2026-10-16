@@ -183,8 +183,28 @@ describe('DictionaryManager — Initial State & Construction', () => {
         identity: 'inconsistent-custom',
         dictionary: spy3.dictionary,
       })
-    }).toThrow(/mode "custom" requires dictionary source "ecdict-local"/)
+    }).toThrow(/mode "custom" requires dictionary source "custom-local"/)
     expect(spy3.closeCalls).toBe(1)
+
+    const spy4 = createSpyDictionary('ecdict-local')
+    expect(() => {
+      new DictionaryManager({
+        mode: 'custom',
+        identity: 'inconsistent-custom-2',
+        dictionary: spy4.dictionary,
+      })
+    }).toThrow(/mode "custom" requires dictionary source "custom-local"/)
+    expect(spy4.closeCalls).toBe(1)
+
+    const spy5 = createSpyDictionary('custom-local')
+    expect(() => {
+      new DictionaryManager({
+        mode: 'fixture',
+        identity: 'inconsistent-fixture-custom',
+        dictionary: spy5.dictionary,
+      })
+    }).toThrow(/mode "fixture" requires dictionary source "sqlite-fixture"/)
+    expect(spy5.closeCalls).toBe(1)
   })
 
   it('rejects invalid descriptor object or incomplete dictionary', () => {
@@ -330,7 +350,7 @@ describe('DictionaryManager — Atomic Hot Switching', () => {
   it('supports repeated sequential switching A -> B -> C with correct retirement', () => {
     const spyA = createSpyDictionary('sqlite-fixture', { test: makeHit('hit-A') })
     const spyB = createSpyDictionary('ecdict-local', { test: makeHit('hit-B') })
-    const spyC = createSpyDictionary('ecdict-local', { test: makeHit('hit-C') })
+    const spyC = createSpyDictionary('custom-local', { test: makeHit('hit-C') })
 
     const manager = new DictionaryManager({
       mode: 'fixture',
@@ -511,7 +531,7 @@ describe('DictionaryManager — Failure Semantics & Protection Against Handle Le
     if (res.found) expect(res.headword).toBe('B')
 
     // Subsequent activation without error clears lastRetirementError
-    const spyC = createSpyDictionary('ecdict-local', { test: makeHit('C') })
+    const spyC = createSpyDictionary('custom-local', { test: makeHit('C') })
     const result2 = manager.activate({
       mode: 'custom',
       identity: 'custom-clean',

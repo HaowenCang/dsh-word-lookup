@@ -27,7 +27,7 @@ import { basename, join, resolve } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 
 import { openProductionDictionary } from './corpus-db.js'
-import type { Dictionary } from './dictionary.js'
+import type { Dictionary, DictionarySource } from './dictionary.js'
 import { DictionaryManager } from './dictionary-manager.js'
 import { openFixtureDictionary } from './fixture-db.js'
 import { FIXTURE_ENTRIES, FIXTURE_FORMS, FIXTURE_VERSION } from './fixture.js'
@@ -120,7 +120,7 @@ export interface CustomDatabaseVerificationResult {
 export interface ActivationStateSummary {
   readonly activeMode: DictionaryMode
   readonly configuredMode: DictionaryMode
-  readonly activeSource: 'sqlite-fixture' | 'ecdict-local'
+  readonly activeSource: DictionarySource
   readonly activeIdentity: string
   readonly installed: boolean
   readonly installedCorpus: InstalledCorpusInfo | null

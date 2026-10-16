@@ -20,11 +20,13 @@ import { resolve } from 'node:path'
 import { Worker } from 'node:worker_threads'
 
 import type {
+  CompanionWorkerRequest,
   IntegrityRequest,
   IntegrityResponse,
 } from './ecdict-integrity-worker.js'
 
 export type {
+  CompanionWorkerRequest,
   IntegrityRequest,
   IntegrityResponse,
 }
@@ -743,7 +745,7 @@ declare const __PROD_BUNDLE__: boolean | undefined
  * @param options - optional test options (dev/test only).
  */
 export function spawnIntegrityWorker(
-  request: IntegrityRequest,
+  request: CompanionWorkerRequest,
   options?: SpawnIntegrityWorkerOptions,
 ): Worker {
   if (typeof __PROD_BUNDLE__ !== 'undefined' && __PROD_BUNDLE__) {
