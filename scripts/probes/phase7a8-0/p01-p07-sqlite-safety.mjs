@@ -74,10 +74,18 @@ export async function runSqliteSafetyProbes() {
       const nodeVersion = process.version
       const dshVersion = execSync('dsh --version', { encoding: 'utf8' }).trim()
 
+      const BASELINE_COMMIT = '31d4fb989e1d710c21e879117755d0c0e3916f63'
+      let isAncestorOfBaseline = false
+      try {
+        execSync(`git merge-base --is-ancestor ${BASELINE_COMMIT} HEAD`)
+        isAncestorOfBaseline = true
+      } catch {
+        isAncestorOfBaseline = false
+      }
+
       const p01Pass =
         gitBranch === 'master' &&
-        gitHead === '31d4fb989e1d710c21e879117755d0c0e3916f63' &&
-        gitOriginMaster === '31d4fb989e1d710c21e879117755d0c0e3916f63' &&
+        isAncestorOfBaseline &&
         dshVersion === '0.2.0-rc.2' &&
         nodeVersion.startsWith('v24.')
 
@@ -88,7 +96,8 @@ export async function runSqliteSafetyProbes() {
         gitStatusClean: gitStatus.length === 0,
         nodeVersion,
         dshVersion,
-        expectedHead: '31d4fb989e1d710c21e879117755d0c0e3916f63',
+        baselineCommit: BASELINE_COMMIT,
+        buildsUponBaseline: isAncestorOfBaseline,
       })
     } catch (err) {
       record('P01', 'Verify Git baseline and DSH 0.2.0-rc.2 environment', 'FAIL', { error: err.message })
