@@ -8,4 +8,13 @@ export interface ProbeResult {
   timestamp: string
 }
 
+export declare function evaluateP05Predicate(params: {
+  unicodeValid: boolean
+  missingHandledCleanly: boolean
+  directoryHandledCleanly: boolean
+  deleteFailedWhileLocked: boolean
+  deleteLockError: string | null
+  deleteSucceededAfterClose: boolean
+}): boolean
+
 export declare function runSqliteSafetyProbes(): Promise<ProbeResult[]>

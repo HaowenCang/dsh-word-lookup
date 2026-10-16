@@ -11,8 +11,13 @@ describe('Phase 7A.8.0 Probes P08 - P09: Event-Loop Delay & Worker Thread Isolat
     }
 
     const p08 = results.find((r) => r.probeId === 'P08')!
-    expect(p08.details.slaEvaluation.rssOk).toBe(true)
-    expect(p08.details.slaEvaluation.p99Ok).toBe(true)
+    expect(p08.details.resourceEvaluation.slaEvaluation.rssOk).toBe(true)
+    expect(p08.details.resourceEvaluation.slaEvaluation.p99Ok).toBe(true)
+    expect(p08.details.conclusions.MAIN_THREAD_FULL_VERIFY_RECOMMENDED).toBe('NO')
+    expect(p08.details.conclusions.WORKER_FEASIBILITY).toBe('CONFIRMED')
+    expect(p08.details.conclusions['5000MS_TIMEOUT_UNIVERSALLY_SUFFICIENT']).toBe('UNVERIFIED')
+    expect(p08.details.inferredProjections.fullEcdictMainThreadExecuted).toBe(false)
+    expect(p08.details.controlledProbeMeasurements.large_50000.iterations).toBe(3)
 
     const p09 = results.find((r) => r.probeId === 'P09')!
     expect(p09.details.normalVerificationSuccess).toBe(true)
