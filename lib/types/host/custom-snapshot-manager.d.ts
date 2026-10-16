@@ -87,6 +87,38 @@ export declare class SnapshotCleanupError extends Error {
     readonly originalCode?: string;
     constructor(message: string, originalCode?: string);
 }
+export interface StagingOwnershipPayload {
+    readonly version: 1;
+    readonly managerId: string;
+    readonly snapshotId: string;
+    readonly pid: number;
+    readonly processStartTime: number;
+    readonly createdAt: number;
+    readonly hostInstanceId: string;
+}
+export interface StagingCleanupOptions {
+    /**
+     * Explicit recovery of unverified staging files (missing or malformed owner records).
+     * Default is false (fail-closed: do not delete unverified files).
+     */
+    readonly allowUnverifiedRecovery?: boolean;
+    /**
+     * Optional liveness check override for testing cross-process PID reuse or dead owners.
+     */
+    readonly isOwnerAlive?: (owner: StagingOwnershipPayload) => boolean;
+}
+export interface CustomSnapshotHooks {
+    readonly onBeforeValidateCleanup?: (snapshotId: string) => Promise<void> | void;
+    readonly onBeforeUnlinkCleanup?: (snapshotId: string) => Promise<void> | void;
+    readonly onBeforeWriteOwner?: (ownerPath: string) => Promise<void> | void;
+    readonly onAfterCreateStaging?: (stagingPath: string) => Promise<void> | void;
+    readonly openSqliteDictionary?: (options: any) => SqliteDictionary;
+    readonly now?: () => number;
+}
+export declare function _setCustomSnapshotHooksForTesting(hooks: CustomSnapshotHooks | null): void;
+export declare function _getHostProcessInstanceIdForTesting(): string;
+export declare function _getProcessStartTimeForTesting(): number;
+export declare function _resetActiveManagersForTesting(): void;
 /**
  * Manages the lifecycle, creation, verification, and storage of custom SQLite snapshots.
  */
@@ -95,6 +127,7 @@ export declare class CustomSnapshotManager {
     constructor(options: CustomSnapshotManagerOptions);
     get managerId(): string;
     get isDisposed(): boolean;
+    isStagingActive(stagingPath: string): boolean;
     get paths(): ManagedStoragePaths;
     /**
      * Retrieve a snapshot record by ID.
@@ -144,7 +177,7 @@ export declare class CustomSnapshotManager {
      * Scan customSnapshotDirectory and safely remove orphaned staging files.
      * Never deletes staging files actively owned by another manager instance or process.
      */
-    cleanupStagingFiles(): Promise<number>;
+    cleanupStagingFiles(options?: StagingCleanupOptions): Promise<number>;
     /**
      * Dispose manager and validator.
      * Cancels in-flight tasks and cleans up ONLY staging files owned by this manager instance.

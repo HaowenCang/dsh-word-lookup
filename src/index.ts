@@ -90,10 +90,15 @@ import {
   SnapshotActiveReferenceError,
   SnapshotPublishConflictError,
   SnapshotCleanupError,
+  _setCustomSnapshotHooksForTesting,
+  _getHostProcessInstanceIdForTesting,
+  _resetActiveManagersForTesting,
   type CustomSnapshotManagerOptions,
   type CustomSnapshotRecord,
   type SnapshotPublishOptions,
   type SnapshotState,
+  type StagingOwnershipPayload,
+  type StagingCleanupOptions,
 } from './host/custom-snapshot-manager.js'
 import {
   descriptorToActiveMetadataSource,
@@ -275,10 +280,15 @@ export {
   SnapshotActiveReferenceError,
   SnapshotPublishConflictError,
   SnapshotCleanupError,
+  _setCustomSnapshotHooksForTesting,
+  _getHostProcessInstanceIdForTesting,
+  _resetActiveManagersForTesting,
   type CustomSnapshotManagerOptions,
   type CustomSnapshotRecord,
   type SnapshotPublishOptions,
   type SnapshotState,
+  type StagingOwnershipPayload,
+  type StagingCleanupOptions,
 }
 
 /** Package name; equals the Loader entry id and the settings namespace. */

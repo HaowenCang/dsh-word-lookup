@@ -28,7 +28,7 @@
 
 import { randomUUID } from 'node:crypto'
 import { constants, existsSync, lstatSync, statSync } from 'node:fs'
-import { copyFile, link, mkdir, readFile, readdir, unlink, writeFile } from 'node:fs/promises'
+import { copyFile, link, lstat, mkdir, readFile, readdir, unlink, writeFile } from 'node:fs/promises'
 import { isAbsolute, join, resolve } from 'node:path'
 
 import {
@@ -139,11 +139,84 @@ export class SnapshotCleanupError extends Error {
   }
 }
 
-interface StagingOwnershipPayload {
+export interface StagingOwnershipPayload {
+  readonly version: 1
   readonly managerId: string
   readonly snapshotId: string
   readonly pid: number
+  readonly processStartTime: number
   readonly createdAt: number
+  readonly hostInstanceId: string
+}
+
+export interface StagingCleanupOptions {
+  /**
+   * Explicit recovery of unverified staging files (missing or malformed owner records).
+   * Default is false (fail-closed: do not delete unverified files).
+   */
+  readonly allowUnverifiedRecovery?: boolean
+  /**
+   * Optional liveness check override for testing cross-process PID reuse or dead owners.
+   */
+  readonly isOwnerAlive?: (owner: StagingOwnershipPayload) => boolean
+}
+
+export interface CustomSnapshotHooks {
+  readonly onBeforeValidateCleanup?: (snapshotId: string) => Promise<void> | void
+  readonly onBeforeUnlinkCleanup?: (snapshotId: string) => Promise<void> | void
+  readonly onBeforeWriteOwner?: (ownerPath: string) => Promise<void> | void
+  readonly onAfterCreateStaging?: (stagingPath: string) => Promise<void> | void
+  readonly openSqliteDictionary?: (options: any) => SqliteDictionary
+  readonly now?: () => number
+}
+
+const HOST_PROCESS_INSTANCE_ID = randomUUID()
+const PROCESS_START_TIME = Date.now() - Math.floor(process.uptime() * 1000)
+const ACTIVE_MANAGERS = new Map<string, CustomSnapshotManager>()
+
+let customSnapshotHooks: CustomSnapshotHooks | null = null
+
+export function _setCustomSnapshotHooksForTesting(hooks: CustomSnapshotHooks | null): void {
+  customSnapshotHooks = hooks
+}
+
+export function _getHostProcessInstanceIdForTesting(): string {
+  return HOST_PROCESS_INSTANCE_ID
+}
+
+export function _getProcessStartTimeForTesting(): number {
+  return PROCESS_START_TIME
+}
+
+export function _resetActiveManagersForTesting(): void {
+  ACTIVE_MANAGERS.clear()
+}
+
+function parseAndValidateOwnerPayload(content: string): StagingOwnershipPayload | null {
+  try {
+    const parsed = JSON.parse(content)
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      parsed.version === 1 &&
+      typeof parsed.managerId === 'string' &&
+      parsed.managerId.length > 0 &&
+      typeof parsed.snapshotId === 'string' &&
+      parsed.snapshotId.length > 0 &&
+      typeof parsed.pid === 'number' &&
+      Number.isInteger(parsed.pid) &&
+      parsed.pid > 0 &&
+      typeof parsed.processStartTime === 'number' &&
+      typeof parsed.createdAt === 'number' &&
+      typeof parsed.hostInstanceId === 'string' &&
+      parsed.hostInstanceId.length > 0
+    ) {
+      return parsed as StagingOwnershipPayload
+    }
+  } catch {
+    return null
+  }
+  return null
 }
 
 /**
@@ -156,6 +229,7 @@ export class CustomSnapshotManager {
   readonly #maxSizeBytes: number
   readonly #snapshots = new Map<string, CustomSnapshotRecord>()
   readonly #ownedStagingFiles = new Set<string>()
+  readonly #inFlightCleanups = new Map<string, Promise<boolean>>()
 
   #disposed = false
 
@@ -166,6 +240,7 @@ export class CustomSnapshotManager {
     this.#paths = options.paths
     this.#validator = options.validator ?? new CustomDictionaryValidator()
     this.#maxSizeBytes = options.maxSizeBytes ?? 2 * 1024 * 1024 * 1024 // 2 GiB
+    ACTIVE_MANAGERS.set(this.#managerId, this)
   }
 
   get managerId(): string {
@@ -174,6 +249,10 @@ export class CustomSnapshotManager {
 
   get isDisposed(): boolean {
     return this.#disposed
+  }
+
+  isStagingActive(stagingPath: string): boolean {
+    return !this.#disposed && this.#ownedStagingFiles.has(stagingPath)
   }
 
   get paths(): ManagedStoragePaths {
@@ -277,16 +356,26 @@ export class CustomSnapshotManager {
 
     // Establish staging ownership record
     this.#ownedStagingFiles.add(stagingPath)
+    const ownerPayload: StagingOwnershipPayload = {
+      version: 1,
+      managerId: this.#managerId,
+      snapshotId: id,
+      pid: process.pid,
+      processStartTime: PROCESS_START_TIME,
+      createdAt: customSnapshotHooks?.now ? customSnapshotHooks.now() : Date.now(),
+      hostInstanceId: HOST_PROCESS_INSTANCE_ID,
+    }
+
     try {
-      const ownerPayload: StagingOwnershipPayload = {
-        managerId: this.#managerId,
-        snapshotId: id,
-        pid: process.pid,
-        createdAt: Date.now(),
+      if (customSnapshotHooks?.onBeforeWriteOwner) {
+        await customSnapshotHooks.onBeforeWriteOwner(ownerPath)
       }
       await writeFile(ownerPath, JSON.stringify(ownerPayload), { flag: 'wx' })
-    } catch {
-      // Non-fatal if ownership file creation fails; memory set holds ownership
+    } catch (ownerErr: unknown) {
+      this.#ownedStagingFiles.delete(stagingPath)
+      throw new Error(
+        `Failed to establish staging ownership record at "${ownerPath}": ${ownerErr instanceof Error ? ownerErr.message : String(ownerErr)}`,
+      )
     }
 
     // Compute external logical identity
@@ -347,6 +436,10 @@ export class CustomSnapshotManager {
         byteSize: createRes.byteSize,
       }
       this.#snapshots.set(id, record)
+
+      if (customSnapshotHooks?.onAfterCreateStaging) {
+        await customSnapshotHooks.onAfterCreateStaging(stagingPath)
+      }
 
       // Step B: Validate Snapshot via Worker
       record = { ...record, state: 'VERIFYING' }
@@ -519,6 +612,23 @@ export class CustomSnapshotManager {
       throw new Error(`Snapshot "${snapshotId}" is not tracked by this manager`)
     }
 
+    if (
+      record.state === 'CLEANUP_PENDING' ||
+      record.state === 'DELETED' ||
+      record.state === 'RETIRING' ||
+      record.state === 'REJECTED' ||
+      record.state === 'STAGING' ||
+      record.state === 'CREATING' ||
+      record.state === 'CREATED_UNVERIFIED' ||
+      record.state === 'VERIFYING' ||
+      record.state === 'VERIFIED' ||
+      record.state === 'PUBLISHING'
+    ) {
+      throw new Error(
+        `Snapshot "${snapshotId}" is in state "${record.state}" and cannot be opened as a dictionary`,
+      )
+    }
+
     const isPublishedState =
       record.state === 'PUBLISHED_INACTIVE' ||
       record.state === 'ACTIVE' ||
@@ -531,7 +641,10 @@ export class CustomSnapshotManager {
       )
     }
 
-    const currentLeases = record.activeLeases + 1
+    // Transactional lease reservation:
+    const prevLeases = record.activeLeases
+    const prevState = record.state
+    const currentLeases = prevLeases + 1
     const updatedRecord: CustomSnapshotRecord = {
       ...record,
       activeLeases: currentLeases,
@@ -539,11 +652,34 @@ export class CustomSnapshotManager {
     }
     this.#snapshots.set(snapshotId, updatedRecord)
 
-    const dict = openSqliteDictionary({
-      path: record.publishedPath,
-      readOnly: true,
-      source: 'custom-local',
-    })
+    const doOpen = customSnapshotHooks?.openSqliteDictionary ?? openSqliteDictionary
+    let dict: SqliteDictionary
+    try {
+      if (this.#disposed) {
+        throw new Error('CustomSnapshotManager has been disposed')
+      }
+      dict = doOpen({
+        path: record.publishedPath,
+        readOnly: true,
+        source: 'custom-local',
+      })
+    } catch (openError: unknown) {
+      // Transactional rollback of exactly this reserved lease
+      const currentRec = this.#snapshots.get(snapshotId)
+      if (currentRec) {
+        const rolledLeases = Math.max(0, currentRec.activeLeases - 1)
+        const rolledState =
+          rolledLeases > 0
+            ? 'ACTIVE'
+            : (prevState === 'ACTIVE' ? 'PUBLISHED_INACTIVE' : prevState)
+        this.#snapshots.set(snapshotId, {
+          ...currentRec,
+          activeLeases: rolledLeases,
+          state: rolledState,
+        })
+      }
+      throw openError
+    }
 
     const originalClose = dict.close.bind(dict)
     let leaseReleased = false
@@ -622,47 +758,87 @@ export class CustomSnapshotManager {
       return true
     }
 
+    // Deduplicate concurrent cleanup calls (atomic idempotency)
+    const existing = this.#inFlightCleanups.get(snapshotId)
+    if (existing) {
+      return await existing
+    }
+
     // Active reference protection: reject cleanup while query connections are held
-    if (record.activeLeases > 0 || record.state === 'ACTIVE' || record.state === 'RETIRING') {
+    if (
+      record.activeLeases > 0 ||
+      record.state === 'ACTIVE' ||
+      record.state === 'RETIRING' ||
+      record.state === 'PUBLISHED_LEASED'
+    ) {
       throw new SnapshotActiveReferenceError(
         `Cannot clean up snapshot "${snapshotId}" while ${record.activeLeases} active dictionary reference(s) exist (state: ${record.state})`,
         record.activeLeases,
       )
     }
 
-    try {
-      await validateCustomSnapshotPath(record.publishedPath, this.#paths.customSnapshotDirectory)
+    const isEligible =
+      record.state === 'PUBLISHED_INACTIVE' ||
+      record.state === 'PUBLISHED' ||
+      record.state === 'CLEANUP_PENDING'
 
-      this.#snapshots.set(snapshotId, {
-        ...record,
-        state: 'CLEANUP_PENDING',
-      })
-
-      if (existsSync(record.publishedPath)) {
-        await unlink(record.publishedPath)
-      }
-
-      this.#snapshots.set(snapshotId, {
-        ...record,
-        state: 'DELETED',
-      })
-      return true
-    } catch (err: unknown) {
-      const errCode = (err as { code?: string })?.code ?? 'CLEANUP_FAILED'
-      const errMsg = err instanceof Error ? err.message : String(err)
-
-      this.#snapshots.set(snapshotId, {
-        ...record,
-        state: 'CLEANUP_PENDING',
-        error: errMsg,
-        errorCode: errCode,
-      })
-
-      throw new SnapshotCleanupError(
-        `Failed to delete snapshot file "${record.publishedPath}": ${errMsg}`,
-        errCode,
+    if (!isEligible) {
+      throw new Error(
+        `Cannot clean up snapshot "${snapshotId}" in state "${record.state}"`,
       )
     }
+
+    // SYNCHRONOUS TRANSITION: Claim deletion ownership before ANY await!
+    this.#snapshots.set(snapshotId, {
+      ...record,
+      state: 'CLEANUP_PENDING',
+    })
+
+    const cleanupPromise = (async (): Promise<boolean> => {
+      try {
+        if (customSnapshotHooks?.onBeforeValidateCleanup) {
+          await customSnapshotHooks.onBeforeValidateCleanup(snapshotId)
+        }
+
+        await validateCustomSnapshotPath(record.publishedPath!, this.#paths.customSnapshotDirectory)
+
+        if (customSnapshotHooks?.onBeforeUnlinkCleanup) {
+          await customSnapshotHooks.onBeforeUnlinkCleanup(snapshotId)
+        }
+
+        if (existsSync(record.publishedPath!)) {
+          await unlink(record.publishedPath!)
+        }
+
+        this.#snapshots.set(snapshotId, {
+          ...this.#snapshots.get(snapshotId)!,
+          state: 'DELETED',
+          error: null,
+          errorCode: null,
+        })
+        return true
+      } catch (err: unknown) {
+        const errCode = (err as { code?: string })?.code ?? 'CLEANUP_FAILED'
+        const errMsg = err instanceof Error ? err.message : String(err)
+
+        this.#snapshots.set(snapshotId, {
+          ...this.#snapshots.get(snapshotId)!,
+          state: 'CLEANUP_PENDING',
+          error: errMsg,
+          errorCode: errCode,
+        })
+
+        throw new SnapshotCleanupError(
+          `Failed to delete snapshot file "${record.publishedPath}": ${errMsg}`,
+          errCode,
+        )
+      } finally {
+        this.#inFlightCleanups.delete(snapshotId)
+      }
+    })()
+
+    this.#inFlightCleanups.set(snapshotId, cleanupPromise)
+    return await cleanupPromise
   }
 
   /**
@@ -684,7 +860,7 @@ export class CustomSnapshotManager {
    * Scan customSnapshotDirectory and safely remove orphaned staging files.
    * Never deletes staging files actively owned by another manager instance or process.
    */
-  async cleanupStagingFiles(): Promise<number> {
+  async cleanupStagingFiles(options?: StagingCleanupOptions): Promise<number> {
     let cleaned = 0
     if (!existsSync(this.#paths.customSnapshotDirectory)) return 0
 
@@ -695,39 +871,107 @@ export class CustomSnapshotManager {
           const fullPath = join(this.#paths.customSnapshotDirectory, entry)
           const ownerPath = `${fullPath}.owner`
 
-          // Check if this staging file is actively owned by this manager
-          if (this.#ownedStagingFiles.has(fullPath) && !this.#disposed) {
-            // Actively in progress in this manager, do not delete
+          // Path safety and object type check (fail-closed against symlinks / non-files)
+          try {
+            const st = await lstat(fullPath)
+            if (st.isSymbolicLink() || !st.isFile()) {
+              continue
+            }
+            await validateCustomSnapshotPath(fullPath, this.#paths.customSnapshotDirectory)
+          } catch {
             continue
           }
 
-          // Check owner file to prevent deleting another active manager's staging file
-          if (existsSync(ownerPath)) {
-            try {
-              const content = await readFile(ownerPath, 'utf8')
-              const owner = JSON.parse(content) as StagingOwnershipPayload
-              if (owner && typeof owner.pid === 'number') {
-                if (owner.managerId !== this.#managerId) {
-                  let isPidAlive = false
-                  try {
-                    process.kill(owner.pid, 0)
-                    isPidAlive = true
-                  } catch {
-                    isPidAlive = false
-                  }
-                  // If other process is still running and created less than 1 hour ago, do NOT touch!
-                  if (isPidAlive && Date.now() - owner.createdAt < 3600000) {
-                    continue
-                  }
-                }
-              }
-            } catch {
-              // Ignore owner file read/parse errors
+          // In-process active manager check: if actively owned by this manager, skip!
+          if (this.#ownedStagingFiles.has(fullPath) && !this.#disposed) {
+            continue
+          }
+
+          // Owner file check
+          if (!existsSync(ownerPath)) {
+            if (!options?.allowUnverifiedRecovery) {
+              // Fail-closed: missing owner record, do NOT delete without explicit recovery
+              continue
             }
+            try {
+              await unlink(fullPath)
+              cleaned++
+            } catch {}
+            continue
           }
 
           try {
-            await validateCustomSnapshotPath(fullPath, this.#paths.customSnapshotDirectory)
+            const ownerStat = await lstat(ownerPath)
+            if (ownerStat.isSymbolicLink() || !ownerStat.isFile()) {
+              if (!options?.allowUnverifiedRecovery) continue
+            }
+          } catch {
+            if (!options?.allowUnverifiedRecovery) continue
+          }
+
+          let owner: StagingOwnershipPayload | null = null
+          try {
+            const content = await readFile(ownerPath, 'utf8')
+            owner = parseAndValidateOwnerPayload(content)
+          } catch {
+            owner = null
+          }
+
+          if (!owner) {
+            if (!options?.allowUnverifiedRecovery) {
+              // Fail-closed: malformed owner record, do NOT delete without explicit recovery
+              continue
+            }
+            try {
+              await unlink(fullPath)
+              if (existsSync(ownerPath)) await unlink(ownerPath).catch(() => {})
+              cleaned++
+            } catch {}
+            continue
+          }
+
+          let isDead = false
+
+          if (options?.isOwnerAlive) {
+            const alive = options.isOwnerAlive(owner)
+            isDead = !alive
+          } else if (owner.pid === process.pid) {
+            if (owner.hostInstanceId === HOST_PROCESS_INSTANCE_ID) {
+              const activeMgr = ACTIVE_MANAGERS.get(owner.managerId)
+              if (activeMgr && activeMgr.isStagingActive(fullPath)) {
+                // Active manager in current process owns this file -> survives regardless of elapsed time!
+                isDead = false
+              } else {
+                // Manager is disposed or no longer tracks this staging file -> confirmed dead!
+                isDead = true
+              }
+            } else {
+              // Same PID but different hostInstanceId -> PID was reused by current process!
+              isDead = true
+            }
+          } else {
+            // Cross-process
+            let isPidAlive = false
+            try {
+              process.kill(owner.pid, 0)
+              isPidAlive = true
+            } catch {
+              isPidAlive = false
+            }
+
+            if (!isPidAlive) {
+              isDead = true
+            } else {
+              // Process exists in OS, cannot prove it lost ownership -> fail-closed
+              isDead = false
+            }
+          }
+
+          if (!isDead) {
+            continue
+          }
+
+          try {
             await unlink(fullPath)
             cleaned++
             if (existsSync(ownerPath)) {
@@ -753,6 +997,8 @@ export class CustomSnapshotManager {
   async dispose(): Promise<void> {
     if (this.#disposed) return
     this.#disposed = true
+
+    ACTIVE_MANAGERS.delete(this.#managerId)
 
     await this.#validator.dispose()
 

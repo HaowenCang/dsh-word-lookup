@@ -19,7 +19,7 @@ import {
 } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 
 import {
@@ -645,8 +645,37 @@ describe('Phase 7A.8.1AR: Scenario Acceptance Matrix (R01–R22)', () => {
   })
 
   // R16: symlink/junction 实际逃逸
-  it('R16: rejects file symlinks and directory junctions attempting to escape or breach managed boundaries', async () => {
+  it('R16: rejects file symlinks, junctions, and directory reparse points attempting to escape or breach managed boundaries', async () => {
     const tmp = createTempDir('r16-')
+    const probeTarget = join(tmp, 'probe-target.txt')
+    writeFileSync(probeTarget, 'test')
+    const probeLink = join(tmp, 'probe-link.txt')
+
+    let symlinkSupported = false
+    try {
+      symlinkSync(probeTarget, probeLink, 'file')
+      symlinkSupported = true
+      unlinkSync(probeLink)
+    } catch {
+      symlinkSupported = false
+    }
+
+    let junctionSupported = false
+    const probeDir = join(tmp, 'probe-dir')
+    mkdirSync(probeDir, { recursive: true })
+    const probeJunc = join(tmp, 'probe-junc')
+    try {
+      symlinkSync(probeDir, probeJunc, 'junction')
+      junctionSupported = true
+      unlinkSync(probeJunc)
+    } catch {
+      junctionSupported = false
+    }
+
+    if (!symlinkSupported) {
+      throw new Error('NOT_EXECUTED: Environment lacks symlink creation privileges')
+    }
+
     const homeDir = join(tmp, 'home')
     const paths = resolveManagedStoragePaths({ home: homeDir })
     await mkdir(paths.customSnapshotDirectory, { recursive: true })
@@ -656,36 +685,51 @@ describe('Phase 7A.8.1AR: Scenario Acceptance Matrix (R01–R22)', () => {
     const outsideDb = join(externalDir, 'outside.sqlite3')
     buildValidTestDatabase(outsideDb)
 
-    // Staging file symlink
+    // 1. Staging file symlink
     const symlinkTarget = join(paths.customSnapshotDirectory, `staging-${randomUUID()}.sqlite3`)
-    let created = false
-    try {
-      symlinkSync(outsideDb, symlinkTarget, 'file')
-      created = true
-    } catch {}
+    symlinkSync(outsideDb, symlinkTarget, 'file')
+    await expect(
+      validateCustomSnapshotPath(symlinkTarget, paths.customSnapshotDirectory),
+    ).rejects.toThrow(/must not be a symbolic link/i)
+    try { unlinkSync(symlinkTarget) } catch {}
 
-    if (created) {
-      await expect(
-        validateCustomSnapshotPath(symlinkTarget, paths.customSnapshotDirectory),
-      ).rejects.toThrow(/must not be a symbolic link/i)
-      try { unlinkSync(symlinkTarget) } catch {}
+    // 2. Source database as symlink
+    const symlinkSource = join(tmp, 'src-symlink.sqlite3')
+    symlinkSync(outsideDb, symlinkSource, 'file')
+    const manager = new CustomSnapshotManager({ paths })
+    try {
+      await expect(manager.createAndPublishSnapshot(symlinkSource)).rejects.toThrow(/must not be a symbolic link/i)
+    } finally {
+      await manager.dispose()
+      try { unlinkSync(symlinkSource) } catch {}
     }
 
-    // Source database as symlink
-    const symlinkSource = join(tmp, 'src-symlink.sqlite3')
-    let srcCreated = false
-    try {
-      symlinkSync(outsideDb, symlinkSource, 'file')
-      srcCreated = true
-    } catch {}
+    // 3. Directory junction: custom snapshot directory itself as a junction pointing outside
+    if (junctionSupported) {
+      const juncHome = join(tmp, 'junc-home')
+      const juncPaths = resolveManagedStoragePaths({ home: juncHome })
+      mkdirSync(juncPaths.storageDirectory, { recursive: true })
+      symlinkSync(externalDir, juncPaths.customSnapshotDirectory, 'junction')
 
-    if (srcCreated) {
-      const manager = new CustomSnapshotManager({ paths })
-      try {
-        await expect(manager.createAndPublishSnapshot(symlinkSource)).rejects.toThrow(/must not be a symbolic link/i)
-      } finally {
-        await manager.dispose()
-      }
+      const dummySnapshot = join(juncPaths.customSnapshotDirectory, `custom-${randomUUID()}.sqlite3`)
+      await expect(
+        validateCustomSnapshotPath(dummySnapshot, juncPaths.customSnapshotDirectory),
+      ).rejects.toThrow(/must not be a symbolic link or junction/i)
+
+      try { unlinkSync(juncPaths.customSnapshotDirectory) } catch {}
+
+      // 4. Parent directory reparse point / junction
+      const parentJuncHome = join(tmp, 'parent-junc-home')
+      const parentJuncPaths = resolveManagedStoragePaths({ home: parentJuncHome })
+      mkdirSync(resolve(parentJuncPaths.storageDirectory, '..'), { recursive: true })
+      symlinkSync(externalDir, parentJuncPaths.storageDirectory, 'junction')
+
+      const parentJuncSnapshot = join(parentJuncPaths.customSnapshotDirectory, `custom-${randomUUID()}.sqlite3`)
+      await expect(
+        validateCustomSnapshotPath(parentJuncSnapshot, parentJuncPaths.customSnapshotDirectory),
+      ).rejects.toThrow(/must not be a symbolic link or junction/i)
+
+      try { unlinkSync(parentJuncPaths.storageDirectory) } catch {}
     }
 
     rmSync(tmp, { recursive: true, force: true })
@@ -834,8 +878,8 @@ describe('Phase 7A.8.1AR: Scenario Acceptance Matrix (R01–R22)', () => {
     }
   })
 
-  // R22: 旧 ECDICT 全量兼容
-  it('R22: maintains 100% regression compatibility with existing ECDICT and Fixture functionality', async () => {
+  // R22A: Fixture 兼容性
+  it('R22A: maintains 100% regression compatibility with existing built-in fixture functionality', async () => {
     const { openFixtureDictionary } = await import('../src/host/fixture-db.js')
     const fixtureDict = openFixtureDictionary()
     const dictManager = new DictionaryManager({
@@ -853,10 +897,62 @@ describe('Phase 7A.8.1AR: Scenario Acceptance Matrix (R01–R22)', () => {
         expect(hit.headword).toBe('derive')
       }
 
+      const hitForm = dictManager.lookup('derived')
+      expect(hitForm.found).toBe(true)
+
       const miss = dictManager.lookup('nonexistent_word_xyz')
       expect(miss.found).toBe(false)
     } finally {
       dictManager.close()
+    }
+  })
+
+  // R22B: Managed ECDICT 兼容性
+  it('R22B: maintains 100% regression compatibility with managed-ecdict query semantics', async () => {
+    const { openSqliteDictionary } = await import('../src/host/sqlite-dictionary.js')
+    const tmp = createTempDir('r22b-')
+    const dbPath = join(tmp, 'ecdict-compat.sqlite3')
+
+    buildValidTestDatabase(dbPath)
+
+    const ecdictDict = openSqliteDictionary({
+      path: dbPath,
+      readOnly: true,
+      source: 'ecdict-local',
+    })
+
+    const dictManager = new DictionaryManager({
+      mode: 'managed-ecdict',
+      identity: 'ecdict-v1-compat',
+      dictionary: ecdictDict,
+    })
+
+    try {
+      expect(dictManager.source).toBe('ecdict-local')
+      expect(dictManager.snapshot().activeMode).toBe('managed-ecdict')
+
+      // 1. Headword query
+      const hitHeadword = dictManager.lookup('apple')
+      expect(hitHeadword.found).toBe(true)
+      if (hitHeadword.found) {
+        expect(hitHeadword.headword).toBe('apple')
+        expect(hitHeadword.senses[0]?.translation).toBe('苹果')
+        expect(hitHeadword.examples.length).toBeGreaterThan(0)
+      }
+
+      // 2. Inflected form query
+      const hitForm = dictManager.lookup('apples')
+      expect(hitForm.found).toBe(true)
+      if (hitForm.found) {
+        expect(hitForm.headword).toBe('apple')
+      }
+
+      // 3. Nonexistent word
+      const miss = dictManager.lookup('nonexistent_word_xyz')
+      expect(miss.found).toBe(false)
+    } finally {
+      dictManager.close()
+      rmSync(tmp, { recursive: true, force: true })
     }
   })
 })

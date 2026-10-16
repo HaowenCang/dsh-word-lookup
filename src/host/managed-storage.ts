@@ -178,13 +178,24 @@ export async function validateCustomSnapshotPath(
     )
   }
 
-  // 3. Parent directory symlink & junction inspection (even if snapshot file does not exist yet)
+  // 3. Directory and ancestor symlink & junction inspection (even if snapshot file or directory does not exist yet)
+  let curr = normalizedDir
+  while (curr && curr !== resolve(curr, '..')) {
+    try {
+      const stat = await lstat(curr)
+      if (stat.isSymbolicLink()) {
+        throw new Error(`Custom snapshot directory path "${curr}" must not be a symbolic link or junction`)
+      }
+    } catch (err: any) {
+      if (err?.code !== 'ENOENT') {
+        throw err
+      }
+    }
+    curr = resolve(curr, '..')
+  }
+
   let realSnapDir = normalizedDir
   try {
-    const dirStat = await lstat(normalizedDir)
-    if (dirStat.isSymbolicLink()) {
-      throw new Error(`Custom snapshot directory "${normalizedDir}" must not be a symbolic link or junction`)
-    }
     realSnapDir = await realpath(normalizedDir)
   } catch (err: any) {
     if (err?.code !== 'ENOENT') {

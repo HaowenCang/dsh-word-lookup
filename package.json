@@ -86,6 +86,8 @@
     "test:mgmt-runtime": "node scripts/phase7a6-management-runtime.mjs",
     "test:mgmt-e2e": "node scripts/test-phase7a6-management-e2e.mjs",
     "test:settings-e2e": "node scripts/phase7a7-settings-e2e.mjs",
+    "test:phase7a8-1ar": "node scripts/probes/phase7a8-1ar/r01-r22-acceptance-matrix.mjs",
+    "test:phase7a8-1ar2": "node scripts/probes/phase7a8-1ar2/l01-l12-acceptance-matrix.mjs",
     "test:acceptance": "node scripts/phase5-browser-acceptance.mjs",
     "test:native-input": "node scripts/phase421-native-input-probe.mjs",
     "test:native-input:preflight": "node scripts/phase421-native-input-probe.mjs --preflight",

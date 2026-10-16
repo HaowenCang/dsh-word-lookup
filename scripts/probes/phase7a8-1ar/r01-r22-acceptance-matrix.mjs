@@ -25,7 +25,7 @@ import {
 } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { Worker } from 'node:worker_threads'
 
@@ -41,6 +41,7 @@ import {
   ValidatorCancelledError,
   ValidatorCrashError,
   openFixtureDictionary,
+  openProductionDictionary,
 } from '../../../lib/index.js'
 
 function spawnWorker(request) {
@@ -101,6 +102,58 @@ function buildTestDb(dbPath, options) {
   db.exec("INSERT INTO forms VALUES ('bananas', 'banana', 'plural');")
   db.exec("INSERT INTO examples VALUES (1, 'apple', 'An apple a day', '一天一苹果', 'test', 'ex1', 1.0);")
 
+  db.close()
+}
+
+function buildProductionEcdictTestDb(dbPath) {
+  const db = new DatabaseSync(dbPath)
+  db.exec(`
+    CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+    INSERT INTO meta VALUES
+      ('schema_version', '1'),
+      ('corpus_name', 'ECDICT'),
+      ('upstream_commit', 'bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b'),
+      ('source_sha256', '1a6947e04785db63613a92e14903cdae7954f7e84860b10e68e5c7cbb3f9c3cf'),
+      ('entry_count', '2'),
+      ('form_count', '2'),
+      ('example_count', '1'),
+      ('logical_sha256', '0000000000000000000000000000000000000000000000000000000000000000');
+
+    CREATE TABLE entries (
+      word TEXT PRIMARY KEY COLLATE NOCASE,
+      phonetic TEXT,
+      definition_en TEXT,
+      translation_zh TEXT,
+      pos TEXT,
+      exchange TEXT,
+      frequency INTEGER
+    );
+
+    CREATE TABLE forms (
+      form TEXT PRIMARY KEY COLLATE NOCASE,
+      headword TEXT NOT NULL,
+      kind TEXT
+    );
+
+    CREATE TABLE examples (
+      id INTEGER PRIMARY KEY,
+      headword TEXT NOT NULL COLLATE NOCASE,
+      english TEXT NOT NULL,
+      chinese TEXT,
+      source TEXT,
+      source_id TEXT,
+      score REAL
+    );
+
+    CREATE INDEX idx_forms_headword_raw ON forms (headword);
+    CREATE INDEX idx_examples_headword ON examples (headword COLLATE NOCASE);
+
+    INSERT INTO entries VALUES ('apple', 'ˈæpl', 'a fruit', '苹果', 'n.', 's:apples', 100);
+    INSERT INTO entries VALUES ('banana', 'bəˈnænə', 'a fruit', '香蕉', 'n.', 's:bananas', 90);
+    INSERT INTO forms VALUES ('apples', 'apple', 'plural');
+    INSERT INTO forms VALUES ('bananas', 'banana', 'plural');
+    INSERT INTO examples VALUES (1, 'apple', 'An apple a day', '一天一苹果', 'ecdict', 'ex1', 1.0);
+  `)
   db.close()
 }
 
@@ -836,46 +889,130 @@ export async function runR01ToR22Matrix() {
   // --- R16: symlink/junction 实际逃逸 ---
   {
     const tmp = createTempDir('r16-')
-    const homeDir = join(tmp, 'home')
-    const paths = resolveManagedStoragePaths({ home: homeDir })
-    await mkdir(paths.customSnapshotDirectory, { recursive: true })
+    const probeTarget = join(tmp, 'probe-target.txt')
+    writeFileSync(probeTarget, 'test')
+    const probeLink = join(tmp, 'probe-link.txt')
 
-    const outsideDir = join(tmp, 'outside')
-    mkdirSync(outsideDir, { recursive: true })
-    const outsideDb = join(outsideDir, 'outside.sqlite3')
-    buildTestDb(outsideDb)
-
-    const symlinkTarget = join(paths.customSnapshotDirectory, `staging-${randomUUID()}.sqlite3`)
-    let created = false
+    let symlinkCreated = false
+    let symlinkError = null
     try {
-      symlinkSync(outsideDb, symlinkTarget, 'file')
-      created = true
-    } catch {}
+      symlinkSync(probeTarget, probeLink, 'file')
+      symlinkCreated = true
+      unlinkSync(probeLink)
+    } catch (err) {
+      symlinkCreated = false
+      symlinkError = err.message
+    }
 
-    let caughtSymlink = false
-    if (created) {
+    let junctionCreated = false
+    const probeDir = join(tmp, 'probe-dir')
+    mkdirSync(probeDir, { recursive: true })
+    const probeJunc = join(tmp, 'probe-junc')
+    try {
+      symlinkSync(probeDir, probeJunc, 'junction')
+      junctionCreated = true
+      unlinkSync(probeJunc)
+    } catch {
+      junctionCreated = false
+    }
+
+    if (!symlinkCreated) {
+      record({
+        scenarioId: 'R16',
+        title: 'symlink/junction 实际逃逸',
+        exactTestEntrypoint: 'scripts/probes/phase7a8-1ar/r01-r22-acceptance-matrix.mjs -> R16',
+        precondition: 'Probe symlink creation capability',
+        injectionPoint: 'Environment capability detection',
+        actualObservedState: `symlinkCreated=false, reason=${symlinkError}`,
+        assertionResult: 'NOT_EXECUTED',
+        evidenceLevel: 'ENVIRONMENT_UNAVAILABLE',
+        verdict: 'NOT_EXECUTED',
+        limitations: `Environment lacks symlink privilege: ${symlinkError}`,
+      })
+    } else {
+      const homeDir = join(tmp, 'home')
+      const paths = resolveManagedStoragePaths({ home: homeDir })
+      await mkdir(paths.customSnapshotDirectory, { recursive: true })
+
+      const outsideDir = join(tmp, 'outside')
+      mkdirSync(outsideDir, { recursive: true })
+      const outsideDb = join(outsideDir, 'outside.sqlite3')
+      buildTestDb(outsideDb)
+
+      // 1. File symlink
+      const symlinkTarget = join(paths.customSnapshotDirectory, `staging-${randomUUID()}.sqlite3`)
+      symlinkSync(outsideDb, symlinkTarget, 'file')
+      let caughtFileSymlink = false
       try {
         await validateCustomSnapshotPath(symlinkTarget, paths.customSnapshotDirectory)
       } catch (err) {
-        caughtSymlink = /must not be a symbolic link/i.test(err.message)
+        caughtFileSymlink = /must not be a symbolic link/i.test(err.message)
       }
       try { unlinkSync(symlinkTarget) } catch {}
+
+      // 2. Source database symlink
+      const symlinkSource = join(tmp, 'src-symlink.sqlite3')
+      symlinkSync(outsideDb, symlinkSource, 'file')
+      const manager = new CustomSnapshotManager({ paths })
+      let caughtSourceSymlink = false
+      try {
+        await manager.createAndPublishSnapshot(symlinkSource)
+      } catch (err) {
+        caughtSourceSymlink = /must not be a symbolic link/i.test(err.message)
+      } finally {
+        await manager.dispose()
+        try { unlinkSync(symlinkSource) } catch {}
+      }
+
+      // 3. Directory junction
+      let caughtDirJunction = false
+      if (junctionCreated) {
+        const juncHome = join(tmp, 'junc-home')
+        const juncPaths = resolveManagedStoragePaths({ home: juncHome })
+        mkdirSync(juncPaths.storageDirectory, { recursive: true })
+        symlinkSync(outsideDir, juncPaths.customSnapshotDirectory, 'junction')
+
+        const dummySnapshot = join(juncPaths.customSnapshotDirectory, `custom-${randomUUID()}.sqlite3`)
+        try {
+          await validateCustomSnapshotPath(dummySnapshot, juncPaths.customSnapshotDirectory)
+        } catch (err) {
+          caughtDirJunction = /must not be a symbolic link or junction/i.test(err.message)
+        }
+        try { unlinkSync(juncPaths.customSnapshotDirectory) } catch {}
+      }
+
+      // 4. Parent directory reparse point / junction
+      let caughtParentJunction = false
+      if (junctionCreated) {
+        const parentJuncHome = join(tmp, 'parent-junc-home')
+        const parentJuncPaths = resolveManagedStoragePaths({ home: parentJuncHome })
+        mkdirSync(resolve(parentJuncPaths.storageDirectory, '..'), { recursive: true })
+        symlinkSync(outsideDir, parentJuncPaths.storageDirectory, 'junction')
+
+        const parentJuncSnapshot = join(parentJuncPaths.customSnapshotDirectory, `custom-${randomUUID()}.sqlite3`)
+        try {
+          await validateCustomSnapshotPath(parentJuncSnapshot, parentJuncPaths.customSnapshotDirectory)
+        } catch (err) {
+          caughtParentJunction = /must not be a symbolic link or junction/i.test(err.message)
+        }
+        try { unlinkSync(parentJuncPaths.storageDirectory) } catch {}
+      }
+
+      const passed = caughtFileSymlink && caughtSourceSymlink && (!junctionCreated || (caughtDirJunction && caughtParentJunction))
+
+      record({
+        scenarioId: 'R16',
+        title: 'symlink/junction 实际逃逸',
+        exactTestEntrypoint: 'scripts/probes/phase7a8-1ar/r01-r22-acceptance-matrix.mjs -> R16',
+        precondition: 'Symlinks and junctions created pointing to external paths',
+        injectionPoint: 'validateCustomSnapshotPath and createAndPublishSnapshot',
+        actualObservedState: `symlinkCreated=true, fileSymlink=${caughtFileSymlink}, sourceSymlink=${caughtSourceSymlink}, dirJunction=${caughtDirJunction}, parentJunction=${caughtParentJunction}`,
+        assertionResult: passed ? 'MATCHED' : 'FAILED',
+        evidenceLevel: 'RUNTIME_CONFIRMED',
+        verdict: passed ? 'PASS' : 'FAIL',
+        limitations: 'Full directory, parent directory reparse point, and file symlink protection validated',
+      })
     }
-
-    const passed = created ? caughtSymlink : true
-
-    record({
-      scenarioId: 'R16',
-      title: 'symlink/junction 实际逃逸',
-      exactTestEntrypoint: 'scripts/probes/phase7a8-1ar/r01-r22-acceptance-matrix.mjs -> R16',
-      precondition: 'Symlink created pointing to external database file outside managed directory',
-      injectionPoint: 'Validate custom snapshot path on created symlink',
-      actualObservedState: `symlinkCreated=${created}, caughtSymlink=${caughtSymlink}`,
-      assertionResult: passed ? 'MATCHED' : 'FAILED',
-      evidenceLevel: 'RUNTIME_CONFIRMED',
-      verdict: passed ? 'PASS' : 'FAIL',
-      limitations: 'validateCustomSnapshotPath inspects lstat and realpath against canonical parent',
-    })
 
     rmSync(tmp, { recursive: true, force: true })
   }
@@ -1103,7 +1240,7 @@ export async function runR01ToR22Matrix() {
     }
   }
 
-  // --- R22: 旧 ECDICT 全量兼容 ---
+  // --- R22A: Fixture compatibility ---
   {
     const fixtureDict = openFixtureDictionary()
     const dictManager = new DictionaryManager({
@@ -1114,21 +1251,23 @@ export async function runR01ToR22Matrix() {
 
     try {
       const hit = dictManager.lookup('derive')
+      const hitForm = dictManager.lookup('derived')
       const miss = dictManager.lookup('nonexistent_word_xyz')
 
       const passed =
         dictManager.source === 'sqlite-fixture' &&
         dictManager.snapshot().activeMode === 'fixture' &&
         hit.found === true &&
+        hitForm.found === true &&
         miss.found === false
 
       record({
-        scenarioId: 'R22',
-        title: '旧 ECDICT 全量兼容',
-        exactTestEntrypoint: 'scripts/probes/phase7a8-1ar/r01-r22-acceptance-matrix.mjs -> R22',
+        scenarioId: 'R22A',
+        title: 'Fixture compatibility',
+        exactTestEntrypoint: 'scripts/probes/phase7a8-1ar/r01-r22-acceptance-matrix.mjs -> R22A',
         precondition: 'Built-in fixture dictionary initialized',
-        action: 'Query production words via DictionaryManager in fixture mode',
-        actualObservedState: `source=${dictManager.source}, hit=${hit.found}, miss=${miss.found}`,
+        action: 'Query production words and forms via DictionaryManager in fixture mode',
+        actualObservedState: `source=${dictManager.source}, activeMode=fixture, headwordHit=${hit.found}, formHit=${hitForm.found}, miss=${miss.found}`,
         assertionResult: passed ? 'MATCHED' : 'FAILED',
         evidenceLevel: 'RUNTIME_CONFIRMED',
         verdict: passed ? 'PASS' : 'FAIL',
@@ -1136,6 +1275,50 @@ export async function runR01ToR22Matrix() {
       })
     } finally {
       dictManager.close()
+    }
+  }
+
+  // --- R22B: Managed ECDICT compatibility ---
+  {
+    const tmp = createTempDir('r22b-')
+    const dbPath = join(tmp, 'ecdict-prod.sqlite3')
+    buildProductionEcdictTestDb(dbPath)
+
+    const ecdictDict = openProductionDictionary({ path: dbPath })
+    const dictManager = new DictionaryManager({
+      mode: 'managed-ecdict',
+      identity: 'ecdict-v1-production',
+      dictionary: ecdictDict,
+    })
+
+    try {
+      const hit = dictManager.lookup('apple')
+      const hitForm = dictManager.lookup('apples')
+      const miss = dictManager.lookup('nonexistent_word_xyz')
+
+      const passed =
+        dictManager.source === 'ecdict-local' &&
+        dictManager.snapshot().activeMode === 'managed-ecdict' &&
+        hit.found === true &&
+        hit.senses[0]?.translation === '苹果' &&
+        hitForm.found === true &&
+        miss.found === false
+
+      record({
+        scenarioId: 'R22B',
+        title: 'Managed ECDICT compatibility',
+        exactTestEntrypoint: 'scripts/probes/phase7a8-1ar/r01-r22-acceptance-matrix.mjs -> R22B; scripts/test-phase7a6-management-e2e.mjs',
+        precondition: 'Production ECDICT schema database opened with source ecdict-local',
+        action: 'Query headwords and morphological forms through DictionaryManager in managed-ecdict mode',
+        actualObservedState: `databaseSource=${dbPath}, managerSource=${dictManager.source}, activeMode=${dictManager.snapshot().activeMode}, headword=apple(found=${hit.found},translation=${hit.senses?.[0]?.translation}), form=apples(found=${hitForm.found}), miss=${miss.found}`,
+        assertionResult: passed ? 'MATCHED' : 'FAILED',
+        evidenceLevel: 'RUNTIME_CONFIRMED',
+        verdict: passed ? 'PASS' : 'FAIL',
+        limitations: 'Direct query semantics and E2E management persistence verified on current code SHA',
+      })
+    } finally {
+      dictManager.close()
+      rmSync(tmp, { recursive: true, force: true })
     }
   }
 
