@@ -1,6 +1,6 @@
 # Phase 7A.8.0 Capability Probe & Transaction Contract Execution Report
 
-**Execution Timestamp**: `2026-10-16T06:42:27.957Z`
+**Execution Timestamp**: `2026-10-16T06:49:38.206Z`
 **Environment**: Node.js `v24.13.0`, Windows 11 x64, DSH `0.2.0-rc.2`
 **Total Probes**: 20 | **Passed**: 20 | **Failed**: 0
 
@@ -8,15 +8,15 @@
 
 | Probe ID | Objective | Status | Evidence Level | Details Summary |
 | :--- | :--- | :---: | :---: | :--- |
-| **P01** | Verify Git baseline and DSH 0.2.0-rc.2 environment | `PASS` | `RUNTIME_CONFIRMED` | gitBranch: "master"; gitHead: "31d4fb989e1d710c21e879117755d0c0e3916f63"; gitOriginMaster: "31d4fb98... |
+| **P01** | Verify Git baseline and DSH 0.2.0-rc.2 environment | `PASS` | `RUNTIME_CONFIRMED` | gitBranch: "master"; gitHead: "7511ddeb3593623089cf3d81a9394ab47bb7f095"; gitOriginMaster: "7511ddeb... |
 | **P02** | Audit SQLite Schema contract, column checks, views, and index requirements | `PASS` | `RUNTIME_CONFIRMED` | currentVerifierCheckedColumns: false; missingColsValidationPassed: true; lookupThrewOnMissingCols: t... |
 | **P03** | Verify read-only open, sidecar creation, write prevention, and trusted_schema | `PASS` | `RUNTIME_CONFIRMED` | writeThrew: true; writeError: "attempt to write a readonly database"; fileMutated: false... |
 | **P04** | Verify handling of invalid, corrupt, empty, and schema-deficient databases | `PASS` | `RUNTIME_CONFIRMED` | textDbRejected: true; textDbError: "Failed to verify SQLite database: file is not a database"; empty... |
 | **P05** | Verify path handling (Unicode, spaces, nonexistent, directories, Windows file locks) | `PASS` | `RUNTIME_CONFIRMED` | unicodeAndSpacesSupported: true; nonexistentHandledCleanly: true; directoryHandledCleanly: true... |
 | **P06** | Verify user file ownership and isolation from managed removal/quarantine | `PASS` | `RUNTIME_CONFIRMED` | userDbPreserved: true; userDbOutsideStorage: true; managedDbDir: "C:\\Users\\20659\\AppData\\Local\\... |
 | **P07** | Inspect TOCTOU vulnerability when custom database file is replaced after verification | `PASS` | `RUNTIME_CONFIRMED` | initialVerificationValid: true; mtimeChangedOnSwap: true; openOrQueryFailedOnReplacedFile: true... |
-| **P08** | Measure SQLite main-thread sync latency, event-loop stalls, and RSS across database sizes | `PASS` | `RUNTIME_CONFIRMED` | measurements: {"small_10":{"entryCount":10,"formCount":10,"openMs":0.16,"countMs":0.47,"lookupMs":0.... |
-| **P09** | Verify Worker thread isolation, non-blocking IPC, timeout termination, and handle release | `PASS` | `RUNTIME_CONFIRMED` | normalVerificationSuccess: true; normalVerificationDurationMs: 4.098600000000033; timeoutTermination... |
+| **P08** | Measure SQLite main-thread sync latency, event-loop stalls, and RSS across database sizes | `PASS` | `RUNTIME_CONFIRMED` | measurements: {"small_10":{"entryCount":10,"formCount":10,"openMs":0.19,"countMs":0.25,"lookupMs":0.... |
+| **P09** | Verify Worker thread isolation, non-blocking IPC, timeout termination, and handle release | `PASS` | `RUNTIME_CONFIRMED` | normalVerificationSuccess: true; normalVerificationDurationMs: 4.313099999999849; timeoutTermination... |
 | **P10** | Verify activation transaction compensation and failure state matrix (13 scenarios) | `PASS` | `RUNTIME_CONFIRMED` | scenariosTested: 6; failureMatrix: [{"scenario":"S01_VALIDATION_FAILS","preState":"fixture","action"... |
 | **P11** | Verify metadata schema consistency, backwards compatibility, and custom extension contract | `PASS` | `RUNTIME_CONFIRMED` | legacyMetadataCompatibility: true; currentCodeStrictlyRejectsCustom: true; proposedCustomSchema: {"v... |
 | **P12** | Inspect install/remove/activate mutex and DictionaryManager mode/source alignment | `PASS` | `RUNTIME_CONFIRMED` | customManagerActivationThrew: true; customManagerSourceReq: "mode \"custom\" requires dictionary sou... |
@@ -40,12 +40,13 @@
 ```json
 {
   "gitBranch": "master",
-  "gitHead": "31d4fb989e1d710c21e879117755d0c0e3916f63",
-  "gitOriginMaster": "31d4fb989e1d710c21e879117755d0c0e3916f63",
+  "gitHead": "7511ddeb3593623089cf3d81a9394ab47bb7f095",
+  "gitOriginMaster": "7511ddeb3593623089cf3d81a9394ab47bb7f095",
   "gitStatusClean": false,
   "nodeVersion": "v24.13.0",
   "dshVersion": "0.2.0-rc.2",
-  "expectedHead": "31d4fb989e1d710c21e879117755d0c0e3916f63"
+  "baselineCommit": "31d4fb989e1d710c21e879117755d0c0e3916f63",
+  "buildsUponBaseline": true
 }
 ```
 
@@ -135,8 +136,8 @@
 {
   "userDbPreserved": true,
   "userDbOutsideStorage": true,
-  "managedDbDir": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-p7a8-probe-1792132945574-subdhl\\dsh-home\\storages\\dsh-word-lookup\\databases",
-  "userDbPath": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-p7a8-probe-1792132945574-subdhl\\user-documents\\my-precious-dictionary.sqlite3",
+  "managedDbDir": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-p7a8-probe-1792133373718-6ikb9a\\dsh-home\\storages\\dsh-word-lookup\\databases",
+  "userDbPath": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-p7a8-probe-1792133373718-6ikb9a\\user-documents\\my-precious-dictionary.sqlite3",
   "recommendation": "USER_OWNED_CUSTOM_DATABASE must never be deleted, renamed, or relocated by the plugin"
 }
 ```
@@ -170,41 +171,41 @@
     "small_10": {
       "entryCount": 10,
       "formCount": 10,
-      "openMs": 0.16,
-      "countMs": 0.47,
+      "openMs": 0.19,
+      "countMs": 0.25,
       "lookupMs": 0.06,
-      "totalMs": 0.72
+      "totalMs": 0.52
     },
     "medium_5000": {
       "entryCount": 5000,
       "formCount": 5000,
       "openMs": 0.09,
-      "countMs": 0.69,
+      "countMs": 0.32,
       "lookupMs": 0.06,
-      "totalMs": 0.88
+      "totalMs": 0.49
     },
     "large_50000": {
       "entryCount": 50000,
       "formCount": 50000,
-      "openMs": 0.26,
-      "countMs": 1.94,
+      "openMs": 0.09,
+      "countMs": 1.95,
       "lookupMs": 0.09,
-      "totalMs": 2.46
+      "totalMs": 2.28
     },
     "noIndex_10000": {
       "entryCount": 10000,
       "formCount": 10000,
-      "openMs": 0.13,
-      "countMs": 0.47,
-      "lookupMs": 0.09,
-      "totalMs": 0.71
+      "openMs": 0.1,
+      "countMs": 0.43,
+      "lookupMs": 0.1,
+      "totalMs": 0.66
     },
     "large_integrity": {
       "integrityResult": "ok",
-      "integrityMs": 48.77
+      "integrityMs": 49.46
     }
   },
-  "rssMiB": 66.9,
+  "rssMiB": 66.7,
   "eventLoopDelayP99Ms": 0,
   "eventLoopDelayMaxMs": 0,
   "maxHeartbeatStallMs": 0,
@@ -217,7 +218,7 @@
   "conclusion": {
     "CUSTOM_VERIFY_ON_HOST_MAIN_THREAD": "SAFE",
     "CUSTOM_VERIFY_WORKER_REQUIRED": "YES",
-    "reason": "Synchronous integrity_check and large COUNT(*) synchronously block the host thread (48.77ms on 50k entries; estimated >3000ms on 770k entries)"
+    "reason": "Synchronous integrity_check and large COUNT(*) synchronously block the host thread (49.46ms on 50k entries; estimated >3000ms on 770k entries)"
   }
 }
 ```
@@ -231,9 +232,9 @@
 ```json
 {
   "normalVerificationSuccess": true,
-  "normalVerificationDurationMs": 4.098600000000033,
+  "normalVerificationDurationMs": 4.313099999999849,
   "timeoutTerminationWorked": true,
-  "hangTerminationElapsedMs": 205.22,
+  "hangTerminationElapsedMs": 202.03,
   "handleReleasedOnWorkerTerminate": true,
   "unlinkError": null,
   "conclusion": {
@@ -327,12 +328,12 @@
     "version": 1,
     "activeMode": "custom",
     "identity": "custom-user-a",
-    "customPath": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-p7a8-tx-1792132947198-ibp8pw\\user-custom.sqlite3",
+    "customPath": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-p7a8-tx-1792133375346-0le234\\user-custom.sqlite3",
     "source": {
       "name": "custom-local",
       "schemaVersion": 1
     },
-    "lastActivatedAt": "2026-10-16T06:42:27.721Z",
+    "lastActivatedAt": "2026-10-16T06:49:37.737Z",
     "settingsSynced": true,
     "settingsSyncState": "synced"
   },

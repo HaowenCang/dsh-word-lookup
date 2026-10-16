@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-10-16T06:42:27.956Z",
+  "timestamp": "2026-10-16T06:49:38.204Z",
   "summary": {
     "total": 20,
     "passed": 20,
@@ -13,15 +13,16 @@
       "evidenceType": "RUNTIME_CONFIRMED",
       "details": {
         "gitBranch": "master",
-        "gitHead": "31d4fb989e1d710c21e879117755d0c0e3916f63",
-        "gitOriginMaster": "31d4fb989e1d710c21e879117755d0c0e3916f63",
+        "gitHead": "7511ddeb3593623089cf3d81a9394ab47bb7f095",
+        "gitOriginMaster": "7511ddeb3593623089cf3d81a9394ab47bb7f095",
         "gitStatusClean": false,
         "nodeVersion": "v24.13.0",
         "dshVersion": "0.2.0-rc.2",
-        "expectedHead": "31d4fb989e1d710c21e879117755d0c0e3916f63"
+        "baselineCommit": "31d4fb989e1d710c21e879117755d0c0e3916f63",
+        "buildsUponBaseline": true
       },
       "limitation": "None",
-      "timestamp": "2026-10-16T06:42:25.931Z"
+      "timestamp": "2026-10-16T06:49:34.092Z"
     },
     {
       "probeId": "P02",
@@ -39,7 +40,7 @@
         "recommendation": "Must enforce PRAGMA table_info column verification and index verification in 7A.8.1"
       },
       "limitation": "None",
-      "timestamp": "2026-10-16T06:42:26.175Z"
+      "timestamp": "2026-10-16T06:49:34.326Z"
     },
     {
       "probeId": "P03",
@@ -57,7 +58,7 @@
         "recommendation": "Must issue PRAGMA trusted_schema = 0 immediately upon opening any custom database"
       },
       "limitation": "None",
-      "timestamp": "2026-10-16T06:42:26.255Z"
+      "timestamp": "2026-10-16T06:49:34.410Z"
     },
     {
       "probeId": "P04",
@@ -75,7 +76,7 @@
         "missingTableError": "Database is missing required table: \"entries\""
       },
       "limitation": "None",
-      "timestamp": "2026-10-16T06:42:26.271Z"
+      "timestamp": "2026-10-16T06:49:34.426Z"
     },
     {
       "probeId": "P05",
@@ -93,7 +94,7 @@
         "recommendation": "Must enforce handle closure before unlinking/retiring on Windows to avoid EBUSY"
       },
       "limitation": "None",
-      "timestamp": "2026-10-16T06:42:26.516Z"
+      "timestamp": "2026-10-16T06:49:34.670Z"
     },
     {
       "probeId": "P06",
@@ -103,12 +104,12 @@
       "details": {
         "userDbPreserved": true,
         "userDbOutsideStorage": true,
-        "managedDbDir": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-p7a8-probe-1792132945574-subdhl\\dsh-home\\storages\\dsh-word-lookup\\databases",
-        "userDbPath": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-p7a8-probe-1792132945574-subdhl\\user-documents\\my-precious-dictionary.sqlite3",
+        "managedDbDir": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-p7a8-probe-1792133373718-6ikb9a\\dsh-home\\storages\\dsh-word-lookup\\databases",
+        "userDbPath": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-p7a8-probe-1792133373718-6ikb9a\\user-documents\\my-precious-dictionary.sqlite3",
         "recommendation": "USER_OWNED_CUSTOM_DATABASE must never be deleted, renamed, or relocated by the plugin"
       },
       "limitation": "None",
-      "timestamp": "2026-10-16T06:42:26.598Z"
+      "timestamp": "2026-10-16T06:49:34.752Z"
     },
     {
       "probeId": "P07",
@@ -124,7 +125,7 @@
         "recommendation": "Activation transaction MUST re-verify candidate or check fingerprint (mtime + size + header hash) at commit boundary"
       },
       "limitation": "None",
-      "timestamp": "2026-10-16T06:42:26.678Z"
+      "timestamp": "2026-10-16T06:49:34.833Z"
     },
     {
       "probeId": "P08",
@@ -136,41 +137,41 @@
           "small_10": {
             "entryCount": 10,
             "formCount": 10,
-            "openMs": 0.16,
-            "countMs": 0.47,
+            "openMs": 0.19,
+            "countMs": 0.25,
             "lookupMs": 0.06,
-            "totalMs": 0.72
+            "totalMs": 0.52
           },
           "medium_5000": {
             "entryCount": 5000,
             "formCount": 5000,
             "openMs": 0.09,
-            "countMs": 0.69,
+            "countMs": 0.32,
             "lookupMs": 0.06,
-            "totalMs": 0.88
+            "totalMs": 0.49
           },
           "large_50000": {
             "entryCount": 50000,
             "formCount": 50000,
-            "openMs": 0.26,
-            "countMs": 1.94,
+            "openMs": 0.09,
+            "countMs": 1.95,
             "lookupMs": 0.09,
-            "totalMs": 2.46
+            "totalMs": 2.28
           },
           "noIndex_10000": {
             "entryCount": 10000,
             "formCount": 10000,
-            "openMs": 0.13,
-            "countMs": 0.47,
-            "lookupMs": 0.09,
-            "totalMs": 0.71
+            "openMs": 0.1,
+            "countMs": 0.43,
+            "lookupMs": 0.1,
+            "totalMs": 0.66
           },
           "large_integrity": {
             "integrityResult": "ok",
-            "integrityMs": 48.77
+            "integrityMs": 49.46
           }
         },
-        "rssMiB": 66.9,
+        "rssMiB": 66.7,
         "eventLoopDelayP99Ms": 0,
         "eventLoopDelayMaxMs": 0,
         "maxHeartbeatStallMs": 0,
@@ -183,11 +184,11 @@
         "conclusion": {
           "CUSTOM_VERIFY_ON_HOST_MAIN_THREAD": "SAFE",
           "CUSTOM_VERIFY_WORKER_REQUIRED": "YES",
-          "reason": "Synchronous integrity_check and large COUNT(*) synchronously block the host thread (48.77ms on 50k entries; estimated >3000ms on 770k entries)"
+          "reason": "Synchronous integrity_check and large COUNT(*) synchronously block the host thread (49.46ms on 50k entries; estimated >3000ms on 770k entries)"
         }
       },
       "limitation": "None",
-      "timestamp": "2026-10-16T06:42:26.944Z"
+      "timestamp": "2026-10-16T06:49:35.096Z"
     },
     {
       "probeId": "P09",
@@ -196,9 +197,9 @@
       "evidenceType": "RUNTIME_CONFIRMED",
       "details": {
         "normalVerificationSuccess": true,
-        "normalVerificationDurationMs": 4.098600000000033,
+        "normalVerificationDurationMs": 4.313099999999849,
         "timeoutTerminationWorked": true,
-        "hangTerminationElapsedMs": 205.22,
+        "hangTerminationElapsedMs": 202.03,
         "handleReleasedOnWorkerTerminate": true,
         "unlinkError": null,
         "conclusion": {
@@ -208,7 +209,7 @@
         }
       },
       "limitation": "None",
-      "timestamp": "2026-10-16T06:42:27.196Z"
+      "timestamp": "2026-10-16T06:49:35.344Z"
     },
     {
       "probeId": "P10",
@@ -276,7 +277,7 @@
         "allPassed": true
       },
       "limitation": "None",
-      "timestamp": "2026-10-16T06:42:27.712Z"
+      "timestamp": "2026-10-16T06:49:37.715Z"
     },
     {
       "probeId": "P11",
@@ -290,19 +291,19 @@
           "version": 1,
           "activeMode": "custom",
           "identity": "custom-user-a",
-          "customPath": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-p7a8-tx-1792132947198-ibp8pw\\user-custom.sqlite3",
+          "customPath": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-p7a8-tx-1792133375346-0le234\\user-custom.sqlite3",
           "source": {
             "name": "custom-local",
             "schemaVersion": 1
           },
-          "lastActivatedAt": "2026-10-16T06:42:27.721Z",
+          "lastActivatedAt": "2026-10-16T06:49:37.737Z",
           "settingsSynced": true,
           "settingsSyncState": "synced"
         },
         "recommendation": "Expand ActiveMetadata to discriminated union in 7A.8.1; preserve version: 1 to ensure zero-migration upgrade"
       },
       "limitation": "None",
-      "timestamp": "2026-10-16T06:42:27.721Z"
+      "timestamp": "2026-10-16T06:49:37.737Z"
     },
     {
       "probeId": "P12",
@@ -316,7 +317,7 @@
         "ecdictRemovalSafetyRule": "When Custom is active, removing ECDICT must NOT switch manager back to fixture; only unlink managed files in paths.databaseDirectory."
       },
       "limitation": "None",
-      "timestamp": "2026-10-16T06:42:27.952Z"
+      "timestamp": "2026-10-16T06:49:38.174Z"
     },
     {
       "probeId": "P13",
@@ -329,7 +330,7 @@
         "managerState": "ready"
       },
       "limitation": "None",
-      "timestamp": "2026-10-16T06:42:27.953Z"
+      "timestamp": "2026-10-16T06:49:38.182Z"
     },
     {
       "probeId": "P14",
@@ -372,7 +373,7 @@
         "PUBLIC_SHORTCUT_OVERRIDE_API": "AVAILABLE (ctx.shortcuts.edit)"
       },
       "limitation": "None",
-      "timestamp": "2026-10-16T06:42:27.954Z"
+      "timestamp": "2026-10-16T06:49:38.192Z"
     },
     {
       "probeId": "P15",
@@ -400,7 +401,7 @@
         "aria": "Control+Shift+L"
       },
       "limitation": "None",
-      "timestamp": "2026-10-16T06:42:27.955Z"
+      "timestamp": "2026-10-16T06:49:38.197Z"
     },
     {
       "probeId": "P16",
@@ -429,7 +430,7 @@
         "latestSequence": 3
       },
       "limitation": "None",
-      "timestamp": "2026-10-16T06:42:27.956Z"
+      "timestamp": "2026-10-16T06:49:38.200Z"
     },
     {
       "probeId": "P17",
@@ -465,7 +466,7 @@
         }
       },
       "limitation": "None",
-      "timestamp": "2026-10-16T06:42:27.956Z"
+      "timestamp": "2026-10-16T06:49:38.201Z"
     },
     {
       "probeId": "P18",
@@ -480,7 +481,7 @@
         "safetyContract": "Transactions are fail-closed: conflict or invalid combination rejects write and keeps existing binding intact"
       },
       "limitation": "None",
-      "timestamp": "2026-10-16T06:42:27.956Z"
+      "timestamp": "2026-10-16T06:49:38.202Z"
     },
     {
       "probeId": "P19",
@@ -497,7 +498,7 @@
         "storageHygiene": "Reset removes key from profile object rather than setting null"
       },
       "limitation": "None",
-      "timestamp": "2026-10-16T06:42:27.956Z"
+      "timestamp": "2026-10-16T06:49:38.203Z"
     },
     {
       "probeId": "P20",
@@ -574,7 +575,7 @@
         }
       },
       "limitation": "Linux and macOS matrix evaluated from DSH upstream source code; Windows evaluated via live runtime.",
-      "timestamp": "2026-10-16T06:42:27.956Z"
+      "timestamp": "2026-10-16T06:49:38.204Z"
     }
   ]
 }
