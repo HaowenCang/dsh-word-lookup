@@ -1,0 +1,107 @@
+{
+  "phase": "Phase 7A.8.2",
+  "name": "Native Settings UI, Custom Dictionary Management, Three-Mode Switching & Configurable Lookup Shortcut",
+  "timestamp": "2026-10-17T15:18:13.290Z",
+  "status": "PASS",
+  "totalSteps": 10,
+  "passedSteps": 10,
+  "records": [
+    {
+      "step": "E2E-01-INITIAL_STATUS",
+      "verdict": "PASS",
+      "details": {
+        "activeMode": "fixture",
+        "installed": false
+      }
+    },
+    {
+      "step": "E2E-02-VERIFY_CUSTOM_DB",
+      "verdict": "PASS",
+      "details": {
+        "ok": true,
+        "valid": true,
+        "schemaVersion": 1,
+        "entryCount": 3,
+        "formCount": 0,
+        "headwordsSample": [
+          "entanglement",
+          "qubit",
+          "superposition"
+        ],
+        "message": "Database passed schema and query capability verification"
+      }
+    },
+    {
+      "step": "E2E-03-ACTIVATE_CUSTOM_DB",
+      "verdict": "PASS",
+      "details": {
+        "snapshotId": "54a588e7-4da4-4f09-ba1e-7eea6f7d22cd",
+        "activeMode": "custom"
+      }
+    },
+    {
+      "step": "E2E-04-CUSTOM_LOOKUP_QUERY",
+      "verdict": "PASS",
+      "details": {
+        "found": true,
+        "source": "custom-local"
+      }
+    },
+    {
+      "step": "E2E-05-SWITCH_TO_FIXTURE",
+      "verdict": "PASS",
+      "details": {
+        "ok": true,
+        "operationId": "switch-mode-1792250290252-a0902dec",
+        "activeMode": "fixture",
+        "identity": "fixture",
+        "message": "Successfully switched to \"fixture\" dictionary mode"
+      }
+    },
+    {
+      "step": "E2E-06-SWITCH_TO_CUSTOM",
+      "verdict": "PASS",
+      "details": {
+        "ok": true,
+        "operationId": "switch-mode-1792250290522-d94d7abb",
+        "activeMode": "custom",
+        "identity": "quantum-physics",
+        "message": "Successfully switched to \"custom\" dictionary mode"
+      }
+    },
+    {
+      "step": "E2E-07-ACTIVE_SNAPSHOT_REMOVAL_REJECTED",
+      "verdict": "PASS",
+      "details": {
+        "status": 409,
+        "code": "SNAPSHOT_ACTIVE"
+      }
+    },
+    {
+      "step": "E2E-08-INACTIVE_SNAPSHOT_REMOVED",
+      "verdict": "PASS",
+      "details": {
+        "ok": true,
+        "snapshotId": "54a588e7-4da4-4f09-ba1e-7eea6f7d22cd",
+        "removed": true,
+        "message": "Custom dictionary snapshot \"54a588e7-4da4-4f09-ba1e-7eea6f7d22cd\" (quantum-physics) was successfully removed"
+      }
+    },
+    {
+      "step": "E2E-09-USER_SOURCE_FILE_PRESERVED",
+      "verdict": "PASS",
+      "details": {
+        "originalSize": 49152,
+        "currentSize": 49152
+      }
+    },
+    {
+      "step": "E2E-10-SHORTCUT_CONTEXT_CONFIRMED",
+      "verdict": "PASS",
+      "details": {
+        "hasWindowShortcuts": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36"
+      }
+    }
+  ]
+}

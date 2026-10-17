@@ -1,0 +1,124 @@
+[
+  {
+    "id": "CAPABILITY_SHORTCUT_READ",
+    "name": "Read Current Effective Shortcut Binding",
+    "status": "SUPPORTED",
+    "exactPackage": "@deepseek-ai/dsh-client-shortcuts",
+    "exactTypeOrInterface": "Shortcuts.catalog: ObservableSnapshot<readonly ShortcutCatalogEntry[]>",
+    "actualCallPath": "ctx.shortcuts.catalog.getSnapshot().find(e => e.id === \"wordLookup.lookupSelection\")",
+    "sourceReference": "node_modules/@deepseek-ai/dsh-client-shortcuts/lib/types/client/types.d.ts:93",
+    "probeResult": "Read default binding: Ctrl+++Shift+++L, modified: false, status: ready",
+    "details": {
+      "commandId": "wordLookup.lookupSelection",
+      "binding": {
+        "code": "KeyL",
+        "modifiers": [
+          "control",
+          "shift"
+        ]
+      },
+      "presentedKeys": [
+        "Ctrl",
+        "+",
+        "Shift",
+        "+",
+        "L"
+      ],
+      "modified": false
+    }
+  },
+  {
+    "id": "CAPABILITY_SHORTCUT_WRITE",
+    "name": "Modify and Persist Shortcut Binding Overrides",
+    "status": "SUPPORTED",
+    "exactPackage": "@deepseek-ai/dsh-client-shortcuts",
+    "exactTypeOrInterface": "Shortcuts.edit(edit: ShortcutEdit, revision: ShortcutRevision): Promise<ShortcutSaveResult>",
+    "actualCallPath": "ctx.shortcuts.edit({ type: \"set\", id, binding }, revision) / edit({ type: \"reset\", id }, revision)",
+    "sourceReference": "node_modules/@deepseek-ai/dsh-client-shortcuts/lib/types/client/types.d.ts:127",
+    "probeResult": "Persisted override to dsh.keybindings.v1 (status: saved) and reset back to default (status: saved)",
+    "details": {
+      "editStatus": "saved",
+      "resetStatus": "saved"
+    }
+  },
+  {
+    "id": "CAPABILITY_SHORTCUT_RECORDER",
+    "name": "Native Keyboard Interception and Recorder State",
+    "status": "SUPPORTED",
+    "exactPackage": "@deepseek-ai/dsh-client-shortcuts",
+    "exactTypeOrInterface": "Shortcuts.recording(active: boolean): Promise<void>",
+    "actualCallPath": "ctx.shortcuts.recording(true) / ctx.shortcuts.recording(false)",
+    "sourceReference": "node_modules/@deepseek-ai/dsh-client-shortcuts/lib/types/client/types.d.ts:133",
+    "probeResult": "Low-level accelerator suppression and recording API supported; inline UI recorder implemented in plugin settings.",
+    "details": {
+      "method": "recording(active: boolean): Promise<void>",
+      "suppressesNativeAccelerators": true
+    }
+  },
+  {
+    "id": "CAPABILITY_SHORTCUT_CONFLICT_CHECK",
+    "name": "Shortcut Validation and Conflict Detection",
+    "status": "SUPPORTED",
+    "exactPackage": "@deepseek-ai/dsh-client-shortcuts",
+    "exactTypeOrInterface": "Shortcuts.describeBinding(binding: ShortcutBinding | null): { binding: NormalizedBinding | null; keys: readonly string[]; issue: BindingIssue | null; conflicts: readonly ShortcutCommandId[] }",
+    "actualCallPath": "ctx.shortcuts.describeBinding(binding)",
+    "sourceReference": "node_modules/@deepseek-ai/dsh-client-shortcuts/lib/types/client/types.d.ts:114",
+    "probeResult": "Validation passed, issue: none, overlap: true",
+    "details": {
+      "normalized": {
+        "code": "KeyL",
+        "modifiers": [
+          "control",
+          "shift"
+        ]
+      },
+      "issue": null,
+      "overlap": true
+    }
+  },
+  {
+    "id": "CAPABILITY_HOST_FILE_PICKER",
+    "name": "Host Native File Picker / Open File Dialog",
+    "status": "UNSUPPORTED",
+    "exactPackage": "@deepseek-ai/dsh-client-ui-directory-picker-native",
+    "exactTypeOrInterface": "None (only directory picking: ctx.uiWorkspace.pickDirectory() or __DSH_DIRECTORY_PICKER__.pick())",
+    "actualCallPath": "N/A (No open-file dialog available; HTML <input type=\"file\"> returns synthetic C:\\fakepath\\)",
+    "sourceReference": "node_modules/@deepseek-ai/dsh-client-ui-directory-picker-native/package.json",
+    "probeResult": "UNSUPPORTED. DSH 0.2.0-rc.2 provides only workspace directory pickers. Custom dictionary import relies on validated host path input (MANUAL_HOST_PATH).",
+    "details": {
+      "supportsDirectoryPicking": true,
+      "supportsFilePicking": false,
+      "inputFileInputFakePath": "C:\\fakepath\\"
+    }
+  },
+  {
+    "id": "CAPABILITY_STREAMING_FILE_UPLOAD",
+    "name": "Plugin Custom Streaming File Upload Gateway",
+    "status": "UNSUPPORTED",
+    "exactPackage": "@deepseek-ai/dsh-client-file-upload",
+    "exactTypeOrInterface": "ctx.fileUpload.upload(sessionId, body, name, signal, onProgress)",
+    "actualCallPath": "N/A (Tied to session prompt attachments in ctx.attachments; plugin route body limit is 64 KiB JSON)",
+    "sourceReference": "node_modules/@deepseek-ai/dsh-client-file-upload/package.json",
+    "probeResult": "UNSUPPORTED for plugin custom SQLite imports. File upload package requires session context and stages into chat attachments; plugin management routes cap JSON at 64 KiB.",
+    "details": {
+      "availableForSessions": true,
+      "availableForPluginCustomCorpus": false,
+      "pluginRouteMaxBytes": 65536
+    }
+  },
+  {
+    "id": "CAPABILITY_NATIVE_SETTINGS_COMPONENTS",
+    "name": "Pre-built Native Settings Components for Custom Dictionaries",
+    "status": "UNSUPPORTED",
+    "exactPackage": "@deepseek-ai/dsh-client-ui-settings",
+    "exactTypeOrInterface": "ConfigForms (schema-based primitives) & slot \"settings.section\"",
+    "actualCallPath": "ctx.slots.register({ name: \"settings.section\", ... }, DictionarySettingsSection)",
+    "sourceReference": "node_modules/@deepseek-ai/dsh-client-ui-settings/lib/types/client/contract/slots.d.ts:73",
+    "probeResult": "UNSUPPORTED for domain widgets (no pre-built dictionary cards or preview tables); SUPPORTED for custom React components registered into slot \"settings.section\".",
+    "details": {
+      "configFormsAvailable": true,
+      "settingsSectionSlotAvailable": true,
+      "domainComponentsProvidedByDSH": false
+    }
+  }
+]
