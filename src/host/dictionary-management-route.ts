@@ -67,6 +67,31 @@ function jsonResponse(body: unknown, status = 200): Response {
   })
 }
 
+function sanitizeValue(val: unknown): unknown {
+  if (typeof val === 'string') {
+    return sanitizeErrorMessage(val)
+  }
+  if (Array.isArray(val)) {
+    return val.map(sanitizeValue)
+  }
+  if (val && typeof val === 'object' && Object.getPrototypeOf(val) === Object.prototype) {
+    const res: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(val)) {
+      res[k] = sanitizeValue(v)
+    }
+    return res
+  }
+  return val
+}
+
+/**
+ * Sanitize structured error details to prevent machine paths or sensitive data leakage.
+ */
+function sanitizeDetails(details?: Readonly<Record<string, unknown>>): Record<string, unknown> | undefined {
+  if (!details) return undefined
+  return sanitizeValue(details) as Record<string, unknown>
+}
+
 /**
  * Build a structured machine-readable error response.
  */
@@ -80,7 +105,7 @@ function errorResponse(
     ok: false,
     error,
     message: sanitizeErrorMessage(rawMessage),
-    ...(details ? { details } : {}),
+    ...(details ? { details: sanitizeDetails(details) } : {}),
   }
   return Response.json(body, {
     status,
@@ -202,6 +227,7 @@ export function createStatusHandler(
         activeIdentity: summary.activeIdentity,
         activeSnapshotId: summary.activeSnapshotId,
         customSnapshotStatus: summary.customSnapshotStatus,
+        customSnapshots: summary.customSnapshots ?? [],
         installed: summary.installed,
         installedCorpus: summary.installedCorpus,
         fixtureStats: summary.fixtureStats,

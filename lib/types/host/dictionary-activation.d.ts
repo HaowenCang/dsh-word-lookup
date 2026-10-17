@@ -25,7 +25,7 @@ import { DictionaryManager } from './dictionary-manager.js';
 import { type ManagedStoragePaths, type SettingsSyncState } from './managed-storage.js';
 import { CustomSnapshotManager } from './custom-snapshot-manager.js';
 import { type DictionaryMode, type HostConfig } from './config.js';
-import type { FixtureCorpusInfo, InstalledCorpusInfo, ManagementErrorCode } from '../shared/dictionary-management-protocol.js';
+import type { CustomSnapshotSummary, FixtureCorpusInfo, InstalledCorpusInfo, ManagementErrorCode } from '../shared/dictionary-management-protocol.js';
 import type { ManagedEcdictBuildResult } from './ecdict-importer.js';
 /**
  * Error thrown when an activation attempt fails and rollback of previous state also fails.
@@ -94,6 +94,7 @@ export interface ActivationStateSummary {
     } | null;
     readonly installed: boolean;
     readonly installedCorpus: InstalledCorpusInfo | null;
+    readonly customSnapshots?: readonly CustomSnapshotSummary[];
     readonly fixtureStats: FixtureCorpusInfo;
     readonly quarantined: boolean;
     readonly quarantineReason: string | null;
@@ -145,8 +146,17 @@ export declare class ActivationCoordinator {
     get isDisposed(): boolean;
     /**
      * Mark coordinator as disposed, preventing future activations or mutations.
+     * Awaits owned CustomSnapshotManager and companion worker thread termination.
      */
-    dispose(): void;
+    dispose(): Promise<void>;
+    /**
+     * List all persistent custom snapshots currently tracked in catalog.
+     */
+    listCustomSnapshots(): readonly CustomSnapshotSummary[];
+    /**
+     * Retrieve a persistent custom snapshot summary by ID.
+     */
+    getCustomSnapshot(snapshotId: string): CustomSnapshotSummary | undefined;
     /**
      * Return whether startup recovery is currently in flight.
      */
@@ -174,21 +184,34 @@ export declare class ActivationCoordinator {
      */
     recoverOnStartup(): Promise<void>;
     /**
-     * Commit a newly built managed database and activate it in DictionaryManager.
+     * Commit a newly built managed database to installed inventory and activate it in DictionaryManager
+     * unless custom mode is actively selected (B11 inventory isolation).
      *
      * Transaction Sequence:
      * 1. Validate published SQLite database read-only.
-     * 2. Atomically write `active.json` (Commit Point 1: Durability).
-     * 3. Atomically switch `DictionaryManager` active reference (Commit Point 2: Runtime).
-     * 4. Best-effort update Host Config `dictionaryMode` via DSH settings service (Commit Point 3).
+     * 2. Commit installed inventory to installed-ecdict.json and update cached inventory (Commit Point 1).
+     * 3. If activeMode is 'custom' and not forceActivate, close candidate and leave custom active (B11).
+     * 4. Atomically write `active.json` (Commit Point 2: Durability).
+     * 5. Atomically switch `DictionaryManager` active reference (Commit Point 3: Runtime).
+     * 6. Best-effort update Host Config `dictionaryMode` via DSH settings service (Commit Point 4).
      *
-     * On Step 3 failure, rolls back `active.json` and closes the candidate.
+     * On Step 5 failure, rolls back `active.json` and closes the candidate.
      *
      * @param buildResult - verified outcome from buildManagedEcdictDatabase.
      */
     activateManagedDatabase(buildResult: ManagedEcdictBuildResult, options?: {
         signal?: AbortSignal;
         onCommitBoundary?: () => void;
+        forceActivate?: boolean;
+    }): Promise<void>;
+    /**
+     * Commit a newly built managed database to installed inventory, and activate it
+     * if active mode is not custom.
+     */
+    commitInstalledManagedDatabase(buildResult: ManagedEcdictBuildResult, options?: {
+        signal?: AbortSignal;
+        onCommitBoundary?: () => void;
+        forceActivate?: boolean;
     }): Promise<void>;
     /**
      * Commit a verified custom snapshot database and activate it in DictionaryManager.

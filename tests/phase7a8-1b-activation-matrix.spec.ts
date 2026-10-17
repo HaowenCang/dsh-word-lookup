@@ -781,12 +781,13 @@ describe('Phase 7A.8.1B: Custom Dictionary Activation & 3-Mode Switching Matrix 
 
   // A20: Startup recovery with missing custom snapshot file
   it('A20: startup recovery detects missing custom snapshot file and records recoveryError', async () => {
+    const snapId = randomUUID()
     const metadata: CustomActiveMetadata = {
       version: 1,
       activeMode: 'custom',
       identity: 'custom-missing',
-      snapshotId: randomUUID(),
-      databaseFile: `custom-${randomUUID()}.sqlite3`,
+      snapshotId: snapId,
+      databaseFile: `custom-${snapId}.sqlite3`,
       source: 'custom-local',
       schemaVersion: 1,
       sha256: 'a'.repeat(64),

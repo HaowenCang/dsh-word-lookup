@@ -402,7 +402,7 @@ export function apply(ctx: Context, config: HostConfig): void {
       try { void disposeManagement?.() } catch { /* ignore */ }
       try { void disposeLookup?.() } catch { /* ignore */ }
       void operationManager.dispose()
-      coordinator.dispose()
+      void coordinator.dispose()
       manager.close()
       throw error
     }
@@ -436,7 +436,7 @@ export function apply(ctx: Context, config: HostConfig): void {
       }
 
       try {
-        coordinator.dispose()
+        await coordinator.dispose()
       } catch (err) {
         errors.push(err)
       }

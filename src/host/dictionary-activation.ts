@@ -21,9 +21,8 @@
  */
 
 import { DatabaseSync } from 'node:sqlite'
-import { createHash } from 'node:crypto'
-import { existsSync, statSync } from 'node:fs'
-import { readFile, stat, unlink } from 'node:fs/promises'
+import { existsSync, lstatSync, statSync } from 'node:fs'
+import { stat, unlink } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 
@@ -59,11 +58,13 @@ import {
   type HostConfig,
 } from './config.js'
 import type {
+  CustomSnapshotSummary,
   FixtureCorpusInfo,
   InstalledCorpusInfo,
   ManagementErrorCode,
 } from '../shared/dictionary-management-protocol.js'
 import type { ManagedEcdictBuildResult } from './ecdict-importer.js'
+import type { CustomSnapshotValidateSuccessResponse } from './ecdict-integrity-worker.js'
 
 /** Probe headwords queried to verify query capability on candidate databases. */
 const ACTIVATION_PROBE_HEADWORDS = Object.freeze(['go', 'derive', 'wave'])
@@ -160,6 +161,7 @@ export interface ActivationStateSummary {
   } | null
   readonly installed: boolean
   readonly installedCorpus: InstalledCorpusInfo | null
+  readonly customSnapshots?: readonly CustomSnapshotSummary[]
   readonly fixtureStats: FixtureCorpusInfo
   readonly quarantined: boolean
   readonly quarantineReason: string | null
@@ -265,12 +267,27 @@ export class ActivationCoordinator {
 
   /**
    * Mark coordinator as disposed, preventing future activations or mutations.
+   * Awaits owned CustomSnapshotManager and companion worker thread termination.
    */
-  dispose(): void {
+  async dispose(): Promise<void> {
     this.#disposed = true
     if (this.#ownsSnapshotManager && this.#customSnapshotManager) {
-      void this.#customSnapshotManager.dispose()
+      await this.#customSnapshotManager.dispose()
     }
+  }
+
+  /**
+   * List all persistent custom snapshots currently tracked in catalog.
+   */
+  listCustomSnapshots(): readonly CustomSnapshotSummary[] {
+    return this.#customSnapshotManager?.listCustomSnapshots() ?? []
+  }
+
+  /**
+   * Retrieve a persistent custom snapshot summary by ID.
+   */
+  getCustomSnapshot(snapshotId: string): CustomSnapshotSummary | undefined {
+    return this.#customSnapshotManager?.getCustomSnapshot(snapshotId)
   }
 
   /**
@@ -390,6 +407,15 @@ export class ActivationCoordinator {
       // non-fatal installed inventory recovery
     }
 
+    // Step 0b: Load custom snapshot catalog
+    if (this.#customSnapshotManager) {
+      try {
+        await this.#customSnapshotManager.loadCatalog()
+      } catch {
+        // non-fatal catalog load error
+      }
+    }
+
     let metadata: ActiveMetadata | null
     try {
       metadata = await readActiveMetadata(this.#paths)
@@ -421,7 +447,7 @@ export class ActivationCoordinator {
 
     const userMode = readDictionaryMode(this.#config)
     const isSyncConfirmed = this.#settingsSyncState === 'synced' && metadata.settingsSynced !== false && !metadata.settingsSyncError
-    const settingsSyncFailed = !isSyncConfirmed
+    const settingsSyncPending = !isSyncConfirmed
 
     // Branch A: Managed ECDICT active mode
     if (metadata.activeMode === 'managed-ecdict') {
@@ -491,14 +517,14 @@ export class ActivationCoordinator {
         } catch {}
       }
 
-      if (userMode === 'managed-ecdict' || (userMode === 'fixture' && settingsSyncFailed)) {
+      if (userMode === 'managed-ecdict' || settingsSyncPending) {
         try {
           this.#manager.activate({
             mode: 'managed-ecdict',
             identity: metadata.identity,
             dictionary: openedDict,
           })
-          if (settingsSyncFailed) {
+          if (settingsSyncPending) {
             const retryState = await this.#persistHostConfigMode('managed-ecdict')
             if (retryState === 'synced') {
               try {
@@ -545,15 +571,18 @@ export class ActivationCoordinator {
         return
       }
 
-      let fileStat
       try {
-        fileStat = statSync(snapPath)
-        if (!fileStat.isFile()) {
+        const lstat = lstatSync(snapPath)
+        if (lstat.isSymbolicLink()) {
+          this.#recoveryError = `Active custom snapshot is a symbolic link: ${metadata.databaseFile}`
+          return
+        }
+        if (!lstat.isFile()) {
           this.#recoveryError = `Active custom snapshot is not a regular file: ${metadata.databaseFile}`
           return
         }
-        if (metadata.byteSize !== undefined && fileStat.size !== metadata.byteSize) {
-          this.#recoveryError = `Active custom snapshot byte size mismatch: expected ${metadata.byteSize}, got ${fileStat.size}`
+        if (metadata.byteSize !== undefined && lstat.size !== metadata.byteSize) {
+          this.#recoveryError = `Active custom snapshot byte size mismatch: expected ${metadata.byteSize}, got ${lstat.size}`
           return
         }
       } catch (err) {
@@ -561,16 +590,28 @@ export class ActivationCoordinator {
         return
       }
 
-      // SHA-256 digest validation
+      // Worker-offloaded streamed SHA-256 and SQLite schema/integrity/query verification (B12: zero whole-file Buffer to Host!)
+      let validation: CustomSnapshotValidateSuccessResponse
       try {
-        const fileBuf = await readFile(snapPath)
-        const computedSha = createHash('sha256').update(fileBuf).digest('hex').toLowerCase()
-        if (metadata.sha256 && computedSha !== metadata.sha256.toLowerCase()) {
-          this.#recoveryError = `Active custom snapshot SHA-256 digest mismatch: expected ${metadata.sha256}, got ${computedSha}`
-          return
-        }
+        validation = await this.#customSnapshotManager.validatePublishedSnapshot(snapPath, {
+          timeoutMs: 30000,
+        })
       } catch (err) {
-        this.#recoveryError = `Failed to compute custom snapshot digest: ${err instanceof Error ? err.message : String(err)}`
+        this.#recoveryError = `Custom snapshot worker verification failed: ${err instanceof Error ? err.message : String(err)}`
+        return
+      }
+
+      // Compare against persisted metadata
+      if (metadata.byteSize !== undefined && validation.byteSize !== metadata.byteSize) {
+        this.#recoveryError = `Active custom snapshot byte size mismatch: expected ${metadata.byteSize}, got ${validation.byteSize}`
+        return
+      }
+      if (metadata.sha256 && validation.sha256.toLowerCase() !== metadata.sha256.toLowerCase()) {
+        this.#recoveryError = `Active custom snapshot SHA-256 digest mismatch: expected ${metadata.sha256}, got ${validation.sha256}`
+        return
+      }
+      if (metadata.schemaVersion !== undefined && validation.schemaVersion !== metadata.schemaVersion) {
+        this.#recoveryError = `Active custom snapshot schema_version mismatch: expected ${metadata.schemaVersion}, got ${validation.schemaVersion}`
         return
       }
 
@@ -579,9 +620,13 @@ export class ActivationCoordinator {
         await this.#customSnapshotManager.adoptPublishedSnapshot(metadata.snapshotId, {
           identity: metadata.identity,
           publishedPath: snapPath,
-          sha256: metadata.sha256,
-          byteSize: metadata.byteSize,
-          schemaVersion: metadata.schemaVersion,
+          sha256: validation.sha256,
+          byteSize: validation.byteSize,
+          schemaVersion: validation.schemaVersion,
+          entryCount: validation.entryCount,
+          formCount: validation.formCount,
+          exampleCount: validation.exampleCount,
+          headwordsSample: validation.headwordsSample,
         })
       } catch (err) {
         this.#recoveryError = `Failed to adopt published snapshot: ${err instanceof Error ? err.message : String(err)}`
@@ -603,7 +648,7 @@ export class ActivationCoordinator {
         return
       }
 
-      if (userMode === 'custom' || (userMode === 'fixture' && settingsSyncFailed)) {
+      if (userMode === 'custom' || settingsSyncPending) {
         try {
           this.#manager.activate({
             mode: 'custom',
@@ -612,7 +657,7 @@ export class ActivationCoordinator {
           })
           this.#activeSnapshotId = metadata.snapshotId
 
-          if (settingsSyncFailed) {
+          if (settingsSyncPending) {
             const retryState = await this.#persistHostConfigMode('custom')
             if (retryState === 'synced') {
               try {
@@ -637,21 +682,24 @@ export class ActivationCoordinator {
   }
 
   /**
-   * Commit a newly built managed database and activate it in DictionaryManager.
+   * Commit a newly built managed database to installed inventory and activate it in DictionaryManager
+   * unless custom mode is actively selected (B11 inventory isolation).
    *
    * Transaction Sequence:
    * 1. Validate published SQLite database read-only.
-   * 2. Atomically write `active.json` (Commit Point 1: Durability).
-   * 3. Atomically switch `DictionaryManager` active reference (Commit Point 2: Runtime).
-   * 4. Best-effort update Host Config `dictionaryMode` via DSH settings service (Commit Point 3).
+   * 2. Commit installed inventory to installed-ecdict.json and update cached inventory (Commit Point 1).
+   * 3. If activeMode is 'custom' and not forceActivate, close candidate and leave custom active (B11).
+   * 4. Atomically write `active.json` (Commit Point 2: Durability).
+   * 5. Atomically switch `DictionaryManager` active reference (Commit Point 3: Runtime).
+   * 6. Best-effort update Host Config `dictionaryMode` via DSH settings service (Commit Point 4).
    *
-   * On Step 3 failure, rolls back `active.json` and closes the candidate.
+   * On Step 5 failure, rolls back `active.json` and closes the candidate.
    *
    * @param buildResult - verified outcome from buildManagedEcdictDatabase.
    */
   async activateManagedDatabase(
     buildResult: ManagedEcdictBuildResult,
-    options?: { signal?: AbortSignal; onCommitBoundary?: () => void },
+    options?: { signal?: AbortSignal; onCommitBoundary?: () => void; forceActivate?: boolean },
   ): Promise<void> {
     const signal = options?.signal
     if (signal?.aborted) {
@@ -719,7 +767,52 @@ export class ActivationCoordinator {
 
     options?.onCommitBoundary?.()
 
-    // 2. Commit metadata atomically
+    const installedMeta: InstalledEcdictMetadata = {
+      version: 1,
+      identity: buildResult.identity,
+      databaseFile: buildResult.databaseFile,
+      source: {
+        name: 'ECDICT',
+        commit: buildResult.sourceCommit,
+        sha256: buildResult.sourceSha256,
+        schemaVersion: buildResult.schemaVersion,
+      },
+      entryCount: buildResult.entryCount,
+      formCount: buildResult.formCount,
+      byteSize: buildResult.byteSize,
+      installedAt: new Date().toISOString(),
+    }
+
+    // Step B: Check active dictionary mode for Inventory Isolation (B11)
+    // If active mode is 'custom', do NOT overwrite active.json and do NOT switch DictionaryManager!
+    const currentMode = this.#manager.snapshot().activeMode
+    const isCustomActive = currentMode === 'custom' || previousMetadata?.activeMode === 'custom'
+
+    if (isCustomActive && !options?.forceActivate) {
+      try {
+        await writeInstalledEcdictMetadataAtomically(this.#paths, installedMeta)
+      } catch (error) {
+        publishedDict.close()
+        throw new Error(`Failed to commit installed ECDICT inventory: ${error instanceof Error ? error.message : String(error)}`, { cause: error })
+      }
+
+      this.#cachedInstalledCorpus = Object.freeze({
+        name: installedMeta.source.name,
+        commit: installedMeta.source.commit,
+        sha256: installedMeta.source.sha256,
+        schemaVersion: installedMeta.source.schemaVersion,
+        databaseFile: installedMeta.databaseFile,
+        entryCount: buildResult.entryCount,
+        formCount: buildResult.formCount,
+        byteSize: buildResult.byteSize,
+        publishedAt: installedMeta.installedAt,
+      })
+
+      publishedDict.close()
+      return
+    }
+
+    // 2. Commit active metadata atomically
     const metadata: ActiveMetadata = {
       version: 1,
       activeMode: 'managed-ecdict',
@@ -812,28 +905,13 @@ export class ActivationCoordinator {
     this.#recoveryError = null
 
     // Persist installed ECDICT inventory record independently
-    const installedMeta: InstalledEcdictMetadata = {
-      version: 1,
-      identity: buildResult.identity,
-      databaseFile: buildResult.databaseFile,
-      source: {
-        name: 'ECDICT',
-        commit: buildResult.sourceCommit,
-        sha256: buildResult.sourceSha256,
-        schemaVersion: buildResult.schemaVersion,
-      },
-      entryCount: buildResult.entryCount,
-      formCount: buildResult.formCount,
-      byteSize: buildResult.byteSize,
-      installedAt: new Date().toISOString(),
-    }
     try {
       await writeInstalledEcdictMetadataAtomically(this.#paths, installedMeta)
     } catch {
       // non-fatal
     }
 
-    // 4. Best-effort Host Config persistence
+    // 5. Best-effort Host Config persistence
     const syncState = await this.#persistHostConfigMode('managed-ecdict')
 
     // Persist final settings sync state into active.json
@@ -847,6 +925,17 @@ export class ActivationCoordinator {
     } catch {
       // non-fatal
     }
+  }
+
+  /**
+   * Commit a newly built managed database to installed inventory, and activate it
+   * if active mode is not custom.
+   */
+  async commitInstalledManagedDatabase(
+    buildResult: ManagedEcdictBuildResult,
+    options?: { signal?: AbortSignal; onCommitBoundary?: () => void; forceActivate?: boolean },
+  ): Promise<void> {
+    return this.activateManagedDatabase(buildResult, options)
   }
 
   /**
@@ -1549,7 +1638,33 @@ export class ActivationCoordinator {
       }
     }
 
-    // Open read-only with SQLite
+    // Worker-offloaded SQLite integrity, schema and sample verification (Host event loop non-blocking)
+    if (this.#customSnapshotManager) {
+      try {
+        const result = await this.#customSnapshotManager.validateCandidateDatabase(resolvedPath)
+        return {
+          valid: true,
+          schemaVersion: result.schemaVersion,
+          entryCount: result.entryCount,
+          formCount: result.formCount,
+          headwordsSample: result.headwordsSample,
+        }
+      } catch (err: unknown) {
+        const errCode = (err as { code?: string })?.code ?? 'INVALID_SQLITE_FILE'
+        const errMsg = err instanceof Error ? err.message : String(err)
+        return {
+          valid: false,
+          schemaVersion: 0,
+          entryCount: 0,
+          formCount: 0,
+          headwordsSample: [],
+          error: errMsg,
+          errorCode: (errCode as ManagementErrorCode) || 'INVALID_SQLITE_FILE',
+        }
+      }
+    }
+
+    // Fallback: Open read-only with SQLite on Host thread if no snapshot manager
     let db: DatabaseSync | null = null
     try {
       db = new DatabaseSync(resolvedPath, { readOnly: true, open: true })
@@ -1641,6 +1756,7 @@ export class ActivationCoordinator {
       customSnapshotStatus,
       installed: isInstalled,
       installedCorpus: this.#cachedInstalledCorpus,
+      customSnapshots: this.#customSnapshotManager?.listCustomSnapshots() ?? [],
       fixtureStats: Object.freeze({
         entryCount: FIXTURE_ENTRIES.length,
         formCount: FIXTURE_FORMS.length,

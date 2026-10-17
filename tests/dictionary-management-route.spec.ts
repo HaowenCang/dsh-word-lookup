@@ -346,13 +346,35 @@ describe('Dictionary Management Route Handlers', () => {
       const customDbPath = join(tempHome, 'valid-custom.sqlite3')
       const db = new DatabaseSync(customDbPath)
       db.exec(`
-        CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);
-        CREATE TABLE entries (word TEXT PRIMARY KEY, phonetic TEXT, translation TEXT);
-        CREATE TABLE forms (form TEXT PRIMARY KEY, headword TEXT);
-        CREATE TABLE examples (id INTEGER PRIMARY KEY, headword TEXT);
+        CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+        CREATE TABLE entries (
+          word TEXT PRIMARY KEY,
+          phonetic TEXT,
+          definition_en TEXT,
+          translation_zh TEXT,
+          pos TEXT,
+          exchange TEXT,
+          frequency INTEGER
+        );
+        CREATE TABLE forms (
+          form TEXT PRIMARY KEY,
+          headword TEXT NOT NULL,
+          kind TEXT
+        );
+        CREATE TABLE examples (
+          id INTEGER PRIMARY KEY,
+          headword TEXT NOT NULL,
+          english TEXT,
+          chinese TEXT,
+          source TEXT,
+          source_id TEXT,
+          score REAL
+        );
+        CREATE INDEX idx_forms_headword_raw ON forms(headword);
+        CREATE INDEX idx_examples_headword ON examples(headword);
         INSERT INTO meta VALUES ('schema_version', '1');
-        INSERT INTO entries VALUES ('word1', 'w', 'translation');
-        INSERT INTO forms VALUES ('word1s', 'word1');
+        INSERT INTO entries VALUES ('word1', 'w', 'def', 'trans', 'n', '', 1);
+        INSERT INTO forms VALUES ('word1s', 'word1', 'p');
       `)
       db.close()
 

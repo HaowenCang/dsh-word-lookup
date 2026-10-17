@@ -881,7 +881,6 @@ export class DictionaryOperationManager {
       return
     }
     this.#disposed = true
-    this.#activationCoordinator.dispose?.()
 
     const isQuar = this.#paths ? isDatabaseDirectoryQuarantined(this.#paths.databaseDirectory) : false
 
@@ -1010,6 +1009,11 @@ export class DictionaryOperationManager {
       }
     } finally {
       if (timer) clearTimeout(timer)
+      try {
+        await this.#activationCoordinator.dispose?.()
+      } catch {
+        // non-fatal
+      }
     }
   }
 

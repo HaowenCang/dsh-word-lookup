@@ -251,6 +251,8 @@ export interface ManagedStoragePaths {
   readonly activeMetadataPath: string
   /** Path to the installed ECDICT inventory file (`<home>/storages/dsh-word-lookup/installed-ecdict.json`). */
   readonly installedEcdictPath: string
+  /** Path to the custom snapshot catalog file (`<home>/storages/dsh-word-lookup/custom-snapshots/index.json`). */
+  readonly customSnapshotCatalogPath: string
 }
 
 /**
@@ -439,6 +441,7 @@ export function resolveManagedStoragePaths(options?: ResolveManagedStorageOption
   const customSnapshotDirectory = join(storageDirectory, 'custom-snapshots')
   const activeMetadataPath = join(storageDirectory, 'active.json')
   const installedEcdictPath = join(storageDirectory, 'installed-ecdict.json')
+  const customSnapshotCatalogPath = join(customSnapshotDirectory, 'index.json')
 
   return Object.freeze({
     home,
@@ -448,6 +451,7 @@ export function resolveManagedStoragePaths(options?: ResolveManagedStorageOption
     customSnapshotDirectory,
     activeMetadataPath,
     installedEcdictPath,
+    customSnapshotCatalogPath,
   })
 }
 
@@ -652,6 +656,13 @@ export function validateActiveMetadata(raw: unknown): ActiveMetadata {
     ) {
       throw new TypeError(
         `Invalid custom active metadata databaseFile "${record.databaseFile}": must be a relative basename matching ${PUBLISHED_SNAPSHOT_FILENAME_PATTERN.source}`,
+      )
+    }
+
+    const expectedDbFile = `custom-${snapshotId}.sqlite3`
+    if (dbFile !== expectedDbFile) {
+      throw new TypeError(
+        `Custom active metadata databaseFile "${dbFile}" does not match snapshotId "${snapshotId}" (expected "${expectedDbFile}")`,
       )
     }
 
@@ -959,6 +970,7 @@ export interface StorageFsHooks {
     data: string,
     options: { encoding: 'utf8'; flush: boolean },
   ) => Promise<void>
+  readonly readFile?: (path: string, encoding: 'utf8') => Promise<string>
   readonly rename?: (oldPath: string, newPath: string) => Promise<void>
   readonly unlink?: (path: string) => Promise<void>
 }
@@ -1063,4 +1075,238 @@ export async function removeStaleTemporaryArtifacts(paths: ManagedStoragePaths):
   }
 
   return { removed }
+}
+
+/**
+ * Single published custom snapshot catalog record.
+ */
+export interface CustomSnapshotCatalogEntry {
+  /** Internal snapshot UUID. */
+  readonly snapshotId: string
+  /** Logical identity token matching SAFE_IDENTITY_PATTERN. */
+  readonly identity: string
+  /** Relative basename strictly matching custom-<snapshotId>.sqlite3. */
+  readonly databaseFile: string
+  /** Fixed source provenance. */
+  readonly source: 'custom-local'
+  /** Database schema version (currently 1). */
+  readonly schemaVersion: number
+  /** 64-character lowercase SHA-256 digest of published database file. */
+  readonly sha256: string
+  /** Physical database byte size on disk. */
+  readonly byteSize: number
+  /** Total valid headword entry count if known. */
+  readonly entryCount?: number
+  /** Total morphological form count if known. */
+  readonly formCount?: number
+  /** Total example sentence count if known. */
+  readonly exampleCount?: number
+  /** ISO-8601 creation/publication timestamp. */
+  readonly createdAt: string
+}
+
+/**
+ * Persistent snapshot catalog stored at `<home>/storages/dsh-word-lookup/custom-snapshots/index.json`.
+ */
+export interface CustomSnapshotCatalog {
+  /** Catalog schema version (currently 1). */
+  readonly version: 1
+  /** Ordered list of published snapshots. */
+  readonly snapshots: readonly CustomSnapshotCatalogEntry[]
+}
+
+/**
+ * Validate an unknown object against the {@link CustomSnapshotCatalog} schema.
+ *
+ * Enforces strict security invariants:
+ * - Version must be 1.
+ * - Basename must strictly match `custom-${snapshotId}.sqlite3`.
+ * - Source must be `custom-local`.
+ * - No user source paths or arbitrary paths permitted.
+ * - SHA-256 must be 64-character hex.
+ * - Byte size must be positive integer.
+ *
+ * @param raw - parsed JSON object to validate.
+ * @returns validated catalog structure.
+ * @throws {TypeError} on schema violations.
+ */
+export function validateCustomSnapshotCatalog(raw: unknown): CustomSnapshotCatalog {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new TypeError('Custom snapshot catalog must be an object')
+  }
+
+  const record = raw as Record<string, unknown>
+  if (record.version !== 1) {
+    throw new TypeError(`Invalid catalog version: expected 1, got ${String(record.version)}`)
+  }
+
+  if (!Array.isArray(record.snapshots)) {
+    throw new TypeError('Custom snapshot catalog snapshots must be an array')
+  }
+
+  const validatedSnapshots: CustomSnapshotCatalogEntry[] = []
+  const seenIds = new Set<string>()
+
+  for (let i = 0; i < record.snapshots.length; i++) {
+    const item = record.snapshots[i]
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      throw new TypeError(`Catalog snapshot entry at index ${i} must be an object`)
+    }
+    const snap = item as Record<string, unknown>
+
+    if (typeof snap.snapshotId !== 'string' || !/^[0-9a-fA-F-]{36}$/.test(snap.snapshotId.trim())) {
+      throw new TypeError(`Catalog snapshot entry at index ${i} has invalid snapshotId: "${String(snap.snapshotId)}"`)
+    }
+    const snapshotId = snap.snapshotId.trim()
+
+    if (seenIds.has(snapshotId)) {
+      throw new TypeError(`Catalog snapshot entry at index ${i} has duplicate snapshotId: "${snapshotId}"`)
+    }
+    seenIds.add(snapshotId)
+
+    if (typeof snap.identity !== 'string' || !SAFE_IDENTITY_PATTERN.test(snap.identity.trim())) {
+      throw new TypeError(`Catalog snapshot entry at index ${i} has invalid identity: "${String(snap.identity)}"`)
+    }
+    const identity = snap.identity.trim()
+
+    if (typeof snap.databaseFile !== 'string') {
+      throw new TypeError(`Catalog snapshot entry at index ${i} databaseFile must be a string`)
+    }
+    const dbFile = snap.databaseFile.trim()
+    const expectedDbFile = `custom-${snapshotId}.sqlite3`
+    if (dbFile !== expectedDbFile) {
+      throw new TypeError(
+        `Catalog snapshot entry at index ${i} databaseFile "${dbFile}" does not match snapshotId "${snapshotId}" (expected "${expectedDbFile}")`,
+      )
+    }
+
+    if (snap.source !== 'custom-local') {
+      throw new TypeError(
+        `Catalog snapshot entry at index ${i} has invalid source: expected "custom-local", got "${String(snap.source)}"`,
+      )
+    }
+
+    if (typeof snap.schemaVersion !== 'number' || !Number.isInteger(snap.schemaVersion) || snap.schemaVersion < 1) {
+      throw new TypeError(`Catalog snapshot entry at index ${i} schemaVersion must be a positive integer >= 1`)
+    }
+
+    if (typeof snap.sha256 !== 'string' || !/^[0-9a-fA-F]{64}$/.test(snap.sha256.trim())) {
+      throw new TypeError(`Catalog snapshot entry at index ${i} sha256 must be a 64-character hex string`)
+    }
+    const sha256 = snap.sha256.trim().toLowerCase()
+
+    if (typeof snap.byteSize !== 'number' || !Number.isInteger(snap.byteSize) || snap.byteSize <= 0) {
+      throw new TypeError(`Catalog snapshot entry at index ${i} byteSize must be a positive integer > 0`)
+    }
+    const byteSize = snap.byteSize
+
+    if (typeof snap.createdAt !== 'string' || snap.createdAt.trim().length === 0) {
+      throw new TypeError(`Catalog snapshot entry at index ${i} createdAt must be a non-empty string`)
+    }
+    const createdAt = snap.createdAt.trim()
+
+    const entryCount =
+      typeof snap.entryCount === 'number' && Number.isInteger(snap.entryCount) && snap.entryCount >= 0
+        ? snap.entryCount
+        : undefined
+    const formCount =
+      typeof snap.formCount === 'number' && Number.isInteger(snap.formCount) && snap.formCount >= 0
+        ? snap.formCount
+        : undefined
+    const exampleCount =
+      typeof snap.exampleCount === 'number' && Number.isInteger(snap.exampleCount) && snap.exampleCount >= 0
+        ? snap.exampleCount
+        : undefined
+
+    validatedSnapshots.push({
+      snapshotId,
+      identity,
+      databaseFile: dbFile,
+      source: 'custom-local',
+      schemaVersion: snap.schemaVersion,
+      sha256,
+      byteSize,
+      ...(entryCount !== undefined ? { entryCount } : {}),
+      ...(formCount !== undefined ? { formCount } : {}),
+      ...(exampleCount !== undefined ? { exampleCount } : {}),
+      createdAt,
+    })
+  }
+
+  return {
+    version: 1,
+    snapshots: Object.freeze(validatedSnapshots),
+  }
+}
+
+/**
+ * Read and validate custom snapshot catalog from `<home>/storages/dsh-word-lookup/custom-snapshots/index.json`.
+ *
+ * @param paths - resolved managed storage paths.
+ * @returns validated catalog object, or null if no catalog file exists.
+ * @throws {Error} on malformed JSON or schema validation failure.
+ */
+export async function readCustomSnapshotCatalog(
+  paths: ManagedStoragePaths,
+): Promise<CustomSnapshotCatalog | null> {
+  const doReadFile = storageFsHooks?.readFile ?? readFile
+  let rawContent: string
+  try {
+    rawContent = await doReadFile(paths.customSnapshotCatalogPath, 'utf8')
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return null
+    }
+    throw error
+  }
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(rawContent)
+  } catch (error) {
+    throw new Error(
+      `Failed to parse custom snapshot catalog at ${paths.customSnapshotCatalogPath}: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
+    )
+  }
+
+  return validateCustomSnapshotCatalog(parsed)
+}
+
+/**
+ * Atomically write custom snapshot catalog to `<home>/storages/dsh-word-lookup/custom-snapshots/index.json`.
+ *
+ * @param paths - resolved managed storage paths.
+ * @param catalog - catalog structure to commit.
+ */
+export async function writeCustomSnapshotCatalogAtomically(
+  paths: ManagedStoragePaths,
+  catalog: CustomSnapshotCatalog,
+): Promise<void> {
+  const validated = validateCustomSnapshotCatalog(catalog)
+  const serialized = JSON.stringify(validated, null, 2) + '\n'
+
+  await ensureManagedStorageDirectories(paths)
+
+  const tempName = `index.json.tmp-${randomUUID()}`
+  const tempPath = join(paths.customSnapshotDirectory, tempName)
+
+  const doWriteFile = storageFsHooks?.writeFile ?? writeFile
+  const doRename = storageFsHooks?.rename ?? rename
+  const doUnlink = storageFsHooks?.unlink ?? unlink
+
+  try {
+    await doWriteFile(tempPath, serialized, {
+      encoding: 'utf8',
+      flush: true,
+    })
+    await doRename(tempPath, paths.customSnapshotCatalogPath)
+  } catch (error) {
+    try {
+      await doUnlink(tempPath)
+    } catch {
+      // best-effort cleanup
+    }
+    throw error
+  }
 }

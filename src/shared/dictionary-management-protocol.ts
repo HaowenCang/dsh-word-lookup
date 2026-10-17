@@ -140,6 +140,32 @@ export interface InstalledCorpusInfo {
 }
 
 /**
+ * Summary representation of a persistent custom snapshot for listing and inspection.
+ */
+export interface CustomSnapshotSummary {
+  /** Internal snapshot UUID. */
+  readonly snapshotId: string
+  /** Logical identity token. */
+  readonly identity: string
+  /** Database schema version. */
+  readonly schemaVersion: number
+  /** Headword entry count. */
+  readonly entryCount: number
+  /** Inflection and morphological forms count. */
+  readonly formCount: number
+  /** Physical database byte size on disk. */
+  readonly byteSize: number
+  /** Current snapshot state in manager. */
+  readonly status: string
+  /** Whether this snapshot is currently active. */
+  readonly isActive: boolean
+  /** Whether the snapshot is valid and eligible for activation. */
+  readonly isValid: boolean
+  /** ISO-8601 creation/publication timestamp. */
+  readonly createdAt: string
+}
+
+/**
  * Summary information of the package-owned deterministic fixture dictionary.
  */
 export interface FixtureCorpusInfo {
@@ -175,6 +201,8 @@ export interface DictionaryStatusResponse {
   readonly installed: boolean
   /** Metadata of the installed corpus, or null if none is installed. */
   readonly installedCorpus: InstalledCorpusInfo | null
+  /** List of persistent custom snapshots in catalog. */
+  readonly customSnapshots?: readonly CustomSnapshotSummary[]
   /** Statistics for built-in fixture dictionary, if active or available. */
   readonly fixtureStats?: FixtureCorpusInfo
   /** Snapshot of currently running background operation, or null. */

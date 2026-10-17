@@ -29,12 +29,17 @@
 import { randomUUID } from 'node:crypto'
 import { constants, existsSync, lstatSync, statSync } from 'node:fs'
 import { copyFile, link, lstat, mkdir, readFile, readdir, unlink, writeFile } from 'node:fs/promises'
-import { isAbsolute, join, resolve } from 'node:path'
+import { basename, isAbsolute, join, resolve } from 'node:path'
 
 import {
   SAFE_IDENTITY_PATTERN,
   STAGING_SNAPSHOT_FILENAME_PATTERN,
+  readActiveMetadata,
+  readCustomSnapshotCatalog,
   validateCustomSnapshotPath,
+  writeCustomSnapshotCatalogAtomically,
+  type CustomSnapshotCatalog,
+  type CustomSnapshotCatalogEntry,
   type ManagedStoragePaths,
 } from './managed-storage.js'
 import {
@@ -42,9 +47,11 @@ import {
   SnapshotTamperingError,
   type CustomValidatorTaskOptions,
 } from './custom-dictionary-validator.js'
+import type { CustomSnapshotValidateSuccessResponse } from './ecdict-integrity-worker.js'
+import type { CustomSnapshotSummary } from '../shared/dictionary-management-protocol.js'
 import { openSqliteDictionary, type SqliteDictionary } from './sqlite-dictionary.js'
 
-export { SnapshotTamperingError }
+export { SnapshotTamperingError, type CustomSnapshotSummary }
 
 /**
  * Valid states of the snapshot lifecycle state machine.
@@ -232,6 +239,7 @@ export class CustomSnapshotManager {
   readonly #inFlightCleanups = new Map<string, Promise<boolean>>()
 
   #disposed = false
+  #catalogError: string | null = null
 
   constructor(options: CustomSnapshotManagerOptions) {
     if (!options?.paths) {
@@ -249,6 +257,186 @@ export class CustomSnapshotManager {
 
   get isDisposed(): boolean {
     return this.#disposed
+  }
+
+  get catalogError(): string | null {
+    return this.#catalogError
+  }
+
+  get validator(): CustomDictionaryValidator {
+    return this.#validator
+  }
+
+  /**
+   * Validate an existing published snapshot file via isolated worker thread.
+   */
+  async validatePublishedSnapshot(
+    publishedPath: string,
+    options?: CustomValidatorTaskOptions,
+  ): Promise<CustomSnapshotValidateSuccessResponse> {
+    if (this.#disposed) {
+      throw new Error('CustomSnapshotManager has been disposed')
+    }
+    return this.#validator.validateSnapshot(publishedPath, options)
+  }
+
+  /**
+   * Validate a user candidate database file via isolated worker thread without modifying disk.
+   */
+  async validateCandidateDatabase(
+    candidatePath: string,
+    options?: CustomValidatorTaskOptions,
+  ): Promise<CustomSnapshotValidateSuccessResponse> {
+    if (this.#disposed) {
+      throw new Error('CustomSnapshotManager has been disposed')
+    }
+    return this.#validator.validateSnapshot(candidatePath, options)
+  }
+
+  /**
+   * Load snapshots from persistent catalog into in-memory registry.
+   *
+   * Invariants:
+   * - B21: If catalog is missing but legacy active.json references a valid custom snapshot, migrates and persists catalog.
+   * - B22: If catalog file is corrupt or unparseable, safely degrades without throwing, recording degradation status.
+   * - B24: If an entry in catalog references a missing or corrupt file, records state gracefully without crashing.
+   * - Adopted snapshots start in PUBLISHED_INACTIVE state with 0 leases.
+   */
+  async loadCatalog(): Promise<void> {
+    if (this.#disposed) return
+
+    let catalog: CustomSnapshotCatalog | null = null
+    try {
+      catalog = await readCustomSnapshotCatalog(this.#paths)
+    } catch (err) {
+      // B22: Catalog 损坏安全降级
+      this.#catalogError = `Custom snapshot catalog corrupted: ${err instanceof Error ? err.message : String(err)}`
+      return
+    }
+
+    if (!catalog) {
+      // B21: Catalog 文件缺失迁移
+      try {
+        const activeMeta = await readActiveMetadata(this.#paths)
+        if (activeMeta && activeMeta.activeMode === 'custom' && activeMeta.snapshotId) {
+          const pubPath = join(this.#paths.customSnapshotDirectory, activeMeta.databaseFile)
+          if (existsSync(pubPath)) {
+            const st = statSync(pubPath)
+            if (st.isFile()) {
+              const migratedEntry: CustomSnapshotCatalogEntry = {
+                snapshotId: activeMeta.snapshotId,
+                identity: activeMeta.identity,
+                databaseFile: activeMeta.databaseFile,
+                source: 'custom-local',
+                schemaVersion: activeMeta.schemaVersion,
+                sha256: activeMeta.sha256,
+                byteSize: activeMeta.byteSize,
+                createdAt: activeMeta.lastActivatedAt ?? new Date().toISOString(),
+              }
+              const newCatalog: CustomSnapshotCatalog = {
+                version: 1,
+                snapshots: Object.freeze([migratedEntry]),
+              }
+              await writeCustomSnapshotCatalogAtomically(this.#paths, newCatalog)
+              catalog = newCatalog
+            }
+          }
+        }
+      } catch {
+        // migration best effort
+      }
+    }
+
+    if (!catalog) return
+
+    for (const entry of catalog.snapshots) {
+      const pubPath = join(this.#paths.customSnapshotDirectory, entry.databaseFile)
+      const existing = this.#snapshots.get(entry.snapshotId)
+      if (existing && existing.activeLeases > 0) {
+        // preserve active lease
+        continue
+      }
+
+      const fileExists = existsSync(pubPath)
+      let isFileValid = fileExists
+      if (fileExists) {
+        try {
+          const st = statSync(pubPath)
+          if (!st.isFile() || st.size === 0) {
+            isFileValid = false
+          }
+        } catch {
+          isFileValid = false
+        }
+      }
+
+      const record: CustomSnapshotRecord = {
+        id: entry.snapshotId,
+        identity: entry.identity,
+        sourcePath: '',
+        stagingPath: '',
+        publishedPath: isFileValid ? pubPath : null,
+        state: isFileValid ? 'PUBLISHED_INACTIVE' : 'REJECTED',
+        activeLeases: 0,
+        sha256: entry.sha256,
+        byteSize: entry.byteSize,
+        schemaVersion: entry.schemaVersion,
+        entryCount: entry.entryCount ?? 0,
+        formCount: entry.formCount ?? 0,
+        exampleCount: entry.exampleCount ?? 0,
+        headwordsSample: Object.freeze([]),
+        createdAt: Date.parse(entry.createdAt) || Date.now(),
+        verifiedAt: Date.parse(entry.createdAt) || Date.now(),
+        publishedAt: Date.parse(entry.createdAt) || Date.now(),
+        error: isFileValid ? null : (fileExists ? 'Snapshot file is not a regular file' : 'Snapshot file is missing on disk'),
+        errorCode: isFileValid ? null : (fileExists ? 'NOT_A_FILE' : 'FILE_NOT_FOUND'),
+      }
+
+      this.#snapshots.set(entry.snapshotId, record)
+    }
+  }
+
+  /**
+   * List all custom snapshots as public summaries without sensitive source paths.
+   */
+  listCustomSnapshots(): readonly CustomSnapshotSummary[] {
+    const list: CustomSnapshotSummary[] = []
+    for (const record of this.#snapshots.values()) {
+      if (record.state === 'DELETED') continue
+      list.push({
+        snapshotId: record.id,
+        identity: record.identity,
+        schemaVersion: record.schemaVersion ?? 1,
+        entryCount: record.entryCount ?? 0,
+        formCount: record.formCount ?? 0,
+        byteSize: record.byteSize ?? 0,
+        status: record.state,
+        isActive: record.state === 'ACTIVE' || record.state === 'PUBLISHED_LEASED',
+        isValid: record.error === null && record.state !== 'REJECTED',
+        createdAt: new Date(record.createdAt).toISOString(),
+      })
+    }
+    return Object.freeze(list)
+  }
+
+  /**
+   * Retrieve a custom snapshot summary by ID without sensitive source paths.
+   */
+  getCustomSnapshot(snapshotId: string): CustomSnapshotSummary | undefined {
+    const record = this.#snapshots.get(snapshotId)
+    if (!record || record.state === 'DELETED') return undefined
+    return {
+      snapshotId: record.id,
+      identity: record.identity,
+      schemaVersion: record.schemaVersion ?? 1,
+      entryCount: record.entryCount ?? 0,
+      formCount: record.formCount ?? 0,
+      byteSize: record.byteSize ?? 0,
+      status: record.state,
+      isActive: record.state === 'ACTIVE' || record.state === 'PUBLISHED_LEASED',
+      isValid: record.error === null && record.state !== 'REJECTED',
+      createdAt: new Date(record.createdAt).toISOString(),
+    }
   }
 
   isStagingActive(stagingPath: string): boolean {
@@ -340,6 +528,13 @@ export class CustomSnapshotManager {
     // Validate path containment and naming
     await validateCustomSnapshotPath(resolvedPath, this.#paths.customSnapshotDirectory)
 
+    const expectedDbFile = `custom-${cleanId}.sqlite3`
+    if (basename(resolvedPath) !== expectedDbFile) {
+      throw new Error(
+        `Published snapshot filename "${basename(resolvedPath)}" does not match snapshotId "${cleanId}" (expected "${expectedDbFile}")`,
+      )
+    }
+
     // Check existence and file type
     const lstat = lstatSync(resolvedPath)
     if (lstat.isSymbolicLink()) {
@@ -380,6 +575,7 @@ export class CustomSnapshotManager {
     }
 
     this.#snapshots.set(cleanId, record)
+    await this.#persistSnapshotToCatalog(record)
     return record
   }
 
@@ -667,6 +863,7 @@ export class CustomSnapshotManager {
         publishedAt: Date.now(),
       }
       this.#snapshots.set(id, record)
+      await this.#persistSnapshotToCatalog(record)
 
       return record
     } catch (err: unknown) {
@@ -916,6 +1113,7 @@ export class CustomSnapshotManager {
           error: null,
           errorCode: null,
         })
+        await this.#removeSnapshotFromCatalog(snapshotId)
         return true
       } catch (err: unknown) {
         const errCode = (err as { code?: string })?.code ?? 'CLEANUP_FAILED'
@@ -939,6 +1137,60 @@ export class CustomSnapshotManager {
 
     this.#inFlightCleanups.set(snapshotId, cleanupPromise)
     return await cleanupPromise
+  }
+
+  async #persistSnapshotToCatalog(record: CustomSnapshotRecord): Promise<void> {
+    if (!record.publishedPath) return
+    try {
+      let catalog: CustomSnapshotCatalog | null = null
+      try {
+        catalog = await readCustomSnapshotCatalog(this.#paths)
+      } catch {
+        // Degrade safely: if corrupt, don't overwrite blindly
+        return
+      }
+      const existingList = catalog ? [...catalog.snapshots] : []
+      const entryIndex = existingList.findIndex((e) => e.snapshotId === record.id)
+      const newEntry: CustomSnapshotCatalogEntry = {
+        snapshotId: record.id,
+        identity: record.identity,
+        databaseFile: basename(record.publishedPath),
+        source: 'custom-local',
+        schemaVersion: record.schemaVersion ?? 1,
+        sha256: record.sha256 ?? '',
+        byteSize: record.byteSize ?? 0,
+        entryCount: record.entryCount ?? undefined,
+        formCount: record.formCount ?? undefined,
+        exampleCount: record.exampleCount ?? undefined,
+        createdAt: new Date(record.createdAt).toISOString(),
+      }
+      if (entryIndex >= 0) {
+        existingList[entryIndex] = newEntry
+      } else {
+        existingList.push(newEntry)
+      }
+      await writeCustomSnapshotCatalogAtomically(this.#paths, {
+        version: 1,
+        snapshots: Object.freeze(existingList),
+      })
+    } catch (err) {
+      // Non-fatal catalog failure must not break active dictionary
+      this.#catalogError = `Failed to persist catalog entry: ${err instanceof Error ? err.message : String(err)}`
+    }
+  }
+
+  async #removeSnapshotFromCatalog(snapshotId: string): Promise<void> {
+    try {
+      const catalog = await readCustomSnapshotCatalog(this.#paths)
+      if (!catalog) return
+      const filtered = catalog.snapshots.filter((e) => e.snapshotId !== snapshotId)
+      await writeCustomSnapshotCatalogAtomically(this.#paths, {
+        version: 1,
+        snapshots: Object.freeze(filtered),
+      })
+    } catch {
+      // Non-fatal
+    }
   }
 
   /**

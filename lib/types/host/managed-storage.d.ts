@@ -86,6 +86,8 @@ export interface ManagedStoragePaths {
     readonly activeMetadataPath: string;
     /** Path to the installed ECDICT inventory file (`<home>/storages/dsh-word-lookup/installed-ecdict.json`). */
     readonly installedEcdictPath: string;
+    /** Path to the custom snapshot catalog file (`<home>/storages/dsh-word-lookup/custom-snapshots/index.json`). */
+    readonly customSnapshotCatalogPath: string;
 }
 /**
  * Options for resolving managed storage paths.
@@ -302,6 +304,7 @@ export interface StorageFsHooks {
         encoding: 'utf8';
         flush: boolean;
     }) => Promise<void>;
+    readonly readFile?: (path: string, encoding: 'utf8') => Promise<string>;
     readonly rename?: (oldPath: string, newPath: string) => Promise<void>;
     readonly unlink?: (path: string) => Promise<void>;
 }
@@ -343,3 +346,70 @@ export declare function writeActiveMetadataAtomically(paths: ManagedStoragePaths
 export declare function removeStaleTemporaryArtifacts(paths: ManagedStoragePaths): Promise<{
     removed: string[];
 }>;
+/**
+ * Single published custom snapshot catalog record.
+ */
+export interface CustomSnapshotCatalogEntry {
+    /** Internal snapshot UUID. */
+    readonly snapshotId: string;
+    /** Logical identity token matching SAFE_IDENTITY_PATTERN. */
+    readonly identity: string;
+    /** Relative basename strictly matching custom-<snapshotId>.sqlite3. */
+    readonly databaseFile: string;
+    /** Fixed source provenance. */
+    readonly source: 'custom-local';
+    /** Database schema version (currently 1). */
+    readonly schemaVersion: number;
+    /** 64-character lowercase SHA-256 digest of published database file. */
+    readonly sha256: string;
+    /** Physical database byte size on disk. */
+    readonly byteSize: number;
+    /** Total valid headword entry count if known. */
+    readonly entryCount?: number;
+    /** Total morphological form count if known. */
+    readonly formCount?: number;
+    /** Total example sentence count if known. */
+    readonly exampleCount?: number;
+    /** ISO-8601 creation/publication timestamp. */
+    readonly createdAt: string;
+}
+/**
+ * Persistent snapshot catalog stored at `<home>/storages/dsh-word-lookup/custom-snapshots/index.json`.
+ */
+export interface CustomSnapshotCatalog {
+    /** Catalog schema version (currently 1). */
+    readonly version: 1;
+    /** Ordered list of published snapshots. */
+    readonly snapshots: readonly CustomSnapshotCatalogEntry[];
+}
+/**
+ * Validate an unknown object against the {@link CustomSnapshotCatalog} schema.
+ *
+ * Enforces strict security invariants:
+ * - Version must be 1.
+ * - Basename must strictly match `custom-${snapshotId}.sqlite3`.
+ * - Source must be `custom-local`.
+ * - No user source paths or arbitrary paths permitted.
+ * - SHA-256 must be 64-character hex.
+ * - Byte size must be positive integer.
+ *
+ * @param raw - parsed JSON object to validate.
+ * @returns validated catalog structure.
+ * @throws {TypeError} on schema violations.
+ */
+export declare function validateCustomSnapshotCatalog(raw: unknown): CustomSnapshotCatalog;
+/**
+ * Read and validate custom snapshot catalog from `<home>/storages/dsh-word-lookup/custom-snapshots/index.json`.
+ *
+ * @param paths - resolved managed storage paths.
+ * @returns validated catalog object, or null if no catalog file exists.
+ * @throws {Error} on malformed JSON or schema validation failure.
+ */
+export declare function readCustomSnapshotCatalog(paths: ManagedStoragePaths): Promise<CustomSnapshotCatalog | null>;
+/**
+ * Atomically write custom snapshot catalog to `<home>/storages/dsh-word-lookup/custom-snapshots/index.json`.
+ *
+ * @param paths - resolved managed storage paths.
+ * @param catalog - catalog structure to commit.
+ */
+export declare function writeCustomSnapshotCatalogAtomically(paths: ManagedStoragePaths, catalog: CustomSnapshotCatalog): Promise<void>;

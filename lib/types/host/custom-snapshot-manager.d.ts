@@ -27,8 +27,10 @@
  */
 import { type ManagedStoragePaths } from './managed-storage.js';
 import { CustomDictionaryValidator, SnapshotTamperingError, type CustomValidatorTaskOptions } from './custom-dictionary-validator.js';
+import type { CustomSnapshotValidateSuccessResponse } from './ecdict-integrity-worker.js';
+import type { CustomSnapshotSummary } from '../shared/dictionary-management-protocol.js';
 import { type SqliteDictionary } from './sqlite-dictionary.js';
-export { SnapshotTamperingError };
+export { SnapshotTamperingError, type CustomSnapshotSummary };
 /**
  * Valid states of the snapshot lifecycle state machine.
  */
@@ -127,6 +129,34 @@ export declare class CustomSnapshotManager {
     constructor(options: CustomSnapshotManagerOptions);
     get managerId(): string;
     get isDisposed(): boolean;
+    get catalogError(): string | null;
+    get validator(): CustomDictionaryValidator;
+    /**
+     * Validate an existing published snapshot file via isolated worker thread.
+     */
+    validatePublishedSnapshot(publishedPath: string, options?: CustomValidatorTaskOptions): Promise<CustomSnapshotValidateSuccessResponse>;
+    /**
+     * Validate a user candidate database file via isolated worker thread without modifying disk.
+     */
+    validateCandidateDatabase(candidatePath: string, options?: CustomValidatorTaskOptions): Promise<CustomSnapshotValidateSuccessResponse>;
+    /**
+     * Load snapshots from persistent catalog into in-memory registry.
+     *
+     * Invariants:
+     * - B21: If catalog is missing but legacy active.json references a valid custom snapshot, migrates and persists catalog.
+     * - B22: If catalog file is corrupt or unparseable, safely degrades without throwing, recording degradation status.
+     * - B24: If an entry in catalog references a missing or corrupt file, records state gracefully without crashing.
+     * - Adopted snapshots start in PUBLISHED_INACTIVE state with 0 leases.
+     */
+    loadCatalog(): Promise<void>;
+    /**
+     * List all custom snapshots as public summaries without sensitive source paths.
+     */
+    listCustomSnapshots(): readonly CustomSnapshotSummary[];
+    /**
+     * Retrieve a custom snapshot summary by ID without sensitive source paths.
+     */
+    getCustomSnapshot(snapshotId: string): CustomSnapshotSummary | undefined;
     isStagingActive(stagingPath: string): boolean;
     get paths(): ManagedStoragePaths;
     /**
