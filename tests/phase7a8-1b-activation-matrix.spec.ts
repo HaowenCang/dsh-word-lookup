@@ -1078,7 +1078,7 @@ describe('Phase 7A.8.1B: Custom Dictionary Activation & 3-Mode Switching Matrix 
     }
 
     const dispose = registerDictionaryManagementRoutes(mockCtx as any, opMan, coordinator)
-    expect(registeredPaths).toHaveLength(7)
+    expect(registeredPaths).toHaveLength(8)
 
     await opMan.dispose(100)
     expect(opMan.isDisposed).toBe(true)

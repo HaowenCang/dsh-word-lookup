@@ -19,6 +19,9 @@ export const MANAGEMENT_CANCEL_DOCUMENT_PATH = 'api/dsh-word-lookup/dictionary/c
 /** Document-relative URL of dictionary removal endpoint (client-facing). */
 export const MANAGEMENT_REMOVE_DOCUMENT_PATH = 'api/dsh-word-lookup/dictionary/remove'
 
+/** Document-relative URL of custom snapshot removal endpoint (client-facing). */
+export const MANAGEMENT_REMOVE_CUSTOM_DOCUMENT_PATH = 'api/dsh-word-lookup/dictionary/remove-custom'
+
 /** Document-relative URL of dictionary verification endpoint (client-facing). */
 export const MANAGEMENT_VERIFY_DOCUMENT_PATH = 'api/dsh-word-lookup/dictionary/verify'
 
@@ -89,7 +92,12 @@ export interface DictionaryOperationError {
 /**
  * Kind of dictionary background operation.
  */
-export type DictionaryOperationKind = 'install' | 'remove' | 'activate-custom' | 'switch-mode'
+export type DictionaryOperationKind =
+  | 'install'
+  | 'remove'
+  | 'activate-custom'
+  | 'switch-mode'
+  | 'remove-custom'
 
 /**
  * Diagnostic snapshot of a background dictionary operation.
@@ -366,6 +374,27 @@ export interface DictionaryVerifyResponse {
 }
 
 /**
+ * Request payload for POST /api/dsh-word-lookup/dictionary/remove-custom.
+ */
+export interface DictionaryRemoveCustomRequest {
+  /** Target published snapshot UUID to remove. */
+  readonly snapshotId: string
+}
+
+/**
+ * Response returned by POST /api/dsh-word-lookup/dictionary/remove-custom.
+ */
+export interface DictionaryRemoveCustomResponse {
+  readonly ok: true
+  /** Removed snapshot UUID. */
+  readonly snapshotId: string
+  /** Whether files were unlinked. */
+  readonly removed: boolean
+  /** Informational message. */
+  readonly message: string
+}
+
+/**
  * Machine-readable error codes across management endpoints.
  */
 export type ManagementErrorCode =
@@ -388,10 +417,13 @@ export type ManagementErrorCode =
   | 'INVALID_DATABASE_SCHEMA'
   | 'INCOMPATIBLE_DICTIONARY'
   | 'SNAPSHOT_NOT_FOUND'
+  | 'SNAPSHOT_ACTIVE'
+  | 'SNAPSHOT_LEASED'
   | 'ECDICT_NOT_INSTALLED'
   | 'ACTIVATE_CUSTOM_FAILED'
   | 'SWITCH_MODE_FAILED'
   | 'REMOVE_FAILED'
+  | 'REMOVE_CUSTOM_FAILED'
   | 'INTERNAL_ERROR'
 
 /**

@@ -7,7 +7,7 @@
  *
  * @module dsh-word-lookup/client/settings/dictionary-management-transport
  */
-import { type DictionaryCancelResponse, type DictionaryInstallResponse, type DictionaryRemoveResponse, type DictionaryStatusResponse, type DictionaryVerifyResponse, type ManagementErrorCode } from '../../shared/dictionary-management-protocol.js';
+import { type DictionaryActivateCustomResponse, type DictionaryCancelResponse, type DictionaryInstallResponse, type DictionaryRemoveCustomResponse, type DictionaryRemoveResponse, type DictionarySelectModeResponse, type DictionaryStatusResponse, type DictionaryVerifyResponse, type ManagementErrorCode } from '../../shared/dictionary-management-protocol.js';
 /**
  * Successful management API result.
  */
@@ -68,3 +68,15 @@ export declare function removeManagedDictionary(signal?: AbortSignal): Promise<M
  * Verify a custom SQLite dictionary path.
  */
 export declare function verifyCustomDictionary(path: string, signal?: AbortSignal): Promise<ManagementApiResult<DictionaryVerifyResponse>>;
+/**
+ * Activate a custom SQLite dictionary database from host path.
+ */
+export declare function activateCustomDictionary(path: string, identity?: string, signal?: AbortSignal): Promise<ManagementApiResult<DictionaryActivateCustomResponse>>;
+/**
+ * Switch operational dictionary mode between fixture, managed-ecdict, and custom snapshot.
+ */
+export declare function selectDictionaryMode(mode: 'fixture' | 'managed-ecdict' | 'custom', snapshotId?: string, signal?: AbortSignal): Promise<ManagementApiResult<DictionarySelectModeResponse>>;
+/**
+ * Remove an inactive custom dictionary snapshot by snapshot UUID.
+ */
+export declare function removeCustomDictionary(snapshotId: string, signal?: AbortSignal): Promise<ManagementApiResult<DictionaryRemoveCustomResponse>>;

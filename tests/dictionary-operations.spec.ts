@@ -1855,4 +1855,22 @@ describe('DictionaryOperationManager', () => {
       }
     })
   })
+
+  describe('removeCustom and canRemoveCustom', () => {
+    it('rejects invalid snapshotId with INVALID_ARGUMENT', async () => {
+      const paths = resolveManagedStoragePaths({ home: tempHome })
+      const opMan = new DictionaryOperationManager({ paths, activationCoordinator: coordinator })
+
+      await expect(opMan.removeCustom('not-a-uuid')).rejects.toThrow('Invalid snapshotId format')
+    })
+
+    it('canRemoveCustom returns false for non-UUID, active, or missing snapshot', () => {
+      const paths = resolveManagedStoragePaths({ home: tempHome })
+      const opMan = new DictionaryOperationManager({ paths, activationCoordinator: coordinator })
+
+      expect(opMan.canRemoveCustom('')).toBe(false)
+      expect(opMan.canRemoveCustom('not-a-uuid')).toBe(false)
+      expect(opMan.canRemoveCustom('11111111-2222-3333-4444-555555555555')).toBe(false)
+    })
+  })
 })

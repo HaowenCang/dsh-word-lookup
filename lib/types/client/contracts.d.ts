@@ -24,3 +24,5 @@ export type SlotRegistry = ClientContext['slots'];
 export type Shortcuts = ClientContext['shortcuts'];
 /** The settings mirror the two automatic switches are read from. */
 export type ConfigForms = ClientContext['configForms'];
+/** The first-class manual lookup command ID registered into DSH shortcuts. */
+export declare const LOOKUP_COMMAND_ID = "wordLookup.lookupSelection";

@@ -66,6 +66,22 @@ export declare class DictionaryManagementStore {
      */
     remove(): Promise<boolean>;
     /**
+     * Request activation of a custom SQLite dictionary.
+     */
+    activateCustom(path: string, identity?: string): Promise<boolean>;
+    /**
+     * Request switching active dictionary mode (fixture, managed-ecdict, custom).
+     */
+    selectMode(mode: 'fixture' | 'managed-ecdict' | 'custom', snapshotId?: string): Promise<boolean>;
+    /**
+     * Request removal of an inactive custom dictionary snapshot.
+     */
+    removeCustom(snapshotId: string): Promise<boolean>;
+    /**
+     * Verify candidate custom SQLite dictionary file.
+     */
+    verifyCustom(path: string): Promise<import("./dictionary-management-transport.js").ManagementApiResult<import("../../index.js").DictionaryVerifyResponse>>;
+    /**
      * Clear any outstanding action errors.
      */
     clearActionError(): void;

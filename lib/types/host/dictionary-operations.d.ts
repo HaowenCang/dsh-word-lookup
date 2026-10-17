@@ -13,7 +13,7 @@
  *
  * @module dsh-word-lookup/host/dictionary-operations
  */
-import type { DictionaryActivateCustomResponse, DictionaryOperationSnapshot, DictionaryRemoveResponse, DictionarySelectModeResponse } from '../shared/dictionary-management-protocol.js';
+import type { DictionaryActivateCustomResponse, DictionaryOperationSnapshot, DictionaryRemoveCustomResponse, DictionaryRemoveResponse, DictionarySelectModeResponse } from '../shared/dictionary-management-protocol.js';
 import type { ManagedStoragePaths } from './managed-storage.js';
 import type { DictionaryMode } from './config.js';
 import type { ActivationCoordinator } from './dictionary-activation.js';
@@ -142,6 +142,10 @@ export declare class DictionaryOperationManager {
      */
     canRemove(): boolean;
     /**
+     * Check whether a specific custom snapshot can currently be removed.
+     */
+    canRemoveCustom(snapshotId: string): boolean;
+    /**
      * Check whether a custom dictionary can currently be activated.
      */
     canActivateCustom(): boolean;
@@ -203,6 +207,21 @@ export declare class DictionaryOperationManager {
      * @returns removal outcome.
      */
     remove(): Promise<DictionaryRemoveResponse>;
+    /**
+     * Request removal of a published custom dictionary snapshot.
+     *
+     * Enforces:
+     * - Exclusive operation lock (isolated from install, remove, activate, switch).
+     * - Validated UUID.
+     * - Cannot remove active snapshot.
+     * - Cannot remove snapshot with active leases > 0.
+     * - Deletes only managed snapshot in customSnapshotDirectory.
+     * - Raw source database is NEVER touched.
+     *
+     * @param snapshotId - target published snapshot UUID.
+     * @returns settled removal response.
+     */
+    removeCustom(snapshotId: string): Promise<DictionaryRemoveCustomResponse>;
     /**
      * Request activation of a custom SQLite dictionary database.
      *

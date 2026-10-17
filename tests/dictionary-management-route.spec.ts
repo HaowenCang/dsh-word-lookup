@@ -22,6 +22,7 @@ import {
   createActivateCustomHandler,
   createCancelHandler,
   createInstallHandler,
+  createRemoveCustomHandler,
   createRemoveHandler,
   createSelectModeHandler,
   createStatusHandler,
@@ -37,6 +38,7 @@ import {
   MANAGEMENT_ACTIVATE_CUSTOM_PATH,
   MANAGEMENT_CANCEL_PATH,
   MANAGEMENT_INSTALL_PATH,
+  MANAGEMENT_REMOVE_CUSTOM_PATH,
   MANAGEMENT_REMOVE_PATH,
   MANAGEMENT_SELECT_MODE_PATH,
   MANAGEMENT_STATUS_PATH,
@@ -482,8 +484,87 @@ describe('Dictionary Management Route Handlers', () => {
     })
   })
 
+  describe('POST /api/dsh-word-lookup/dictionary/remove-custom', () => {
+    it('returns 405 on non-POST', async () => {
+      const handler = createRemoveCustomHandler(opMan)
+      const res = await handler(new Request('http://localhost' + MANAGEMENT_REMOVE_CUSTOM_PATH, { method: 'GET' }))
+      expect(res.status).toBe(405)
+      const data = await res.json()
+      expect(data.error).toBe('METHOD_NOT_ALLOWED')
+    })
+
+    it('returns 400 when snapshotId is missing or empty', async () => {
+      const handler = createRemoveCustomHandler(opMan)
+      const res = await handler(jsonPostRequest('http://localhost' + MANAGEMENT_REMOVE_CUSTOM_PATH, {}))
+      expect(res.status).toBe(400)
+      const data = await res.json()
+      expect(data.error).toBe('INVALID_ARGUMENT')
+    })
+
+    it('returns 400 when snapshotId is not a valid UUID', async () => {
+      const handler = createRemoveCustomHandler(opMan)
+      const res = await handler(jsonPostRequest('http://localhost' + MANAGEMENT_REMOVE_CUSTOM_PATH, { snapshotId: 'invalid-id' }))
+      expect(res.status).toBe(400)
+      const data = await res.json()
+      expect(data.error).toBe('INVALID_ARGUMENT')
+    })
+
+    it('returns 404 when snapshotId is not found', async () => {
+      const err = new Error('Custom snapshot not found')
+      ;(err as unknown as { code: string }).code = 'SNAPSHOT_NOT_FOUND'
+      vi.spyOn(opMan, 'removeCustom').mockRejectedValue(err)
+
+      const handler = createRemoveCustomHandler(opMan)
+      const res = await handler(
+        jsonPostRequest('http://localhost' + MANAGEMENT_REMOVE_CUSTOM_PATH, {
+          snapshotId: '11111111-2222-3333-4444-555555555555',
+        }),
+      )
+      expect(res.status).toBe(404)
+      const data = await res.json()
+      expect(data.error).toBe('SNAPSHOT_NOT_FOUND')
+    })
+
+    it('returns 409 when snapshot is currently active', async () => {
+      const err = new Error('Cannot remove currently active custom dictionary snapshot')
+      ;(err as unknown as { code: string }).code = 'SNAPSHOT_ACTIVE'
+      vi.spyOn(opMan, 'removeCustom').mockRejectedValue(err)
+
+      const handler = createRemoveCustomHandler(opMan)
+      const res = await handler(
+        jsonPostRequest('http://localhost' + MANAGEMENT_REMOVE_CUSTOM_PATH, {
+          snapshotId: '11111111-2222-3333-4444-555555555555',
+        }),
+      )
+      expect(res.status).toBe(409)
+      const data = await res.json()
+      expect(data.error).toBe('SNAPSHOT_ACTIVE')
+    })
+
+    it('accepts valid request and delegates to operationManager.removeCustom', async () => {
+      vi.spyOn(opMan, 'removeCustom').mockResolvedValue({
+        ok: true,
+        snapshotId: '11111111-2222-3333-4444-555555555555',
+        removed: true,
+        message: 'Snapshot removed',
+      })
+
+      const handler = createRemoveCustomHandler(opMan)
+      const res = await handler(
+        jsonPostRequest('http://localhost' + MANAGEMENT_REMOVE_CUSTOM_PATH, {
+          snapshotId: '11111111-2222-3333-4444-555555555555',
+        }),
+      )
+      expect(res.status).toBe(200)
+      const data = await res.json()
+      expect(data.ok).toBe(true)
+      expect(data.snapshotId).toBe('11111111-2222-3333-4444-555555555555')
+      expect(data.removed).toBe(true)
+    })
+  })
+
   describe('registerDictionaryManagementRoutes', () => {
-    it('registers all 7 routes and returns clean disposer', async () => {
+    it('registers all 8 routes and returns clean disposer', async () => {
       const registeredPaths: string[] = []
       const mockCtx = {
         connection: {
@@ -500,7 +581,7 @@ describe('Dictionary Management Route Handlers', () => {
       }
 
       const dispose = registerDictionaryManagementRoutes(mockCtx as any, opMan, coordinator)
-      expect(registeredPaths).toHaveLength(7)
+      expect(registeredPaths).toHaveLength(8)
       expect(registeredPaths).toContain(MANAGEMENT_STATUS_PATH)
       expect(registeredPaths).toContain(MANAGEMENT_INSTALL_PATH)
       expect(registeredPaths).toContain(MANAGEMENT_CANCEL_PATH)
@@ -508,6 +589,7 @@ describe('Dictionary Management Route Handlers', () => {
       expect(registeredPaths).toContain(MANAGEMENT_VERIFY_PATH)
       expect(registeredPaths).toContain(MANAGEMENT_ACTIVATE_CUSTOM_PATH)
       expect(registeredPaths).toContain(MANAGEMENT_SELECT_MODE_PATH)
+      expect(registeredPaths).toContain(MANAGEMENT_REMOVE_CUSTOM_PATH)
 
       // Unregister
       await dispose()

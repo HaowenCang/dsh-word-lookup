@@ -9,7 +9,7 @@
  *
  * @module dsh-word-lookup/client/settings/dictionary-settings-components
  */
-import { type ReactNode } from 'react';
+import React, { type ReactNode } from 'react';
 /** CSS styles injected for settings UI components. */
 export declare const SETTINGS_THEME_STYLES = "\n.dsh-wl-settings {\n  --wl-set-bg-card: var(--dsw-alias-settings-card-fill, var(--dsw-alias-bg-layer-2, rgba(255, 255, 255, 0.04)));\n  --wl-set-stroke: var(--dsw-alias-settings-card-stroke, var(--dsw-alias-border-l4, var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.08))));\n  --wl-set-text-main: var(--dsw-alias-label-primary, #f2f2f7);\n  --wl-set-text-sub: var(--dsw-alias-label-secondary, #9898a6);\n  --wl-set-text-muted: var(--dsw-alias-label-tertiary, #6c6c7a);\n  --wl-set-accent: var(--dsw-alias-brand-primary, #4176e6);\n  --wl-set-accent-hover: #3463c2;\n  --wl-set-success: var(--dsw-alias-state-success-primary, #22c55e);\n  --wl-set-warn: var(--dsw-alias-state-warn-primary, #f59e0b);\n  --wl-set-error: var(--dsw-alias-state-error-primary, #ef4444);\n  --wl-set-border-row: var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.06));\n}\n\n@media (prefers-color-scheme: light) {\n  .dsh-wl-settings {\n    --wl-set-bg-card: var(--dsw-alias-settings-card-fill, var(--dsw-alias-bg-layer-2, #ffffff));\n    --wl-set-stroke: var(--dsw-alias-settings-card-stroke, var(--dsw-alias-border-l4, var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.08))));\n    --wl-set-text-main: var(--dsw-alias-label-primary, #18181c);\n    --wl-set-text-sub: var(--dsw-alias-label-secondary, #5c5c66);\n    --wl-set-text-muted: var(--dsw-alias-label-tertiary, #8c8c99);\n    --wl-set-border-row: var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.06));\n  }\n}\n\n:root[data-theme=\"light\"] .dsh-wl-settings,\nbody:not([data-ds-dark-theme]) .dsh-wl-settings,\n.light .dsh-wl-settings {\n  --wl-set-bg-card: var(--dsw-alias-settings-card-fill, var(--dsw-alias-bg-layer-2, #ffffff));\n  --wl-set-stroke: var(--dsw-alias-settings-card-stroke, var(--dsw-alias-border-l4, var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.08))));\n  --wl-set-text-main: var(--dsw-alias-label-primary, #18181c);\n  --wl-set-text-sub: var(--dsw-alias-label-secondary, #5c5c66);\n  --wl-set-text-muted: var(--dsw-alias-label-tertiary, #8c8c99);\n  --wl-set-border-row: var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.06));\n}\n\n:root[data-theme=\"dark\"] .dsh-wl-settings,\nbody[data-ds-dark-theme] .dsh-wl-settings,\n.dark .dsh-wl-settings {\n  --wl-set-bg-card: var(--dsw-alias-settings-card-fill, var(--dsw-alias-bg-layer-2, rgba(255, 255, 255, 0.04)));\n  --wl-set-stroke: var(--dsw-alias-settings-card-stroke, var(--dsw-alias-border-l4, var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.08))));\n  --wl-set-text-main: var(--dsw-alias-label-primary, #f2f2f7);\n  --wl-set-text-sub: var(--dsw-alias-label-secondary, #9898a6);\n  --wl-set-text-muted: var(--dsw-alias-label-tertiary, #6c6c7a);\n  --wl-set-border-row: var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.06));\n}\n\n@media (max-width: 600px) {\n  .dsh-wl-setting-row {\n    flex-direction: column !important;\n    align-items: flex-start !important;\n    gap: 8px !important;\n  }\n}\n";
 export interface SectionCardProps {
@@ -53,8 +53,9 @@ export interface ActionButtonProps {
     readonly size?: 'small' | 'medium';
     readonly ariaLabel?: string;
     readonly title?: string;
+    readonly 'data-testid'?: string;
 }
-export declare function ActionButton({ children, onClick, variant, disabled, busy, size, ariaLabel, title, }: ActionButtonProps): import("react/jsx-runtime").JSX.Element;
+export declare function ActionButton({ children, onClick, variant, disabled, busy, size, ariaLabel, title, 'data-testid': testId, }: ActionButtonProps): import("react/jsx-runtime").JSX.Element;
 export interface ProgressBarProps {
     readonly percent?: number;
     readonly label: string;
@@ -71,3 +72,38 @@ export interface ModalConfirmProps {
     readonly onCancel: () => void;
 }
 export declare function ModalConfirm({ title, message, confirmLabel, cancelLabel, isDanger, onConfirm, onCancel, }: ModalConfirmProps): import("react/jsx-runtime").JSX.Element;
+export interface TextInputProps {
+    readonly id?: string;
+    readonly label?: string;
+    readonly placeholder?: string;
+    readonly value: string;
+    readonly onChange: (value: string) => void;
+    readonly disabled?: boolean;
+    readonly error?: string | null;
+    readonly helpText?: string;
+    readonly width?: string | number;
+    readonly 'data-testid'?: string;
+    readonly onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+}
+export declare function TextInput({ id, label, placeholder, value, onChange, disabled, error, helpText, width, 'data-testid': testId, onKeyDown, }: TextInputProps): import("react/jsx-runtime").JSX.Element;
+export interface ShortcutRecorderModalProps {
+    readonly currentKeys: readonly string[];
+    readonly isModified: boolean;
+    readonly onClose: () => void;
+    readonly onSave: (binding: {
+        code: string;
+        modifiers: readonly string[];
+    }) => Promise<boolean>;
+    readonly onReset: () => Promise<boolean>;
+    readonly describeBinding?: (binding: {
+        code: string;
+        modifiers: readonly string[];
+    } | null) => {
+        binding: unknown;
+        keys: readonly string[];
+        issue: string | null;
+        conflicts: readonly string[];
+    };
+    readonly recording?: (active: boolean) => Promise<void>;
+}
+export declare function ShortcutRecorderModal({ currentKeys, isModified, onClose, onSave, onReset, describeBinding, recording, }: ShortcutRecorderModalProps): import("react/jsx-runtime").JSX.Element;

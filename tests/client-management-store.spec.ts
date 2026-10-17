@@ -391,4 +391,95 @@ describe('DictionaryManagementStore', () => {
     store.dispose()
     expect(capturedSignal?.aborted).toBe(true)
   })
+
+  it('handles activateCustom action: sets isActing, refreshes on success', async () => {
+    const activateSpy = vi.spyOn(transport, 'activateCustomDictionary').mockResolvedValue({
+      ok: true,
+      data: {
+        ok: true,
+        operationId: 'op-act-1',
+        activeMode: 'custom',
+        identity: 'custom-db',
+        snapshotId: '11111111-2222-3333-4444-555555555555',
+        message: 'Activated',
+      },
+    })
+    const fetchSpy = vi.spyOn(transport, 'fetchDictionaryStatus').mockResolvedValue({
+      ok: true,
+      data: sampleStatus({ activeMode: 'custom', activeIdentity: 'custom-db' }),
+    })
+
+    const store = new DictionaryManagementStore({ autoStart: false })
+    const promise = store.activateCustom('C:/path/dict.db', 'custom-db')
+    expect(store.getSnapshot().isActing).toBe(true)
+
+    const res = await promise
+    expect(res).toBe(true)
+    expect(store.getSnapshot().isActing).toBe(false)
+    expect(activateSpy).toHaveBeenCalledWith('C:/path/dict.db', 'custom-db', expect.any(AbortSignal))
+    expect(fetchSpy).toHaveBeenCalled()
+    store.dispose()
+  })
+
+  it('handles selectMode action: sets isActing, records error on failure', async () => {
+    vi.spyOn(transport, 'selectDictionaryMode').mockResolvedValue({
+      ok: false,
+      kind: 'refused',
+      httpStatus: 400,
+      code: 'INVALID_ARGUMENT',
+      message: 'Snapshot not found',
+    })
+
+    const store = new DictionaryManagementStore({ autoStart: false })
+    const ok = await store.selectMode('custom', 'invalid-id')
+    expect(ok).toBe(false)
+    expect(store.getSnapshot().isActing).toBe(false)
+    expect(store.getSnapshot().actionError).toBe('Snapshot not found')
+    store.dispose()
+  })
+
+  it('handles removeCustom action: sets isActing, refreshes on success', async () => {
+    const removeSpy = vi.spyOn(transport, 'removeCustomDictionary').mockResolvedValue({
+      ok: true,
+      data: {
+        ok: true,
+        snapshotId: '11111111-2222-3333-4444-555555555555',
+        removed: true,
+        message: 'Removed',
+      },
+    })
+    const fetchSpy = vi.spyOn(transport, 'fetchDictionaryStatus').mockResolvedValue({
+      ok: true,
+      data: sampleStatus(),
+    })
+
+    const store = new DictionaryManagementStore({ autoStart: false })
+    const ok = await store.removeCustom('11111111-2222-3333-4444-555555555555')
+    expect(ok).toBe(true)
+    expect(removeSpy).toHaveBeenCalledWith('11111111-2222-3333-4444-555555555555', expect.any(AbortSignal))
+    expect(fetchSpy).toHaveBeenCalled()
+    store.dispose()
+  })
+
+  it('handles verifyCustom: delegates to transport without toggling isActing', async () => {
+    const verifySpy = vi.spyOn(transport, 'verifyCustomDictionary').mockResolvedValue({
+      ok: true,
+      data: {
+        ok: true,
+        valid: true,
+        schemaVersion: 1,
+        entryCount: 50,
+        formCount: 10,
+        headwordsSample: ['alpha', 'beta'],
+        message: 'Valid',
+      },
+    })
+
+    const store = new DictionaryManagementStore({ autoStart: false })
+    const res = await store.verifyCustom('C:/path/dict.db')
+    expect(res.ok).toBe(true)
+    expect(store.getSnapshot().isActing).toBe(false)
+    expect(verifySpy).toHaveBeenCalledWith('C:/path/dict.db', expect.any(AbortSignal))
+    store.dispose()
+  })
 })

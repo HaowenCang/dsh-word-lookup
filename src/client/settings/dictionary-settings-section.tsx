@@ -1,12 +1,15 @@
 /**
  * Native DSH Settings Section for Dictionary Management (`settings.section`).
  *
- * Implements Phase 7A.7:
+ * Implements Phase 7A.8.2:
  * - Current Dictionary Status (Active mode, entry counts, forms, source, diagnostics).
+ * - Three-Mode Switching (Fixture, Managed ECDICT, Custom SQLite).
  * - 1-Click ECDICT Installation, Real-time Streaming Progress, Safe Cancellation.
- * - Managed Corpus Removal with Confirmation Dialog and Fixture Fallback.
+ * - Managed Corpus Removal with Confirmation Dialog, preserving active Custom mode if present.
+ * - Custom SQLite Management: Host path validation (MANUAL_HOST_PATH), live /verify, /activate-custom.
+ * - Custom Snapshot List with safe removal gating (unleased, inactive only) and safe /remove-custom unlinking.
  * - Automatic Lookup Switches (autoDoubleClick, autoSelection) via ConfigForms.
- * - Platform-accurate shortcut inspection and advanced dictionary informational notices.
+ * - Configurable Lookup Shortcut with ctx.shortcuts live inspection, recording modal, conflict check, and reset.
  * - Responsive, theme-aware, WCAG-accessible (WCAG 2.1 AA).
  *
  * @module dsh-word-lookup/client/settings/dictionary-settings-section
@@ -16,6 +19,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ConfigForm, ConfigFormSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client'
 
+import { LOOKUP_COMMAND_ID, type Shortcuts } from '../contracts.js'
 import {
   ActionButton,
   ModalConfirm,
@@ -23,14 +27,17 @@ import {
   SectionCard,
   SettingRow,
   SETTINGS_THEME_STYLES,
+  ShortcutRecorderModal,
   StatusBadge,
   Switch,
+  TextInput,
   type BadgeVariant,
 } from './dictionary-settings-components.js'
 import {
   DictionaryManagementStore,
   type DictionaryManagementStoreState,
 } from './dictionary-management-store.js'
+import type { CustomSnapshotSummary } from '../../shared/dictionary-management-protocol.js'
 
 /** Host settings schema for automatic triggers. */
 export interface DictionaryHostSettings {
@@ -45,6 +52,8 @@ export type DictionarySettingsSectionProps = Partial<PropsRuntime<'settings.sect
   readonly store?: DictionaryManagementStore
   /** Optional settings form controller for live switches. */
   readonly form?: ConfigForm<DictionaryHostSettings>
+  /** Optional shortcuts registry from DSH context. */
+  readonly shortcuts?: Shortcuts
   /** Force specific platform for shortcut testing. */
   readonly testPlatform?: 'windows' | 'macos' | 'linux'
 }
@@ -62,11 +71,12 @@ function detectPlatform(override?: 'windows' | 'macos' | 'linux'): 'windows' | '
 export function DictionarySettingsSection({
   store: externalStore,
   form,
+  shortcuts,
   testPlatform,
   close: _close,
 }: DictionarySettingsSectionProps) {
   // Store initialization
-  const [internalStore] = useState(() => (externalStore ? null : new DictionaryManagementStore()))
+  const [internalStore] = useState(() => (externalStore ? null : new DictionaryManagementStore({ autoStart: false })))
   const store = externalStore ?? internalStore!
 
   useEffect(() => {
@@ -163,9 +173,27 @@ export function DictionarySettingsSection({
     }
   }
 
-  // Remove confirmation modal state
+  // Modals & local state
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false)
   const [isExpandingDetails, setIsExpandingDetails] = useState(false)
+
+  // Custom dictionary import form state
+  const [customPath, setCustomPath] = useState('')
+  const [customIdentity, setCustomIdentity] = useState('')
+  const [isVerifying, setIsVerifying] = useState(false)
+  const [verifyOutcome, setVerifyOutcome] = useState<{
+    valid: boolean
+    schemaVersion?: number
+    entryCount?: number
+    formCount?: number
+    headwordsSample?: readonly string[]
+    message: string
+    error?: string
+  } | null>(null)
+  const [snapshotToRemove, setSnapshotToRemove] = useState<CustomSnapshotSummary | null>(null)
+
+  // Shortcut recorder state
+  const [showShortcutRecorder, setShowShortcutRecorder] = useState(false)
 
   const { status, isLoading, isActing, actionError, connectionError } = storeState
   const currentOp = status?.currentOperation
@@ -173,6 +201,125 @@ export function DictionarySettingsSection({
 
   // Platform detection for shortcut display
   const platform = detectPlatform(testPlatform)
+
+  // Shortcuts catalog synchronization
+  const activeShortcuts =
+    shortcuts ??
+    (typeof window !== 'undefined'
+      ? (window as unknown as { __DSH_SHORTCUTS__?: Shortcuts }).__DSH_SHORTCUTS__
+      : undefined)
+
+  const catalogSnapshot = useSyncExternalStore(
+    (callback) => {
+      if (activeShortcuts?.catalog?.subscribe) {
+        return activeShortcuts.catalog.subscribe(callback)
+      }
+      return () => {}
+    },
+    () => {
+      if (activeShortcuts?.catalog?.getSnapshot) {
+        return activeShortcuts.catalog.getSnapshot()
+      }
+      return null
+    },
+    () => {
+      if (activeShortcuts?.catalog?.getSnapshot) {
+        return activeShortcuts.catalog.getSnapshot()
+      }
+      return null
+    },
+  )
+
+  const lookupShortcutEntry = catalogSnapshot?.find((e) => e.id === LOOKUP_COMMAND_ID)
+
+  // Shortcut actions
+  const handleSaveShortcut = async (binding: { code: string; modifiers: readonly string[] }): Promise<boolean> => {
+    if (!activeShortcuts) return false
+    const configSnap = activeShortcuts.config?.getSnapshot ? activeShortcuts.config.getSnapshot() : null
+    const revision = (configSnap as { revision?: number } | null)?.revision ?? 1
+    const res = await activeShortcuts.edit(
+      { type: 'set', id: LOOKUP_COMMAND_ID as never, binding: binding as never },
+      revision as never,
+    )
+    return res.status === 'saved'
+  }
+
+  const handleResetShortcut = async (): Promise<boolean> => {
+    if (!activeShortcuts) return false
+    const configSnap = activeShortcuts.config?.getSnapshot ? activeShortcuts.config.getSnapshot() : null
+    const revision = (configSnap as { revision?: number } | null)?.revision ?? 1
+    const res = await activeShortcuts.edit(
+      { type: 'reset', id: LOOKUP_COMMAND_ID as never },
+      revision as never,
+    )
+    return res.status === 'saved'
+  }
+
+  // Custom dictionary verification handler
+  const handleVerifyCustom = async () => {
+    const trimmedPath = customPath.trim()
+    if (!trimmedPath || isVerifying || isActing) return
+    setIsVerifying(true)
+    setVerifyOutcome(null)
+    try {
+      const res = await store.verifyCustom(trimmedPath)
+      if (res.ok) {
+        setVerifyOutcome({
+          valid: true,
+          schemaVersion: res.data.schemaVersion,
+          entryCount: res.data.entryCount,
+          formCount: res.data.formCount,
+          headwordsSample: res.data.headwordsSample,
+          message: res.data.message || 'SQLite 数据库架构校验通过',
+        })
+      } else {
+        setVerifyOutcome({
+          valid: false,
+          message:
+            res.kind === 'refused'
+              ? res.message
+              : res.kind === 'network'
+                ? `网络/连接异常: ${res.message}`
+                : '校验请求已取消',
+          error:
+            res.kind === 'refused'
+              ? res.code
+              : res.kind === 'network'
+                ? 'NETWORK_ERROR'
+                : 'ABORTED',
+        })
+      }
+    } catch (err) {
+      setVerifyOutcome({
+        valid: false,
+        message: err instanceof Error ? err.message : String(err),
+        error: 'INTERNAL_ERROR',
+      })
+    } finally {
+      setIsVerifying(false)
+    }
+  }
+
+  // Custom dictionary activation handler
+  const handleActivateCustom = async () => {
+    const trimmedPath = customPath.trim()
+    if (!trimmedPath || isActing || isVerifying) return
+    const trimmedIdentity = customIdentity.trim() || undefined
+    const success = await store.activateCustom(trimmedPath, trimmedIdentity)
+    if (success) {
+      setCustomPath('')
+      setCustomIdentity('')
+      setVerifyOutcome(null)
+    }
+  }
+
+  // Custom snapshot removal handler
+  const handleConfirmRemoveCustom = async () => {
+    if (!snapshotToRemove || isActing) return
+    const id = snapshotToRemove.snapshotId
+    setSnapshotToRemove(null)
+    await store.removeCustom(id)
+  }
 
   // Status badge calculation
   let badgeVariant: BadgeVariant = 'neutral'
@@ -192,6 +339,9 @@ export function DictionarySettingsSection({
     else if (currentOp.phase === 'validating-database') badgeLabel = '正在校验完整性'
     else if (currentOp.phase === 'activating') badgeLabel = '正在激活词典'
     else badgeLabel = '正在执行操作'
+  } else if (status?.activeMode === 'custom') {
+    badgeVariant = 'success'
+    badgeLabel = `自定义已启用 (${status.activeIdentity ?? 'custom'})`
   } else if (status?.installed) {
     if (status.activeMode === 'managed-ecdict') {
       badgeVariant = 'success'
@@ -204,6 +354,12 @@ export function DictionarySettingsSection({
     badgeVariant = 'neutral'
     badgeLabel = '内置基础词典 (Fixture)'
   }
+
+  // Lookup active custom snapshot if in custom mode
+  const activeCustomSnapshot =
+    status?.activeMode === 'custom' && status.customSnapshots
+      ? status.customSnapshots.find((s) => s.snapshotId === status.activeSnapshotId)
+      : null
 
   return (
     <div className="dsh-wl-settings" style={{ maxWidth: '800px', width: '100%', boxSizing: 'border-box' }}>
@@ -279,7 +435,7 @@ export function DictionarySettingsSection({
         </div>
       )}
 
-      {/* Section A: Current Dictionary Status */}
+      {/* Section A: Current Dictionary Status & 3-Mode Switching */}
       <SectionCard
         title="当前活动词典"
         description="当前在查词过程中负责提供释义的词典源与运行状态。"
@@ -297,6 +453,58 @@ export function DictionarySettingsSection({
           </ActionButton>
         }
       >
+        {/* Three-Mode Switching Control */}
+        <div
+          data-testid="mode-switcher-container"
+          style={{
+            display: 'flex',
+            gap: '8px',
+            marginBottom: '16px',
+            paddingBottom: '14px',
+            borderBottom: '1px solid var(--wl-set-border-row, rgba(255, 255, 255, 0.08))',
+            flexWrap: 'wrap',
+          }}
+        >
+          <ActionButton
+            data-testid="btn-mode-fixture"
+            variant={status?.activeMode === 'fixture' ? 'primary' : 'secondary'}
+            size="small"
+            disabled={isActing}
+            onClick={() => void store.selectMode('fixture')}
+            ariaLabel="切换至内置基础词典"
+          >
+            内置基础词典 (Fixture)
+          </ActionButton>
+
+          <ActionButton
+            data-testid="btn-mode-ecdict"
+            variant={status?.activeMode === 'managed-ecdict' ? 'primary' : 'secondary'}
+            size="small"
+            disabled={!status?.installed || isActing}
+            onClick={() => void store.selectMode('managed-ecdict')}
+            title={!status?.installed ? '需先在一键安装 ECDICT 后方可切换' : '切换至本地全量 ECDICT 词典'}
+            ariaLabel="切换至本地 ECDICT 词典"
+          >
+            ECDICT 本地全量词典
+          </ActionButton>
+
+          <ActionButton
+            data-testid="btn-mode-custom"
+            variant={status?.activeMode === 'custom' ? 'primary' : 'secondary'}
+            size="small"
+            disabled={!status?.customSnapshots || status.customSnapshots.length === 0 || isActing}
+            onClick={() => void store.selectMode('custom')}
+            title={
+              !status?.customSnapshots || status.customSnapshots.length === 0
+                ? '需先在下方导入自定义 SQLite 词典'
+                : '切换至自定义 SQLite 词典'
+            }
+            ariaLabel="切换至自定义词典"
+          >
+            自定义 SQLite 词典
+          </ActionButton>
+        </div>
+
         <SettingRow
           title="词典模式"
           description="当前使用的词典引擎类别"
@@ -339,11 +547,15 @@ export function DictionarySettingsSection({
                   ? status.installedCorpus?.entryCount !== undefined
                     ? `${status.installedCorpus.entryCount.toLocaleString()} 词条`
                     : '暂无统计'
-                  : status.activeMode === 'fixture'
-                    ? status.fixtureStats?.entryCount !== undefined
-                      ? `${status.fixtureStats.entryCount} 词条`
+                  : status.activeMode === 'custom'
+                    ? activeCustomSnapshot?.entryCount !== undefined
+                      ? `${activeCustomSnapshot.entryCount.toLocaleString()} 词条`
                       : '暂无统计'
-                    : '暂无统计'}
+                    : status.activeMode === 'fixture'
+                      ? status.fixtureStats?.entryCount !== undefined
+                        ? `${status.fixtureStats.entryCount} 词条`
+                        : '暂无统计'
+                      : '暂无统计'}
             </span>
           }
         />
@@ -366,11 +578,15 @@ export function DictionarySettingsSection({
                   ? status.installedCorpus?.formCount !== undefined
                     ? `${status.installedCorpus.formCount.toLocaleString()} 记录`
                     : '暂无统计'
-                  : status.activeMode === 'fixture'
-                    ? status.fixtureStats?.formCount !== undefined
-                      ? `${status.fixtureStats.formCount} 记录`
+                  : status.activeMode === 'custom'
+                    ? activeCustomSnapshot?.formCount !== undefined
+                      ? `${activeCustomSnapshot.formCount.toLocaleString()} 记录`
                       : '暂无统计'
-                    : '暂无统计'}
+                    : status.activeMode === 'fixture'
+                      ? status.fixtureStats?.formCount !== undefined
+                        ? `${status.fixtureStats.formCount} 记录`
+                        : '暂无统计'
+                      : '暂无统计'}
             </span>
           }
         />
@@ -393,11 +609,15 @@ export function DictionarySettingsSection({
                   ? status.installedCorpus?.commit
                     ? `ECDICT @ ${status.installedCorpus.commit.slice(0, 7)}`
                     : 'ECDICT (版本未知)'
-                  : status.activeMode === 'fixture'
-                    ? status.fixtureStats?.version
-                      ? `内置 Fixture (${status.fixtureStats.version})`
-                      : '内置 Fixture'
-                    : (status.activeIdentity ?? '自定义版本')}
+                  : status.activeMode === 'custom'
+                    ? activeCustomSnapshot?.identity
+                      ? `自定义 (${activeCustomSnapshot.identity})`
+                      : (status.activeIdentity ?? '自定义 SQLite')
+                    : status.activeMode === 'fixture'
+                      ? status.fixtureStats?.version
+                        ? `内置 Fixture (${status.fixtureStats.version})`
+                        : '内置 Fixture'
+                      : (status.activeIdentity ?? '自定义版本')}
             </span>
           }
         />
@@ -438,6 +658,10 @@ export function DictionarySettingsSection({
               <div>活跃标识: {status?.activeIdentity ?? 'fixture'}</div>
               <div>活跃模式: {status?.activeMode ?? 'fixture'}</div>
               <div>配置模式: {status?.configuredMode ?? 'fixture'}</div>
+              {status?.activeSnapshotId && <div>活跃快照: {status.activeSnapshotId}</div>}
+              {status?.customSnapshotStatus && (
+                <div>快照引用租约: {status.customSnapshotStatus.activeLeases}</div>
+              )}
               <div>数据库文件: {status?.installedCorpus?.databaseFile ?? '内置只读'}</div>
               <div>架构版本: {status?.installedCorpus?.schemaVersion ?? 1}</div>
               <div>世代编号: {status?.generation ?? 0}</div>
@@ -539,7 +763,7 @@ export function DictionarySettingsSection({
             >
               {status.activeMode === 'managed-ecdict'
                 ? `ECDICT 本地全量数据库已就绪${status.installedCorpus?.entryCount !== undefined ? `（${status.installedCorpus.entryCount.toLocaleString()} 词条${status.installedCorpus?.formCount !== undefined ? `，${status.installedCorpus.formCount.toLocaleString()} 形态学记录` : ''}）` : ''}。当前运行状态稳定，查词请求直接命中本地只读 SQLite 数据库。`
-                : `ECDICT 本地全量数据库已安装在磁盘，但当前活动词典模式为「${status.activeMode === 'fixture' ? '内置基础词典 (Fixture)' : status.activeMode}」。查词请求尚未命中 ECDICT。`}
+                : `ECDICT 本地全量数据库已安装在磁盘，但当前活动词典模式为「${status.activeMode === 'fixture' ? '内置基础词典 (Fixture)' : status.activeMode === 'custom' ? '自定义 SQLite 词典' : status.activeMode}」。查词请求尚未命中 ECDICT。`}
             </div>
 
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -552,7 +776,7 @@ export function DictionarySettingsSection({
                 移除本地词典
               </ActionButton>
               <span style={{ fontSize: '12px', color: 'var(--wl-set-text-muted, #6c6c7a)' }}>
-                移除后将恢复为内置基础词典 (Fixture)。
+                移除后将恢复为内置基础词典 (Fixture)；若当前使用自定义词典则继续保持。
               </span>
             </div>
           </div>
@@ -641,7 +865,195 @@ export function DictionarySettingsSection({
         )}
       </SectionCard>
 
-      {/* Section C: Automatic Lookup Settings */}
+      {/* Section C: Custom SQLite Dictionary Management */}
+      <SectionCard
+        title="自定义 SQLite 词典管理"
+        description="支持通过本地绝对路径导入自建 SQLite 词典（.sqlite3 / .sqlite / .db）。原文件始终保持只读完整，插件在内部维护独立只读安全快照。"
+      >
+        {/* MANUAL_HOST_PATH Notice */}
+        <div
+          data-testid="manual-host-path-notice"
+          style={{
+            padding: '12px 14px',
+            borderRadius: '8px',
+            background: 'rgba(65, 118, 230, 0.08)',
+            border: '1px solid rgba(65, 118, 230, 0.25)',
+            marginBottom: '16px',
+            fontSize: '12.5px',
+            lineHeight: '1.5',
+            color: 'var(--wl-set-text-main, #f2f2f7)',
+          }}
+        >
+          <div style={{ fontWeight: 600, marginBottom: '3px' }}>路径输入说明 (MANUAL_HOST_PATH)</div>
+          <div style={{ color: 'var(--wl-set-text-sub, #9898a6)' }}>
+            受浏览器沙箱安全策略限制，无法直接调用本地文件选择窗口。请在资源管理器中复制 SQLite 数据库文件的完整绝对路径（如 <code style={{ fontFamily: 'monospace' }}>C:\dictionaries\my-dict.sqlite3</code> 或 <code style={{ fontFamily: 'monospace' }}>/home/user/dict.db</code>）并粘贴于下方。
+          </div>
+        </div>
+
+        {/* Import Form */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
+          <TextInput
+            id="input-custom-dict-path"
+            data-testid="input-custom-dict-path"
+            label="SQLite 数据库绝对路径 (MANUAL_HOST_PATH)"
+            placeholder="例如: C:\dictionaries\my-dict.sqlite3 或 /path/to/dict.db"
+            value={customPath}
+            onChange={setCustomPath}
+            disabled={isActing || isVerifying}
+          />
+
+          <TextInput
+            id="input-custom-dict-identity"
+            data-testid="input-custom-dict-identity"
+            label="自定义词库标识（可选，留空则自动提取文件名）"
+            placeholder="例如: medical-terms 或 collins-en-zh (仅限字母/数字/短横线/下划线)"
+            value={customIdentity}
+            onChange={setCustomIdentity}
+            disabled={isActing || isVerifying}
+          />
+
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '4px' }}>
+            <ActionButton
+              data-testid="btn-verify-custom"
+              variant="secondary"
+              disabled={!customPath.trim() || isVerifying || isActing}
+              busy={isVerifying}
+              onClick={() => void handleVerifyCustom()}
+            >
+              校验数据库
+            </ActionButton>
+
+            <ActionButton
+              data-testid="btn-activate-custom"
+              variant="primary"
+              disabled={!customPath.trim() || isVerifying || isActing}
+              busy={isActing}
+              onClick={() => void handleActivateCustom()}
+            >
+              导入并激活
+            </ActionButton>
+          </div>
+        </div>
+
+        {/* Live Verification Feedback */}
+        {verifyOutcome && (
+          <div
+            data-testid="verify-outcome-box"
+            role="alert"
+            style={{
+              padding: '12px 14px',
+              borderRadius: '8px',
+              marginBottom: '16px',
+              fontSize: '12.5px',
+              background: verifyOutcome.valid ? 'rgba(34, 197, 94, 0.08)' : 'rgba(239, 68, 68, 0.12)',
+              border: verifyOutcome.valid
+                ? '1px solid rgba(34, 197, 94, 0.25)'
+                : '1px solid rgba(239, 68, 68, 0.3)',
+              color: verifyOutcome.valid ? 'var(--wl-set-text-main, #f2f2f7)' : 'var(--wl-set-error, #ef4444)',
+            }}
+          >
+            <div style={{ fontWeight: 600, marginBottom: '4px' }}>
+              {verifyOutcome.valid ? '数据库架构校验通过' : '数据库校验未通过'}
+            </div>
+            {verifyOutcome.valid ? (
+              <div style={{ color: 'var(--wl-set-text-sub, #9898a6)', lineHeight: '1.6' }}>
+                <div>架构版本: v{verifyOutcome.schemaVersion ?? 1}</div>
+                <div>词条条目数: {verifyOutcome.entryCount?.toLocaleString() ?? 0} 条</div>
+                <div>词形形态数: {verifyOutcome.formCount?.toLocaleString() ?? 0} 条</div>
+                {verifyOutcome.headwordsSample && verifyOutcome.headwordsSample.length > 0 && (
+                  <div>样词抽样: {verifyOutcome.headwordsSample.slice(0, 5).join(', ')}</div>
+                )}
+              </div>
+            ) : (
+              <div>{verifyOutcome.message}</div>
+            )}
+          </div>
+        )}
+
+        {/* Custom Snapshots List */}
+        <div style={{ marginTop: '18px', paddingTop: '14px', borderTop: '1px solid var(--wl-set-border-row, rgba(255, 255, 255, 0.08))' }}>
+          <h4 style={{ fontSize: '14px', fontWeight: 600, margin: '0 0 10px 0', color: 'var(--wl-set-text-main, #f2f2f7)' }}>
+            已导入的自定义词典快照
+          </h4>
+
+          {!status?.customSnapshots || status.customSnapshots.length === 0 ? (
+            <div data-testid="custom-snapshots-empty" style={{ fontSize: '12.5px', color: 'var(--wl-set-text-muted, #6c6c7a)', padding: '8px 0' }}>
+              暂无已导入的自定义词典快照。
+            </div>
+          ) : (
+            <div data-testid="custom-snapshots-list" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {status.customSnapshots.map((snap) => {
+                const isCurrentActive = snap.snapshotId === status.activeSnapshotId || snap.isActive
+                const leases =
+                  status.customSnapshotStatus?.snapshotId === snap.snapshotId
+                    ? status.customSnapshotStatus.activeLeases
+                    : 0
+                const isLeased = leases > 0
+
+                return (
+                  <div
+                    key={snap.snapshotId}
+                    data-testid={`custom-snapshot-row-${snap.snapshotId}`}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '10px 14px',
+                      borderRadius: '8px',
+                      background: 'rgba(255, 255, 255, 0.03)',
+                      border: isCurrentActive
+                        ? '1px solid rgba(34, 197, 94, 0.35)'
+                        : '1px solid var(--wl-set-stroke, rgba(255, 255, 255, 0.08))',
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '2px' }}>
+                        <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--wl-set-text-main, #f2f2f7)' }}>
+                          {snap.identity}
+                        </span>
+                        {isCurrentActive && <StatusBadge variant="success" label="当前激活" />}
+                        {isLeased && <StatusBadge variant="warning" label={`查询中 (${leases})`} />}
+                      </div>
+                      <div style={{ fontSize: '11.5px', color: 'var(--wl-set-text-muted, #6c6c7a)', fontFamily: 'monospace' }}>
+                        ID: {snap.snapshotId.slice(0, 8)}... | {snap.entryCount.toLocaleString()} 词条 | {snap.formCount.toLocaleString()} 形态
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <ActionButton
+                        size="small"
+                        variant="secondary"
+                        disabled={isCurrentActive || isActing}
+                        onClick={() => void store.selectMode('custom', snap.snapshotId)}
+                      >
+                        启用
+                      </ActionButton>
+
+                      <ActionButton
+                        size="small"
+                        variant="danger"
+                        disabled={isCurrentActive || isLeased || isActing}
+                        title={
+                          isCurrentActive
+                            ? '不能删除当前激活的词典快照，请先切换至其他词典'
+                            : isLeased
+                              ? '快照当前有活动查询占用，暂不可删除'
+                              : '安全删除快照（不影响原始文件）'
+                        }
+                        onClick={() => setSnapshotToRemove(snap)}
+                      >
+                        删除
+                      </ActionButton>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </SectionCard>
+
+      {/* Section D: Automatic Lookup Settings */}
       <SectionCard
         title="手势与自动查词"
         description="配置在浏览和编辑时通过鼠标手势自动触发查词。设置修改后实时生效，无需重启应用。"
@@ -711,50 +1123,87 @@ export function DictionarySettingsSection({
         )}
       </SectionCard>
 
-      {/* Section D: Shortcuts & Advanced Features (Informational) */}
+      {/* Section E: Shortcuts & Advanced Features */}
       <SectionCard
         title="快捷键与高级功能"
-        description="查看当前查词快捷键与高级自定义词库扩展计划。"
+        description="查看与自定义划词查询快捷键，配置按键偏好。设置修改将即时持久化至宿主。"
       >
         <SettingRow
           title="划词查询快捷键"
           description={
-            platform === 'linux'
-              ? 'Linux Web 平台受浏览器系统快捷键限制，默认未绑定。自定义快捷键功能将在 Phase 7A.8 开放。'
-              : '选中任意文本后按下快捷键即可发起词典查询。自定义快捷键将在 Phase 7A.8 开放。'
+            platform === 'linux' && !lookupShortcutEntry
+              ? 'Linux Web 平台受浏览器系统快捷键限制，默认未绑定。支持通过自定义配置按键。'
+              : '选中任意文本后按下快捷键即可发起词典查询。支持在此重新绑定自定义按键。'
           }
           control={
-            platform === 'linux' ? (
-              <StatusBadge variant="neutral" label="未绑定 (Unbound)" />
-            ) : platform === 'macos' ? (
-              <span
-                style={{
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  fontFamily: 'monospace',
-                  padding: '3px 8px',
-                  borderRadius: '6px',
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  color: 'var(--wl-set-text-main, #f2f2f7)',
-                }}
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              {lookupShortcutEntry ? (
+                <>
+                  <span
+                    data-testid="shortcut-key-display"
+                    style={{
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      fontFamily: 'monospace',
+                      padding: '3px 8px',
+                      borderRadius: '6px',
+                      background: 'rgba(255, 255, 255, 0.08)',
+                      color: 'var(--wl-set-text-main, #f2f2f7)',
+                    }}
+                  >
+                    {lookupShortcutEntry.keys && lookupShortcutEntry.keys.length > 0
+                      ? lookupShortcutEntry.keys.join(' + ')
+                      : '未绑定'}
+                  </span>
+                  {lookupShortcutEntry.modified ? (
+                    <StatusBadge variant="warning" label="已自定义" />
+                  ) : (
+                    <StatusBadge variant="neutral" label="默认绑定" />
+                  )}
+                </>
+              ) : platform === 'linux' ? (
+                <StatusBadge variant="neutral" label="未绑定 (Unbound)" />
+              ) : platform === 'macos' ? (
+                <span
+                  data-testid="shortcut-key-display"
+                  style={{
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    fontFamily: 'monospace',
+                    padding: '3px 8px',
+                    borderRadius: '6px',
+                    background: 'rgba(255, 255, 255, 0.08)',
+                    color: 'var(--wl-set-text-main, #f2f2f7)',
+                  }}
+                >
+                  ⌘ + Shift + L
+                </span>
+              ) : (
+                <span
+                  data-testid="shortcut-key-display"
+                  style={{
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    fontFamily: 'monospace',
+                    padding: '3px 8px',
+                    borderRadius: '6px',
+                    background: 'rgba(255, 255, 255, 0.08)',
+                    color: 'var(--wl-set-text-main, #f2f2f7)',
+                  }}
+                >
+                  Ctrl + Shift + L
+                </span>
+              )}
+
+              <ActionButton
+                data-testid="btn-edit-shortcut"
+                size="small"
+                variant="secondary"
+                onClick={() => setShowShortcutRecorder(true)}
               >
-                ⌘ + Shift + L
-              </span>
-            ) : (
-              <span
-                style={{
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  fontFamily: 'monospace',
-                  padding: '3px 8px',
-                  borderRadius: '6px',
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  color: 'var(--wl-set-text-main, #f2f2f7)',
-                }}
-              >
-                Ctrl + Shift + L
-              </span>
-            )
+                修改快捷键
+              </ActionButton>
+            </div>
           }
         />
 
@@ -762,17 +1211,17 @@ export function DictionarySettingsSection({
           title="自定义外部 SQLite 词典"
           description="允许指定本地用户自建或专业领域的 SQLite 词库文件，通过校验后无缝挂载使用。"
           isLast={true}
-          control={<StatusBadge variant="neutral" label="Phase 7A.8 开放" />}
+          control={<StatusBadge variant="success" label="Phase 7A.8 开放" />}
         />
       </SectionCard>
 
-      {/* Modal: Removal Confirmation */}
+      {/* Modal: ECDICT Removal Confirmation */}
       {showRemoveConfirm && (
         <ModalConfirm
           title="确认移除 ECDICT 本地词典？"
           message={
             <span>
-              移除操作将安全删除本地托管的 ECDICT SQLite 数据库文件并释放存储空间。插件将自动回退到内置基础词典 (Fixture)。该操作不会影响任何用户自有的自定义文件。
+              移除操作将安全删除本地托管的 ECDICT SQLite 数据库文件并释放存储空间。若当前处于 ECDICT 模式，插件将自动回退到内置基础词典 (Fixture)；若当前处于自定义词典模式，则将继续保持自定义模式。该操作不会影响任何用户自有的自定义文件。
             </span>
           }
           confirmLabel="确认移除"
@@ -783,6 +1232,43 @@ export function DictionarySettingsSection({
             void store.remove()
           }}
           onCancel={() => setShowRemoveConfirm(false)}
+        />
+      )}
+
+      {/* Modal: Custom Snapshot Removal Confirmation */}
+      {snapshotToRemove && (
+        <ModalConfirm
+          title={`确认删除自定义词典快照 "${snapshotToRemove.identity}"？`}
+          message={
+            <span>
+              该操作将安全清理插件内部管理的快照副本（ID: {snapshotToRemove.snapshotId}）。您的本地原始数据库文件将保持完整，绝不会被修改或删除。
+            </span>
+          }
+          confirmLabel="确认删除"
+          cancelLabel="取消"
+          isDanger={true}
+          onConfirm={() => void handleConfirmRemoveCustom()}
+          onCancel={() => setSnapshotToRemove(null)}
+        />
+      )}
+
+      {/* Modal: Shortcut Recorder */}
+      {showShortcutRecorder && (
+        <ShortcutRecorderModal
+          currentKeys={
+            lookupShortcutEntry?.keys ??
+            (platform === 'macos' ? ['⌘', 'Shift', 'L'] : ['Ctrl', 'Shift', 'L'])
+          }
+          isModified={Boolean(lookupShortcutEntry?.modified)}
+          onClose={() => setShowShortcutRecorder(false)}
+          onSave={handleSaveShortcut}
+          onReset={handleResetShortcut}
+          describeBinding={
+            activeShortcuts?.describeBinding
+              ? (b) => activeShortcuts.describeBinding(b as never) as never
+              : undefined
+          }
+          recording={activeShortcuts?.recording ? (act) => activeShortcuts.recording(act) : undefined}
         />
       )}
     </div>

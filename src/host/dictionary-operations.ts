@@ -22,6 +22,7 @@ import type {
   DictionaryOperationProgress,
   DictionaryOperationSnapshot,
   DictionaryOperationStatus,
+  DictionaryRemoveCustomResponse,
   DictionaryRemoveResponse,
   DictionarySelectModeResponse,
 } from '../shared/dictionary-management-protocol.js'
@@ -298,6 +299,26 @@ export class DictionaryOperationManager {
   }
 
   /**
+   * Check whether a specific custom snapshot can currently be removed.
+   */
+  canRemoveCustom(snapshotId: string): boolean {
+    if (this.#disposed) return false
+    if (!this.#paths) return false
+    if (this.isBusy()) return false
+    if (isDatabaseDirectoryQuarantined(this.#paths.databaseDirectory) || getQuarantineRecord(this.#paths.databaseDirectory) !== null) {
+      return false
+    }
+    const cleanId = typeof snapshotId === 'string' ? snapshotId.trim().toLowerCase() : ''
+    if (!cleanId || this.#activationCoordinator.activeSnapshotId === cleanId) return false
+    const snapshotMgr = this.#activationCoordinator.customSnapshotManager
+    if (!snapshotMgr) return false
+    const rec = snapshotMgr.getSnapshot(cleanId)
+    if (!rec) return false
+    if (rec.state === 'ACTIVE' || rec.activeLeases > 0) return false
+    return rec.state === 'PUBLISHED_INACTIVE' || rec.state === 'PUBLISHED'
+  }
+
+  /**
    * Check whether a custom dictionary can currently be activated.
    */
   canActivateCustom(): boolean {
@@ -570,6 +591,120 @@ export class DictionaryOperationManager {
               ? 'Managed ECDICT database removed; custom dictionary remains active'
               : 'Managed ECDICT database removed and active dictionary reverted to fixture')
           : 'No managed database was installed',
+      }
+      resolveSettled(response)
+      return response
+    } catch (error) {
+      rejectSettled(error)
+      throw error
+    } finally {
+      this.#activeRemove = null
+    }
+  }
+
+  /**
+   * Request removal of a published custom dictionary snapshot.
+   *
+   * Enforces:
+   * - Exclusive operation lock (isolated from install, remove, activate, switch).
+   * - Validated UUID.
+   * - Cannot remove active snapshot.
+   * - Cannot remove snapshot with active leases > 0.
+   * - Deletes only managed snapshot in customSnapshotDirectory.
+   * - Raw source database is NEVER touched.
+   *
+   * @param snapshotId - target published snapshot UUID.
+   * @returns settled removal response.
+   */
+  async removeCustom(snapshotId: string): Promise<DictionaryRemoveCustomResponse> {
+    if (this.#disposed) {
+      throw new Error('DictionaryOperationManager is disposed')
+    }
+
+    if (!this.#paths) {
+      throw new Error('Managed storage is unavailable: DSH home cannot be resolved')
+    }
+
+    const cleanId = typeof snapshotId === 'string' ? snapshotId.trim().toLowerCase() : ''
+    const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!UUID_PATTERN.test(cleanId)) {
+      const err = new Error('Invalid snapshotId format (expected UUID)')
+      ;(err as unknown as { code: string }).code = 'INVALID_ARGUMENT'
+      throw err
+    }
+
+    const quarantine = getQuarantineRecord(this.#paths.databaseDirectory)
+    if (quarantine) {
+      throw new OperationDirectoryQuarantinedError(this.#paths.databaseDirectory, quarantine.reason)
+    }
+
+    if (this.isBusy()) {
+      throw new OperationInProgressError(this.#currentOp?.operationId ?? this.#activeRemove?.operationId ?? 'operation')
+    }
+
+    const snapshotMgr = this.#activationCoordinator.customSnapshotManager
+    if (!snapshotMgr) {
+      throw new Error('Custom snapshot manager is unavailable')
+    }
+
+    const record = snapshotMgr.getSnapshot(cleanId)
+    if (!record) {
+      const err = new Error(`Custom snapshot "${cleanId}" not found in catalog`)
+      ;(err as unknown as { code: string }).code = 'SNAPSHOT_NOT_FOUND'
+      throw err
+    }
+
+    if (this.#activationCoordinator.activeSnapshotId === cleanId || record.state === 'ACTIVE') {
+      const err = new Error(`Cannot remove currently active custom dictionary snapshot "${cleanId}". Switch to another dictionary before removing.`)
+      ;(err as unknown as { code: string }).code = 'SNAPSHOT_ACTIVE'
+      throw err
+    }
+
+    const activeLeases = snapshotMgr.getActiveLeases(cleanId)
+    if (activeLeases > 0 || record.activeLeases > 0) {
+      const err = new Error(`Cannot remove snapshot "${cleanId}" with ${activeLeases} active query reference(s)`)
+      ;(err as unknown as { code: string }).code = 'SNAPSHOT_LEASED'
+      throw err
+    }
+
+    const operationId = `remove-custom-${Date.now()}-${randomUUID().slice(0, 8)}`
+    const abortController = new AbortController()
+    let resolveSettled!: (val: DictionaryRemoveCustomResponse) => void
+    let rejectSettled!: (err: unknown) => void
+    const settledPromise = new Promise<DictionaryRemoveCustomResponse>((res, rej) => {
+      resolveSettled = res
+      rejectSettled = rej
+    })
+    settledPromise.catch(() => {})
+
+    const removeCtx: ActiveRemoveContext = {
+      operationId,
+      abortController,
+      startedAt: new Date().toISOString(),
+      promise: settledPromise as unknown as Promise<DictionaryRemoveResponse>,
+    }
+    this.#activeRemove = removeCtx
+
+    try {
+      if (this.#activationCoordinator.isRecovering) {
+        await this.#activationCoordinator.ensureReady()
+      }
+      if (this.#disposed || removeCtx.abortController.signal.aborted) {
+        throw new Error('DictionaryOperationManager was disposed before removeCustom execution')
+      }
+
+      const ok = await snapshotMgr.cleanupSnapshot(cleanId)
+      if (!ok) {
+        const err = new Error(`Failed to remove snapshot "${cleanId}"`)
+        ;(err as unknown as { code: string }).code = 'REMOVE_CUSTOM_FAILED'
+        throw err
+      }
+
+      const response: DictionaryRemoveCustomResponse = {
+        ok: true,
+        snapshotId: cleanId,
+        removed: true,
+        message: `Custom dictionary snapshot "${cleanId}" (${record.identity}) was successfully removed`,
       }
       resolveSettled(response)
       return response

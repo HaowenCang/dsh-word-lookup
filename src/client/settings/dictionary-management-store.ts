@@ -14,10 +14,14 @@
 
 import type { DictionaryStatusResponse } from '../../shared/dictionary-management-protocol.js'
 import {
+  activateCustomDictionary,
   cancelDictionaryOperation,
   fetchDictionaryStatus,
   installManagedDictionary,
+  removeCustomDictionary,
   removeManagedDictionary,
+  selectDictionaryMode,
+  verifyCustomDictionary,
 } from './dictionary-management-transport.js'
 
 /**
@@ -317,6 +321,136 @@ export class DictionaryManagementStore {
         this.#state = { ...this.#state, isActing: false }
         this.#emit()
       }
+    }
+  }
+
+  /**
+   * Request activation of a custom SQLite dictionary.
+   */
+  async activateCustom(path: string, identity?: string): Promise<boolean> {
+    if (this.#disposed || this.#state.isActing) return false
+
+    this.#state = { ...this.#state, isActing: true, actionError: null }
+    this.#emit()
+
+    const controller = new AbortController()
+    this.#actionControllers.add(controller)
+    try {
+      const result = await activateCustomDictionary(path, identity, controller.signal)
+      if (this.#disposed) return false
+
+      if (result.ok) {
+        await this.refresh()
+        return true
+      }
+
+      const errMsg =
+        result.kind === 'refused'
+          ? result.message
+          : result.kind === 'network'
+            ? `网络异常: ${result.message}`
+            : '激活自定义词典请求被取消'
+
+      this.#state = { ...this.#state, actionError: errMsg }
+      this.#emit()
+      return false
+    } finally {
+      this.#actionControllers.delete(controller)
+      if (!this.#disposed) {
+        this.#state = { ...this.#state, isActing: false }
+        this.#emit()
+      }
+    }
+  }
+
+  /**
+   * Request switching active dictionary mode (fixture, managed-ecdict, custom).
+   */
+  async selectMode(mode: 'fixture' | 'managed-ecdict' | 'custom', snapshotId?: string): Promise<boolean> {
+    if (this.#disposed || this.#state.isActing) return false
+
+    this.#state = { ...this.#state, isActing: true, actionError: null }
+    this.#emit()
+
+    const controller = new AbortController()
+    this.#actionControllers.add(controller)
+    try {
+      const result = await selectDictionaryMode(mode, snapshotId, controller.signal)
+      if (this.#disposed) return false
+
+      if (result.ok) {
+        await this.refresh()
+        return true
+      }
+
+      const errMsg =
+        result.kind === 'refused'
+          ? result.message
+          : result.kind === 'network'
+            ? `网络异常: ${result.message}`
+            : '切换词典模式请求未完成'
+
+      this.#state = { ...this.#state, actionError: errMsg }
+      this.#emit()
+      return false
+    } finally {
+      this.#actionControllers.delete(controller)
+      if (!this.#disposed) {
+        this.#state = { ...this.#state, isActing: false }
+        this.#emit()
+      }
+    }
+  }
+
+  /**
+   * Request removal of an inactive custom dictionary snapshot.
+   */
+  async removeCustom(snapshotId: string): Promise<boolean> {
+    if (this.#disposed || this.#state.isActing) return false
+
+    this.#state = { ...this.#state, isActing: true, actionError: null }
+    this.#emit()
+
+    const controller = new AbortController()
+    this.#actionControllers.add(controller)
+    try {
+      const result = await removeCustomDictionary(snapshotId, controller.signal)
+      if (this.#disposed) return false
+
+      if (result.ok) {
+        await this.refresh()
+        return true
+      }
+
+      const errMsg =
+        result.kind === 'refused'
+          ? result.message
+          : result.kind === 'network'
+            ? `网络异常: ${result.message}`
+            : '删除自定义词典快照未完成'
+
+      this.#state = { ...this.#state, actionError: errMsg }
+      this.#emit()
+      return false
+    } finally {
+      this.#actionControllers.delete(controller)
+      if (!this.#disposed) {
+        this.#state = { ...this.#state, isActing: false }
+        this.#emit()
+      }
+    }
+  }
+
+  /**
+   * Verify candidate custom SQLite dictionary file.
+   */
+  async verifyCustom(path: string) {
+    const controller = new AbortController()
+    this.#actionControllers.add(controller)
+    try {
+      return await verifyCustomDictionary(path, controller.signal)
+    } finally {
+      this.#actionControllers.delete(controller)
     }
   }
 

@@ -14,11 +14,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
+  activateCustomDictionary,
   cancelDictionaryOperation,
   fetchDictionaryStatus,
   installManagedDictionary,
   isValidDictionaryStatusResponse,
+  removeCustomDictionary,
   removeManagedDictionary,
+  selectDictionaryMode,
   verifyCustomDictionary,
 } from '../src/client/settings/dictionary-management-transport.js'
 import type { DictionaryStatusResponse } from '../src/shared/dictionary-management-protocol.js'
@@ -138,6 +141,78 @@ describe('dictionary-management-transport', () => {
       expect(res.ok).toBe(true)
       expect(capturedUrl).toBe('api/dsh-word-lookup/dictionary/verify')
       expect(JSON.parse(capturedBody)).toEqual({ path: 'C:/custom.sqlite' })
+    })
+
+    it('uses document-relative path and sends path payload for activateCustomDictionary', async () => {
+      let capturedUrl = ''
+      let capturedBody = ''
+      globalThis.fetch = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+        capturedUrl = url
+        capturedBody = String(init?.body ?? '')
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            operationId: 'act-1',
+            activeMode: 'custom',
+            identity: 'custom-id',
+            snapshotId: '11111111-2222-3333-4444-555555555555',
+            message: 'activated',
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        )
+      })
+
+      const res = await activateCustomDictionary('C:/dict.db', 'my-id')
+      expect(res.ok).toBe(true)
+      expect(capturedUrl).toBe('api/dsh-word-lookup/dictionary/activate-custom')
+      expect(JSON.parse(capturedBody)).toEqual({ path: 'C:/dict.db', identity: 'my-id' })
+    })
+
+    it('uses document-relative path and sends mode for selectDictionaryMode', async () => {
+      let capturedUrl = ''
+      let capturedBody = ''
+      globalThis.fetch = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+        capturedUrl = url
+        capturedBody = String(init?.body ?? '')
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            operationId: 'sel-1',
+            activeMode: 'managed-ecdict',
+            identity: 'ecdict',
+            message: 'switched',
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        )
+      })
+
+      const res = await selectDictionaryMode('managed-ecdict')
+      expect(res.ok).toBe(true)
+      expect(capturedUrl).toBe('api/dsh-word-lookup/dictionary/select-mode')
+      expect(JSON.parse(capturedBody)).toEqual({ mode: 'managed-ecdict' })
+    })
+
+    it('uses document-relative path and sends snapshotId for removeCustomDictionary', async () => {
+      let capturedUrl = ''
+      let capturedBody = ''
+      globalThis.fetch = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+        capturedUrl = url
+        capturedBody = String(init?.body ?? '')
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            snapshotId: '11111111-2222-3333-4444-555555555555',
+            removed: true,
+            message: 'removed',
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        )
+      })
+
+      const res = await removeCustomDictionary('11111111-2222-3333-4444-555555555555')
+      expect(res.ok).toBe(true)
+      expect(capturedUrl).toBe('api/dsh-word-lookup/dictionary/remove-custom')
+      expect(JSON.parse(capturedBody)).toEqual({ snapshotId: '11111111-2222-3333-4444-555555555555' })
     })
   })
 

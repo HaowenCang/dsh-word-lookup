@@ -29,3 +29,5 @@ export declare const MANAGEMENT_VERIFY_PATH = "/api/dsh-word-lookup/dictionary/v
 export declare const MANAGEMENT_ACTIVATE_CUSTOM_PATH = "/api/dsh-word-lookup/dictionary/activate-custom";
 /** Absolute path of dictionary operational mode selection route. */
 export declare const MANAGEMENT_SELECT_MODE_PATH = "/api/dsh-word-lookup/dictionary/select-mode";
+/** Absolute path of custom snapshot removal route. */
+export declare const MANAGEMENT_REMOVE_CUSTOM_PATH = "/api/dsh-word-lookup/dictionary/remove-custom";

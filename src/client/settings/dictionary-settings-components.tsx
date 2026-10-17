@@ -338,6 +338,7 @@ export interface ActionButtonProps {
   readonly size?: 'small' | 'medium'
   readonly ariaLabel?: string
   readonly title?: string
+  readonly 'data-testid'?: string
 }
 
 export function ActionButton({
@@ -349,6 +350,7 @@ export function ActionButton({
   size = 'medium',
   ariaLabel,
   title,
+  'data-testid': testId,
 }: ActionButtonProps) {
   let bg = 'rgba(255, 255, 255, 0.08)'
   let color = 'var(--wl-set-text-main, #f2f2f7)'
@@ -394,6 +396,7 @@ export function ActionButton({
   return (
     <button
       type="button"
+      data-testid={testId}
       style={buttonStyle}
       disabled={disabled || busy}
       onClick={onClick}
@@ -660,3 +663,422 @@ export function ModalConfirm({
     </div>
   )
 }
+
+// --- Accessible Text Input ---
+
+export interface TextInputProps {
+  readonly id?: string
+  readonly label?: string
+  readonly placeholder?: string
+  readonly value: string
+  readonly onChange: (value: string) => void
+  readonly disabled?: boolean
+  readonly error?: string | null
+  readonly helpText?: string
+  readonly width?: string | number
+  readonly 'data-testid'?: string
+  readonly onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void
+}
+
+export function TextInput({
+  id,
+  label,
+  placeholder,
+  value,
+  onChange,
+  disabled = false,
+  error,
+  helpText,
+  width = '100%',
+  'data-testid': testId,
+  onKeyDown,
+}: TextInputProps) {
+  const containerStyle: CSSProperties = {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '6px',
+    width: typeof width === 'number' ? `${width}px` : width,
+    boxSizing: 'border-box',
+  }
+
+  const labelStyle: CSSProperties = {
+    fontSize: '12.5px',
+    fontWeight: 500,
+    color: 'var(--wl-set-text-main, #f2f2f7)',
+  }
+
+  const inputStyle: CSSProperties = {
+    background: 'rgba(0, 0, 0, 0.2)',
+    border: error
+      ? '1px solid var(--wl-set-error, #ef4444)'
+      : '1px solid var(--wl-set-stroke, rgba(255, 255, 255, 0.12))',
+    borderRadius: '6px',
+    padding: '8px 12px',
+    fontSize: '13px',
+    color: 'var(--wl-set-text-main, #f2f2f7)',
+    outline: 'none',
+    boxSizing: 'border-box',
+    width: '100%',
+    fontFamily: 'inherit',
+    transition: 'border-color 0.15s ease',
+  }
+
+  return (
+    <div style={containerStyle}>
+      {label && (
+        <label htmlFor={id} style={labelStyle}>
+          {label}
+        </label>
+      )}
+      <input
+        id={id}
+        data-testid={testId}
+        type="text"
+        value={value}
+        placeholder={placeholder}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={onKeyDown}
+        style={inputStyle}
+        aria-invalid={Boolean(error)}
+        aria-describedby={error ? `${id}-error` : helpText ? `${id}-help` : undefined}
+      />
+      {helpText && !error && (
+        <span id={`${id}-help`} style={{ fontSize: '11.5px', color: 'var(--wl-set-text-muted, #6c6c7a)' }}>
+          {helpText}
+        </span>
+      )}
+      {error && (
+        <span
+          id={`${id}-error`}
+          role="alert"
+          style={{ fontSize: '12px', color: 'var(--wl-set-error, #ef4444)' }}
+        >
+          {error}
+        </span>
+      )}
+    </div>
+  )
+}
+
+// --- Accessible Shortcut Recorder Modal ---
+
+export interface ShortcutRecorderModalProps {
+  readonly currentKeys: readonly string[]
+  readonly isModified: boolean
+  readonly onClose: () => void
+  readonly onSave: (binding: { code: string; modifiers: readonly string[] }) => Promise<boolean>
+  readonly onReset: () => Promise<boolean>
+  readonly describeBinding?: (binding: { code: string; modifiers: readonly string[] } | null) => {
+    binding: unknown
+    keys: readonly string[]
+    issue: string | null
+    conflicts: readonly string[]
+  }
+  readonly recording?: (active: boolean) => Promise<void>
+}
+
+export function ShortcutRecorderModal({
+  currentKeys,
+  isModified,
+  onClose,
+  onSave,
+  onReset,
+  describeBinding,
+  recording,
+}: ShortcutRecorderModalProps) {
+  const [candidate, setCandidate] = React.useState<{ code: string; modifiers: readonly string[] } | null>(null)
+  const [candidateKeys, setCandidateKeys] = React.useState<readonly string[] | null>(null)
+  const [issue, setIssue] = React.useState<string | null>(null)
+  const [conflictWarning, setConflictWarning] = React.useState<string | null>(null)
+  const [isSaving, setIsSaving] = React.useState(false)
+  const [saveError, setSaveError] = React.useState<string | null>(null)
+
+  const recorderRef = React.useRef<HTMLDivElement>(null)
+  const previousActiveElementRef = React.useRef<HTMLElement | null>(null)
+
+  React.useEffect(() => {
+    if (typeof document !== 'undefined') {
+      previousActiveElementRef.current = document.activeElement as HTMLElement | null
+    }
+
+    if (recording) {
+      void recording(true).catch(() => {})
+    }
+
+    const timer = setTimeout(() => {
+      recorderRef.current?.focus()
+    }, 20)
+
+    return () => {
+      clearTimeout(timer)
+      if (recording) {
+        void recording(false).catch(() => {})
+      }
+      if (previousActiveElementRef.current && typeof previousActiveElementRef.current.focus === 'function') {
+        try {
+          previousActiveElementRef.current.focus()
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }, [recording])
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (isSaving) return
+
+    // Plain Escape key cancels and closes modal
+    if (e.key === 'Escape' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
+      e.preventDefault()
+      e.stopPropagation()
+      onClose()
+      return
+    }
+
+    // Ignore Tab navigation so user can tab to Save/Cancel/Reset buttons
+    if (e.key === 'Tab') {
+      return
+    }
+
+    // Modifiers only: wait for final character
+    if (/^(Control|Alt|Shift|Meta)(Left|Right)?$/.test(e.key) || /^(Control|Alt|Shift|Meta)(Left|Right)?$/.test(e.code)) {
+      e.preventDefault()
+      e.stopPropagation()
+      return
+    }
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    const modifiers: string[] = []
+    if (e.ctrlKey) modifiers.push('control')
+    if (e.altKey) modifiers.push('alt')
+    if (e.shiftKey) modifiers.push('shift')
+    if (e.metaKey) modifiers.push('meta')
+
+    const nextBinding = { code: e.code, modifiers }
+    setCandidate(nextBinding)
+    setSaveError(null)
+
+    if (describeBinding) {
+      try {
+        const desc = describeBinding(nextBinding)
+        setCandidateKeys(desc.keys && desc.keys.length > 0 ? desc.keys : [e.code])
+        if (desc.issue) {
+          setIssue(
+            desc.issue === 'requires-modifier'
+              ? '快捷键必须包含至少一个修饰键（Ctrl、Alt 或 Shift）'
+              : desc.issue === 'reserved-key'
+                ? '该按键为系统保留快捷键，不可重定义'
+                : `按键不合规: ${desc.issue}`,
+          )
+        } else {
+          setIssue(null)
+        }
+        if (desc.conflicts && desc.conflicts.length > 0) {
+          const otherConflicts = desc.conflicts.filter((c) => c !== 'wordLookup.lookupSelection')
+          if (otherConflicts.length > 0) {
+            setConflictWarning(`该快捷键与现有命令冲突: ${otherConflicts.join(', ')}`)
+          } else {
+            setConflictWarning(null)
+          }
+        } else {
+          setConflictWarning(null)
+        }
+      } catch (err) {
+        setIssue(`无效组合键: ${err instanceof Error ? err.message : String(err)}`)
+      }
+    } else {
+      const parts = [...modifiers.map((m) => m.toUpperCase()), e.code.replace(/^Key/, '')]
+      setCandidateKeys(parts)
+      if (modifiers.length === 0) {
+        setIssue('快捷键必须包含至少一个修饰键（Ctrl、Alt 或 Shift）')
+      } else {
+        setIssue(null)
+        setConflictWarning(null)
+      }
+    }
+  }
+
+  const handleSave = async () => {
+    if (!candidate || issue || isSaving) return
+    setIsSaving(true)
+    setSaveError(null)
+    try {
+      const ok = await onSave(candidate)
+      if (ok) {
+        onClose()
+      } else {
+        setSaveError('保存快捷键失败，Host 未接受该配置')
+      }
+    } catch (err) {
+      setSaveError(`保存失败: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleReset = async () => {
+    if (isSaving) return
+    setIsSaving(true)
+    setSaveError(null)
+    try {
+      const ok = await onReset()
+      if (ok) {
+        onClose()
+      } else {
+        setSaveError('恢复默认快捷键失败')
+      }
+    } catch (err) {
+      setSaveError(`恢复默认失败: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const backdropStyle: CSSProperties = {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: 'rgba(0, 0, 0, 0.6)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 99999,
+    padding: '16px',
+  }
+
+  const modalStyle: CSSProperties = {
+    background: 'var(--wl-set-bg-card, #202026)',
+    border: '1px solid var(--wl-set-stroke, rgba(255, 255, 255, 0.15))',
+    borderRadius: '12px',
+    maxWidth: '460px',
+    width: '100%',
+    padding: '22px 24px',
+    boxShadow: '0 12px 36px rgba(0, 0, 0, 0.55)',
+    boxSizing: 'border-box',
+    outline: 'none',
+  }
+
+  const displayKeys = candidateKeys ?? currentKeys
+
+  return (
+    <div style={backdropStyle} role="presentation" onClick={onClose}>
+      <div
+        ref={recorderRef}
+        tabIndex={0}
+        style={modalStyle}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="recorder-dialog-title"
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={handleKeyDown}
+      >
+        <h4
+          id="recorder-dialog-title"
+          style={{ fontSize: '16px', fontWeight: 600, margin: '0 0 8px 0', color: 'var(--wl-set-text-main, #f2f2f7)' }}
+        >
+          修改划词查询快捷键
+        </h4>
+        <p style={{ fontSize: '12.5px', color: 'var(--wl-set-text-sub, #9898a6)', margin: '0 0 16px 0', lineHeight: '1.5' }}>
+          请直接在键盘上按下您希望设置的组合键（例如 Ctrl + Alt + K 或 Command + Shift + L）。
+        </p>
+
+        {/* Keycap preview */}
+        <div
+          data-testid="shortcut-recorder-box"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: '64px',
+            padding: '12px',
+            borderRadius: '8px',
+            background: 'rgba(0, 0, 0, 0.25)',
+            border: issue
+              ? '1px solid var(--wl-set-error, #ef4444)'
+              : candidate
+                ? '1px solid var(--wl-set-accent, #4176e6)'
+                : '1px dashed var(--wl-set-stroke, rgba(255, 255, 255, 0.18))',
+            marginBottom: '14px',
+          }}
+        >
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+            {displayKeys && displayKeys.length > 0 ? (
+              displayKeys.map((k, idx) => (
+                <span
+                  key={idx}
+                  style={{
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    fontFamily: 'monospace',
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    background: candidate ? 'var(--wl-set-accent, #4176e6)' : 'rgba(255, 255, 255, 0.12)',
+                    color: '#ffffff',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                  }}
+                >
+                  {k}
+                </span>
+              ))
+            ) : (
+              <span style={{ fontSize: '13px', color: 'var(--wl-set-text-muted, #6c6c7a)' }}>
+                等待按键输入...
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Issue message */}
+        {issue && (
+          <div role="alert" style={{ fontSize: '12px', color: 'var(--wl-set-error, #ef4444)', marginBottom: '12px' }}>
+            {issue}
+          </div>
+        )}
+
+        {/* Conflict warning */}
+        {conflictWarning && !issue && (
+          <div role="alert" style={{ fontSize: '12px', color: 'var(--wl-set-warn, #f59e0b)', marginBottom: '12px' }}>
+            {conflictWarning}
+          </div>
+        )}
+
+        {/* Save error */}
+        {saveError && (
+          <div role="alert" style={{ fontSize: '12px', color: 'var(--wl-set-error, #ef4444)', marginBottom: '12px' }}>
+            {saveError}
+          </div>
+        )}
+
+        {/* Footer actions */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '18px' }}>
+          <div>
+            {isModified && (
+              <ActionButton size="small" variant="ghost" onClick={handleReset} busy={isSaving}>
+                恢复默认快捷键
+              </ActionButton>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <ActionButton variant="secondary" onClick={onClose} disabled={isSaving}>
+              取消
+            </ActionButton>
+            <ActionButton
+              variant="primary"
+              disabled={!candidate || Boolean(issue) || Boolean(conflictWarning) || isSaving}
+              busy={isSaving}
+              onClick={handleSave}
+            >
+              保存修改
+            </ActionButton>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+

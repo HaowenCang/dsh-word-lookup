@@ -466,7 +466,7 @@ function createRuntime(ctx: ClientContext): () => void {
                 'zh'
               return lang.toLowerCase().startsWith('en') ? 'Dictionary' : '词典'
             },
-            inject: () => ({ store: mgmtStore, form }),
+            inject: () => ({ store: mgmtStore, form, shortcuts: ctx.shortcuts }),
           },
           DictionarySettingsSection,
         )

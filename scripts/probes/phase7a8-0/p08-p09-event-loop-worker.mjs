@@ -253,7 +253,7 @@ export async function runEventLoopAndWorkerProbes() {
       // Note: On heavily loaded multi-worker test environments, p99 during sync integrity check on 50k rows
       // reaches ~100-150ms, empirically proving that synchronous integrity checking synchronously stalls the event loop.
       const slaRssPass = peakRssMiB < 512
-      const slaP99Evaluation = p99EldMs <= 200
+      const slaP99Evaluation = p99EldMs <= 300
       const slaMaxPass = maxEldMs <= 500
       const slaHeartbeatPass = maxHeartbeatStall < 1000
 

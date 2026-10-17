@@ -14,6 +14,8 @@ export declare const MANAGEMENT_INSTALL_DOCUMENT_PATH = "api/dsh-word-lookup/dic
 export declare const MANAGEMENT_CANCEL_DOCUMENT_PATH = "api/dsh-word-lookup/dictionary/cancel";
 /** Document-relative URL of dictionary removal endpoint (client-facing). */
 export declare const MANAGEMENT_REMOVE_DOCUMENT_PATH = "api/dsh-word-lookup/dictionary/remove";
+/** Document-relative URL of custom snapshot removal endpoint (client-facing). */
+export declare const MANAGEMENT_REMOVE_CUSTOM_DOCUMENT_PATH = "api/dsh-word-lookup/dictionary/remove-custom";
 /** Document-relative URL of dictionary verification endpoint (client-facing). */
 export declare const MANAGEMENT_VERIFY_DOCUMENT_PATH = "api/dsh-word-lookup/dictionary/verify";
 /** Document-relative URL of custom dictionary activation endpoint (client-facing). */
@@ -65,7 +67,7 @@ export interface DictionaryOperationError {
 /**
  * Kind of dictionary background operation.
  */
-export type DictionaryOperationKind = 'install' | 'remove' | 'activate-custom' | 'switch-mode';
+export type DictionaryOperationKind = 'install' | 'remove' | 'activate-custom' | 'switch-mode' | 'remove-custom';
 /**
  * Diagnostic snapshot of a background dictionary operation.
  */
@@ -326,9 +328,28 @@ export interface DictionaryVerifyResponse {
     readonly message: string;
 }
 /**
+ * Request payload for POST /api/dsh-word-lookup/dictionary/remove-custom.
+ */
+export interface DictionaryRemoveCustomRequest {
+    /** Target published snapshot UUID to remove. */
+    readonly snapshotId: string;
+}
+/**
+ * Response returned by POST /api/dsh-word-lookup/dictionary/remove-custom.
+ */
+export interface DictionaryRemoveCustomResponse {
+    readonly ok: true;
+    /** Removed snapshot UUID. */
+    readonly snapshotId: string;
+    /** Whether files were unlinked. */
+    readonly removed: boolean;
+    /** Informational message. */
+    readonly message: string;
+}
+/**
  * Machine-readable error codes across management endpoints.
  */
-export type ManagementErrorCode = 'BAD_REQUEST' | 'INVALID_ARGUMENT' | 'METHOD_NOT_ALLOWED' | 'UNSUPPORTED_MEDIA_TYPE' | 'BODY_TOO_LARGE' | 'OPERATION_IN_PROGRESS' | 'OPERATION_NOT_RUNNING' | 'OPERATION_NOT_CANCELLABLE' | 'OPERATION_NOT_FOUND' | 'OPERATION_CANCELLED' | 'DIRECTORY_QUARANTINED' | 'INVALID_OPERATION_ID' | 'INVALID_PATH' | 'FILE_NOT_FOUND' | 'NOT_A_FILE' | 'INVALID_SQLITE_FILE' | 'INVALID_DATABASE_SCHEMA' | 'INCOMPATIBLE_DICTIONARY' | 'SNAPSHOT_NOT_FOUND' | 'ECDICT_NOT_INSTALLED' | 'ACTIVATE_CUSTOM_FAILED' | 'SWITCH_MODE_FAILED' | 'REMOVE_FAILED' | 'INTERNAL_ERROR';
+export type ManagementErrorCode = 'BAD_REQUEST' | 'INVALID_ARGUMENT' | 'METHOD_NOT_ALLOWED' | 'UNSUPPORTED_MEDIA_TYPE' | 'BODY_TOO_LARGE' | 'OPERATION_IN_PROGRESS' | 'OPERATION_NOT_RUNNING' | 'OPERATION_NOT_CANCELLABLE' | 'OPERATION_NOT_FOUND' | 'OPERATION_CANCELLED' | 'DIRECTORY_QUARANTINED' | 'INVALID_OPERATION_ID' | 'INVALID_PATH' | 'FILE_NOT_FOUND' | 'NOT_A_FILE' | 'INVALID_SQLITE_FILE' | 'INVALID_DATABASE_SCHEMA' | 'INCOMPATIBLE_DICTIONARY' | 'SNAPSHOT_NOT_FOUND' | 'SNAPSHOT_ACTIVE' | 'SNAPSHOT_LEASED' | 'ECDICT_NOT_INSTALLED' | 'ACTIVATE_CUSTOM_FAILED' | 'SWITCH_MODE_FAILED' | 'REMOVE_FAILED' | 'REMOVE_CUSTOM_FAILED' | 'INTERNAL_ERROR';
 /**
  * Structured error response returned when an endpoint refuses or fails.
  */

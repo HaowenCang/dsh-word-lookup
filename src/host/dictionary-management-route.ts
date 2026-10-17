@@ -25,6 +25,7 @@ import {
   MANAGEMENT_ACTIVATE_CUSTOM_PATH,
   MANAGEMENT_CANCEL_PATH,
   MANAGEMENT_INSTALL_PATH,
+  MANAGEMENT_REMOVE_CUSTOM_PATH,
   MANAGEMENT_REMOVE_PATH,
   MANAGEMENT_SELECT_MODE_PATH,
   MANAGEMENT_STATUS_PATH,
@@ -35,6 +36,7 @@ import {
   type DictionaryCancelResponse,
   type DictionaryErrorResponse,
   type DictionaryInstallResponse,
+  type DictionaryRemoveCustomResponse,
   type DictionaryRemoveResponse,
   type DictionaryStatusResponse,
   type DictionaryVerifyResponse,
@@ -596,7 +598,70 @@ export function createVerifyHandler(
 }
 
 /**
- * Register all seven dictionary management Fetch routes onto `ctx.connection.fetch`.
+ * Create handler for POST /api/dsh-word-lookup/dictionary/remove-custom.
+ */
+export function createRemoveCustomHandler(
+  operationManager: DictionaryOperationManager,
+): (req: Request) => Promise<Response> {
+  return async (req: Request): Promise<Response> => {
+    if (req.method !== 'POST') {
+      return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Method not allowed (expected POST)')
+    }
+
+    const parseResult = await parseJsonBody(req)
+    if (!parseResult.ok) {
+      return errorResponse(parseResult.status, parseResult.error, parseResult.message)
+    }
+
+    const rawSnapshotId = parseResult.data.snapshotId
+    if (typeof rawSnapshotId !== 'string' || rawSnapshotId.trim().length === 0) {
+      return errorResponse(400, 'INVALID_ARGUMENT', 'Request body must contain non-empty "snapshotId"')
+    }
+
+    const snapshotId = rawSnapshotId.trim()
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!UUID_REGEX.test(snapshotId)) {
+      return errorResponse(400, 'INVALID_ARGUMENT', 'Invalid snapshotId format (expected UUID)')
+    }
+
+    try {
+      const result = await operationManager.removeCustom(snapshotId)
+      const body: DictionaryRemoveCustomResponse = {
+        ok: true,
+        snapshotId: result.snapshotId,
+        removed: result.removed,
+        message: result.message,
+      }
+      return jsonResponse(body, 200)
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code
+      if (err instanceof OperationInProgressError || code === 'OPERATION_IN_PROGRESS') {
+        return errorResponse(
+          409,
+          'OPERATION_IN_PROGRESS',
+          'Cannot remove custom snapshot while another operation is in progress',
+          { operationId: (err as { operationId?: string })?.operationId },
+        )
+      }
+      if (err instanceof OperationDirectoryQuarantinedError || code === 'DIRECTORY_QUARANTINED') {
+        return errorResponse(409, 'DIRECTORY_QUARANTINED', (err as Error).message)
+      }
+      if (code === 'SNAPSHOT_NOT_FOUND') {
+        return errorResponse(404, 'SNAPSHOT_NOT_FOUND', (err as Error).message)
+      }
+      if (code === 'SNAPSHOT_ACTIVE') {
+        return errorResponse(409, 'SNAPSHOT_ACTIVE', (err as Error).message)
+      }
+      if (code === 'SNAPSHOT_LEASED') {
+        return errorResponse(409, 'SNAPSHOT_LEASED', (err as Error).message)
+      }
+      return errorResponse(500, 'REMOVE_CUSTOM_FAILED', err instanceof Error ? err.message : String(err))
+    }
+  }
+}
+
+/**
+ * Register all eight dictionary management Fetch routes onto `ctx.connection.fetch`.
  *
  * Implements atomic registration: if any route registration throws, all previously
  * registered routes in this batch are safely unregistered before the error propagates.
@@ -604,7 +669,7 @@ export function createVerifyHandler(
  * @param ctx - host Cordis context providing `connection` service.
  * @param operationManager - active operation manager.
  * @param activationCoordinator - active activation coordinator.
- * @returns unified async disposer unregistering all seven management routes.
+ * @returns unified async disposer unregistering all eight management routes.
  */
 export function registerDictionaryManagementRoutes(
   ctx: Context,
@@ -681,6 +746,16 @@ export function registerDictionaryManagementRoutes(
         methods: ['POST'],
         requestBody: 'buffered',
         fetch: createSelectModeHandler(operationManager),
+      }),
+    )
+
+    // 8. POST remove-custom
+    disposers.push(
+      ctx.connection.fetch.register({
+        path: MANAGEMENT_REMOVE_CUSTOM_PATH,
+        methods: ['POST'],
+        requestBody: 'buffered',
+        fetch: createRemoveCustomHandler(operationManager),
       }),
     )
   } catch (registrationError) {

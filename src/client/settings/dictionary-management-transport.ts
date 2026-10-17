@@ -9,17 +9,26 @@
  */
 
 import {
+  MANAGEMENT_ACTIVATE_CUSTOM_DOCUMENT_PATH,
   MANAGEMENT_CANCEL_DOCUMENT_PATH,
   MANAGEMENT_INSTALL_DOCUMENT_PATH,
   MANAGEMENT_MEDIA_TYPE,
+  MANAGEMENT_REMOVE_CUSTOM_DOCUMENT_PATH,
   MANAGEMENT_REMOVE_DOCUMENT_PATH,
+  MANAGEMENT_SELECT_MODE_DOCUMENT_PATH,
   MANAGEMENT_STATUS_DOCUMENT_PATH,
   MANAGEMENT_VERIFY_DOCUMENT_PATH,
+  type DictionaryActivateCustomRequest,
+  type DictionaryActivateCustomResponse,
   type DictionaryCancelRequest,
   type DictionaryCancelResponse,
   type DictionaryErrorResponse,
   type DictionaryInstallResponse,
+  type DictionaryRemoveCustomRequest,
+  type DictionaryRemoveCustomResponse,
   type DictionaryRemoveResponse,
+  type DictionarySelectModeRequest,
+  type DictionarySelectModeResponse,
   type DictionaryStatusResponse,
   type DictionaryVerifyRequest,
   type DictionaryVerifyResponse,
@@ -234,3 +243,51 @@ export async function verifyCustomDictionary(
     signal,
   })
 }
+
+/**
+ * Activate a custom SQLite dictionary database from host path.
+ */
+export async function activateCustomDictionary(
+  path: string,
+  identity?: string,
+  signal?: AbortSignal,
+): Promise<ManagementApiResult<DictionaryActivateCustomResponse>> {
+  const body: DictionaryActivateCustomRequest = { path, ...(identity ? { identity } : {}) }
+  return sendManagementRequest<DictionaryActivateCustomResponse>(MANAGEMENT_ACTIVATE_CUSTOM_DOCUMENT_PATH, {
+    method: 'POST',
+    body,
+    signal,
+  })
+}
+
+/**
+ * Switch operational dictionary mode between fixture, managed-ecdict, and custom snapshot.
+ */
+export async function selectDictionaryMode(
+  mode: 'fixture' | 'managed-ecdict' | 'custom',
+  snapshotId?: string,
+  signal?: AbortSignal,
+): Promise<ManagementApiResult<DictionarySelectModeResponse>> {
+  const body: DictionarySelectModeRequest = { mode, ...(snapshotId ? { snapshotId } : {}) }
+  return sendManagementRequest<DictionarySelectModeResponse>(MANAGEMENT_SELECT_MODE_DOCUMENT_PATH, {
+    method: 'POST',
+    body,
+    signal,
+  })
+}
+
+/**
+ * Remove an inactive custom dictionary snapshot by snapshot UUID.
+ */
+export async function removeCustomDictionary(
+  snapshotId: string,
+  signal?: AbortSignal,
+): Promise<ManagementApiResult<DictionaryRemoveCustomResponse>> {
+  const body: DictionaryRemoveCustomRequest = { snapshotId }
+  return sendManagementRequest<DictionaryRemoveCustomResponse>(MANAGEMENT_REMOVE_CUSTOM_DOCUMENT_PATH, {
+    method: 'POST',
+    body,
+    signal,
+  })
+}
+
