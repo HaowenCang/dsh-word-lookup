@@ -1,0 +1,94 @@
+{
+  "phase": "Phase 7A.8.1BR",
+  "title": "Activation Recovery, Inventory Isolation & Persistent Snapshot Catalog Repair Matrix (B01–B28)",
+  "testedCommit": "2f304f0377ae93c3d9553a314cdde1d86f6e0678",
+  "testedAt": "2026-10-17T09:53:00.000Z",
+  "overallStatus": "PASS",
+  "totalTests": 28,
+  "passed": 28,
+  "failed": 0,
+  "hardGates": {
+    "B01": {
+      "status": "PASS",
+      "description": "Candidate DB verification via isolated worker thread offload without blocking Host event loop",
+      "gate": "HARD_GATE"
+    },
+    "B04": {
+      "status": "PASS",
+      "description": "Zero whole-file buffers in Host thread during candidate verification and custom startup recovery",
+      "gate": "HARD_GATE"
+    },
+    "B07": {
+      "status": "PASS",
+      "description": "Strict UUID-to-filename binding check (databaseFile === custom-${snapshotId}.sqlite3) enforced",
+      "gate": "HARD_GATE"
+    },
+    "B13": {
+      "status": "PASS",
+      "description": "Crash consistency & intent recovery: startup recovery with Custom active and unconfirmed settings sync recovers Custom",
+      "gate": "HARD_GATE"
+    },
+    "B14": {
+      "status": "PASS",
+      "description": "Crash consistency & intent recovery: startup recovery with Managed active and unconfirmed settings sync recovers Managed",
+      "gate": "HARD_GATE"
+    },
+    "B20": {
+      "status": "PASS",
+      "description": "Catalog corrupt safe degradation: corrupted custom-snapshots/index.json degrades safely without throwing",
+      "gate": "HARD_GATE"
+    },
+    "B22": {
+      "status": "PASS",
+      "description": "Active lease protection: snapshot in active use cannot be deleted via cleanupSnapshot",
+      "gate": "HARD_GATE"
+    },
+    "B28": {
+      "status": "PASS",
+      "description": "Unified concurrency mutex across install, remove, activate-custom, and select-mode operations",
+      "gate": "HARD_GATE"
+    }
+  },
+  "scenarios": {
+    "B01": "PASS: candidate database verification offloads to worker and returns valid schema and count without blocking Host",
+    "B02": "PASS: candidate database verification rejects non-existent database file with FILE_NOT_FOUND",
+    "B03": "PASS: candidate database verification rejects database missing required tables with INVALID_DATABASE_SCHEMA",
+    "B04": "PASS: verifies candidate database and startup recovery via worker without whole-file buffering in Host thread",
+    "B05": "PASS: candidate verification is strictly read-only and preserves user raw database unchanged",
+    "B06": "PASS: publish snapshot creates custom-<uuid>.sqlite3 and records entry in custom-snapshots/index.json",
+    "B07": "PASS: strict UUID-to-filename binding rejects mismatches between snapshotId and databaseFile",
+    "B08": "PASS: writes custom snapshot catalog atomically via temporary file and atomic replace",
+    "B09": "PASS: snapshot catalog entry correctly records all schema and count fields",
+    "B10": "PASS: cleaning up an inactive snapshot atomically removes it from custom-snapshots/index.json",
+    "B11": "PASS: installing ECDICT while Custom mode is active commits installed-ecdict.json without overwriting active Custom mode",
+    "B12": "PASS: status handler exposes installed ECDICT inventory and customSnapshots while activeMode is custom",
+    "B13": "PASS: startup recovery recovers committed Custom mode when settings sync was unconfirmed/failed",
+    "B14": "PASS: startup recovery recovers committed Managed ECDICT mode when settings sync was unconfirmed/failed",
+    "B15": "PASS: confirmed settings sync honors user choice of fixture mode while preserving installed ECDICT inventory",
+    "B16": "PASS: startup recovery adopts published snapshot into CustomSnapshotManager tracking state cleanly",
+    "B17": "PASS: startup recovery detects corrupt custom snapshot file via worker, records recoveryError, and falls back to fixture",
+    "B18": "PASS: startup recovery detects missing custom snapshot file, records recoveryError, and falls back to fixture",
+    "B19": "PASS: startup recovery degrades safely when active.json is corrupt, falling back to fixture without throwing",
+    "B20": "PASS: corrupted custom-snapshots/index.json safely degrades without crashing CustomSnapshotManager or ActivationCoordinator",
+    "B21": "PASS: missing catalog automatically migrates and recreates index.json from active custom metadata",
+    "B22": "PASS: cannot clean up snapshot while active dictionary references exist",
+    "B23": "PASS: switching from custom to managed-ecdict releases custom lease and switches active dictionary",
+    "B24": "PASS: switching from managed-ecdict to custom acquires custom lease and switches active dictionary",
+    "B25": "PASS: hot-swap between custom-A and custom-B transfers leases atomically with uninterrupted lookups",
+    "B26": "PASS: coordinator.dispose() cleanly awaits customSnapshotManager disposal and worker shutdown",
+    "B27": "PASS: route error responses sanitize internal machine paths from error message and details",
+    "B28": "PASS: unified concurrency mutex rejects concurrent operations with OperationInProgressError"
+  },
+  "defectsResolved": {
+    "B11": "Resolved: Dual model decoupled, installing ECDICT while Custom is active commits installed-ecdict.json without switching DictionaryManager",
+    "B12": "Resolved: Zero whole-file buffers in Host thread during startup recovery, streaming digests via companion worker",
+    "B13": "Resolved: Settings sync pending respects durable active.json state over Host Config",
+    "B14": "Resolved: Settings sync pending for managed-ecdict recovers managed mode and retries sync"
+  },
+  "consistencyChecks": {
+    "C1": "verifyCustomDatabase offloads to worker thread via validateCandidateDatabase",
+    "C2": "Sanitization of structured error details and nested objects in management routes",
+    "C3": "Asynchronous coordinator.dispose() and operations.dispose() awaiting companion worker exit",
+    "C4": "Strict UUID-to-filename binding validation in active.json and catalog records"
+  }
+}
