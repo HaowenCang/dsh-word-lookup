@@ -1,0 +1,32 @@
+{
+  "phase": "Phase 7A.8.1BR2",
+  "reportTitle": "Phase 7A.8.1BR2 Anti-TOCTOU, Multi-Custom Lifecycle & Cross-Restart Recovery Real DSH E2E Verification",
+  "generatedAt": "2026-10-17T13:36:27.970Z",
+  "status": "PASS",
+  "platform": "win32",
+  "nodeVersion": "v24.13.0",
+  "dshVersion": "0.2.0-rc.2",
+  "home": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-word-lookup-br2-test\\home",
+  "profile": "word-lookup-test",
+  "port": 50998,
+  "e2eCoverage": {
+    "E2E-BR2-01": "PASS: Multi-custom candidate database publication and independent snapshotId tracking in catalog",
+    "E2E-BR2-02": "PASS: Active switching between multiple custom snapshots with verified live lookups on both",
+    "E2E-BR2-03": "PASS: Cross-process restart restores active custom snapshot B while keeping dormant snapshot A selectable",
+    "E2E-BR2-04": "PASS: Live switching back to snapshot A and back to B across real DSH HTTP endpoints",
+    "E2E-BR2-05": "PASS: Tampered dormant snapshot rejected fail-closed before activation without crashing server",
+    "E2E-BR2-06": "PASS: Existing active dictionary B remains uninterrupted with zero ghost leases after rejected switch",
+    "E2E-BR2-07": "PASS: Clean reversion to fixture mode and successful fixture lookups"
+  },
+  "invariantsEnforced": {
+    "multiCustomPublishingIndependent": true,
+    "catalogPersistenceMutexDurable": true,
+    "crossProcessRebootPersistenceB": true,
+    "crossProcessDormantSelectableA": true,
+    "tamperedDormantSnapshotRejected": true,
+    "antiToctouIntegrityEnforced": true,
+    "zeroGhostLeasesOnRejection": true,
+    "uninterruptedActiveLookupsOnB": true,
+    "cleanFixtureReversion": true
+  }
+}

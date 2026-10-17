@@ -143,7 +143,7 @@ Scratch home: C:\Users\20659\AppData\Local\Temp\dsh-word-lookup-test\home
 Prepared isolated profile word-lookup-test with candidate plugin at C:\Users\20659\AppData\Local\Temp\dsh-word-lookup-test\home\profiles\word-lookup-test\node_modules\dsh-word-lookup
 Created user candidate database at: C:\Users\20659\AppData\Local\Temp\dsh-word-lookup-test\user-data\user-custom-dict.sqlite3 (49152 bytes, sha256: 35bf58f08840a0f6...)
 Booting isolated DSH process on port 50998...
-DSH booted successfully at: http://127.0.0.1:50998/?token=xAkouyTDFnliX_tinARlyLMO9hBFH3PFGxyIDwpdQ88
+DSH booted successfully at: http://127.0.0.1:50998/?token=<redacted>
 
 --- Part 1 (E2E-01): HostConnectionService Unauthenticated Request Fence ---
   PASS: Anonymous POST /api/dsh-word-lookup -> 401 Unauthorized
@@ -186,7 +186,7 @@ DSH booted successfully at: http://127.0.0.1:50998/?token=xAkouyTDFnliX_tinARlyL
 --- Part 8 (E2E-08): Cross-Process Restart Persistence & Recovery ---
 Stopping DSH process while Custom Dictionary is active...
 Re-booting DSH on port 50998 to test startup recovery...
-DSH rebooted successfully at: http://127.0.0.1:50998/?token=zmEBhzYYZXU90yWs-Hi0NW51bJM6DNkfOA5AXGhhQAs
+DSH rebooted successfully at: http://127.0.0.1:50998/?token=<redacted>
   PASS (E2E-08): Post-restart status directly restored activeMode: 'custom' with snapshotId: 5237ef28-6e84-4068-96f8-a81864ca55cd
   PASS (E2E-08): Post-restart lookup for 'phenomenon' -> 200 OK (found: true, source: 'custom-local')
 
