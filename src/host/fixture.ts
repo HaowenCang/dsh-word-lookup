@@ -368,6 +368,7 @@ export const SCHEMA_SQL: readonly string[] = [
  */
 export const INDEX_SQL: readonly string[] = [
   `CREATE INDEX IF NOT EXISTS idx_forms_headword ON forms (headword COLLATE NOCASE)`,
+  `CREATE INDEX IF NOT EXISTS idx_forms_headword_raw ON forms (headword)`,
   `CREATE INDEX IF NOT EXISTS idx_examples_headword ON examples (headword COLLATE NOCASE)`,
 ]
 

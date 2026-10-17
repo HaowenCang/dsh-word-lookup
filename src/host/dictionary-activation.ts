@@ -201,7 +201,6 @@ export class ActivationCoordinator {
   readonly #manager: DictionaryManager
   readonly #config?: HostConfig
   readonly #customSnapshotManager: CustomSnapshotManager | null
-  readonly #ownsSnapshotManager: boolean
 
   #recoveryPromise: Promise<void> | null = null
   #isRecovering = false
@@ -220,13 +219,10 @@ export class ActivationCoordinator {
     this.#config = options.config
     if (options.customSnapshotManager !== undefined) {
       this.#customSnapshotManager = options.customSnapshotManager
-      this.#ownsSnapshotManager = false
     } else if (this.#paths) {
       this.#customSnapshotManager = new CustomSnapshotManager({ paths: this.#paths })
-      this.#ownsSnapshotManager = true
     } else {
       this.#customSnapshotManager = null
-      this.#ownsSnapshotManager = false
     }
   }
 
@@ -271,7 +267,7 @@ export class ActivationCoordinator {
    */
   async dispose(): Promise<void> {
     this.#disposed = true
-    if (this.#ownsSnapshotManager && this.#customSnapshotManager) {
+    if (this.#customSnapshotManager) {
       await this.#customSnapshotManager.dispose()
     }
   }
@@ -889,6 +885,72 @@ export class ActivationCoordinator {
       throw error
     }
 
+    // 4. Durably persist installed ECDICT inventory record (B16)
+    try {
+      await writeInstalledEcdictMetadataAtomically(this.#paths, installedMeta)
+    } catch (invError) {
+      // Inventory persistence failed: execute rollback compensation to prevent false install success
+      try {
+        if (previousMetadata !== null) {
+          await writeActiveMetadataAtomically(this.#paths, previousMetadata)
+        } else {
+          await unlink(this.#paths.activeMetadataPath)
+        }
+      } catch {
+        // best effort
+      }
+
+      if (previousMetadata?.activeMode === 'managed-ecdict') {
+        try {
+          const prevDbPath = join(this.#paths.databaseDirectory, previousMetadata.databaseFile)
+          const prevDict = openProductionDictionary({ path: prevDbPath })
+          this.#manager.activate({
+            mode: 'managed-ecdict',
+            identity: previousMetadata.identity,
+            dictionary: prevDict,
+          })
+        } catch {
+          // fallback to fixture
+          this.#manager.activate({
+            mode: 'fixture',
+            identity: 'fixture',
+            dictionary: openFixtureDictionary(),
+          })
+        }
+      } else if (previousMetadata?.activeMode === 'custom' && previousMetadata.snapshotId && this.#customSnapshotManager) {
+        try {
+          const prevDict = this.#customSnapshotManager.openSnapshotDictionary(previousMetadata.snapshotId)
+          this.#manager.activate({
+            mode: 'custom',
+            identity: previousMetadata.identity,
+            dictionary: prevDict,
+          })
+        } catch {
+          this.#manager.activate({
+            mode: 'fixture',
+            identity: 'fixture',
+            dictionary: openFixtureDictionary(),
+          })
+        }
+      } else {
+        try {
+          this.#manager.activate({
+            mode: 'fixture',
+            identity: 'fixture',
+            dictionary: openFixtureDictionary(),
+          })
+        } catch {
+          // ignore
+        }
+      }
+
+      this.#cachedInstalledCorpus = null
+      throw new Error(
+        `Failed to commit installed ECDICT inventory: ${invError instanceof Error ? invError.message : String(invError)}`,
+        { cause: invError },
+      )
+    }
+
     // Update internal cached summary
     this.#cachedInstalledCorpus = Object.freeze({
       name: metadata.source.name,
@@ -903,13 +965,6 @@ export class ActivationCoordinator {
     })
     this.#activeSnapshotId = null
     this.#recoveryError = null
-
-    // Persist installed ECDICT inventory record independently
-    try {
-      await writeInstalledEcdictMetadataAtomically(this.#paths, installedMeta)
-    } catch {
-      // non-fatal
-    }
 
     // 5. Best-effort Host Config persistence
     const syncState = await this.#persistHostConfigMode('managed-ecdict')
@@ -1014,8 +1069,12 @@ export class ActivationCoordinator {
       throw err
     }
 
-    // 1. Open snapshot dictionary (leases candidate snapshot)
-    const publishedDict = this.#customSnapshotManager.openSnapshotDictionary(cleanId)
+    // 1. Fully validate dormant/published snapshot before activation via isolated Worker (B15)
+    // Streamed SHA-256, PRAGMA integrity_check, schema, indexes, queries, catalog digest match,
+    // and anti-TOCTOU lease opening.
+    const publishedDict = await this.#customSnapshotManager.validatePublishedSnapshotForActivation(cleanId, {
+      signal,
+    })
     try {
       for (const probe of ACTIVATION_PROBE_HEADWORDS) {
         publishedDict.lookup(probe)

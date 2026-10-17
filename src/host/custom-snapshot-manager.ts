@@ -146,6 +146,16 @@ export class SnapshotCleanupError extends Error {
   }
 }
 
+/** Error thrown when persistent catalog registration or synchronization fails. */
+export class CatalogPersistenceError extends Error {
+  readonly code = 'CATALOG_PERSISTENCE_FAILED'
+
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options)
+    this.name = 'CatalogPersistenceError'
+  }
+}
+
 export interface StagingOwnershipPayload {
   readonly version: 1
   readonly managerId: string
@@ -173,6 +183,8 @@ export interface CustomSnapshotHooks {
   readonly onBeforeUnlinkCleanup?: (snapshotId: string) => Promise<void> | void
   readonly onBeforeWriteOwner?: (ownerPath: string) => Promise<void> | void
   readonly onAfterCreateStaging?: (stagingPath: string) => Promise<void> | void
+  readonly onAfterValidateBeforeOpen?: (snapshotId: string, publishedPath: string) => Promise<void> | void
+  readonly onBeforePersistCatalog?: (record: CustomSnapshotRecord) => Promise<void> | void
   readonly openSqliteDictionary?: (options: any) => SqliteDictionary
   readonly now?: () => number
 }
@@ -240,6 +252,21 @@ export class CustomSnapshotManager {
 
   #disposed = false
   #catalogError: string | null = null
+  #catalogLock: Promise<void> = Promise.resolve()
+
+  async #withCatalogLock<T>(fn: () => Promise<T>): Promise<T> {
+    const prev = this.#catalogLock
+    let release: () => void
+    this.#catalogLock = new Promise<void>((res) => {
+      release = res
+    })
+    await prev
+    try {
+      return await fn()
+    } finally {
+      release!()
+    }
+  }
 
   constructor(options: CustomSnapshotManagerOptions) {
     if (!options?.paths) {
@@ -359,15 +386,39 @@ export class CustomSnapshotManager {
 
       const fileExists = existsSync(pubPath)
       let isFileValid = fileExists
+      let errorCode: string | null = null
+      let errorMsg: string | null = null
       if (fileExists) {
         try {
-          const st = statSync(pubPath)
-          if (!st.isFile() || st.size === 0) {
+          const lstat = lstatSync(pubPath)
+          if (lstat.isSymbolicLink()) {
             isFileValid = false
+            errorCode = 'SYMLINK_REJECTED'
+            errorMsg = 'Snapshot file must not be a symbolic link or junction'
+          } else {
+            const st = statSync(pubPath)
+            if (!st.isFile()) {
+              isFileValid = false
+              errorCode = 'NOT_A_FILE'
+              errorMsg = 'Snapshot file is not a regular file'
+            } else if (st.size === 0) {
+              isFileValid = false
+              errorCode = 'EMPTY_FILE'
+              errorMsg = 'Snapshot file is empty (0 bytes)'
+            } else if (entry.byteSize && st.size !== entry.byteSize) {
+              isFileValid = false
+              errorCode = 'SIZE_MISMATCH'
+              errorMsg = `Snapshot file byte size (${st.size}) does not match catalog record (${entry.byteSize})`
+            }
           }
-        } catch {
+        } catch (e) {
           isFileValid = false
+          errorCode = 'STAT_FAILED'
+          errorMsg = e instanceof Error ? e.message : String(e)
         }
+      } else {
+        errorCode = 'FILE_NOT_FOUND'
+        errorMsg = 'Snapshot file is missing on disk'
       }
 
       const record: CustomSnapshotRecord = {
@@ -375,7 +426,7 @@ export class CustomSnapshotManager {
         identity: entry.identity,
         sourcePath: '',
         stagingPath: '',
-        publishedPath: isFileValid ? pubPath : null,
+        publishedPath: fileExists ? pubPath : null,
         state: isFileValid ? 'PUBLISHED_INACTIVE' : 'REJECTED',
         activeLeases: 0,
         sha256: entry.sha256,
@@ -386,14 +437,97 @@ export class CustomSnapshotManager {
         exampleCount: entry.exampleCount ?? 0,
         headwordsSample: Object.freeze([]),
         createdAt: Date.parse(entry.createdAt) || Date.now(),
-        verifiedAt: Date.parse(entry.createdAt) || Date.now(),
+        verifiedAt: null,
         publishedAt: Date.parse(entry.createdAt) || Date.now(),
-        error: isFileValid ? null : (fileExists ? 'Snapshot file is not a regular file' : 'Snapshot file is missing on disk'),
-        errorCode: isFileValid ? null : (fileExists ? 'NOT_A_FILE' : 'FILE_NOT_FOUND'),
+        error: isFileValid ? null : errorMsg,
+        errorCode: isFileValid ? null : errorCode,
       }
 
       this.#snapshots.set(entry.snapshotId, record)
     }
+
+    // Safely reconcile any published but uncataloged snapshots (R10)
+    await this.reconcileUnregisteredSnapshots()
+  }
+
+  /**
+   * Reconcile physically published snapshot databases on disk with the persistent catalog.
+   * If a valid custom database file (custom-<id>.sqlite3) exists in customSnapshotDirectory
+   * but is missing from index.json (e.g. from a crash during catalog persistence or failure recovery),
+   * this method verifies its SQLite integrity via worker, recovers its metadata, and durably registers
+   * it into the catalog.
+   */
+  async reconcileUnregisteredSnapshots(): Promise<readonly string[]> {
+    if (this.#disposed) return Object.freeze([])
+    if (!existsSync(this.#paths.customSnapshotDirectory)) return Object.freeze([])
+
+    const recoveredIds: string[] = []
+
+    try {
+      const files = await readdir(this.#paths.customSnapshotDirectory)
+      for (const file of files) {
+        const match = /^custom-([a-zA-Z0-9._-]{1,64})\.sqlite3$/.exec(file)
+        if (!match) continue
+
+        const snapshotId = match[1]!
+        const fullPath = join(this.#paths.customSnapshotDirectory, file)
+
+        try {
+          const st = await lstat(fullPath)
+          if (st.isSymbolicLink() || !st.isFile() || st.size === 0) continue
+          await validateCustomSnapshotPath(fullPath, this.#paths.customSnapshotDirectory)
+        } catch {
+          continue
+        }
+
+        const currentCatalog = await readCustomSnapshotCatalog(this.#paths).catch(() => null)
+        if (currentCatalog?.snapshots.some((s) => s.snapshotId === snapshotId)) {
+          continue
+        }
+
+        let validation: CustomSnapshotValidateSuccessResponse
+        try {
+          validation = await this.#validator.validateSnapshot(fullPath, { timeoutMs: 30000 })
+        } catch {
+          continue
+        }
+
+        const now = Date.now()
+        const record: CustomSnapshotRecord = {
+          id: snapshotId,
+          identity: snapshotId,
+          sourcePath: '',
+          stagingPath: '',
+          publishedPath: fullPath,
+          state: 'PUBLISHED_INACTIVE',
+          activeLeases: 0,
+          sha256: validation.sha256,
+          byteSize: validation.byteSize,
+          schemaVersion: validation.schemaVersion,
+          entryCount: validation.entryCount,
+          formCount: validation.formCount,
+          exampleCount: validation.exampleCount,
+          headwordsSample: validation.headwordsSample,
+          createdAt: now,
+          verifiedAt: now,
+          publishedAt: now,
+          error: null,
+          errorCode: null,
+        }
+
+        this.#snapshots.set(snapshotId, record)
+        try {
+          await this.#persistSnapshotToCatalog(record)
+          recoveredIds.push(snapshotId)
+        } catch {
+          // best-effort persistence
+        }
+      }
+    } catch {
+      // ignore readdir failure
+    }
+
+    return Object.freeze(recoveredIds)
   }
 
   /**
@@ -863,7 +997,25 @@ export class CustomSnapshotManager {
         publishedAt: Date.now(),
       }
       this.#snapshots.set(id, record)
-      await this.#persistSnapshotToCatalog(record)
+
+      try {
+        await this.#persistSnapshotToCatalog(record)
+      } catch (catErr: unknown) {
+        // B16: Catalog persistence failure must not report publication success,
+        // and physically published snapshot file must not be deleted.
+        const errMsg = catErr instanceof Error ? catErr.message : String(catErr)
+        record = {
+          ...record,
+          state: 'REJECTED',
+          error: errMsg,
+          errorCode: 'CATALOG_PERSISTENCE_FAILED',
+        }
+        this.#snapshots.set(id, record)
+        if (catErr instanceof CatalogPersistenceError) {
+          throw catErr
+        }
+        throw new CatalogPersistenceError(errMsg, { cause: catErr })
+      }
 
       return record
     } catch (err: unknown) {
@@ -892,6 +1044,299 @@ export class CustomSnapshotManager {
       await this.#cleanupStagingOwnership(stagingPath)
 
       throw err
+    }
+  }
+
+  /**
+   * Fully validate a dormant or published custom snapshot before dictionary activation (B15).
+   *
+   * Security & Integrity Contract:
+   * 1. Snapshot ID and basename strictly bound.
+   * 2. Path containment, ancestor directory symlinks, and file symlink/junction inspection.
+   * 3. File type and byte size validation against catalog.
+   * 4. Companion Worker streaming SHA-256 calculation (zero full-file Buffer in Host).
+   * 5. Catalog SHA-256 digest matching (rejects tampered or replaced databases).
+   * 6. Catalog byteSize matching.
+   * 7. Full SQLite PRAGMA integrity_check(100) via Worker.
+   * 8. SQLite schema, required indexes (rejects SCAN), and query compatibility verification.
+   * 9. Anti-TOCTOU protection between verification and opening; returns SqliteDictionary holding active lease.
+   * 10. Fail-closed: if validation fails, zero leases are leaked, in-memory state is marked REJECTED,
+   *     and the caller does NOT commit active.json or switch active dictionary.
+   */
+  async validatePublishedSnapshotForActivation(
+    snapshotId: string,
+    options?: CustomValidatorTaskOptions,
+  ): Promise<SqliteDictionary> {
+    if (this.#disposed) {
+      throw new Error('CustomSnapshotManager has been disposed')
+    }
+
+    if (typeof snapshotId !== 'string' || snapshotId.trim().length === 0) {
+      throw new TypeError('snapshotId must be a non-empty string')
+    }
+    const cleanId = snapshotId.trim()
+
+    const record = this.#snapshots.get(cleanId)
+    if (!record || !record.publishedPath) {
+      if (record?.errorCode === 'SIZE_MISMATCH') {
+        throw new SnapshotTamperingError(
+          record.error ?? `Snapshot "${cleanId}" byte size mismatch against catalog`,
+        )
+      }
+      const error = new Error(`Snapshot "${cleanId}" not found or not published`)
+      ;(error as unknown as { code: string }).code = 'SNAPSHOT_NOT_FOUND'
+      throw error
+    }
+
+    const isPublishedState =
+      record.state === 'PUBLISHED_INACTIVE' ||
+      record.state === 'ACTIVE' ||
+      record.state === 'PUBLISHED_LEASED' ||
+      record.state === 'PUBLISHED'
+
+    if (!isPublishedState) {
+      if (record.errorCode === 'SIZE_MISMATCH') {
+        throw new SnapshotTamperingError(
+          record.error ?? `Snapshot "${cleanId}" byte size mismatch against catalog`,
+        )
+      }
+      const error = new Error(
+        `Snapshot "${cleanId}" is in state "${record.state}" and cannot be activated`,
+      )
+      ;(error as unknown as { code: string }).code = 'SNAPSHOT_INVALID_STATE'
+      throw error
+    }
+
+    const publishedPath = record.publishedPath
+
+    // 1. Snapshot ID and basename strict binding:
+    const expectedBaseName = `custom-${record.id}.sqlite3`
+    const actualBaseName = basename(publishedPath)
+    if (actualBaseName !== expectedBaseName && actualBaseName !== `custom-${cleanId}.sqlite3`) {
+      const error = new Error(
+        `Snapshot filename "${actualBaseName}" violates identity binding to snapshotId "${cleanId}"`,
+      )
+      const code = 'INVALID_SNAPSHOT_IDENTITY'
+      ;(error as unknown as { code: string }).code = code
+      this.#markSnapshotRejected(cleanId, error.message, code)
+      throw error
+    }
+
+    // 2. Path containment, ancestor directory symlinks, and file symlink/junction check
+    try {
+      await validateCustomSnapshotPath(publishedPath, this.#paths.customSnapshotDirectory)
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err)
+      const error = new Error(`Snapshot path security validation failed: ${errMsg}`)
+      const code = 'INVALID_SNAPSHOT_PATH'
+      ;(error as unknown as { code: string }).code = code
+      this.#markSnapshotRejected(cleanId, error.message, code)
+      throw error
+    }
+
+    if (!existsSync(publishedPath)) {
+      const error = new Error(`Published snapshot file not found on disk: "${publishedPath}"`)
+      const code = 'FILE_NOT_FOUND'
+      ;(error as unknown as { code: string }).code = code
+      this.#markSnapshotRejected(cleanId, error.message, code)
+      throw error
+    }
+
+    // 3. File type and byte size validation
+    let preLstat: ReturnType<typeof lstatSync>
+    let preStat: ReturnType<typeof statSync>
+    try {
+      preLstat = lstatSync(publishedPath)
+      if (preLstat.isSymbolicLink()) {
+        const error = new Error(`Published snapshot at "${publishedPath}" is a symbolic link or junction`)
+        const code = 'SYMLINK_REJECTED'
+        ;(error as unknown as { code: string }).code = code
+        this.#markSnapshotRejected(cleanId, error.message, code)
+        throw error
+      }
+      preStat = statSync(publishedPath, { bigint: true })
+      if (!preStat.isFile()) {
+        const error = new Error(`Published snapshot at "${publishedPath}" is not a regular file`)
+        const code = 'NOT_A_FILE'
+        ;(error as unknown as { code: string }).code = code
+        this.#markSnapshotRejected(cleanId, error.message, code)
+        throw error
+      }
+      if (preStat.size === 0n) {
+        const error = new Error(`Published snapshot at "${publishedPath}" is empty (0 bytes)`)
+        const code = 'EMPTY_FILE'
+        ;(error as unknown as { code: string }).code = code
+        this.#markSnapshotRejected(cleanId, error.message, code)
+        throw error
+      }
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code
+      if (code === 'SYMLINK_REJECTED' || code === 'NOT_A_FILE' || code === 'EMPTY_FILE') {
+        throw err
+      }
+      const error = new Error(
+        `Cannot stat snapshot file "${publishedPath}": ${err instanceof Error ? err.message : String(err)}`,
+      )
+      const errCode = 'STAT_FAILED'
+      ;(error as unknown as { code: string }).code = errCode
+      this.#markSnapshotRejected(cleanId, error.message, errCode)
+      throw error
+    }
+
+    // Check size against catalog record
+    if (record.byteSize !== null && record.byteSize !== undefined) {
+      if (Number(preStat.size) !== record.byteSize) {
+        const error = new SnapshotTamperingError(
+          `Snapshot byte size mismatch: catalog recorded ${record.byteSize} bytes, actual file is ${preStat.size} bytes`,
+        )
+        this.#markSnapshotRejected(cleanId, error.message, error.code)
+        throw error
+      }
+    }
+
+    // 4. Companion Worker streaming SHA-256, SQLite integrity check, schema & query compatibility verification
+    let validation: CustomSnapshotValidateSuccessResponse
+    try {
+      validation = await this.#validator.validateSnapshot(publishedPath, options)
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err)
+      const errCode = (err as { code?: string })?.code ?? 'VALIDATION_FAILED'
+      this.#markSnapshotRejected(cleanId, `Worker validation failed: ${errMsg}`, errCode)
+      throw err
+    }
+
+    // 5. Catalog SHA-256 matching
+    if (record.sha256 && validation.sha256 !== record.sha256) {
+      const error = new SnapshotTamperingError(
+        `Snapshot SHA-256 digest mismatch: catalog recorded ${record.sha256}, actual file digest is ${validation.sha256}`,
+      )
+      this.#markSnapshotRejected(cleanId, error.message, error.code)
+      throw error
+    }
+
+    // 6. Catalog byteSize matching
+    if (
+      record.byteSize !== null &&
+      record.byteSize !== undefined &&
+      validation.byteSize !== record.byteSize
+    ) {
+      const error = new SnapshotTamperingError(
+        `Snapshot validated byte size mismatch: catalog recorded ${record.byteSize}, actual is ${validation.byteSize}`,
+      )
+      this.#markSnapshotRejected(cleanId, error.message, error.code)
+      throw error
+    }
+
+    // 7. Schema version matching
+    const expectedSchema = record.schemaVersion ?? 1
+    if (validation.schemaVersion !== expectedSchema) {
+      const error = new Error(
+        `Snapshot schemaVersion mismatch: expected ${expectedSchema}, got ${validation.schemaVersion}`,
+      )
+      const code = 'INVALID_SCHEMA_VERSION'
+      ;(error as unknown as { code: string }).code = code
+      this.#markSnapshotRejected(cleanId, error.message, code)
+      throw error
+    }
+
+    // 8. TOCTOU Protection & Atomic Opening
+    if (customSnapshotHooks?.onAfterValidateBeforeOpen) {
+      await customSnapshotHooks.onAfterValidateBeforeOpen(cleanId, publishedPath)
+    }
+
+    // Check pre-open stat
+    try {
+      const preOpenLstat = lstatSync(publishedPath)
+      if (preOpenLstat.isSymbolicLink()) {
+        const error = new SnapshotTamperingError(
+          'Snapshot was replaced with a symbolic link during activation window',
+        )
+        this.#markSnapshotRejected(cleanId, error.message, error.code)
+        throw error
+      }
+      const preOpenStat = statSync(publishedPath, { bigint: true })
+      if (
+        preOpenStat.ino !== preStat.ino ||
+        preOpenStat.dev !== preStat.dev ||
+        preOpenStat.size !== preStat.size ||
+        preOpenStat.mtimeNs !== preStat.mtimeNs
+      ) {
+        const error = new SnapshotTamperingError(
+          'Snapshot file was replaced or modified during activation window (pre-open)',
+        )
+        this.#markSnapshotRejected(cleanId, error.message, error.code)
+        throw error
+      }
+    } catch (err: unknown) {
+      if (err instanceof SnapshotTamperingError) throw err
+      const error = new SnapshotTamperingError(
+        `Cannot verify snapshot identity before opening: ${err instanceof Error ? err.message : String(err)}`,
+      )
+      this.#markSnapshotRejected(cleanId, error.message, error.code)
+      throw error
+    }
+
+    // Open dictionary with lease
+    const dict = this.openSnapshotDictionary(cleanId)
+
+    // Inspect post-open stat
+    try {
+      const postOpenLstat = lstatSync(publishedPath)
+      if (postOpenLstat.isSymbolicLink()) {
+        dict.close()
+        const error = new SnapshotTamperingError(
+          'Snapshot was replaced with a symbolic link during activation window',
+        )
+        this.#markSnapshotRejected(cleanId, error.message, error.code)
+        throw error
+      }
+      const postOpenStat = statSync(publishedPath, { bigint: true })
+      if (
+        postOpenStat.ino !== preStat.ino ||
+        postOpenStat.dev !== preStat.dev ||
+        postOpenStat.size !== preStat.size ||
+        postOpenStat.mtimeNs !== preStat.mtimeNs
+      ) {
+        dict.close()
+        const error = new SnapshotTamperingError(
+          'Snapshot file was replaced or modified during activation window (post-open)',
+        )
+        this.#markSnapshotRejected(cleanId, error.message, error.code)
+        throw error
+      }
+    } catch (err: unknown) {
+      dict.close()
+      if (err instanceof SnapshotTamperingError) throw err
+      const error = new SnapshotTamperingError(
+        `Cannot verify snapshot identity after opening: ${err instanceof Error ? err.message : String(err)}`,
+      )
+      this.#markSnapshotRejected(cleanId, error.message, error.code)
+      throw error
+    }
+
+    // 9. Successfully verified and leased
+    const currentRec = this.#snapshots.get(cleanId)
+    if (currentRec) {
+      this.#snapshots.set(cleanId, {
+        ...currentRec,
+        verifiedAt: Date.now(),
+        error: null,
+        errorCode: null,
+      })
+    }
+
+    return dict
+  }
+
+  #markSnapshotRejected(snapshotId: string, error: string, errorCode: string): void {
+    const current = this.#snapshots.get(snapshotId)
+    if (current) {
+      this.#snapshots.set(snapshotId, {
+        ...current,
+        state: 'REJECTED',
+        error,
+        errorCode,
+      })
     }
   }
 
@@ -1141,20 +1586,30 @@ export class CustomSnapshotManager {
 
   async #persistSnapshotToCatalog(record: CustomSnapshotRecord): Promise<void> {
     if (!record.publishedPath) return
-    try {
+
+    if (customSnapshotHooks?.onBeforePersistCatalog) {
+      await customSnapshotHooks.onBeforePersistCatalog(record)
+    }
+
+    await this.#withCatalogLock(async () => {
       let catalog: CustomSnapshotCatalog | null = null
       try {
         catalog = await readCustomSnapshotCatalog(this.#paths)
-      } catch {
-        // Degrade safely: if corrupt, don't overwrite blindly
-        return
+      } catch (err) {
+        // If catalog exists on disk but is unparseable or corrupt, fail closed
+        this.#catalogError = `Custom snapshot catalog corrupted: ${err instanceof Error ? err.message : String(err)}`
+        throw new CatalogPersistenceError(
+          `Cannot persist to corrupted custom snapshot catalog: ${err instanceof Error ? err.message : String(err)}`,
+          { cause: err },
+        )
       }
+
       const existingList = catalog ? [...catalog.snapshots] : []
       const entryIndex = existingList.findIndex((e) => e.snapshotId === record.id)
       const newEntry: CustomSnapshotCatalogEntry = {
         snapshotId: record.id,
         identity: record.identity,
-        databaseFile: basename(record.publishedPath),
+        databaseFile: basename(record.publishedPath!),
         source: 'custom-local',
         schemaVersion: record.schemaVersion ?? 1,
         sha256: record.sha256 ?? '',
@@ -1169,28 +1624,38 @@ export class CustomSnapshotManager {
       } else {
         existingList.push(newEntry)
       }
-      await writeCustomSnapshotCatalogAtomically(this.#paths, {
-        version: 1,
-        snapshots: Object.freeze(existingList),
-      })
-    } catch (err) {
-      // Non-fatal catalog failure must not break active dictionary
-      this.#catalogError = `Failed to persist catalog entry: ${err instanceof Error ? err.message : String(err)}`
-    }
+
+      try {
+        await writeCustomSnapshotCatalogAtomically(this.#paths, {
+          version: 1,
+          snapshots: Object.freeze(existingList),
+        })
+      } catch (err: unknown) {
+        if (err instanceof CatalogPersistenceError) {
+          throw err
+        }
+        throw new CatalogPersistenceError(
+          `Failed to persist custom snapshot catalog: ${err instanceof Error ? err.message : String(err)}`,
+          { cause: err },
+        )
+      }
+    })
   }
 
   async #removeSnapshotFromCatalog(snapshotId: string): Promise<void> {
-    try {
-      const catalog = await readCustomSnapshotCatalog(this.#paths)
-      if (!catalog) return
-      const filtered = catalog.snapshots.filter((e) => e.snapshotId !== snapshotId)
-      await writeCustomSnapshotCatalogAtomically(this.#paths, {
-        version: 1,
-        snapshots: Object.freeze(filtered),
-      })
-    } catch {
-      // Non-fatal
-    }
+    await this.#withCatalogLock(async () => {
+      try {
+        const catalog = await readCustomSnapshotCatalog(this.#paths)
+        if (!catalog) return
+        const filtered = catalog.snapshots.filter((e) => e.snapshotId !== snapshotId)
+        await writeCustomSnapshotCatalogAtomically(this.#paths, {
+          version: 1,
+          snapshots: Object.freeze(filtered),
+        })
+      } catch {
+        // Non-fatal on cleanup
+      }
+    })
   }
 
   /**

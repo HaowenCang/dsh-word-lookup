@@ -59,6 +59,7 @@ import {
   managedDatabaseFileName,
   managedDatabasePath,
   readActiveMetadata,
+  readCustomSnapshotCatalog,
   readInstalledEcdictMetadata,
   removeInstalledEcdictMetadata,
   removeStaleTemporaryArtifacts,
@@ -68,12 +69,15 @@ import {
   validateCustomSnapshotPath,
   validateInstalledEcdictMetadata,
   writeActiveMetadataAtomically,
+  writeCustomSnapshotCatalogAtomically,
   writeInstalledEcdictMetadataAtomically,
+  _setStorageFsHooksForTesting,
   STAGING_SNAPSHOT_FILENAME_PATTERN,
   PUBLISHED_SNAPSHOT_FILENAME_PATTERN,
   CUSTOM_SNAPSHOT_FILENAME_PATTERN,
   type ActiveMetadata,
   type CustomActiveMetadata,
+  type CustomSnapshotCatalog,
   type InstalledEcdictMetadata,
   type ManagedActiveMetadata,
   type ActiveMetadataSource,
@@ -97,6 +101,7 @@ import {
   SnapshotActiveReferenceError,
   SnapshotPublishConflictError,
   SnapshotCleanupError,
+  CatalogPersistenceError,
   _setCustomSnapshotHooksForTesting,
   _getHostProcessInstanceIdForTesting,
   _resetActiveManagersForTesting,
@@ -145,6 +150,7 @@ import {
 import {
   ActivationCoordinator,
   ActivationRollbackError,
+  _setActivationHooksForTesting,
   type ActivationCoordinatorOptions,
   type ActivationStateSummary,
   type CustomDatabaseVerificationResult,
@@ -209,6 +215,7 @@ export {
   managedDatabaseFileName,
   managedDatabasePath,
   readActiveMetadata,
+  readCustomSnapshotCatalog,
   readInstalledEcdictMetadata,
   removeInstalledEcdictMetadata,
   removeStaleTemporaryArtifacts,
@@ -217,9 +224,13 @@ export {
   validateActiveMetadata,
   validateInstalledEcdictMetadata,
   writeActiveMetadataAtomically,
+  writeCustomSnapshotCatalogAtomically,
   writeInstalledEcdictMetadataAtomically,
+  _setStorageFsHooksForTesting,
+  _setActivationHooksForTesting,
   type ActiveMetadata,
   type CustomActiveMetadata,
+  type CustomSnapshotCatalog,
   type InstalledEcdictMetadata,
   type ManagedActiveMetadata,
   type ActiveMetadataSource,
@@ -314,6 +325,7 @@ export {
   SnapshotActiveReferenceError,
   SnapshotPublishConflictError,
   SnapshotCleanupError,
+  CatalogPersistenceError,
   _setCustomSnapshotHooksForTesting,
   _getHostProcessInstanceIdForTesting,
   _resetActiveManagersForTesting,
@@ -399,11 +411,13 @@ export function apply(ctx: Context, config: HostConfig): void {
         fetch: createLookupHandler(config, manager),
       })
     } catch (error) {
-      try { void disposeManagement?.() } catch { /* ignore */ }
-      try { void disposeLookup?.() } catch { /* ignore */ }
-      void operationManager.dispose()
-      void coordinator.dispose()
-      manager.close()
+      void (async () => {
+        try { await disposeManagement?.() } catch { /* ignore */ }
+        try { await disposeLookup?.() } catch { /* ignore */ }
+        try { await operationManager.dispose() } catch { /* ignore */ }
+        try { await coordinator.dispose() } catch { /* ignore */ }
+        try { manager.close() } catch { /* ignore */ }
+      })()
       throw error
     }
 

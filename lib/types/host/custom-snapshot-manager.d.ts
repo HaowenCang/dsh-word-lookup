@@ -89,6 +89,13 @@ export declare class SnapshotCleanupError extends Error {
     readonly originalCode?: string;
     constructor(message: string, originalCode?: string);
 }
+/** Error thrown when persistent catalog registration or synchronization fails. */
+export declare class CatalogPersistenceError extends Error {
+    readonly code = "CATALOG_PERSISTENCE_FAILED";
+    constructor(message: string, options?: {
+        cause?: unknown;
+    });
+}
 export interface StagingOwnershipPayload {
     readonly version: 1;
     readonly managerId: string;
@@ -114,6 +121,8 @@ export interface CustomSnapshotHooks {
     readonly onBeforeUnlinkCleanup?: (snapshotId: string) => Promise<void> | void;
     readonly onBeforeWriteOwner?: (ownerPath: string) => Promise<void> | void;
     readonly onAfterCreateStaging?: (stagingPath: string) => Promise<void> | void;
+    readonly onAfterValidateBeforeOpen?: (snapshotId: string, publishedPath: string) => Promise<void> | void;
+    readonly onBeforePersistCatalog?: (record: CustomSnapshotRecord) => Promise<void> | void;
     readonly openSqliteDictionary?: (options: any) => SqliteDictionary;
     readonly now?: () => number;
 }
@@ -149,6 +158,14 @@ export declare class CustomSnapshotManager {
      * - Adopted snapshots start in PUBLISHED_INACTIVE state with 0 leases.
      */
     loadCatalog(): Promise<void>;
+    /**
+     * Reconcile physically published snapshot databases on disk with the persistent catalog.
+     * If a valid custom database file (custom-<id>.sqlite3) exists in customSnapshotDirectory
+     * but is missing from index.json (e.g. from a crash during catalog persistence or failure recovery),
+     * this method verifies its SQLite integrity via worker, recovers its metadata, and durably registers
+     * it into the catalog.
+     */
+    reconcileUnregisteredSnapshots(): Promise<readonly string[]>;
     /**
      * List all custom snapshots as public summaries without sensitive source paths.
      */
@@ -215,6 +232,23 @@ export declare class CustomSnapshotManager {
      * User source database is NEVER deleted, renamed, or modified.
      */
     createAndPublishSnapshot(sourcePath: string, options?: SnapshotPublishOptions): Promise<CustomSnapshotRecord>;
+    /**
+     * Fully validate a dormant or published custom snapshot before dictionary activation (B15).
+     *
+     * Security & Integrity Contract:
+     * 1. Snapshot ID and basename strictly bound.
+     * 2. Path containment, ancestor directory symlinks, and file symlink/junction inspection.
+     * 3. File type and byte size validation against catalog.
+     * 4. Companion Worker streaming SHA-256 calculation (zero full-file Buffer in Host).
+     * 5. Catalog SHA-256 digest matching (rejects tampered or replaced databases).
+     * 6. Catalog byteSize matching.
+     * 7. Full SQLite PRAGMA integrity_check(100) via Worker.
+     * 8. SQLite schema, required indexes (rejects SCAN), and query compatibility verification.
+     * 9. Anti-TOCTOU protection between verification and opening; returns SqliteDictionary holding active lease.
+     * 10. Fail-closed: if validation fails, zero leases are leaked, in-memory state is marked REJECTED,
+     *     and the caller does NOT commit active.json or switch active dictionary.
+     */
+    validatePublishedSnapshotForActivation(snapshotId: string, options?: CustomValidatorTaskOptions): Promise<SqliteDictionary>;
     /**
      * Open an already-published snapshot as a queryable SqliteDictionary with source `'custom-local'`.
      * Acquires a lease on the snapshot to protect it against deletion while active.

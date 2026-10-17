@@ -47,13 +47,11 @@ import { openFixtureDictionary } from '../src/host/fixture-db.js'
 import { loadRuntimeCorpusManifest } from '../src/host/corpus-db.js'
 import {
   ActivationCoordinator,
-  ActivationRollbackError,
   _setActivationHooksForTesting,
 } from '../src/host/dictionary-activation.js'
 import {
   DictionaryOperationManager,
   OperationInProgressError,
-  OperationNotCancellableError,
 } from '../src/host/dictionary-operations.js'
 import {
   CustomSnapshotManager,
@@ -72,20 +70,15 @@ import {
   type ActiveMetadata,
   type CustomActiveMetadata,
   type CustomSnapshotCatalog,
-  type InstalledEcdictMetadata,
   type ManagedStoragePaths,
 } from '../src/host/managed-storage.js'
 import {
   createActivateCustomHandler,
-  createSelectModeHandler,
   createStatusHandler,
-  createVerifyHandler,
 } from '../src/host/dictionary-management-route.js'
 import {
   MANAGEMENT_ACTIVATE_CUSTOM_PATH,
-  MANAGEMENT_SELECT_MODE_PATH,
   MANAGEMENT_STATUS_PATH,
-  MANAGEMENT_VERIFY_PATH,
 } from '../src/host/route.js'
 import * as downloader from '../src/host/ecdict-downloader.js'
 import * as importer from '../src/host/ecdict-importer.js'
@@ -286,7 +279,6 @@ describe('Phase 7A.8.1BR: Activation Recovery, Inventory Isolation & Catalog Rep
     opMan = new DictionaryOperationManager({
       paths,
       activationCoordinator: coordinator,
-      customSnapshotManager: snapshotMgr,
     })
   })
 
@@ -428,7 +420,7 @@ describe('Phase 7A.8.1BR: Activation Recovery, Inventory Isolation & Catalog Rep
     expect(existsSync(paths.customSnapshotCatalogPath)).toBe(true)
 
     const readBack = await readCustomSnapshotCatalog(paths)
-    expect(readBack?.snapshots[0].identity).toBe('atomic-test')
+    expect(readBack?.snapshots[0]?.identity).toBe('atomic-test')
   })
 
   // B09: Snapshot catalog entries track metadata
@@ -954,6 +946,7 @@ describe('Phase 7A.8.1BR: Activation Recovery, Inventory Isolation & Catalog Rep
     const disposeSpy = vi.spyOn(freshSnapshotMgr, 'dispose')
     await freshCoordinator.dispose()
     expect(freshCoordinator.isDisposed).toBe(true)
+    expect(disposeSpy).toHaveBeenCalled()
 
     freshManager.close()
   })
