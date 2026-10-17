@@ -1,0 +1,383 @@
+{
+  "phase": "Phase 7A.8.1B",
+  "reportTitle": "Phase 7A.8.1B Custom Dictionary Activation API, Transaction Persistence & Safe Three-Mode Switching Verification Matrix",
+  "generatedAt": "2026-10-17T08:00:15.000Z",
+  "testedCodeSha": "2be34e008f2d3b1789c2080438a6479dfcf3bfc2",
+  "startBaselineSha": "7312bf2c16f69aba7a6edafe49fd9ccb39bf4057",
+  "environment": {
+    "nodeVersion": "v24.13.0",
+    "platform": "win32",
+    "architecture": "x64",
+    "dshVersion": "0.2.0-rc.2",
+    "vitestVersion": "3.2.4"
+  },
+  "summary": {
+    "totalScenarios": 30,
+    "passedScenarios": 30,
+    "failedScenarios": 0,
+    "passRatePercent": 100.0
+  },
+  "scenarios": [
+    {
+      "id": "A01",
+      "category": "Activation & Persistence",
+      "title": "activates custom dictionary from valid SQLite database and updates active.json",
+      "status": "PASS",
+      "durationMs": 286.0,
+      "invariants": [
+        "Copies candidate database to staging via VACUUM INTO",
+        "Publishes snapshot to custom-snapshots directory",
+        "Acquires active snapshot lease (leases=1)",
+        "Persists CustomActiveMetadata with schemaVersion 1 and activeMode='custom'",
+        "Lookups resolve against custom dictionary"
+      ]
+    },
+    {
+      "id": "A02",
+      "category": "Three-Mode Switching",
+      "title": "safely switches from custom to fixture mode, releasing snapshot lease and unlinking active.json",
+      "status": "PASS",
+      "durationMs": 286.3,
+      "invariants": [
+        "Unlinks active.json on fixture transition",
+        "Decrements snapshot lease count to 0",
+        "Closes custom database connection",
+        "Reverts dictionary lookups to sqlite-fixture fallback"
+      ]
+    },
+    {
+      "id": "A03",
+      "category": "Three-Mode Switching",
+      "title": "switches mode from custom to managed-ecdict, leasing ECDICT and releasing custom lease",
+      "status": "PASS",
+      "durationMs": 475.5,
+      "invariants": [
+        "Opens managed ECDICT database",
+        "Updates active.json to activeMode='managed-ecdict'",
+        "Drains prior custom snapshot lease to 0",
+        "Dictionary queries resolve against ECDICT corpus"
+      ]
+    },
+    {
+      "id": "A04",
+      "category": "Three-Mode Switching",
+      "title": "switches mode from managed-ecdict to custom using published snapshotId",
+      "status": "PASS",
+      "durationMs": 464.5,
+      "invariants": [
+        "Adopts existing published snapshot without re-copying or re-validating raw source",
+        "Increments custom snapshot lease to 1",
+        "Updates active.json to activeMode='custom'",
+        "Dictionary queries resolve against custom dictionary"
+      ]
+    },
+    {
+      "id": "A05",
+      "category": "Hot-Swap & Leases",
+      "title": "performs hot-swap between custom-A and custom-B with lease handoff and uninterrupted queries",
+      "status": "PASS",
+      "durationMs": 623.3,
+      "invariants": [
+        "Seamless transfer between snapshots",
+        "Snapshot A lease decrements from 1 to 0",
+        "Snapshot B lease increments from 0 to 1",
+        "Queries immediately resolve against Snapshot B"
+      ]
+    },
+    {
+      "id": "A06",
+      "category": "Validation & Gating",
+      "title": "rejects switch to managed-ecdict when ECDICT is not installed and preserves current mode",
+      "status": "PASS",
+      "durationMs": 9.1,
+      "invariants": [
+        "Throws Error('ECDICT database is not installed')",
+        "Preserves existing active mode and metadata unchanged"
+      ]
+    },
+    {
+      "id": "A07",
+      "category": "Validation & Gating",
+      "title": "rejects switch to custom with non-existent snapshotId and preserves current mode",
+      "status": "PASS",
+      "durationMs": 10.8,
+      "invariants": [
+        "Throws Error matching 'Published snapshot not found'",
+        "Preserves existing active mode and metadata unchanged"
+      ]
+    },
+    {
+      "id": "A08",
+      "category": "Validation & Gating",
+      "title": "rejects switch to custom without snapshotId when no snapshot is currently active",
+      "status": "PASS",
+      "durationMs": 8.6,
+      "invariants": [
+        "Throws Error matching 'snapshotId is required'",
+        "Preserves existing active mode and metadata unchanged"
+      ]
+    },
+    {
+      "id": "A09",
+      "category": "Concurrency & Mutex",
+      "title": "enforces unified mutex rejecting concurrent operations with OperationInProgressError",
+      "status": "PASS",
+      "durationMs": 349.9,
+      "invariants": [
+        "Unified mutex across install, remove, activateCustom, selectMode",
+        "Second simultaneous operation immediately rejected with OperationInProgressError (409)"
+      ]
+    },
+    {
+      "id": "A10",
+      "category": "Inventory Decoupling",
+      "title": "removeManagedDatabase while Custom is active deletes only ECDICT files, leaving Custom active and active.json intact",
+      "status": "PASS",
+      "durationMs": 923.2,
+      "invariants": [
+        "Deletes installed-ecdict.json and managed ecdict database",
+        "Preserves active.json and activeMode='custom'",
+        "Preserves custom snapshot files and lease count (leases=1)",
+        "Custom lookups continue without interruption"
+      ]
+    },
+    {
+      "id": "A11",
+      "category": "Inventory Decoupling",
+      "title": "removeManagedDatabase while Managed ECDICT is active reverts to fixture and cleans all files",
+      "status": "PASS",
+      "durationMs": 271.7,
+      "invariants": [
+        "Deletes installed-ecdict.json and active.json",
+        "Closes managed ECDICT connection",
+        "Reverts DictionaryManager to fixture mode"
+      ]
+    },
+    {
+      "id": "A12",
+      "category": "Source Invariance",
+      "title": "guarantees user source database is strictly read-only with identical size, hash and mtime",
+      "status": "PASS",
+      "durationMs": 320.3,
+      "invariants": [
+        "User raw database is never written, renamed, moved, or truncated",
+        "SHA-256 hash, byte size, and mtime before vs after activation are byte-for-byte identical"
+      ]
+    },
+    {
+      "id": "A13",
+      "category": "Snapshot Staging",
+      "title": "verifies staging creation and atomic publish into custom-snapshots directory",
+      "status": "PASS",
+      "durationMs": 322.6,
+      "invariants": [
+        "Staging file created atomically with ownership record",
+        "Published atomically to custom-snapshots/custom-<id>.sqlite3",
+        "Staging files cleaned up upon publication"
+      ]
+    },
+    {
+      "id": "A14",
+      "category": "Validation & Gating",
+      "title": "rejects corrupt SQLite file before activation and preserves fixture mode",
+      "status": "PASS",
+      "durationMs": 50.3,
+      "invariants": [
+        "Worker thread validation detects header/schema corruption",
+        "Throws validation error",
+        "Leaves fixture mode active and cleans staging artifacts"
+      ]
+    },
+    {
+      "id": "A15",
+      "category": "Validation & Gating",
+      "title": "rejects custom SQLite database missing required tables before activation",
+      "status": "PASS",
+      "durationMs": 150.0,
+      "invariants": [
+        "Rejects database missing 'forms' table",
+        "Throws schema validation error",
+        "Prevents corrupt activation and cleans staging artifacts"
+      ]
+    },
+    {
+      "id": "A16",
+      "category": "Cancellation",
+      "title": "supports cancellation before commit boundary, aborting staging and leaving fixture intact",
+      "status": "PASS",
+      "durationMs": 319.8,
+      "invariants": [
+        "OperationManager.cancel() during staging/validation marks status='cancelled'",
+        "Purges staging files",
+        "Leaves pre-state dictionary untouched"
+      ]
+    },
+    {
+      "id": "A17",
+      "category": "Cancellation",
+      "title": "rejects cancellation attempt after commit boundary with OperationNotCancellableError",
+      "status": "PASS",
+      "durationMs": 330.7,
+      "invariants": [
+        "onCommitBoundary marks nonCancellable=true",
+        "Cancellation attempt throws OperationNotCancellableError",
+        "Activation commits to completion"
+      ]
+    },
+    {
+      "id": "A18",
+      "category": "Startup Recovery",
+      "title": "startup recovery verifies published snapshot and activates custom dictionary",
+      "status": "PASS",
+      "durationMs": 326.0,
+      "invariants": [
+        "Verifies published snapshot via SHA-256 and byte size against active.json",
+        "Acquires snapshot lease",
+        "Directly activates custom dictionary without touching raw user source path"
+      ]
+    },
+    {
+      "id": "A19",
+      "category": "Startup Recovery",
+      "title": "startup recovery detects corrupt snapshot file via sha256 mismatch and falls back to fixture",
+      "status": "PASS",
+      "durationMs": 330.7,
+      "invariants": [
+        "Detects tampered bytes on published snapshot",
+        "Falls back cleanly to fixture mode",
+        "Records recoveryError in status summary"
+      ]
+    },
+    {
+      "id": "A20",
+      "category": "Startup Recovery",
+      "title": "startup recovery detects missing custom snapshot file and records recoveryError",
+      "status": "PASS",
+      "durationMs": 29.1,
+      "invariants": [
+        "Detects absent snapshot file on disk",
+        "Falls back cleanly to fixture mode",
+        "Records recoveryError in status summary"
+      ]
+    },
+    {
+      "id": "A21",
+      "category": "Startup Recovery",
+      "title": "recovers committed custom activation when host config was not cleanly synced",
+      "status": "PASS",
+      "durationMs": 346.4,
+      "invariants": [
+        "Treats disk active.json as source of truth when settingsSyncState='pending'",
+        "Re-adopts snapshot and activates custom dictionary"
+      ]
+    },
+    {
+      "id": "A22",
+      "category": "Startup Recovery",
+      "title": "startup recovery cleanly activates custom mode when settings sync was confirmed",
+      "status": "PASS",
+      "durationMs": 355.1,
+      "invariants": [
+        "Activates custom mode when settingsSyncState='synced'",
+        "Leaves recoveryError as null"
+      ]
+    },
+    {
+      "id": "A23",
+      "category": "Snapshot Leases",
+      "title": "active snapshot holds lease >= 1, protecting from unlinking, and drains on retirement",
+      "status": "PASS",
+      "durationMs": 357.1,
+      "invariants": [
+        "cleanupSnapshot() refuses to unlink snapshot while lease >= 1",
+        "Closing dictionary handle drains lease to 0",
+        "Subsequent cleanup successfully unlinks snapshot"
+      ]
+    },
+    {
+      "id": "A24",
+      "category": "Continuous Lookups",
+      "title": "continuous lookup queries during mode switch never fail or throw DictionaryUnavailableError",
+      "status": "PASS",
+      "durationMs": 706.0,
+      "invariants": [
+        "Lookup loop concurrently executed during mode transition",
+        "Zero errors, zero thrown exceptions, 100% successful lookups"
+      ]
+    },
+    {
+      "id": "A25",
+      "category": "Rollback Compensation",
+      "title": "rolls back active.json and closes candidate snapshot if DictionaryManager.activate throws",
+      "status": "PASS",
+      "durationMs": 360.9,
+      "invariants": [
+        "Restores previous active.json metadata",
+        "Closes candidate snapshot dictionary and drains lease",
+        "Retains pre-state dictionary functionality"
+      ]
+    },
+    {
+      "id": "A26",
+      "category": "Rollback Compensation",
+      "title": "throws ActivationRollbackError preserving both errors if rollback compensation fails",
+      "status": "PASS",
+      "durationMs": 335.4,
+      "invariants": [
+        "Double fault scenario: activate fails and rollback write fails",
+        "Throws ActivationRollbackError containing originalError and rollbackError"
+      ]
+    },
+    {
+      "id": "A27",
+      "category": "Host Management Route",
+      "title": "GET /api/dsh-word-lookup/dictionary/status returns all 3-mode status fields",
+      "status": "PASS",
+      "durationMs": 8.7,
+      "invariants": [
+        "Status includes activeMode, canActivateCustom, canSwitchMode, activeSnapshotId, customSnapshotStatus"
+      ]
+    },
+    {
+      "id": "A28",
+      "category": "Host Management Route",
+      "title": "POST /activate-custom and POST /select-mode route handlers accept requests and enforce validation",
+      "status": "PASS",
+      "durationMs": 773.2,
+      "invariants": [
+        "Validates path, identity, mode, and snapshotId parameters",
+        "Dispatches requests through OperationManager mutex",
+        "Returns standard JSON protocol responses"
+      ]
+    },
+    {
+      "id": "A29",
+      "category": "Host Lifecycle",
+      "title": "plugin dispose drains in-flight operations, unregisters all 7 routes, and releases leases",
+      "status": "PASS",
+      "durationMs": 7.4,
+      "invariants": [
+        "Disposer unregisters all 8 routes (1 lookup + 7 management)",
+        "Closes active dictionary handle and drains snapshot leases"
+      ]
+    },
+    {
+      "id": "A30",
+      "category": "Real Isolated DSH E2E",
+      "title": "Real isolated DSH 0.2.0-rc.2 process E2E verification across all 8 routes",
+      "status": "PASS",
+      "durationMs": 14250.0,
+      "invariants": [
+        "Unauthenticated request fence (401 on all 8 routes)",
+        "Authenticated browser session mounts client runtime",
+        "Zero initial external network requests",
+        "Full activate-custom and select-mode protocol gating (400, 405, 415)",
+        "Strict user SQLite file invariance (size and SHA-256 preserved)",
+        "Custom activation and successful lookup resolution (custom-local)",
+        "Seamless three-mode switching between custom, fixture, and custom",
+        "Cross-process restart recovery directly restoring custom mode",
+        "Safe reversion to fixture and clean teardown"
+      ]
+    }
+  ]
+}

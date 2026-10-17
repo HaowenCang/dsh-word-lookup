@@ -1,0 +1,49 @@
+{
+  "phase": "Phase 7A.8.1B",
+  "reportTitle": "Phase 7A.8.1B Custom Dictionary Activation API, Persistence & Safe 3-Mode Switching Real DSH E2E Verification",
+  "generatedAt": "2026-10-17T07:53:16.265Z",
+  "testedCodeSha": "2be34e008f2d3b1789c2080438a6479dfcf3bfc2",
+  "startBaselineSha": "7312bf2c16f69aba7a6edafe49fd9ccb39bf4057",
+  "status": "PASS",
+  "platform": "win32",
+  "nodeVersion": "v24.13.0",
+  "dshVersion": "0.2.0-rc.2",
+  "home": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-word-lookup-test\\home",
+  "profile": "word-lookup-test",
+  "port": 50998,
+  "e2eCoverage": {
+    "E2E-01": "PASS: Unauthenticated request fence (401 on all 8 routes without session)",
+    "E2E-02": "PASS: Zero initial external downloads and initial fixture capabilities (canActivateCustom, canSwitchMode)",
+    "E2E-03": "PASS: Protocol constraints and negative gating on activate-custom and select-mode (400, 405, 415)",
+    "E2E-04": "PASS: Strict user SQLite file invariant: raw database is read-only and never modified (hash and stat preserved)",
+    "E2E-05": "PASS: Custom dictionary staging, worker verification, publish and activation via POST /activate-custom",
+    "E2E-06": "PASS: Direct lookup hits against custom dictionary entries (source: custom-local, found: true)",
+    "E2E-07": "PASS: Safe three-mode switching between custom, fixture, and custom via published snapshotId",
+    "E2E-08": "PASS: Cross-process restart persistence & recovery in custom mode without touching raw user path",
+    "E2E-09": "PASS: Safe mode reversion to fixture and clean teardown"
+  },
+  "unauthenticatedGate401": true,
+  "routesVerified": [
+    "POST /api/dsh-word-lookup",
+    "GET /api/dsh-word-lookup/dictionary/status",
+    "POST /api/dsh-word-lookup/dictionary/install",
+    "POST /api/dsh-word-lookup/dictionary/cancel",
+    "POST /api/dsh-word-lookup/dictionary/remove",
+    "POST /api/dsh-word-lookup/dictionary/verify",
+    "POST /api/dsh-word-lookup/dictionary/activate-custom",
+    "POST /api/dsh-word-lookup/dictionary/select-mode"
+  ],
+  "invariantsEnforced": {
+    "zeroInitialNetworkRequests": true,
+    "userCandidateFileUntouched": true,
+    "userCandidateFileSha256Matches": true,
+    "methodEnforcement": true,
+    "contentTypeEnforcement": true,
+    "customStagingAndPublishSucceeded": true,
+    "customLookupsFunctional": true,
+    "safeThreeModeSwitchingVerified": true,
+    "crossProcessRestartCustomPersisted": true,
+    "crossProcessRestartLookupsFunctional": true,
+    "finalReversionToFixtureVerified": true
+  }
+}
