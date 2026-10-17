@@ -21,8 +21,9 @@
  */
 
 import { DatabaseSync } from 'node:sqlite'
+import { createHash } from 'node:crypto'
 import { existsSync, statSync } from 'node:fs'
-import { stat, unlink } from 'node:fs/promises'
+import { readFile, stat, unlink } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 
@@ -36,12 +37,22 @@ import {
 } from './ecdict-importer.js'
 import {
   readActiveMetadata,
+  readInstalledEcdictMetadata,
+  removeInstalledEcdictMetadata,
   removeStaleTemporaryArtifacts,
+  validateCustomSnapshotPath,
   writeActiveMetadataAtomically,
+  writeInstalledEcdictMetadataAtomically,
   type ActiveMetadata,
+  type CustomActiveMetadata,
+  type InstalledEcdictMetadata,
+  type ManagedActiveMetadata,
   type ManagedStoragePaths,
   type SettingsSyncState,
 } from './managed-storage.js'
+import {
+  CustomSnapshotManager,
+} from './custom-snapshot-manager.js'
 import {
   readDictionaryMode,
   type DictionaryMode,
@@ -99,6 +110,8 @@ export interface ActivationCoordinatorOptions {
   readonly manager: DictionaryManager
   /** Plugin host configuration. */
   readonly config?: HostConfig
+  /** Optional CustomSnapshotManager instance. If omitted and paths is provided, one is created. */
+  readonly customSnapshotManager?: CustomSnapshotManager | null
 }
 
 /**
@@ -115,6 +128,24 @@ export interface CustomDatabaseVerificationResult {
 }
 
 /**
+ * Result returned by custom dictionary activation.
+ */
+export interface CustomActivationResult {
+  readonly snapshotId: string
+  readonly identity: string
+  readonly activeMode: 'custom'
+  readonly generation: number
+}
+
+/**
+ * Result returned by operational mode selection.
+ */
+export interface ModeSelectionResult {
+  readonly activeMode: DictionaryMode
+  readonly generation: number
+}
+
+/**
  * Diagnostic summary of the coordinator state.
  */
 export interface ActivationStateSummary {
@@ -122,6 +153,11 @@ export interface ActivationStateSummary {
   readonly configuredMode: DictionaryMode
   readonly activeSource: DictionarySource
   readonly activeIdentity: string
+  readonly activeSnapshotId: string | null
+  readonly customSnapshotStatus: {
+    readonly snapshotId: string
+    readonly activeLeases: number
+  } | null
   readonly installed: boolean
   readonly installedCorpus: InstalledCorpusInfo | null
   readonly fixtureStats: FixtureCorpusInfo
@@ -162,6 +198,8 @@ export class ActivationCoordinator {
   readonly #paths: ManagedStoragePaths | null
   readonly #manager: DictionaryManager
   readonly #config?: HostConfig
+  readonly #customSnapshotManager: CustomSnapshotManager | null
+  readonly #ownsSnapshotManager: boolean
 
   #recoveryPromise: Promise<void> | null = null
   #isRecovering = false
@@ -171,12 +209,23 @@ export class ActivationCoordinator {
   #settingsSyncError: string | null = null
   #lastRollbackError: string | null = null
   #cachedInstalledCorpus: InstalledCorpusInfo | null = null
+  #activeSnapshotId: string | null = null
 
   constructor(options: ActivationCoordinatorOptions) {
     this.#ctx = options.ctx
     this.#paths = options.paths ?? null
     this.#manager = options.manager
     this.#config = options.config
+    if (options.customSnapshotManager !== undefined) {
+      this.#customSnapshotManager = options.customSnapshotManager
+      this.#ownsSnapshotManager = false
+    } else if (this.#paths) {
+      this.#customSnapshotManager = new CustomSnapshotManager({ paths: this.#paths })
+      this.#ownsSnapshotManager = true
+    } else {
+      this.#customSnapshotManager = null
+      this.#ownsSnapshotManager = false
+    }
   }
 
   /**
@@ -194,6 +243,20 @@ export class ActivationCoordinator {
   }
 
   /**
+   * Return the custom snapshot manager instance, or null if storage is unavailable.
+   */
+  get customSnapshotManager(): CustomSnapshotManager | null {
+    return this.#customSnapshotManager
+  }
+
+  /**
+   * Return the active custom snapshot ID, or null if custom mode is not active.
+   */
+  get activeSnapshotId(): string | null {
+    return this.#activeSnapshotId
+  }
+
+  /**
    * Return whether the coordinator has been disposed.
    */
   get isDisposed(): boolean {
@@ -205,6 +268,9 @@ export class ActivationCoordinator {
    */
   dispose(): void {
     this.#disposed = true
+    if (this.#ownsSnapshotManager && this.#customSnapshotManager) {
+      void this.#customSnapshotManager.dispose()
+    }
   }
 
   /**
@@ -258,9 +324,70 @@ export class ActivationCoordinator {
   async #runStartupRecovery(): Promise<void> {
     this.#recoveryError = null
     this.#cachedInstalledCorpus = null
+    this.#activeSnapshotId = null
 
     if (!this.#paths) {
       return
+    }
+
+    // Step 0: Recover installed ECDICT inventory
+    try {
+      const installedMeta = await readInstalledEcdictMetadata(this.#paths)
+      if (installedMeta) {
+        const ecdictPath = join(this.#paths.databaseDirectory, installedMeta.databaseFile)
+        if (existsSync(ecdictPath)) {
+          let testDict: Dictionary | null = null
+          try {
+            testDict = openProductionDictionary({ path: ecdictPath })
+            for (const probe of ACTIVATION_PROBE_HEADWORDS) {
+              testDict.lookup(probe)
+            }
+            let stats: { entryCount?: number; formCount?: number; byteSize?: number } = {
+              entryCount: installedMeta.entryCount,
+              formCount: installedMeta.formCount,
+              byteSize: installedMeta.byteSize,
+            }
+            if (stats.entryCount === undefined || stats.byteSize === undefined) {
+              try {
+                const fileStat = statSync(ecdictPath)
+                const rawDb = new DatabaseSync(ecdictPath, { readOnly: true, open: true })
+                try {
+                  const entryRow = rawDb.prepare('SELECT COUNT(*) as c FROM entries').get() as { c: number } | undefined
+                  const formRow = rawDb.prepare('SELECT COUNT(*) as c FROM forms').get() as { c: number } | undefined
+                  stats = {
+                    entryCount: entryRow?.c,
+                    formCount: formRow?.c,
+                    byteSize: fileStat.size,
+                  }
+                } finally {
+                  rawDb.close()
+                }
+              } catch {
+                // ignore
+              }
+            }
+            this.#cachedInstalledCorpus = Object.freeze({
+              name: installedMeta.source.name,
+              commit: installedMeta.source.commit,
+              sha256: installedMeta.source.sha256,
+              schemaVersion: installedMeta.source.schemaVersion,
+              databaseFile: installedMeta.databaseFile,
+              entryCount: stats.entryCount,
+              formCount: stats.formCount,
+              byteSize: stats.byteSize,
+              publishedAt: installedMeta.installedAt,
+            })
+          } catch {
+            this.#cachedInstalledCorpus = null
+          } finally {
+            if (testDict) {
+              try { testDict.close() } catch {}
+            }
+          }
+        }
+      }
+    } catch {
+      // non-fatal installed inventory recovery
     }
 
     let metadata: ActiveMetadata | null
@@ -272,7 +399,7 @@ export class ActivationCoordinator {
     }
 
     if (!metadata) {
-      // Fresh install or uninstalled: normal fixture operation
+      // Fresh install or uninstalled or explicit fixture: normal fixture operation
       return
     }
 
@@ -292,94 +419,220 @@ export class ActivationCoordinator {
       this.#settingsSyncState = 'synced'
     }
 
-    const dbPath = join(this.#paths.databaseDirectory, metadata.databaseFile)
-    if (!existsSync(dbPath)) {
-      this.#recoveryError = `Managed database file missing: ${metadata.databaseFile}`
-      return
-    }
-
-    let openedDict: Dictionary | null = null
-    try {
-      openedDict = openProductionDictionary({ path: dbPath })
-      // Probe query verification
-      for (const probe of ACTIVATION_PROBE_HEADWORDS) {
-        openedDict.lookup(probe)
-      }
-    } catch (error) {
-      if (openedDict) {
-        try { openedDict.close() } catch { /* ignore */ }
-      }
-      this.#recoveryError = `Corrupt or incompatible managed database: ${error instanceof Error ? error.message : String(error)}`
-      return
-    }
-
-    // Inspect database stats for installedCorpus summary
-    let stats: { entryCount?: number; formCount?: number; byteSize?: number } = {}
-    try {
-      const fileStat = statSync(dbPath)
-      const rawDb = new DatabaseSync(dbPath, { readOnly: true, open: true })
-      try {
-        const entryRow = rawDb.prepare('SELECT COUNT(*) as c FROM entries').get() as { c: number } | undefined
-        const formRow = rawDb.prepare('SELECT COUNT(*) as c FROM forms').get() as { c: number } | undefined
-        stats = {
-          entryCount: entryRow?.c,
-          formCount: formRow?.c,
-          byteSize: fileStat.size,
-        }
-      } finally {
-        rawDb.close()
-      }
-    } catch {
-      // Non-fatal metadata enrichment
-    }
-
-    this.#cachedInstalledCorpus = Object.freeze({
-      name: metadata.source.name,
-      commit: metadata.source.commit,
-      sha256: metadata.source.sha256,
-      schemaVersion: metadata.source.schemaVersion,
-      databaseFile: metadata.databaseFile,
-      entryCount: stats.entryCount,
-      formCount: stats.formCount,
-      byteSize: stats.byteSize,
-    })
-
     const userMode = readDictionaryMode(this.#config)
-
-    // Settings sync is verified as confirmed ONLY if recorded as 'synced', settingsSynced is not false, and no sync error
     const isSyncConfirmed = this.#settingsSyncState === 'synced' && metadata.settingsSynced !== false && !metadata.settingsSyncError
     const settingsSyncFailed = !isSyncConfirmed
 
-    if (userMode === 'managed-ecdict' || (userMode === 'fixture' && settingsSyncFailed)) {
+    // Branch A: Managed ECDICT active mode
+    if (metadata.activeMode === 'managed-ecdict') {
+      const dbPath = join(this.#paths.databaseDirectory, metadata.databaseFile)
+      if (!existsSync(dbPath)) {
+        this.#recoveryError = `Managed database file missing: ${metadata.databaseFile}`
+        return
+      }
+
+      let openedDict: Dictionary | null = null
       try {
-        this.#manager.activate({
-          mode: 'managed-ecdict',
-          identity: metadata.identity,
-          dictionary: openedDict,
-        })
-        // Attempt to re-sync host settings if it was previously unconfirmed
-        if (settingsSyncFailed) {
-          const retryState = await this.#persistHostConfigMode('managed-ecdict')
-          if (retryState === 'synced') {
-            try {
-              await writeActiveMetadataAtomically(this.#paths, {
-                ...metadata,
-                settingsSynced: true,
-                settingsSyncState: 'synced',
-                settingsSyncError: null,
-              })
-            } catch {
-              // non-fatal
-            }
-          }
+        openedDict = openProductionDictionary({ path: dbPath })
+        // Probe query verification
+        for (const probe of ACTIVATION_PROBE_HEADWORDS) {
+          openedDict.lookup(probe)
         }
       } catch (error) {
-        openedDict.close()
-        this.#recoveryError = `Activation failed during startup: ${error instanceof Error ? error.message : String(error)}`
+        if (openedDict) {
+          try { openedDict.close() } catch { /* ignore */ }
+        }
+        this.#cachedInstalledCorpus = null
+        this.#recoveryError = `Corrupt or incompatible managed database: ${error instanceof Error ? error.message : String(error)}`
+        return
       }
-    } else {
-      // User explicitly configured 'fixture' (A04) or 'custom': close candidate, keep fixture live
-      openedDict.close()
+
+      // If cachedInstalledCorpus was missing, populate from metadata and persist inventory
+      if (!this.#cachedInstalledCorpus) {
+        let stats: { entryCount?: number; formCount?: number; byteSize?: number } = {}
+        try {
+          const fileStat = statSync(dbPath)
+          const rawDb = new DatabaseSync(dbPath, { readOnly: true, open: true })
+          try {
+            const entryRow = rawDb.prepare('SELECT COUNT(*) as c FROM entries').get() as { c: number } | undefined
+            const formRow = rawDb.prepare('SELECT COUNT(*) as c FROM forms').get() as { c: number } | undefined
+            stats = {
+              entryCount: entryRow?.c,
+              formCount: formRow?.c,
+              byteSize: fileStat.size,
+            }
+          } finally {
+            rawDb.close()
+          }
+        } catch {}
+
+        this.#cachedInstalledCorpus = Object.freeze({
+          name: metadata.source.name,
+          commit: metadata.source.commit,
+          sha256: metadata.source.sha256,
+          schemaVersion: metadata.source.schemaVersion,
+          databaseFile: metadata.databaseFile,
+          entryCount: stats.entryCount,
+          formCount: stats.formCount,
+          byteSize: stats.byteSize,
+        })
+
+        try {
+          await writeInstalledEcdictMetadataAtomically(this.#paths, {
+            version: 1,
+            identity: metadata.identity,
+            databaseFile: metadata.databaseFile,
+            source: metadata.source,
+            entryCount: stats.entryCount,
+            formCount: stats.formCount,
+            byteSize: stats.byteSize,
+            installedAt: metadata.lastActivatedAt,
+          })
+        } catch {}
+      }
+
+      if (userMode === 'managed-ecdict' || (userMode === 'fixture' && settingsSyncFailed)) {
+        try {
+          this.#manager.activate({
+            mode: 'managed-ecdict',
+            identity: metadata.identity,
+            dictionary: openedDict,
+          })
+          if (settingsSyncFailed) {
+            const retryState = await this.#persistHostConfigMode('managed-ecdict')
+            if (retryState === 'synced') {
+              try {
+                await writeActiveMetadataAtomically(this.#paths, {
+                  ...metadata,
+                  settingsSynced: true,
+                  settingsSyncState: 'synced',
+                  settingsSyncError: null,
+                })
+              } catch {
+                // non-fatal
+              }
+            }
+          }
+        } catch (error) {
+          openedDict.close()
+          this.#recoveryError = `Activation failed during startup: ${error instanceof Error ? error.message : String(error)}`
+        }
+      } else {
+        // User explicitly configured 'fixture' (A04) or 'custom': close candidate, keep fixture live
+        openedDict.close()
+      }
+      return
+    }
+
+    // Branch B: Custom active mode
+    if (metadata.activeMode === 'custom') {
+      if (!this.#customSnapshotManager) {
+        this.#recoveryError = 'Custom snapshot manager unavailable'
+        return
+      }
+
+      const snapPath = join(this.#paths.customSnapshotDirectory, metadata.databaseFile)
+      if (!existsSync(snapPath)) {
+        this.#recoveryError = `Active custom snapshot file missing: ${metadata.databaseFile}`
+        return
+      }
+
+      // Security boundary validation
+      try {
+        await validateCustomSnapshotPath(snapPath, this.#paths.customSnapshotDirectory)
+      } catch (err) {
+        this.#recoveryError = `Active custom snapshot path validation failed: ${err instanceof Error ? err.message : String(err)}`
+        return
+      }
+
+      let fileStat
+      try {
+        fileStat = statSync(snapPath)
+        if (!fileStat.isFile()) {
+          this.#recoveryError = `Active custom snapshot is not a regular file: ${metadata.databaseFile}`
+          return
+        }
+        if (metadata.byteSize !== undefined && fileStat.size !== metadata.byteSize) {
+          this.#recoveryError = `Active custom snapshot byte size mismatch: expected ${metadata.byteSize}, got ${fileStat.size}`
+          return
+        }
+      } catch (err) {
+        this.#recoveryError = `Cannot stat custom snapshot file: ${err instanceof Error ? err.message : String(err)}`
+        return
+      }
+
+      // SHA-256 digest validation
+      try {
+        const fileBuf = await readFile(snapPath)
+        const computedSha = createHash('sha256').update(fileBuf).digest('hex').toLowerCase()
+        if (metadata.sha256 && computedSha !== metadata.sha256.toLowerCase()) {
+          this.#recoveryError = `Active custom snapshot SHA-256 digest mismatch: expected ${metadata.sha256}, got ${computedSha}`
+          return
+        }
+      } catch (err) {
+        this.#recoveryError = `Failed to compute custom snapshot digest: ${err instanceof Error ? err.message : String(err)}`
+        return
+      }
+
+      // Adopt snapshot into manager
+      try {
+        await this.#customSnapshotManager.adoptPublishedSnapshot(metadata.snapshotId, {
+          identity: metadata.identity,
+          publishedPath: snapPath,
+          sha256: metadata.sha256,
+          byteSize: metadata.byteSize,
+          schemaVersion: metadata.schemaVersion,
+        })
+      } catch (err) {
+        this.#recoveryError = `Failed to adopt published snapshot: ${err instanceof Error ? err.message : String(err)}`
+        return
+      }
+
+      // Open snapshot dictionary with lease
+      let openedDict: Dictionary | null = null
+      try {
+        openedDict = this.#customSnapshotManager.openSnapshotDictionary(metadata.snapshotId)
+        for (const probe of ACTIVATION_PROBE_HEADWORDS) {
+          openedDict.lookup(probe)
+        }
+      } catch (error) {
+        if (openedDict) {
+          try { openedDict.close() } catch {}
+        }
+        this.#recoveryError = `Corrupt or incompatible custom snapshot database: ${error instanceof Error ? error.message : String(error)}`
+        return
+      }
+
+      if (userMode === 'custom' || (userMode === 'fixture' && settingsSyncFailed)) {
+        try {
+          this.#manager.activate({
+            mode: 'custom',
+            identity: metadata.identity,
+            dictionary: openedDict,
+          })
+          this.#activeSnapshotId = metadata.snapshotId
+
+          if (settingsSyncFailed) {
+            const retryState = await this.#persistHostConfigMode('custom')
+            if (retryState === 'synced') {
+              try {
+                await writeActiveMetadataAtomically(this.#paths, {
+                  ...metadata,
+                  settingsSynced: true,
+                  settingsSyncState: 'synced',
+                  settingsSyncError: null,
+                })
+              } catch {}
+            }
+          }
+        } catch (error) {
+          openedDict.close()
+          this.#recoveryError = `Activation failed during startup: ${error instanceof Error ? error.message : String(error)}`
+        }
+      } else {
+        openedDict.close()
+      }
+      return
     }
   }
 
@@ -555,7 +808,30 @@ export class ActivationCoordinator {
       byteSize: buildResult.byteSize,
       publishedAt: new Date().toISOString(),
     })
+    this.#activeSnapshotId = null
     this.#recoveryError = null
+
+    // Persist installed ECDICT inventory record independently
+    const installedMeta: InstalledEcdictMetadata = {
+      version: 1,
+      identity: buildResult.identity,
+      databaseFile: buildResult.databaseFile,
+      source: {
+        name: 'ECDICT',
+        commit: buildResult.sourceCommit,
+        sha256: buildResult.sourceSha256,
+        schemaVersion: buildResult.schemaVersion,
+      },
+      entryCount: buildResult.entryCount,
+      formCount: buildResult.formCount,
+      byteSize: buildResult.byteSize,
+      installedAt: new Date().toISOString(),
+    }
+    try {
+      await writeInstalledEcdictMetadataAtomically(this.#paths, installedMeta)
+    } catch {
+      // non-fatal
+    }
 
     // 4. Best-effort Host Config persistence
     const syncState = await this.#persistHostConfigMode('managed-ecdict')
@@ -574,18 +850,541 @@ export class ActivationCoordinator {
   }
 
   /**
-   * Safely remove the managed ECDICT database and revert active dictionary to fixture.
+   * Commit a verified custom snapshot database and activate it in DictionaryManager.
    *
-   * Sequence:
-   * 1. Safe hot-switch to fixture in DictionaryManager, releasing Windows file locks on SQLite files.
-   * 2. Remove `active.json`.
-   * 3. Unlink versioned SQLite file `ecdict-<identity>.sqlite3`.
-   * 4. Clean stale temporary artifacts.
-   * 5. Preserve source cache in `cache/dsh-word-lookup/sources/ecdict.csv`.
-   * 6. Best-effort update Host Config `dictionaryMode` to 'fixture'.
+   * Transaction Sequence:
+   * 1. Validate snapshot existence and open candidate dictionary with lease tracking.
+   * 2. Probe candidate dictionary with verification headwords.
+   * 3. Atomically write `active.json` with CustomActiveMetadata (Commit Point 1: Durability).
+   * 4. Atomically hot-switch `DictionaryManager` active reference (Commit Point 2: Runtime).
+   * 5. Best-effort update Host Config `dictionaryMode` to 'custom' (Commit Point 3).
+   *
+   * On failure at Commit Point 2, executes rollback compensation to restore previous metadata
+   * and previous active dictionary. If compensation fails, throws ActivationRollbackError.
+   *
+   * @param snapshotId - published snapshot identifier.
+   * @param options - execution options (signal, commit boundary callback).
+   * @returns custom activation result.
    */
-  async removeManagedDatabase(): Promise<{ removed: boolean }> {
-    // 1. Hot switch to fixture to release handle
+  async activateCustomDatabase(
+    snapshotId: string,
+    options?: { signal?: AbortSignal; onCommitBoundary?: () => void },
+  ): Promise<CustomActivationResult> {
+    const signal = options?.signal
+    if (signal?.aborted) {
+      const err = new Error('The operation was aborted')
+      err.name = 'AbortError'
+      throw err
+    }
+
+    if (!this.#paths) {
+      throw new Error('Managed storage unavailable: cannot activate custom database')
+    }
+    if (!this.#customSnapshotManager) {
+      throw new Error('Custom snapshot manager unavailable: cannot activate custom database')
+    }
+
+    if (typeof snapshotId !== 'string' || snapshotId.trim().length === 0) {
+      throw new TypeError('snapshotId must be a non-empty string')
+    }
+    const cleanId = snapshotId.trim()
+
+    const snapshot = this.#customSnapshotManager.getSnapshot(cleanId)
+    if (!snapshot || !snapshot.publishedPath) {
+      const error = new Error(`Snapshot not found: ${cleanId}`)
+      ;(error as unknown as { code: string }).code = 'SNAPSHOT_NOT_FOUND'
+      throw error
+    }
+
+    if (!existsSync(snapshot.publishedPath)) {
+      const error = new Error(`Published snapshot file not found on disk: ${snapshot.publishedPath}`)
+      ;(error as unknown as { code: string }).code = 'SNAPSHOT_NOT_FOUND'
+      throw error
+    }
+
+    if (activationHooks?.beforeReadMetadata) {
+      await activationHooks.beforeReadMetadata()
+    }
+    if (signal?.aborted) {
+      const err = new Error('The operation was aborted')
+      err.name = 'AbortError'
+      throw err
+    }
+
+    // Capture previous metadata before attempting activation
+    let previousMetadata: ActiveMetadata | null = null
+    try {
+      previousMetadata = await readActiveMetadata(this.#paths)
+    } catch {
+      // previous metadata missing or invalid
+    }
+
+    if (signal?.aborted) {
+      const err = new Error('The operation was aborted')
+      err.name = 'AbortError'
+      throw err
+    }
+
+    // 1. Open snapshot dictionary (leases candidate snapshot)
+    const publishedDict = this.#customSnapshotManager.openSnapshotDictionary(cleanId)
+    try {
+      for (const probe of ACTIVATION_PROBE_HEADWORDS) {
+        publishedDict.lookup(probe)
+      }
+    } catch (error) {
+      publishedDict.close()
+      throw new Error(
+        `Custom snapshot probe verification failed: ${error instanceof Error ? error.message : String(error)}`,
+        { cause: error },
+      )
+    }
+
+    if (activationHooks?.beforeCommitMetadata) {
+      await activationHooks.beforeCommitMetadata()
+    }
+    if (signal?.aborted || this.#disposed || this.#manager.snapshot().lifecycle === 'closed') {
+      publishedDict.close()
+      const err = new Error(
+        this.#disposed || this.#manager.snapshot().lifecycle === 'closed'
+          ? 'Activation cancelled: coordinator is disposed or manager is closed'
+          : 'The operation was aborted',
+      )
+      err.name = 'AbortError'
+      throw err
+    }
+
+    options?.onCommitBoundary?.()
+
+    // 2. Commit metadata atomically
+    const metadata: CustomActiveMetadata = {
+      version: 1,
+      activeMode: 'custom',
+      identity: snapshot.identity,
+      snapshotId: cleanId,
+      databaseFile: basename(snapshot.publishedPath),
+      source: 'custom-local',
+      schemaVersion: snapshot.schemaVersion ?? 1,
+      sha256: snapshot.sha256 ?? '',
+      byteSize: snapshot.byteSize ?? 0,
+      lastActivatedAt: new Date().toISOString(),
+      settingsSynced: false,
+      settingsSyncState: 'pending',
+      settingsSyncError: null,
+    }
+
+    try {
+      await writeActiveMetadataAtomically(this.#paths, metadata)
+    } catch (error) {
+      publishedDict.close()
+      throw new Error(
+        `Failed to commit active metadata atomically: ${error instanceof Error ? error.message : String(error)}`,
+        { cause: error },
+      )
+    }
+
+    // 3. Atomically activate in DictionaryManager
+    try {
+      if (this.#disposed || this.#manager.snapshot().lifecycle === 'closed') {
+        throw new Error('Activation cancelled: coordinator is disposed or manager is closed')
+      }
+      this.#manager.activate({
+        mode: 'custom',
+        identity: snapshot.identity,
+        dictionary: publishedDict,
+      })
+    } catch (error) {
+      try {
+        publishedDict.close()
+      } catch {
+        // ignore
+      }
+
+      if (activationHooks?.duringRollbackCompensation) {
+        try {
+          await activationHooks.duringRollbackCompensation()
+        } catch {
+          // ignore hook error to proceed with compensation
+        }
+      }
+
+      // Rollback compensation: restore previous active metadata
+      if (previousMetadata !== null) {
+        try {
+          await writeActiveMetadataAtomically(this.#paths, previousMetadata)
+        } catch (rollbackErr) {
+          const origMsg = sanitizeErrorMessage(error instanceof Error ? error.message : String(error))
+          const rollbackMsg = sanitizeErrorMessage(rollbackErr instanceof Error ? rollbackErr.message : String(rollbackErr))
+          this.#lastRollbackError = `Rollback failed: unable to restore previous active metadata: ${rollbackMsg}`
+          throw new ActivationRollbackError(
+            `Activation failed (${origMsg}) and rollback of previous active metadata also failed: ${rollbackMsg}`,
+            error,
+            rollbackErr,
+          )
+        }
+      } else {
+        try {
+          await unlink(this.#paths.activeMetadataPath)
+        } catch {
+          // best effort
+        }
+      }
+
+      throw error
+    }
+
+    this.#activeSnapshotId = cleanId
+    this.#recoveryError = null
+
+    // 4. Best-effort Host Config persistence
+    const syncState = await this.#persistHostConfigMode('custom')
+    try {
+      await writeActiveMetadataAtomically(this.#paths, {
+        ...metadata,
+        settingsSynced: syncState === 'synced',
+        settingsSyncState: syncState,
+        settingsSyncError: this.#settingsSyncError,
+      })
+    } catch {
+      // non-fatal
+    }
+
+    return {
+      snapshotId: cleanId,
+      identity: snapshot.identity,
+      activeMode: 'custom',
+      generation: this.#manager.snapshot().generation,
+    }
+  }
+
+  /**
+   * Safely switch between dictionary operational modes ('fixture', 'managed-ecdict', 'custom').
+   *
+   * Rules:
+   * - Switching to 'fixture': activates built-in fixture dictionary, unlinks `active.json`, resets activeSnapshotId.
+   * - Switching to 'managed-ecdict': verifies installed ECDICT database exists on disk, activates it, persists metadata.
+   * - Switching to 'custom': verifies requested snapshot (or activeSnapshotId) exists and is leased/activated.
+   * - Uninterrupted query capability during hot-swap.
+   *
+   * @param mode - target operational mode.
+   * @param options - optional snapshotId (for custom mode) and cancellation/commit signals.
+   * @returns mode selection result.
+   */
+  async selectMode(
+    mode: DictionaryMode,
+    options?: { snapshotId?: string; signal?: AbortSignal; onCommitBoundary?: () => void },
+  ): Promise<ModeSelectionResult> {
+    const signal = options?.signal
+    if (signal?.aborted) {
+      const err = new Error('The operation was aborted')
+      err.name = 'AbortError'
+      throw err
+    }
+
+    if (!this.#paths) {
+      throw new Error('Managed storage unavailable: cannot switch mode')
+    }
+
+    if (mode === 'custom') {
+      const targetSnapshotId = options?.snapshotId?.trim() || this.#activeSnapshotId
+      if (!targetSnapshotId) {
+        const error = new Error('A snapshotId must be provided to switch to custom dictionary mode')
+        ;(error as unknown as { code: string }).code = 'INVALID_ARGUMENT'
+        throw error
+      }
+      const result = await this.activateCustomDatabase(targetSnapshotId, options)
+      return {
+        activeMode: 'custom',
+        generation: result.generation,
+      }
+    }
+
+    if (mode === 'managed-ecdict') {
+      const installedMeta = await readInstalledEcdictMetadata(this.#paths)
+      if (!installedMeta) {
+        const error = new Error('ECDICT database is not installed')
+        ;(error as unknown as { code: string }).code = 'ECDICT_NOT_INSTALLED'
+        throw error
+      }
+
+      const dbPath = join(this.#paths.databaseDirectory, installedMeta.databaseFile)
+      if (!existsSync(dbPath)) {
+        const error = new Error(`Managed database file missing on disk: ${installedMeta.databaseFile}`)
+        ;(error as unknown as { code: string }).code = 'ECDICT_NOT_INSTALLED'
+        throw error
+      }
+
+      if (activationHooks?.beforeReadMetadata) {
+        await activationHooks.beforeReadMetadata()
+      }
+      if (signal?.aborted) {
+        const err = new Error('The operation was aborted')
+        err.name = 'AbortError'
+        throw err
+      }
+
+      let previousMetadata: ActiveMetadata | null = null
+      try {
+        previousMetadata = await readActiveMetadata(this.#paths)
+      } catch {
+        // ignore
+      }
+
+      const openedDict = openProductionDictionary({ path: dbPath })
+      try {
+        for (const probe of ACTIVATION_PROBE_HEADWORDS) {
+          openedDict.lookup(probe)
+        }
+      } catch (err) {
+        openedDict.close()
+        throw new Error(`Managed database probe failed: ${err instanceof Error ? err.message : String(err)}`, { cause: err })
+      }
+
+      if (activationHooks?.beforeCommitMetadata) {
+        await activationHooks.beforeCommitMetadata()
+      }
+      if (signal?.aborted || this.#disposed || this.#manager.snapshot().lifecycle === 'closed') {
+        openedDict.close()
+        const err = new Error(
+          this.#disposed || this.#manager.snapshot().lifecycle === 'closed'
+            ? 'Activation cancelled: coordinator is disposed or manager is closed'
+            : 'The operation was aborted',
+        )
+        err.name = 'AbortError'
+        throw err
+      }
+
+      options?.onCommitBoundary?.()
+
+      const metadata: ManagedActiveMetadata = {
+        version: 1,
+        activeMode: 'managed-ecdict',
+        identity: installedMeta.identity,
+        databaseFile: installedMeta.databaseFile,
+        source: installedMeta.source,
+        lastActivatedAt: new Date().toISOString(),
+        settingsSynced: false,
+        settingsSyncState: 'pending',
+        settingsSyncError: null,
+      }
+
+      try {
+        await writeActiveMetadataAtomically(this.#paths, metadata)
+      } catch (error) {
+        openedDict.close()
+        throw new Error(`Failed to commit active metadata atomically: ${error instanceof Error ? error.message : String(error)}`, { cause: error })
+      }
+
+      try {
+        if (this.#disposed || this.#manager.snapshot().lifecycle === 'closed') {
+          throw new Error('Activation cancelled: coordinator is disposed or manager is closed')
+        }
+        this.#manager.activate({
+          mode: 'managed-ecdict',
+          identity: installedMeta.identity,
+          dictionary: openedDict,
+        })
+      } catch (error) {
+        try {
+          openedDict.close()
+        } catch {}
+
+        if (activationHooks?.duringRollbackCompensation) {
+          try {
+            await activationHooks.duringRollbackCompensation()
+          } catch {}
+        }
+
+        if (previousMetadata !== null) {
+          try {
+            await writeActiveMetadataAtomically(this.#paths, previousMetadata)
+          } catch (rollbackErr) {
+            const origMsg = sanitizeErrorMessage(error instanceof Error ? error.message : String(error))
+            const rollbackMsg = sanitizeErrorMessage(rollbackErr instanceof Error ? rollbackErr.message : String(rollbackErr))
+            this.#lastRollbackError = `Rollback failed: unable to restore previous active metadata: ${rollbackMsg}`
+            throw new ActivationRollbackError(
+              `Activation failed (${origMsg}) and rollback of previous active metadata also failed: ${rollbackMsg}`,
+              error,
+              rollbackErr,
+            )
+          }
+        } else {
+          try {
+            await unlink(this.#paths.activeMetadataPath)
+          } catch {}
+        }
+
+        throw error
+      }
+
+      this.#activeSnapshotId = null
+      this.#recoveryError = null
+
+      const syncState = await this.#persistHostConfigMode('managed-ecdict')
+      try {
+        await writeActiveMetadataAtomically(this.#paths, {
+          ...metadata,
+          settingsSynced: syncState === 'synced',
+          settingsSyncState: syncState,
+          settingsSyncError: this.#settingsSyncError,
+        })
+      } catch {}
+
+      return {
+        activeMode: 'managed-ecdict',
+        generation: this.#manager.snapshot().generation,
+      }
+    }
+
+    if (mode === 'fixture') {
+      const fixtureDict = openFixtureDictionary()
+      try {
+        for (const probe of ACTIVATION_PROBE_HEADWORDS) {
+          fixtureDict.lookup(probe)
+        }
+      } catch (err) {
+        fixtureDict.close()
+        throw err
+      }
+
+      if (activationHooks?.beforeReadMetadata) {
+        await activationHooks.beforeReadMetadata()
+      }
+      if (signal?.aborted) {
+        fixtureDict.close()
+        const err = new Error('The operation was aborted')
+        err.name = 'AbortError'
+        throw err
+      }
+
+      let previousMetadata: ActiveMetadata | null = null
+      try {
+        previousMetadata = await readActiveMetadata(this.#paths)
+      } catch {}
+
+      if (activationHooks?.beforeCommitMetadata) {
+        await activationHooks.beforeCommitMetadata()
+      }
+      if (signal?.aborted || this.#disposed || this.#manager.snapshot().lifecycle === 'closed') {
+        fixtureDict.close()
+        const err = new Error(
+          this.#disposed || this.#manager.snapshot().lifecycle === 'closed'
+            ? 'Activation cancelled: coordinator is disposed or manager is closed'
+            : 'The operation was aborted',
+        )
+        err.name = 'AbortError'
+        throw err
+      }
+
+      options?.onCommitBoundary?.()
+
+      // Unlink active.json (for fixture mode)
+      try {
+        await unlink(this.#paths.activeMetadataPath)
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+          fixtureDict.close()
+          throw err
+        }
+      }
+
+      try {
+        if (this.#disposed || this.#manager.snapshot().lifecycle === 'closed') {
+          throw new Error('Activation cancelled: coordinator is disposed or manager is closed')
+        }
+        this.#manager.activate({
+          mode: 'fixture',
+          identity: 'fixture',
+          dictionary: fixtureDict,
+        })
+      } catch (error) {
+        try {
+          fixtureDict.close()
+        } catch {}
+
+        if (previousMetadata !== null) {
+          try {
+            await writeActiveMetadataAtomically(this.#paths, previousMetadata)
+          } catch (rollbackErr) {
+            const origMsg = sanitizeErrorMessage(error instanceof Error ? error.message : String(error))
+            const rollbackMsg = sanitizeErrorMessage(rollbackErr instanceof Error ? rollbackErr.message : String(rollbackErr))
+            this.#lastRollbackError = `Rollback failed: unable to restore previous active metadata: ${rollbackMsg}`
+            throw new ActivationRollbackError(
+              `Activation failed (${origMsg}) and rollback of previous active metadata also failed: ${rollbackMsg}`,
+              error,
+              rollbackErr,
+            )
+          }
+        }
+        throw error
+      }
+
+      this.#activeSnapshotId = null
+      this.#recoveryError = null
+
+      await this.#persistHostConfigMode('fixture')
+
+      return {
+        activeMode: 'fixture',
+        generation: this.#manager.snapshot().generation,
+      }
+    }
+
+    throw new Error(`Unsupported dictionary mode: "${String(mode)}"`)
+  }
+
+  /**
+   * Safely remove the managed ECDICT database.
+   *
+   * Decoupled semantics:
+   * - If activeMode is 'custom': does NOT revert to fixture; custom dictionary remains active,
+   *   active.json is NOT deleted. Only managed ECDICT files and installed-ecdict.json are unlinked.
+   * - If activeMode is 'managed-ecdict' or 'fixture': hot-switches to fixture, unlinks active.json,
+   *   installed-ecdict.json, and managed ECDICT database file.
+   *
+   * @returns removal outcome including settled activeMode.
+   */
+  async removeManagedDatabase(): Promise<{ removed: boolean; activeMode: 'fixture' | 'custom' }> {
+    const currentActiveMode = this.#manager.snapshot().activeMode
+
+    if (currentActiveMode === 'custom') {
+      // Custom is active: do NOT hot-switch to fixture! Custom remains active!
+      if (!this.#paths) {
+        this.#cachedInstalledCorpus = null
+        return { removed: false, activeMode: 'custom' }
+      }
+
+      // Read installed-ecdict.json to identify file to delete
+      let installedMeta: InstalledEcdictMetadata | null = null
+      try {
+        installedMeta = await readInstalledEcdictMetadata(this.#paths)
+      } catch {}
+
+      // Unlink installed-ecdict.json
+      await removeInstalledEcdictMetadata(this.#paths)
+
+      // Unlink managed ECDICT database file if known
+      const dbFile = installedMeta?.databaseFile ?? this.#cachedInstalledCorpus?.databaseFile
+      if (dbFile) {
+        const dbPath = join(this.#paths.databaseDirectory, dbFile)
+        try {
+          await unlink(dbPath)
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+            throw error
+          }
+        }
+      }
+
+      // Clean stale temporary files
+      await removeStaleTemporaryArtifacts(this.#paths)
+
+      // Reset cached installed corpus
+      this.#cachedInstalledCorpus = null
+
+      return { removed: true, activeMode: 'custom' }
+    }
+
+    // Active mode is managed-ecdict or fixture: hot-switch to fixture
     const fixture = openFixtureDictionary()
     this.#manager.activate({
       mode: 'fixture',
@@ -600,18 +1399,21 @@ export class ActivationCoordinator {
       this.#settingsSyncError = null
       this.#lastRollbackError = null
       await this.#persistHostConfigMode('fixture')
-      return { removed: false }
+      return { removed: false, activeMode: 'fixture' }
     }
 
     // Read current metadata to identify file
     let currentMetadata: ActiveMetadata | null = null
     try {
       currentMetadata = await readActiveMetadata(this.#paths)
-    } catch {
-      // proceed with best effort cleanup
-    }
+    } catch {}
 
-    // 2. Unlink active.json
+    let installedMeta: InstalledEcdictMetadata | null = null
+    try {
+      installedMeta = await readInstalledEcdictMetadata(this.#paths)
+    } catch {}
+
+    // Unlink active.json
     try {
       await unlink(this.#paths.activeMetadataPath)
     } catch (error) {
@@ -620,9 +1422,17 @@ export class ActivationCoordinator {
       }
     }
 
-    // 3. Unlink database file if known
-    if (currentMetadata?.databaseFile) {
-      const dbPath = join(this.#paths.databaseDirectory, currentMetadata.databaseFile)
+    // Unlink installed-ecdict.json
+    await removeInstalledEcdictMetadata(this.#paths)
+
+    // Unlink database file if known
+    const dbFile =
+      (currentMetadata?.activeMode === 'managed-ecdict' ? currentMetadata.databaseFile : null) ??
+      installedMeta?.databaseFile ??
+      this.#cachedInstalledCorpus?.databaseFile
+
+    if (dbFile) {
+      const dbPath = join(this.#paths.databaseDirectory, dbFile)
       try {
         await unlink(dbPath)
       } catch (error) {
@@ -632,7 +1442,7 @@ export class ActivationCoordinator {
       }
     }
 
-    // 4. Clean stale temporary files
+    // Clean stale temporary files
     await removeStaleTemporaryArtifacts(this.#paths)
 
     // Reset cached state
@@ -642,10 +1452,10 @@ export class ActivationCoordinator {
     this.#settingsSyncError = null
     this.#lastRollbackError = null
 
-    // 5. Best-effort update Host Config to fixture
+    // Best-effort update Host Config to fixture
     await this.#persistHostConfigMode('fixture')
 
-    return { removed: true }
+    return { removed: true, activeMode: 'fixture' }
   }
 
   /**
@@ -813,11 +1623,22 @@ export class ActivationCoordinator {
 
     const quarantineRecord = this.#paths ? getQuarantineRecord(this.#paths.databaseDirectory) : null
 
+    const activeSnapshotId = this.#activeSnapshotId
+    const customSnapshotStatus =
+      activeSnapshotId && this.#customSnapshotManager
+        ? {
+            snapshotId: activeSnapshotId,
+            activeLeases: this.#customSnapshotManager.getActiveLeases(activeSnapshotId),
+          }
+        : null
+
     return Object.freeze({
       activeMode: snap.activeMode,
       configuredMode,
       activeSource: snap.source,
       activeIdentity: snap.identity,
+      activeSnapshotId,
+      customSnapshotStatus,
       installed: isInstalled,
       installedCorpus: this.#cachedInstalledCorpus,
       fixtureStats: Object.freeze({

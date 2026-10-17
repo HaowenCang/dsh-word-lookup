@@ -284,6 +284,106 @@ export class CustomSnapshotManager {
   }
 
   /**
+   * Return the current active lease count for a tracked snapshot.
+   */
+  getActiveLeases(snapshotId: string): number {
+    return this.#snapshots.get(snapshotId)?.activeLeases ?? 0
+  }
+
+  /**
+   * Adopt an existing published snapshot file into this manager's tracking table.
+   *
+   * Used during startup recovery or mode switching to load a pre-existing published snapshot.
+   * Enforces security boundaries:
+   * - snapshotId must be a valid non-empty string.
+   * - publishedPath must be an absolute path inside customSnapshotDirectory conforming to naming contracts.
+   * - publishedPath must exist on disk and must not be a symlink or directory.
+   *
+   * @param snapshotId - unique snapshot UUID.
+   * @param metadata - snapshot metadata.
+   * @returns tracked CustomSnapshotRecord.
+   */
+  async adoptPublishedSnapshot(
+    snapshotId: string,
+    metadata: {
+      identity: string
+      publishedPath: string
+      sha256?: string | null
+      byteSize?: number | null
+      schemaVersion?: number | null
+      entryCount?: number | null
+      formCount?: number | null
+      exampleCount?: number | null
+      headwordsSample?: readonly string[]
+    },
+  ): Promise<CustomSnapshotRecord> {
+    if (this.#disposed) {
+      throw new Error('CustomSnapshotManager has been disposed')
+    }
+
+    if (typeof snapshotId !== 'string' || snapshotId.trim().length === 0) {
+      throw new TypeError('snapshotId must be a non-empty string')
+    }
+    const cleanId = snapshotId.trim()
+
+    // If already tracked and active, preserve active reference
+    const existing = this.#snapshots.get(cleanId)
+    if (existing && existing.publishedPath && existing.activeLeases > 0) {
+      return existing
+    }
+
+    if (typeof metadata?.publishedPath !== 'string' || metadata.publishedPath.trim().length === 0) {
+      throw new TypeError('publishedPath must be a non-empty string')
+    }
+    const resolvedPath = resolve(metadata.publishedPath.trim())
+
+    // Validate path containment and naming
+    await validateCustomSnapshotPath(resolvedPath, this.#paths.customSnapshotDirectory)
+
+    // Check existence and file type
+    const lstat = lstatSync(resolvedPath)
+    if (lstat.isSymbolicLink()) {
+      throw new Error(`Published snapshot path "${resolvedPath}" must not be a symbolic link`)
+    }
+    const st = statSync(resolvedPath)
+    if (!st.isFile()) {
+      throw new Error(`Published snapshot path "${resolvedPath}" is not a regular file`)
+    }
+
+    const logicalIdentity = metadata.identity?.trim() || `snap-${cleanId.replace(/-/g, '').slice(0, 16)}`
+    if (!SAFE_IDENTITY_PATTERN.test(logicalIdentity)) {
+      throw new Error(
+        `Snapshot identity "${logicalIdentity}" violates safe identity pattern (${SAFE_IDENTITY_PATTERN.source})`,
+      )
+    }
+
+    const record: CustomSnapshotRecord = {
+      id: cleanId,
+      identity: logicalIdentity,
+      sourcePath: '',
+      stagingPath: '',
+      publishedPath: resolvedPath,
+      state: existing?.state === 'ACTIVE' ? 'ACTIVE' : 'PUBLISHED_INACTIVE',
+      activeLeases: existing?.activeLeases ?? 0,
+      sha256: metadata.sha256 ?? null,
+      byteSize: metadata.byteSize ?? st.size,
+      schemaVersion: metadata.schemaVersion ?? null,
+      entryCount: metadata.entryCount ?? null,
+      formCount: metadata.formCount ?? null,
+      exampleCount: metadata.exampleCount ?? null,
+      headwordsSample: metadata.headwordsSample ? Object.freeze([...metadata.headwordsSample]) : Object.freeze([]),
+      createdAt: existing?.createdAt ?? Date.now(),
+      verifiedAt: existing?.verifiedAt ?? Date.now(),
+      publishedAt: existing?.publishedAt ?? Date.now(),
+      error: null,
+      errorCode: null,
+    }
+
+    this.#snapshots.set(cleanId, record)
+    return record
+  }
+
+  /**
    * Create, verify, and publish a secure transaction-consistent snapshot from a user SQLite file.
    *
    * State transitions:

@@ -37,11 +37,19 @@ export declare function createCancelHandler(operationManager: DictionaryOperatio
  */
 export declare function createRemoveHandler(operationManager: DictionaryOperationManager, activationCoordinator: ActivationCoordinator): (req: Request) => Promise<Response>;
 /**
+ * Create handler for POST /api/dsh-word-lookup/dictionary/activate-custom.
+ */
+export declare function createActivateCustomHandler(operationManager: DictionaryOperationManager): (req: Request) => Promise<Response>;
+/**
+ * Create handler for POST /api/dsh-word-lookup/dictionary/select-mode.
+ */
+export declare function createSelectModeHandler(operationManager: DictionaryOperationManager): (req: Request) => Promise<Response>;
+/**
  * Create handler for POST /api/dsh-word-lookup/dictionary/verify.
  */
 export declare function createVerifyHandler(activationCoordinator: ActivationCoordinator): (req: Request) => Promise<Response>;
 /**
- * Register all five dictionary management Fetch routes onto `ctx.connection.fetch`.
+ * Register all seven dictionary management Fetch routes onto `ctx.connection.fetch`.
  *
  * Implements atomic registration: if any route registration throws, all previously
  * registered routes in this batch are safely unregistered before the error propagates.
@@ -49,6 +57,6 @@ export declare function createVerifyHandler(activationCoordinator: ActivationCoo
  * @param ctx - host Cordis context providing `connection` service.
  * @param operationManager - active operation manager.
  * @param activationCoordinator - active activation coordinator.
- * @returns unified async disposer unregistering all five management routes.
+ * @returns unified async disposer unregistering all seven management routes.
  */
 export declare function registerDictionaryManagementRoutes(ctx: Context, operationManager: DictionaryOperationManager, activationCoordinator: ActivationCoordinator): () => Promise<void>;

@@ -13,8 +13,9 @@
  *
  * @module dsh-word-lookup/host/dictionary-operations
  */
-import type { DictionaryOperationSnapshot } from '../shared/dictionary-management-protocol.js';
+import type { DictionaryActivateCustomResponse, DictionaryOperationSnapshot, DictionaryRemoveResponse, DictionarySelectModeResponse } from '../shared/dictionary-management-protocol.js';
 import type { ManagedStoragePaths } from './managed-storage.js';
+import type { DictionaryMode } from './config.js';
 import type { ActivationCoordinator } from './dictionary-activation.js';
 /**
  * Error thrown when an install operation is requested while another is already running.
@@ -141,6 +142,14 @@ export declare class DictionaryOperationManager {
      */
     canRemove(): boolean;
     /**
+     * Check whether a custom dictionary can currently be activated.
+     */
+    canActivateCustom(): boolean;
+    /**
+     * Check whether the dictionary operational mode can currently be switched.
+     */
+    canSwitchMode(): boolean;
+    /**
      * Check whether an active operation can be cancelled.
      */
     canCancel(): boolean;
@@ -193,9 +202,32 @@ export declare class DictionaryOperationManager {
      *
      * @returns removal outcome.
      */
-    remove(): Promise<{
-        removed: boolean;
-    }>;
+    remove(): Promise<DictionaryRemoveResponse>;
+    /**
+     * Request activation of a custom SQLite dictionary database.
+     *
+     * Executes under exclusive operation mutex:
+     * - Stages snapshot via VACUUM INTO.
+     * - Verifies schema and integrity in Worker.
+     * - Atomically publishes snapshot.
+     * - Atomically activates in DictionaryManager with lease tracking.
+     * - Raw source database is NEVER modified or deleted.
+     *
+     * @param rawSourcePath - host filesystem path to user SQLite database.
+     * @param identity - optional logical identity label.
+     * @returns settled activation response.
+     */
+    activateCustom(rawSourcePath: string, identity?: string): Promise<DictionaryActivateCustomResponse>;
+    /**
+     * Request safe operational mode switch between 'fixture', 'managed-ecdict', and 'custom'.
+     *
+     * Executes under exclusive operation mutex.
+     *
+     * @param mode - target operational mode.
+     * @param snapshotId - target snapshot UUID (required when mode is 'custom').
+     * @returns settled mode switch response.
+     */
+    selectMode(mode: DictionaryMode, snapshotId?: string): Promise<DictionarySelectModeResponse>;
     /**
      * Dispose operation manager and await safe drainage of in-flight tasks.
      *

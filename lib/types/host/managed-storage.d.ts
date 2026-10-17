@@ -84,6 +84,8 @@ export interface ManagedStoragePaths {
     readonly customSnapshotDirectory: string;
     /** Path to the active metadata file (`<home>/storages/dsh-word-lookup/active.json`). */
     readonly activeMetadataPath: string;
+    /** Path to the installed ECDICT inventory file (`<home>/storages/dsh-word-lookup/installed-ecdict.json`). */
+    readonly installedEcdictPath: string;
 }
 /**
  * Options for resolving managed storage paths.
@@ -112,12 +114,12 @@ export interface ActiveMetadataSource {
  */
 export type SettingsSyncState = 'synced' | 'failed' | 'unavailable' | 'pending';
 /**
- * Schema of persisted `active.json` metadata.
+ * Persisted active metadata for managed ECDICT dictionary mode.
  */
-export interface ActiveMetadata {
+export interface ManagedActiveMetadata {
     /** Metadata schema version (currently 1). */
     readonly version: 1;
-    /** Active dictionary mode (must be 'managed-ecdict'). */
+    /** Active dictionary mode ('managed-ecdict'). */
     readonly activeMode: 'managed-ecdict';
     /** Safe identifier matching the database identity. */
     readonly identity: string;
@@ -133,6 +135,63 @@ export interface ActiveMetadata {
     readonly settingsSyncError?: string | null;
     /** ISO timestamp when activation was committed. */
     readonly lastActivatedAt?: string;
+}
+/**
+ * Persisted active metadata for custom SQLite dictionary mode.
+ */
+export interface CustomActiveMetadata {
+    /** Metadata schema version (currently 1). */
+    readonly version: 1;
+    /** Active dictionary mode ('custom'). */
+    readonly activeMode: 'custom';
+    /** Logical identity label. */
+    readonly identity: string;
+    /** Unique published snapshot identifier UUID. */
+    readonly snapshotId: string;
+    /** Basename only of the published snapshot SQLite database (`custom-<snapshotId>.sqlite3`). */
+    readonly databaseFile: string;
+    /** Provenance source token (strictly 'custom-local'). */
+    readonly source: 'custom-local';
+    /** Verified SQLite database schema version. */
+    readonly schemaVersion: number;
+    /** Verified SHA-256 digest of published snapshot file. */
+    readonly sha256: string;
+    /** Verified physical byte size of published snapshot file. */
+    readonly byteSize: number;
+    /** Whether host configuration settings were successfully synced. */
+    readonly settingsSynced?: boolean;
+    /** Distinct verifiable persistence state for host settings synchronization. */
+    readonly settingsSyncState?: SettingsSyncState;
+    /** Sanitized error diagnostic if host settings sync failed. */
+    readonly settingsSyncError?: string | null;
+    /** ISO timestamp when activation was committed. */
+    readonly lastActivatedAt?: string;
+}
+/**
+ * Schema of persisted `active.json` metadata across dictionary modes.
+ */
+export type ActiveMetadata = ManagedActiveMetadata | CustomActiveMetadata;
+/**
+ * Schema of persisted `installed-ecdict.json` inventory metadata.
+ * Tracks installed ECDICT corpus independent of the currently active dictionary mode.
+ */
+export interface InstalledEcdictMetadata {
+    /** Schema version (currently 1). */
+    readonly version: 1;
+    /** Managed database identity. */
+    readonly identity: string;
+    /** Relative basename of installed managed SQLite database. */
+    readonly databaseFile: string;
+    /** Source provenance details. */
+    readonly source: ActiveMetadataSource;
+    /** Total valid headword entry count if known. */
+    readonly entryCount?: number;
+    /** Total morphological form count if known. */
+    readonly formCount?: number;
+    /** Physical database byte size on disk. */
+    readonly byteSize?: number;
+    /** ISO timestamp when installation was completed. */
+    readonly installedAt?: string;
 }
 /**
  * Attempt to extract the resolved DSH home from official host context surfaces.
@@ -194,6 +253,38 @@ export declare function managedDatabasePath(paths: ManagedStoragePaths, identity
  * Throws detailed TypeError if any required field is missing or invalid.
  */
 export declare function validateActiveMetadata(raw: unknown): ActiveMetadata;
+/**
+ * Validate an unknown object against the {@link InstalledEcdictMetadata} schema.
+ *
+ * Throws detailed TypeError if any required field is missing or invalid.
+ */
+export declare function validateInstalledEcdictMetadata(raw: unknown): InstalledEcdictMetadata;
+/**
+ * Read and validate installed ECDICT inventory metadata from `<home>/storages/dsh-word-lookup/installed-ecdict.json`.
+ *
+ * Fallback backward compatibility:
+ * - If `installed-ecdict.json` does not exist (ENOENT): inspects `active.json`. If `active.json` contains
+ *   a valid `managed-ecdict` entry, derives the installed metadata record to preserve upgrade continuity.
+ * - Returns `null` if neither file exists.
+ *
+ * @param paths - resolved managed storage paths.
+ * @returns validated installed metadata, or `null`.
+ */
+export declare function readInstalledEcdictMetadata(paths: ManagedStoragePaths): Promise<InstalledEcdictMetadata | null>;
+/**
+ * Atomically write installed ECDICT inventory metadata to `<home>/storages/dsh-word-lookup/installed-ecdict.json`.
+ *
+ * @param paths - resolved managed storage paths.
+ * @param metadata - valid installed inventory metadata.
+ */
+export declare function writeInstalledEcdictMetadataAtomically(paths: ManagedStoragePaths, metadata: InstalledEcdictMetadata): Promise<void>;
+/**
+ * Remove installed ECDICT inventory metadata file (`installed-ecdict.json`).
+ * Idempotent: ignores ENOENT.
+ *
+ * @param paths - resolved managed storage paths.
+ */
+export declare function removeInstalledEcdictMetadata(paths: ManagedStoragePaths): Promise<void>;
 /**
  * Read and validate active dictionary metadata from `<home>/storages/dsh-word-lookup/active.json`.
  *

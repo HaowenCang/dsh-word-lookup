@@ -16,13 +16,17 @@
 
 import { randomUUID } from 'node:crypto'
 import type {
+  DictionaryActivateCustomResponse,
   DictionaryOperationError,
   DictionaryOperationPhase,
   DictionaryOperationProgress,
   DictionaryOperationSnapshot,
   DictionaryOperationStatus,
+  DictionaryRemoveResponse,
+  DictionarySelectModeResponse,
 } from '../shared/dictionary-management-protocol.js'
 import type { ManagedStoragePaths } from './managed-storage.js'
+import type { DictionaryMode } from './config.js'
 import {
   downloadPinnedEcdict,
   type EcdictDownloadProgress,
@@ -184,7 +188,7 @@ interface ActiveRemoveContext {
   readonly operationId: string
   readonly abortController: AbortController
   readonly startedAt: string
-  readonly promise: Promise<{ removed: boolean }>
+  readonly promise: Promise<DictionaryRemoveResponse>
 }
 
 /**
@@ -291,6 +295,32 @@ export class DictionaryOperationManager {
     }
     const summary = this.#activationCoordinator.getStatusSummary()
     return summary.installed
+  }
+
+  /**
+   * Check whether a custom dictionary can currently be activated.
+   */
+  canActivateCustom(): boolean {
+    if (this.#disposed) return false
+    if (!this.#paths) return false
+    if (this.isBusy()) return false
+    if (isDatabaseDirectoryQuarantined(this.#paths.databaseDirectory) || getQuarantineRecord(this.#paths.databaseDirectory) !== null) {
+      return false
+    }
+    return true
+  }
+
+  /**
+   * Check whether the dictionary operational mode can currently be switched.
+   */
+  canSwitchMode(): boolean {
+    if (this.#disposed) return false
+    if (!this.#paths) return false
+    if (this.isBusy()) return false
+    if (isDatabaseDirectoryQuarantined(this.#paths.databaseDirectory) || getQuarantineRecord(this.#paths.databaseDirectory) !== null) {
+      return false
+    }
+    return true
   }
 
   /**
@@ -470,7 +500,7 @@ export class DictionaryOperationManager {
    *
    * @returns removal outcome.
    */
-  async remove(): Promise<{ removed: boolean }> {
+  async remove(): Promise<DictionaryRemoveResponse> {
     if (this.#disposed) {
       throw new Error('DictionaryOperationManager is disposed')
     }
@@ -493,9 +523,9 @@ export class DictionaryOperationManager {
     // 3. Synchronously claim exclusive operation ownership BEFORE any await
     const operationId = `remove-${Date.now()}-${randomUUID().slice(0, 8)}`
     const abortController = new AbortController()
-    let resolveSettled!: (val: { removed: boolean }) => void
+    let resolveSettled!: (val: DictionaryRemoveResponse) => void
     let rejectSettled!: (err: unknown) => void
-    const settledPromise = new Promise<{ removed: boolean }>((res, rej) => {
+    const settledPromise = new Promise<DictionaryRemoveResponse>((res, rej) => {
       resolveSettled = res
       rejectSettled = rej
     })
@@ -530,13 +560,292 @@ export class DictionaryOperationManager {
 
       // Step D: Execute removal in coordinator
       const outcome = await this.#activationCoordinator.removeManagedDatabase()
-      resolveSettled(outcome)
-      return outcome
+      const resolvedMode = outcome.activeMode ?? 'fixture'
+      const response: DictionaryRemoveResponse = {
+        ok: true,
+        removed: outcome.removed,
+        activeMode: resolvedMode,
+        message: outcome.removed
+          ? (resolvedMode === 'custom'
+              ? 'Managed ECDICT database removed; custom dictionary remains active'
+              : 'Managed ECDICT database removed and active dictionary reverted to fixture')
+          : 'No managed database was installed',
+      }
+      resolveSettled(response)
+      return response
     } catch (error) {
       rejectSettled(error)
       throw error
     } finally {
       this.#activeRemove = null
+    }
+  }
+
+  /**
+   * Request activation of a custom SQLite dictionary database.
+   *
+   * Executes under exclusive operation mutex:
+   * - Stages snapshot via VACUUM INTO.
+   * - Verifies schema and integrity in Worker.
+   * - Atomically publishes snapshot.
+   * - Atomically activates in DictionaryManager with lease tracking.
+   * - Raw source database is NEVER modified or deleted.
+   *
+   * @param rawSourcePath - host filesystem path to user SQLite database.
+   * @param identity - optional logical identity label.
+   * @returns settled activation response.
+   */
+  async activateCustom(
+    rawSourcePath: string,
+    identity?: string,
+  ): Promise<DictionaryActivateCustomResponse> {
+    if (this.#disposed) {
+      throw new Error('DictionaryOperationManager is disposed')
+    }
+
+    if (!this.#paths) {
+      throw new Error('Managed storage is unavailable: DSH home cannot be resolved')
+    }
+
+    const quarantine = getQuarantineRecord(this.#paths.databaseDirectory)
+    if (quarantine) {
+      throw new OperationDirectoryQuarantinedError(this.#paths.databaseDirectory, quarantine.reason)
+    }
+
+    if (this.isBusy()) {
+      throw new OperationInProgressError(this.#currentOp?.operationId ?? this.#activeRemove?.operationId ?? 'operation')
+    }
+
+    const snapshotMgr = this.#activationCoordinator.customSnapshotManager
+    if (!snapshotMgr) {
+      throw new Error('Custom snapshot manager is unavailable')
+    }
+
+    const operationId = `activate-custom-${Date.now()}-${randomUUID().slice(0, 8)}`
+    const now = new Date().toISOString()
+    const abortController = new AbortController()
+    const signal = abortController.signal
+
+    const initialSnapshot: DictionaryOperationSnapshot = {
+      operationId,
+      kind: 'activate-custom',
+      phase: 'validating-database',
+      status: 'running',
+      progress: {
+        phase: 'validating-database',
+        percent: 0,
+        unit: 'steps',
+        message: 'Validating and staging custom SQLite database...',
+      },
+      startedAt: now,
+      updatedAt: now,
+    }
+
+    let resolveSettled!: () => void
+    const settledPromise = new Promise<void>((res) => {
+      resolveSettled = res
+    })
+
+    const ctx: ActiveOperationContext = {
+      operationId,
+      abortController,
+      startedAt: now,
+      snapshot: initialSnapshot,
+      promise: settledPromise,
+      cancelRequested: false,
+      nonCancellable: false,
+    }
+
+    this.#currentOp = ctx
+    this.#notifyListeners(true)
+
+    try {
+      if (this.#activationCoordinator.isRecovering) {
+        await this.#activationCoordinator.ensureReady()
+      }
+      if (signal.aborted || this.#disposed) throw this.#createAbortError()
+
+      // Step 1: Create, verify in worker, and publish snapshot
+      this.#transitionPhase(ctx, 'validating-database', 'Validating SQLite integrity and publishing snapshot...')
+      const record = await snapshotMgr.createAndPublishSnapshot(rawSourcePath, {
+        identity,
+        signal,
+      })
+
+      if (signal.aborted || this.#disposed) throw this.#createAbortError()
+
+      // Step 2: Activate custom database
+      this.#transitionPhase(ctx, 'activating', 'Activating custom dictionary snapshot...')
+      const result = await this.#activationCoordinator.activateCustomDatabase(record.id, {
+        signal,
+        onCommitBoundary: () => {
+          ctx.nonCancellable = true
+        },
+      })
+
+      // Step 3: Settle
+      this.#settleOperation(ctx, 'completed', 'completed', {
+        phase: 'completed',
+        percent: 100,
+        unit: 'steps',
+        message: `Custom dictionary successfully activated (${record.identity})`,
+      })
+
+      return {
+        ok: true,
+        operationId,
+        activeMode: 'custom',
+        identity: result.identity,
+        snapshotId: result.snapshotId,
+        message: 'Custom dictionary activated successfully',
+      }
+    } catch (error) {
+      if (!ctx.nonCancellable && (signal.aborted || this.#isAbortError(error))) {
+        this.#settleOperation(ctx, 'cancelled', 'cancelled', {
+          phase: 'cancelled',
+          unit: 'steps',
+          message: 'Operation cancelled by user before commit point',
+        })
+        const abortErr = new Error('Operation was cancelled')
+        ;(abortErr as unknown as { code: string }).code = 'OPERATION_CANCELLED'
+        throw abortErr
+      }
+      const errorRecord = this.#formatError(error)
+      this.#settleOperation(ctx, 'failed', 'failed', {
+        phase: 'failed',
+        unit: 'steps',
+        message: errorRecord.message,
+      }, errorRecord)
+      throw error
+    } finally {
+      this.#lastOp = ctx.snapshot
+      this.#currentOp = null
+      this.#notifyListeners(true)
+      resolveSettled()
+    }
+  }
+
+  /**
+   * Request safe operational mode switch between 'fixture', 'managed-ecdict', and 'custom'.
+   *
+   * Executes under exclusive operation mutex.
+   *
+   * @param mode - target operational mode.
+   * @param snapshotId - target snapshot UUID (required when mode is 'custom').
+   * @returns settled mode switch response.
+   */
+  async selectMode(
+    mode: DictionaryMode,
+    snapshotId?: string,
+  ): Promise<DictionarySelectModeResponse> {
+    if (this.#disposed) {
+      throw new Error('DictionaryOperationManager is disposed')
+    }
+
+    if (!this.#paths) {
+      throw new Error('Managed storage is unavailable: DSH home cannot be resolved')
+    }
+
+    const quarantine = getQuarantineRecord(this.#paths.databaseDirectory)
+    if (quarantine) {
+      throw new OperationDirectoryQuarantinedError(this.#paths.databaseDirectory, quarantine.reason)
+    }
+
+    if (this.isBusy()) {
+      throw new OperationInProgressError(this.#currentOp?.operationId ?? this.#activeRemove?.operationId ?? 'operation')
+    }
+
+    const operationId = `switch-mode-${Date.now()}-${randomUUID().slice(0, 8)}`
+    const now = new Date().toISOString()
+    const abortController = new AbortController()
+    const signal = abortController.signal
+
+    const initialSnapshot: DictionaryOperationSnapshot = {
+      operationId,
+      kind: 'switch-mode',
+      phase: 'activating',
+      status: 'running',
+      progress: {
+        phase: 'activating',
+        percent: 0,
+        unit: 'steps',
+        message: `Switching dictionary mode to "${mode}"...`,
+      },
+      startedAt: now,
+      updatedAt: now,
+    }
+
+    let resolveSettled!: () => void
+    const settledPromise = new Promise<void>((res) => {
+      resolveSettled = res
+    })
+
+    const ctx: ActiveOperationContext = {
+      operationId,
+      abortController,
+      startedAt: now,
+      snapshot: initialSnapshot,
+      promise: settledPromise,
+      cancelRequested: false,
+      nonCancellable: false,
+    }
+
+    this.#currentOp = ctx
+    this.#notifyListeners(true)
+
+    try {
+      if (this.#activationCoordinator.isRecovering) {
+        await this.#activationCoordinator.ensureReady()
+      }
+      if (signal.aborted || this.#disposed) throw this.#createAbortError()
+
+      const result = await this.#activationCoordinator.selectMode(mode, {
+        snapshotId,
+        signal,
+        onCommitBoundary: () => {
+          ctx.nonCancellable = true
+        },
+      })
+
+      const summary = this.#activationCoordinator.getStatusSummary()
+
+      this.#settleOperation(ctx, 'completed', 'completed', {
+        phase: 'completed',
+        percent: 100,
+        unit: 'steps',
+        message: `Dictionary mode switched to "${result.activeMode}"`,
+      })
+
+      return {
+        ok: true,
+        operationId,
+        activeMode: result.activeMode,
+        identity: summary.activeIdentity,
+        message: `Successfully switched to "${result.activeMode}" dictionary mode`,
+      }
+    } catch (error) {
+      if (!ctx.nonCancellable && (signal.aborted || this.#isAbortError(error))) {
+        this.#settleOperation(ctx, 'cancelled', 'cancelled', {
+          phase: 'cancelled',
+          unit: 'steps',
+          message: 'Operation cancelled by user before commit point',
+        })
+        const abortErr = new Error('Operation was cancelled')
+        ;(abortErr as unknown as { code: string }).code = 'OPERATION_CANCELLED'
+        throw abortErr
+      }
+      const errorRecord = this.#formatError(error)
+      this.#settleOperation(ctx, 'failed', 'failed', {
+        phase: 'failed',
+        unit: 'steps',
+        message: errorRecord.message,
+      }, errorRecord)
+      throw error
+    } finally {
+      this.#lastOp = ctx.snapshot
+      this.#currentOp = null
+      this.#notifyListeners(true)
+      resolveSettled()
     }
   }
 

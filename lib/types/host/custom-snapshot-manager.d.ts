@@ -142,6 +142,34 @@ export declare class CustomSnapshotManager {
      */
     listSnapshots(): readonly CustomSnapshotRecord[];
     /**
+     * Return the current active lease count for a tracked snapshot.
+     */
+    getActiveLeases(snapshotId: string): number;
+    /**
+     * Adopt an existing published snapshot file into this manager's tracking table.
+     *
+     * Used during startup recovery or mode switching to load a pre-existing published snapshot.
+     * Enforces security boundaries:
+     * - snapshotId must be a valid non-empty string.
+     * - publishedPath must be an absolute path inside customSnapshotDirectory conforming to naming contracts.
+     * - publishedPath must exist on disk and must not be a symlink or directory.
+     *
+     * @param snapshotId - unique snapshot UUID.
+     * @param metadata - snapshot metadata.
+     * @returns tracked CustomSnapshotRecord.
+     */
+    adoptPublishedSnapshot(snapshotId: string, metadata: {
+        identity: string;
+        publishedPath: string;
+        sha256?: string | null;
+        byteSize?: number | null;
+        schemaVersion?: number | null;
+        entryCount?: number | null;
+        formCount?: number | null;
+        exampleCount?: number | null;
+        headwordsSample?: readonly string[];
+    }): Promise<CustomSnapshotRecord>;
+    /**
      * Create, verify, and publish a secure transaction-consistent snapshot from a user SQLite file.
      *
      * State transitions:

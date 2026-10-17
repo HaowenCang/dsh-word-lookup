@@ -19,9 +19,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import {
+  createActivateCustomHandler,
   createCancelHandler,
   createInstallHandler,
   createRemoveHandler,
+  createSelectModeHandler,
   createStatusHandler,
   createVerifyHandler,
   registerDictionaryManagementRoutes,
@@ -32,9 +34,11 @@ import { DictionaryManager } from '../src/host/dictionary-manager.js'
 import { openFixtureDictionary } from '../src/host/fixture-db.js'
 import { resolveManagedStoragePaths, type ManagedStoragePaths } from '../src/host/managed-storage.js'
 import {
+  MANAGEMENT_ACTIVATE_CUSTOM_PATH,
   MANAGEMENT_CANCEL_PATH,
   MANAGEMENT_INSTALL_PATH,
   MANAGEMENT_REMOVE_PATH,
+  MANAGEMENT_SELECT_MODE_PATH,
   MANAGEMENT_STATUS_PATH,
   MANAGEMENT_VERIFY_PATH,
 } from '../src/host/route.js'
@@ -305,7 +309,7 @@ describe('Dictionary Management Route Handlers', () => {
     })
 
     it('successfully removes dictionary and returns 200', async () => {
-      vi.spyOn(coordinator, 'removeManagedDatabase').mockResolvedValue({ removed: true })
+      vi.spyOn(coordinator, 'removeManagedDatabase').mockResolvedValue({ removed: true, activeMode: 'fixture' })
 
       const handler = createRemoveHandler(opMan, coordinator)
       const res = await handler(jsonPostRequest('http://localhost' + MANAGEMENT_REMOVE_PATH, {}))
@@ -363,8 +367,101 @@ describe('Dictionary Management Route Handlers', () => {
     })
   })
 
+  describe('POST /api/dsh-word-lookup/dictionary/activate-custom', () => {
+    it('returns 405 on non-POST', async () => {
+      const handler = createActivateCustomHandler(opMan)
+      const res = await handler(new Request('http://localhost' + MANAGEMENT_ACTIVATE_CUSTOM_PATH, { method: 'GET' }))
+      expect(res.status).toBe(405)
+    })
+
+    it('returns 400 when path is missing or invalid', async () => {
+      const handler = createActivateCustomHandler(opMan)
+      const res = await handler(jsonPostRequest('http://localhost' + MANAGEMENT_ACTIVATE_CUSTOM_PATH, {}))
+      expect(res.status).toBe(400)
+      const data = await res.json()
+      expect(data.error).toBe('INVALID_PATH')
+    })
+
+    it('returns 400 when identity has invalid characters', async () => {
+      const handler = createActivateCustomHandler(opMan)
+      const res = await handler(
+        jsonPostRequest('http://localhost' + MANAGEMENT_ACTIVATE_CUSTOM_PATH, {
+          path: '/path/to/dict.sqlite3',
+          identity: 'bad identity with spaces!',
+        }),
+      )
+      expect(res.status).toBe(400)
+      const data = await res.json()
+      expect(data.error).toBe('INVALID_ARGUMENT')
+    })
+
+    it('accepts valid request and delegates to operationManager.activateCustom', async () => {
+      vi.spyOn(opMan, 'activateCustom').mockResolvedValue({
+        ok: true,
+        operationId: 'activate-custom-123',
+        activeMode: 'custom',
+        identity: 'test-custom',
+        snapshotId: 'snap-12345',
+        message: 'Custom dictionary activated successfully',
+      })
+
+      const handler = createActivateCustomHandler(opMan)
+      const res = await handler(
+        jsonPostRequest('http://localhost' + MANAGEMENT_ACTIVATE_CUSTOM_PATH, {
+          path: join(tempHome, 'test.sqlite3'),
+          identity: 'test-custom',
+        }),
+      )
+      expect(res.status).toBe(200)
+      const data = await res.json()
+      expect(data.ok).toBe(true)
+      expect(data.snapshotId).toBe('snap-12345')
+    })
+  })
+
+  describe('POST /api/dsh-word-lookup/dictionary/select-mode', () => {
+    it('returns 405 on non-POST', async () => {
+      const handler = createSelectModeHandler(opMan)
+      const res = await handler(new Request('http://localhost' + MANAGEMENT_SELECT_MODE_PATH, { method: 'GET' }))
+      expect(res.status).toBe(405)
+    })
+
+    it('returns 400 when mode is invalid', async () => {
+      const handler = createSelectModeHandler(opMan)
+      const res = await handler(jsonPostRequest('http://localhost' + MANAGEMENT_SELECT_MODE_PATH, { mode: 'invalid' }))
+      expect(res.status).toBe(400)
+      const data = await res.json()
+      expect(data.error).toBe('INVALID_ARGUMENT')
+    })
+
+    it('returns 400 when mode is custom but snapshotId is missing', async () => {
+      const handler = createSelectModeHandler(opMan)
+      const res = await handler(jsonPostRequest('http://localhost' + MANAGEMENT_SELECT_MODE_PATH, { mode: 'custom' }))
+      expect(res.status).toBe(400)
+      const data = await res.json()
+      expect(data.error).toBe('INVALID_ARGUMENT')
+    })
+
+    it('accepts valid mode switch request and delegates to operationManager.selectMode', async () => {
+      vi.spyOn(opMan, 'selectMode').mockResolvedValue({
+        ok: true,
+        operationId: 'switch-mode-123',
+        activeMode: 'fixture',
+        identity: 'fixture',
+        message: 'Switched to fixture',
+      })
+
+      const handler = createSelectModeHandler(opMan)
+      const res = await handler(jsonPostRequest('http://localhost' + MANAGEMENT_SELECT_MODE_PATH, { mode: 'fixture' }))
+      expect(res.status).toBe(200)
+      const data = await res.json()
+      expect(data.ok).toBe(true)
+      expect(data.activeMode).toBe('fixture')
+    })
+  })
+
   describe('registerDictionaryManagementRoutes', () => {
-    it('registers all 5 routes and returns clean disposer', async () => {
+    it('registers all 7 routes and returns clean disposer', async () => {
       const registeredPaths: string[] = []
       const mockCtx = {
         connection: {
@@ -381,12 +478,14 @@ describe('Dictionary Management Route Handlers', () => {
       }
 
       const dispose = registerDictionaryManagementRoutes(mockCtx as any, opMan, coordinator)
-      expect(registeredPaths).toHaveLength(5)
+      expect(registeredPaths).toHaveLength(7)
       expect(registeredPaths).toContain(MANAGEMENT_STATUS_PATH)
       expect(registeredPaths).toContain(MANAGEMENT_INSTALL_PATH)
       expect(registeredPaths).toContain(MANAGEMENT_CANCEL_PATH)
       expect(registeredPaths).toContain(MANAGEMENT_REMOVE_PATH)
       expect(registeredPaths).toContain(MANAGEMENT_VERIFY_PATH)
+      expect(registeredPaths).toContain(MANAGEMENT_ACTIVATE_CUSTOM_PATH)
+      expect(registeredPaths).toContain(MANAGEMENT_SELECT_MODE_PATH)
 
       // Unregister
       await dispose()

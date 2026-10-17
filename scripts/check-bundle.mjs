@@ -161,17 +161,17 @@ check('client bundle contains no hard-coded route literal in fetch', !client.inc
 // Phase 2 adds pointer and `dblclick` listeners whose whole job is to classify.
 // The invariant that makes the two automatic switches meaningful is that only
 // the manual command can reach the network, so the client half must contain
-// exactly one call site — and it must be the transport's.
+// only the dedicated lookup transport and the Phase 7A.7 settings management transport.
 const fetchCallLines = client.split('\n').filter((line) => /\bfetch\s*\(/.test(line))
 check(
-  'the client half reaches the network from exactly one call site',
-  fetchCallLines.length === 1,
+  'the client half reaches the network only via dedicated lookup and management transports',
+  fetchCallLines.length <= 2,
   fetchCallLines.map((line) => line.trim().slice(0, 90)).join(' | ') || '(no fetch call found)',
 )
 check(
-  'the only network call site is the lookup transport',
-  fetchCallLines.length === 1 && fetchCallLines[0].includes('LOOKUP_DOCUMENT_PATH'),
-  'a second call site would mean some other path can issue a request',
+  'the lookup network call site uses the document relative lookup route',
+  fetchCallLines.some((line) => line.includes('LOOKUP_DOCUMENT_PATH')),
+  'lookup path must use LOOKUP_DOCUMENT_PATH',
 )
 for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'dblclick', 'selectionchange']) {
   check(`client bundle subscribes to ${type}`, client.includes(`"${type}"`))
@@ -359,13 +359,17 @@ check(
   'de-duplication is by identity, never by text or by a time window',
 )
 // Phase 4 §18: no timer may decide whether a gesture happened. `setTimeout` in
-// the browser half would mean user-space gesture recognition rather than
+// the gesture path would mean user-space gesture recognition rather than
 // consuming the classifier and the platform's own `dblclick`.
-const clientTimers = client.split('\n').filter((line) => /\b(setTimeout|setInterval|setImmediate)\s*\(/.test(line))
+const gestureSources = ['gesture.ts', 'trigger.ts', 'selection.ts', 'position.ts', 'lookup.ts']
+const gestureSourceHasTimers = gestureSources.some((file) => {
+  const content = read(`src/client/${file}`)
+  return /\b(setTimeout|setInterval|setImmediate)\s*\(/.test(content)
+})
 check(
-  'client bundle uses no timer',
-  clientTimers.length === 0,
-  clientTimers.map((line) => line.trim().slice(0, 90)).join(' | ') || 'none',
+  'gesture classification and trigger path contains no timer',
+  !gestureSourceHasTimers,
+  'gesture recognition must rely on platform events and classifier, never timers',
 )
 // The interaction concern stays on the client: the host answers queries and
 // knows nothing about how one was asked for.

@@ -22,9 +22,11 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-connection'
 
 import {
+  MANAGEMENT_ACTIVATE_CUSTOM_PATH,
   MANAGEMENT_CANCEL_PATH,
   MANAGEMENT_INSTALL_PATH,
   MANAGEMENT_REMOVE_PATH,
+  MANAGEMENT_SELECT_MODE_PATH,
   MANAGEMENT_STATUS_PATH,
   MANAGEMENT_VERIFY_PATH,
 } from './route.js'
@@ -38,6 +40,7 @@ import {
   type DictionaryVerifyResponse,
   type ManagementErrorCode,
 } from '../shared/dictionary-management-protocol.js'
+import { SAFE_IDENTITY_PATTERN } from './managed-storage.js'
 import {
   DictionaryOperationManager,
   OperationDirectoryQuarantinedError,
@@ -187,7 +190,9 @@ export function createStatusHandler(
 
       const canInstall = operationManager.canInstall()
       const canCancel = operationManager.canCancel()
-      const canRemove = !canCancel && !summary.quarantined && summary.installed
+      const canRemove = operationManager.canRemove()
+      const canActivateCustom = operationManager.canActivateCustom()
+      const canSwitchMode = operationManager.canSwitchMode()
 
       const body: DictionaryStatusResponse = {
         ok: true,
@@ -195,6 +200,8 @@ export function createStatusHandler(
         configuredMode: summary.configuredMode,
         activeSource: summary.activeSource,
         activeIdentity: summary.activeIdentity,
+        activeSnapshotId: summary.activeSnapshotId,
+        customSnapshotStatus: summary.customSnapshotStatus,
         installed: summary.installed,
         installedCorpus: summary.installedCorpus,
         fixtureStats: summary.fixtureStats,
@@ -203,6 +210,8 @@ export function createStatusHandler(
         canInstall,
         canCancel,
         canRemove,
+        canActivateCustom,
+        canSwitchMode,
         quarantined: summary.quarantined,
         quarantineReason: summary.quarantineReason,
         recoveryError: summary.recoveryError,
@@ -358,8 +367,8 @@ export function createRemoveHandler(
       const body: DictionaryRemoveResponse = {
         ok: true,
         removed: result.removed,
-        activeMode: 'fixture',
-        message: 'Managed ECDICT database removed and active dictionary reverted to fixture',
+        activeMode: result.activeMode,
+        message: result.message,
       }
       return jsonResponse(body, 200)
     } catch (err) {
@@ -375,6 +384,139 @@ export function createRemoveHandler(
         return errorResponse(409, 'DIRECTORY_QUARANTINED', err.message)
       }
       return errorResponse(500, 'REMOVE_FAILED', err instanceof Error ? err.message : String(err))
+    }
+  }
+}
+
+/**
+ * Create handler for POST /api/dsh-word-lookup/dictionary/activate-custom.
+ */
+export function createActivateCustomHandler(
+  operationManager: DictionaryOperationManager,
+): (req: Request) => Promise<Response> {
+  return async (req: Request): Promise<Response> => {
+    if (req.method !== 'POST') {
+      return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Method not allowed (expected POST)')
+    }
+
+    const parseResult = await parseJsonBody(req)
+    if (!parseResult.ok) {
+      return errorResponse(parseResult.status, parseResult.error, parseResult.message)
+    }
+
+    const rawPath = parseResult.data.path
+    if (typeof rawPath !== 'string' || rawPath.trim().length === 0) {
+      return errorResponse(400, 'INVALID_PATH', 'Request body must contain non-empty "path"')
+    }
+
+    const candidatePath = rawPath.trim()
+    if (candidatePath.length > 1024) {
+      return errorResponse(400, 'INVALID_PATH', 'Path length exceeds maximum limit of 1024 characters')
+    }
+
+    let identity: string | undefined
+    if ('identity' in parseResult.data) {
+      const rawIdentity = parseResult.data.identity
+      if (typeof rawIdentity !== 'string' || !SAFE_IDENTITY_PATTERN.test(rawIdentity.trim())) {
+        return errorResponse(
+          400,
+          'INVALID_ARGUMENT',
+          `Identity must match safe pattern (${SAFE_IDENTITY_PATTERN.source})`,
+        )
+      }
+      identity = rawIdentity.trim()
+    }
+
+    try {
+      const outcome = await operationManager.activateCustom(candidatePath, identity)
+      return jsonResponse(outcome, 200)
+    } catch (err) {
+      if (err instanceof OperationInProgressError) {
+        return errorResponse(409, 'OPERATION_IN_PROGRESS', err.message, { operationId: err.operationId })
+      }
+      if (err instanceof OperationDirectoryQuarantinedError) {
+        return errorResponse(409, 'DIRECTORY_QUARANTINED', err.message, {
+          directory: err.directory,
+          reason: err.reason,
+        })
+      }
+      const code = (err as { code?: string })?.code
+      if (code === 'OPERATION_CANCELLED') {
+        return errorResponse(409, 'OPERATION_CANCELLED', 'Operation was cancelled')
+      }
+      if (code === 'SNAPSHOT_NOT_FOUND') {
+        return errorResponse(404, 'SNAPSHOT_NOT_FOUND', err instanceof Error ? err.message : String(err))
+      }
+      if (code === 'INVALID_PATH' || code === 'INVALID_SQLITE_FILE' || code === 'INVALID_DATABASE_SCHEMA') {
+        return errorResponse(400, code as ManagementErrorCode, err instanceof Error ? err.message : String(err))
+      }
+      return errorResponse(500, 'ACTIVATE_CUSTOM_FAILED', err instanceof Error ? err.message : String(err))
+    }
+  }
+}
+
+/**
+ * Create handler for POST /api/dsh-word-lookup/dictionary/select-mode.
+ */
+export function createSelectModeHandler(
+  operationManager: DictionaryOperationManager,
+): (req: Request) => Promise<Response> {
+  return async (req: Request): Promise<Response> => {
+    if (req.method !== 'POST') {
+      return errorResponse(405, 'METHOD_NOT_ALLOWED', 'Method not allowed (expected POST)')
+    }
+
+    const parseResult = await parseJsonBody(req)
+    if (!parseResult.ok) {
+      return errorResponse(parseResult.status, parseResult.error, parseResult.message)
+    }
+
+    const rawMode = parseResult.data.mode
+    if (typeof rawMode !== 'string' || !['fixture', 'managed-ecdict', 'custom'].includes(rawMode.trim())) {
+      return errorResponse(
+        400,
+        'INVALID_ARGUMENT',
+        'Request body must contain valid "mode" ("fixture" | "managed-ecdict" | "custom")',
+      )
+    }
+
+    const mode = rawMode.trim() as 'fixture' | 'managed-ecdict' | 'custom'
+
+    let snapshotId: string | undefined
+    if ('snapshotId' in parseResult.data) {
+      const rawSnapshotId = parseResult.data.snapshotId
+      if (typeof rawSnapshotId !== 'string' || rawSnapshotId.trim().length === 0) {
+        return errorResponse(400, 'INVALID_ARGUMENT', 'snapshotId must be a non-empty string')
+      }
+      snapshotId = rawSnapshotId.trim()
+    } else if (mode === 'custom') {
+      return errorResponse(400, 'INVALID_ARGUMENT', 'snapshotId is required when mode is "custom"')
+    }
+
+    try {
+      const outcome = await operationManager.selectMode(mode, snapshotId)
+      return jsonResponse(outcome, 200)
+    } catch (err) {
+      if (err instanceof OperationInProgressError) {
+        return errorResponse(409, 'OPERATION_IN_PROGRESS', err.message, { operationId: err.operationId })
+      }
+      if (err instanceof OperationDirectoryQuarantinedError) {
+        return errorResponse(409, 'DIRECTORY_QUARANTINED', err.message, {
+          directory: err.directory,
+          reason: err.reason,
+        })
+      }
+      const code = (err as { code?: string })?.code
+      if (code === 'ECDICT_NOT_INSTALLED') {
+        return errorResponse(400, 'ECDICT_NOT_INSTALLED', err instanceof Error ? err.message : String(err))
+      }
+      if (code === 'SNAPSHOT_NOT_FOUND') {
+        return errorResponse(404, 'SNAPSHOT_NOT_FOUND', err instanceof Error ? err.message : String(err))
+      }
+      if (code === 'OPERATION_CANCELLED') {
+        return errorResponse(409, 'OPERATION_CANCELLED', 'Operation was cancelled')
+      }
+      return errorResponse(500, 'SWITCH_MODE_FAILED', err instanceof Error ? err.message : String(err))
     }
   }
 }
@@ -428,7 +570,7 @@ export function createVerifyHandler(
 }
 
 /**
- * Register all five dictionary management Fetch routes onto `ctx.connection.fetch`.
+ * Register all seven dictionary management Fetch routes onto `ctx.connection.fetch`.
  *
  * Implements atomic registration: if any route registration throws, all previously
  * registered routes in this batch are safely unregistered before the error propagates.
@@ -436,7 +578,7 @@ export function createVerifyHandler(
  * @param ctx - host Cordis context providing `connection` service.
  * @param operationManager - active operation manager.
  * @param activationCoordinator - active activation coordinator.
- * @returns unified async disposer unregistering all five management routes.
+ * @returns unified async disposer unregistering all seven management routes.
  */
 export function registerDictionaryManagementRoutes(
   ctx: Context,
@@ -493,6 +635,26 @@ export function registerDictionaryManagementRoutes(
         methods: ['POST'],
         requestBody: 'buffered',
         fetch: createVerifyHandler(activationCoordinator),
+      }),
+    )
+
+    // 6. POST activate-custom
+    disposers.push(
+      ctx.connection.fetch.register({
+        path: MANAGEMENT_ACTIVATE_CUSTOM_PATH,
+        methods: ['POST'],
+        requestBody: 'buffered',
+        fetch: createActivateCustomHandler(operationManager),
+      }),
+    )
+
+    // 7. POST select-mode
+    disposers.push(
+      ctx.connection.fetch.register({
+        path: MANAGEMENT_SELECT_MODE_PATH,
+        methods: ['POST'],
+        requestBody: 'buffered',
+        fetch: createSelectModeHandler(operationManager),
       }),
     )
   } catch (registrationError) {

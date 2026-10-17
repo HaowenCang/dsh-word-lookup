@@ -23,6 +23,7 @@ import type { Context } from '@deepseek-ai/cordis';
 import type { DictionarySource } from './dictionary.js';
 import { DictionaryManager } from './dictionary-manager.js';
 import { type ManagedStoragePaths, type SettingsSyncState } from './managed-storage.js';
+import { CustomSnapshotManager } from './custom-snapshot-manager.js';
 import { type DictionaryMode, type HostConfig } from './config.js';
 import type { FixtureCorpusInfo, InstalledCorpusInfo, ManagementErrorCode } from '../shared/dictionary-management-protocol.js';
 import type { ManagedEcdictBuildResult } from './ecdict-importer.js';
@@ -47,6 +48,8 @@ export interface ActivationCoordinatorOptions {
     readonly manager: DictionaryManager;
     /** Plugin host configuration. */
     readonly config?: HostConfig;
+    /** Optional CustomSnapshotManager instance. If omitted and paths is provided, one is created. */
+    readonly customSnapshotManager?: CustomSnapshotManager | null;
 }
 /**
  * Result returned by custom dictionary database verification.
@@ -61,6 +64,22 @@ export interface CustomDatabaseVerificationResult {
     readonly errorCode?: ManagementErrorCode;
 }
 /**
+ * Result returned by custom dictionary activation.
+ */
+export interface CustomActivationResult {
+    readonly snapshotId: string;
+    readonly identity: string;
+    readonly activeMode: 'custom';
+    readonly generation: number;
+}
+/**
+ * Result returned by operational mode selection.
+ */
+export interface ModeSelectionResult {
+    readonly activeMode: DictionaryMode;
+    readonly generation: number;
+}
+/**
  * Diagnostic summary of the coordinator state.
  */
 export interface ActivationStateSummary {
@@ -68,6 +87,11 @@ export interface ActivationStateSummary {
     readonly configuredMode: DictionaryMode;
     readonly activeSource: DictionarySource;
     readonly activeIdentity: string;
+    readonly activeSnapshotId: string | null;
+    readonly customSnapshotStatus: {
+        readonly snapshotId: string;
+        readonly activeLeases: number;
+    } | null;
     readonly installed: boolean;
     readonly installedCorpus: InstalledCorpusInfo | null;
     readonly fixtureStats: FixtureCorpusInfo;
@@ -107,6 +131,14 @@ export declare class ActivationCoordinator {
      * Return the underlying live DictionaryManager.
      */
     get manager(): DictionaryManager;
+    /**
+     * Return the custom snapshot manager instance, or null if storage is unavailable.
+     */
+    get customSnapshotManager(): CustomSnapshotManager | null;
+    /**
+     * Return the active custom snapshot ID, or null if custom mode is not active.
+     */
+    get activeSnapshotId(): string | null;
     /**
      * Return whether the coordinator has been disposed.
      */
@@ -159,18 +191,58 @@ export declare class ActivationCoordinator {
         onCommitBoundary?: () => void;
     }): Promise<void>;
     /**
-     * Safely remove the managed ECDICT database and revert active dictionary to fixture.
+     * Commit a verified custom snapshot database and activate it in DictionaryManager.
      *
-     * Sequence:
-     * 1. Safe hot-switch to fixture in DictionaryManager, releasing Windows file locks on SQLite files.
-     * 2. Remove `active.json`.
-     * 3. Unlink versioned SQLite file `ecdict-<identity>.sqlite3`.
-     * 4. Clean stale temporary artifacts.
-     * 5. Preserve source cache in `cache/dsh-word-lookup/sources/ecdict.csv`.
-     * 6. Best-effort update Host Config `dictionaryMode` to 'fixture'.
+     * Transaction Sequence:
+     * 1. Validate snapshot existence and open candidate dictionary with lease tracking.
+     * 2. Probe candidate dictionary with verification headwords.
+     * 3. Atomically write `active.json` with CustomActiveMetadata (Commit Point 1: Durability).
+     * 4. Atomically hot-switch `DictionaryManager` active reference (Commit Point 2: Runtime).
+     * 5. Best-effort update Host Config `dictionaryMode` to 'custom' (Commit Point 3).
+     *
+     * On failure at Commit Point 2, executes rollback compensation to restore previous metadata
+     * and previous active dictionary. If compensation fails, throws ActivationRollbackError.
+     *
+     * @param snapshotId - published snapshot identifier.
+     * @param options - execution options (signal, commit boundary callback).
+     * @returns custom activation result.
+     */
+    activateCustomDatabase(snapshotId: string, options?: {
+        signal?: AbortSignal;
+        onCommitBoundary?: () => void;
+    }): Promise<CustomActivationResult>;
+    /**
+     * Safely switch between dictionary operational modes ('fixture', 'managed-ecdict', 'custom').
+     *
+     * Rules:
+     * - Switching to 'fixture': activates built-in fixture dictionary, unlinks `active.json`, resets activeSnapshotId.
+     * - Switching to 'managed-ecdict': verifies installed ECDICT database exists on disk, activates it, persists metadata.
+     * - Switching to 'custom': verifies requested snapshot (or activeSnapshotId) exists and is leased/activated.
+     * - Uninterrupted query capability during hot-swap.
+     *
+     * @param mode - target operational mode.
+     * @param options - optional snapshotId (for custom mode) and cancellation/commit signals.
+     * @returns mode selection result.
+     */
+    selectMode(mode: DictionaryMode, options?: {
+        snapshotId?: string;
+        signal?: AbortSignal;
+        onCommitBoundary?: () => void;
+    }): Promise<ModeSelectionResult>;
+    /**
+     * Safely remove the managed ECDICT database.
+     *
+     * Decoupled semantics:
+     * - If activeMode is 'custom': does NOT revert to fixture; custom dictionary remains active,
+     *   active.json is NOT deleted. Only managed ECDICT files and installed-ecdict.json are unlinked.
+     * - If activeMode is 'managed-ecdict' or 'fixture': hot-switches to fixture, unlinks active.json,
+     *   installed-ecdict.json, and managed ECDICT database file.
+     *
+     * @returns removal outcome including settled activeMode.
      */
     removeManagedDatabase(): Promise<{
         removed: boolean;
+        activeMode: 'fixture' | 'custom';
     }>;
     /**
      * Verify an arbitrary custom SQLite dictionary path without mutation or activation.

@@ -623,7 +623,7 @@ describe('DictionaryOperationManager', () => {
       let releaseRemove!: () => void
       vi.spyOn(coordinator, 'removeManagedDatabase').mockImplementation(() => {
         return new Promise((resolve) => {
-          releaseRemove = () => resolve({ removed: true })
+          releaseRemove = () => resolve({ removed: true, activeMode: 'fixture' })
         })
       })
 
@@ -641,7 +641,7 @@ describe('DictionaryOperationManager', () => {
       let releaseRemove!: () => void
       vi.spyOn(coordinator, 'removeManagedDatabase').mockImplementation(() => {
         return new Promise((resolve) => {
-          releaseRemove = () => resolve({ removed: true })
+          releaseRemove = () => resolve({ removed: true, activeMode: 'fixture' })
         })
       })
 
@@ -683,7 +683,7 @@ describe('DictionaryOperationManager', () => {
         postPublicationCleanup: { candidateRemoved: true, sidecarsRemoved: true },
       })
       vi.spyOn(coordinator, 'activateManagedDatabase').mockResolvedValue(undefined)
-      vi.spyOn(coordinator, 'removeManagedDatabase').mockResolvedValue({ removed: true })
+      vi.spyOn(coordinator, 'removeManagedDatabase').mockResolvedValue({ removed: true, activeMode: 'fixture' })
 
       const opMan = new DictionaryOperationManager({ paths, activationCoordinator: coordinator })
 
@@ -837,8 +837,8 @@ describe('DictionaryOperationManager', () => {
     it('B-R3-01: calling remove() synchronously claims mutex; concurrent install() is immediately rejected with 409', async () => {
       const paths = resolveManagedStoragePaths({ home: tempHome })
       let releaseRemove!: () => void
-      const removePromise = new Promise<{ removed: boolean }>((resolve) => {
-        releaseRemove = () => resolve({ removed: true })
+      const removePromise = new Promise<{ removed: boolean; activeMode: 'fixture' }>((resolve) => {
+        releaseRemove = () => resolve({ removed: true, activeMode: 'fixture' })
       })
       vi.spyOn(coordinator, 'removeManagedDatabase').mockImplementation(() => removePromise)
 
@@ -857,8 +857,8 @@ describe('DictionaryOperationManager', () => {
     it('B-R3-02: calling remove() synchronously claims mutex; concurrent second remove() is immediately rejected with 409', async () => {
       const paths = resolveManagedStoragePaths({ home: tempHome })
       let releaseRemove!: () => void
-      const removePromise = new Promise<{ removed: boolean }>((resolve) => {
-        releaseRemove = () => resolve({ removed: true })
+      const removePromise = new Promise<{ removed: boolean; activeMode: 'fixture' }>((resolve) => {
+        releaseRemove = () => resolve({ removed: true, activeMode: 'fixture' })
       })
       vi.spyOn(coordinator, 'removeManagedDatabase').mockImplementation(() => removePromise)
 
@@ -883,7 +883,7 @@ describe('DictionaryOperationManager', () => {
 
       vi.spyOn(coordinator, 'isRecovering', 'get').mockReturnValue(true)
       vi.spyOn(coordinator, 'ensureReady').mockImplementation(() => recoveryPromise)
-      vi.spyOn(coordinator, 'removeManagedDatabase').mockResolvedValue({ removed: true })
+      vi.spyOn(coordinator, 'removeManagedDatabase').mockResolvedValue({ removed: true, activeMode: 'fixture' })
 
       const opMan = new DictionaryOperationManager({ paths, activationCoordinator: coordinator })
 
@@ -903,7 +903,7 @@ describe('DictionaryOperationManager', () => {
       let installRejectedAtHook = false
 
       const opMan = new DictionaryOperationManager({ paths, activationCoordinator: coordinator })
-      vi.spyOn(coordinator, 'removeManagedDatabase').mockResolvedValue({ removed: true })
+      vi.spyOn(coordinator, 'removeManagedDatabase').mockResolvedValue({ removed: true, activeMode: 'fixture' })
 
       _setOperationHooksForTesting({
         beforeRemoveDiskMutation: async () => {
@@ -974,7 +974,7 @@ describe('DictionaryOperationManager', () => {
         step = 1
         await new Promise((r) => setTimeout(r, 20))
         step = 2
-        return { removed: true }
+        return { removed: true, activeMode: 'fixture' }
       })
 
       const opMan = new DictionaryOperationManager({ paths, activationCoordinator: coordinator })
@@ -997,7 +997,7 @@ describe('DictionaryOperationManager', () => {
       vi.spyOn(coordinator, 'removeManagedDatabase').mockImplementation(async () => {
         await new Promise((r) => setTimeout(r, 50))
         removeFinished = true
-        return { removed: true }
+        return { removed: true, activeMode: 'fixture' }
       })
 
       const opMan = new DictionaryOperationManager({ paths, activationCoordinator: coordinator })
@@ -1021,7 +1021,7 @@ describe('DictionaryOperationManager', () => {
           await new Promise((r) => setTimeout(r, 40))
         },
       })
-      vi.spyOn(coordinator, 'removeManagedDatabase').mockResolvedValue({ removed: true })
+      vi.spyOn(coordinator, 'removeManagedDatabase').mockResolvedValue({ removed: true, activeMode: 'fixture' })
 
       const opMan = new DictionaryOperationManager({ paths, activationCoordinator: coordinator })
       const removePromise = opMan.remove()

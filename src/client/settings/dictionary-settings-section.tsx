@@ -477,7 +477,7 @@ export function DictionarySettingsSection({
                     : currentOp.phase === 'building'
                       ? '正在本地编译构建 SQLite 数据库...'
                       : currentOp.phase === 'validating-database'
-                        ? '正在执行 SQLite PRAGMA 完整性校验...'
+                        ? '正在执行 SQLite 完整性校验...'
                         : currentOp.phase === 'activating'
                           ? '正在原子激活并重载词典...'
                           : '正在处理中...'}

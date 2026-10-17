@@ -16,6 +16,7 @@ import {
   writeActiveMetadataAtomically,
   _setStorageFsHooksForTesting,
   type ActiveMetadata,
+  type ManagedActiveMetadata,
   type ManagedStoragePaths,
 } from '../src/host/managed-storage.js'
 
@@ -189,7 +190,7 @@ describe('Managed Storage & DSH Home Resolution (Phase 7A.3)', () => {
           commit: '1A2B3C4D5E6F7A8B9C0D1E2F3A4B5C6D7E8F9A0B',
           sha256: 'E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855',
         },
-      })
+      }) as ManagedActiveMetadata
       expect(result.source.commit).toBe('1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b')
       expect(result.source.sha256).toBe('e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855')
     })

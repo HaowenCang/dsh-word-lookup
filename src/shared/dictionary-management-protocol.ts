@@ -22,6 +22,12 @@ export const MANAGEMENT_REMOVE_DOCUMENT_PATH = 'api/dsh-word-lookup/dictionary/r
 /** Document-relative URL of dictionary verification endpoint (client-facing). */
 export const MANAGEMENT_VERIFY_DOCUMENT_PATH = 'api/dsh-word-lookup/dictionary/verify'
 
+/** Document-relative URL of custom dictionary activation endpoint (client-facing). */
+export const MANAGEMENT_ACTIVATE_CUSTOM_DOCUMENT_PATH = 'api/dsh-word-lookup/dictionary/activate-custom'
+
+/** Document-relative URL of dictionary operational mode selection endpoint (client-facing). */
+export const MANAGEMENT_SELECT_MODE_DOCUMENT_PATH = 'api/dsh-word-lookup/dictionary/select-mode'
+
 /** Content-Type accepted and returned by management endpoints. */
 export const MANAGEMENT_MEDIA_TYPE = 'application/json'
 
@@ -81,13 +87,18 @@ export interface DictionaryOperationError {
 }
 
 /**
+ * Kind of dictionary background operation.
+ */
+export type DictionaryOperationKind = 'install' | 'remove' | 'activate-custom' | 'switch-mode'
+
+/**
  * Diagnostic snapshot of a background dictionary operation.
  */
 export interface DictionaryOperationSnapshot {
   /** Unique operation identifier. */
   readonly operationId: string
-  /** Kind of operation (currently 'install'). */
-  readonly kind: 'install'
+  /** Kind of operation ('install' | 'remove' | 'activate-custom' | 'switch-mode'). */
+  readonly kind: DictionaryOperationKind
   /** Current fine-grained phase. */
   readonly phase: DictionaryOperationPhase
   /** High-level operational status. */
@@ -153,6 +164,13 @@ export interface DictionaryStatusResponse {
   readonly activeSource: 'sqlite-fixture' | 'ecdict-local' | 'custom-local'
   /** Active dictionary identity token (or 'fixture'). */
   readonly activeIdentity: string
+  /** Active custom snapshot UUID if custom mode is active, or null. */
+  readonly activeSnapshotId?: string | null
+  /** Fine-grained active lease summary if custom mode is active, or null. */
+  readonly customSnapshotStatus?: {
+    readonly snapshotId: string
+    readonly activeLeases: number
+  } | null
   /** Whether a valid managed ECDICT corpus is installed and verified on disk. */
   readonly installed: boolean
   /** Metadata of the installed corpus, or null if none is installed. */
@@ -169,6 +187,10 @@ export interface DictionaryStatusResponse {
   readonly canCancel: boolean
   /** Whether the managed dictionary can currently be removed. */
   readonly canRemove: boolean
+  /** Whether a custom dictionary can currently be activated. */
+  readonly canActivateCustom?: boolean
+  /** Whether the dictionary operational mode can currently be switched. */
+  readonly canSwitchMode?: boolean
   /** Whether storage directory is quarantined due to unconfirmed worker termination. */
   readonly quarantined: boolean
   /** Reason for directory quarantine, if quarantined. */
@@ -230,8 +252,60 @@ export interface DictionaryRemoveResponse {
   readonly ok: true
   /** Whether files were unlinked. */
   readonly removed: boolean
-  /** Active dictionary mode after removal (always 'fixture'). */
-  readonly activeMode: 'fixture'
+  /** Active dictionary mode after removal ('fixture' or 'custom'). */
+  readonly activeMode: 'fixture' | 'custom'
+  /** Informational message. */
+  readonly message: string
+}
+
+/**
+ * Request payload for POST /api/dsh-word-lookup/dictionary/activate-custom.
+ */
+export interface DictionaryActivateCustomRequest {
+  /** Absolute filesystem path to candidate custom SQLite database. */
+  readonly path: string
+  /** Optional custom alphanumeric identity label. */
+  readonly identity?: string
+}
+
+/**
+ * Response returned by POST /api/dsh-word-lookup/dictionary/activate-custom.
+ */
+export interface DictionaryActivateCustomResponse {
+  readonly ok: true
+  /** Assigned operation identifier. */
+  readonly operationId: string
+  /** Settled operational mode ('custom'). */
+  readonly activeMode: 'custom'
+  /** Settled dictionary identity. */
+  readonly identity: string
+  /** Assigned published snapshot UUID. */
+  readonly snapshotId: string
+  /** Informational message. */
+  readonly message: string
+}
+
+/**
+ * Request payload for POST /api/dsh-word-lookup/dictionary/select-mode.
+ */
+export interface DictionarySelectModeRequest {
+  /** Target operational mode. */
+  readonly mode: 'fixture' | 'managed-ecdict' | 'custom'
+  /** Published snapshot UUID (required when mode is 'custom'). */
+  readonly snapshotId?: string
+}
+
+/**
+ * Response returned by POST /api/dsh-word-lookup/dictionary/select-mode.
+ */
+export interface DictionarySelectModeResponse {
+  readonly ok: true
+  /** Assigned operation identifier. */
+  readonly operationId?: string
+  /** Settled operational mode. */
+  readonly activeMode: 'fixture' | 'managed-ecdict' | 'custom'
+  /** Settled dictionary identity. */
+  readonly identity?: string | null
   /** Informational message. */
   readonly message: string
 }
@@ -268,6 +342,7 @@ export interface DictionaryVerifyResponse {
  */
 export type ManagementErrorCode =
   | 'BAD_REQUEST'
+  | 'INVALID_ARGUMENT'
   | 'METHOD_NOT_ALLOWED'
   | 'UNSUPPORTED_MEDIA_TYPE'
   | 'BODY_TOO_LARGE'
@@ -275,6 +350,7 @@ export type ManagementErrorCode =
   | 'OPERATION_NOT_RUNNING'
   | 'OPERATION_NOT_CANCELLABLE'
   | 'OPERATION_NOT_FOUND'
+  | 'OPERATION_CANCELLED'
   | 'DIRECTORY_QUARANTINED'
   | 'INVALID_OPERATION_ID'
   | 'INVALID_PATH'
@@ -283,6 +359,10 @@ export type ManagementErrorCode =
   | 'INVALID_SQLITE_FILE'
   | 'INVALID_DATABASE_SCHEMA'
   | 'INCOMPATIBLE_DICTIONARY'
+  | 'SNAPSHOT_NOT_FOUND'
+  | 'ECDICT_NOT_INSTALLED'
+  | 'ACTIVATE_CUSTOM_FAILED'
+  | 'SWITCH_MODE_FAILED'
   | 'REMOVE_FAILED'
   | 'INTERNAL_ERROR'
 

@@ -749,11 +749,11 @@ export async function runActivationLifecycleProbes() {
         settingsSyncState: 'synced',
       }
 
-      // Verify that current validateActiveMetadata rejects custom activeMode (proves strict baseline)
+      // Verify that validateActiveMetadata rejects unknown activeMode (proves strict baseline)
       let currentCodeRejectsCustom = false
       try {
         const { validateActiveMetadata } = await import('../../../lib/index.js')
-        validateActiveMetadata(customMetaProposal)
+        validateActiveMetadata({ ...customMetaProposal, activeMode: 'unknown-mode' })
       } catch (err) {
         currentCodeRejectsCustom = err.message.includes('Invalid activeMode')
       }

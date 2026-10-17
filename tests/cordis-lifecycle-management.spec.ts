@@ -25,6 +25,8 @@ import {
   MANAGEMENT_REMOVE_PATH,
   MANAGEMENT_STATUS_PATH,
   MANAGEMENT_VERIFY_PATH,
+  MANAGEMENT_ACTIVATE_CUSTOM_PATH,
+  MANAGEMENT_SELECT_MODE_PATH,
 } from '../src/host/route.js'
 import {
   DictionaryOperationManager,
@@ -158,7 +160,7 @@ describe('Cordis Host Lifecycle Management Integration', () => {
     apply(mockCtx as any, config)
 
     expect(mockCtx.effect).toHaveBeenCalledTimes(1)
-    expect(mockCtx.connection.fetch.register).toHaveBeenCalledTimes(6)
+    expect(mockCtx.connection.fetch.register).toHaveBeenCalledTimes(8)
 
     expect(registeredRoutes.has(LOOKUP_PATH)).toBe(true)
     expect(registeredRoutes.has(MANAGEMENT_STATUS_PATH)).toBe(true)
@@ -166,6 +168,8 @@ describe('Cordis Host Lifecycle Management Integration', () => {
     expect(registeredRoutes.has(MANAGEMENT_CANCEL_PATH)).toBe(true)
     expect(registeredRoutes.has(MANAGEMENT_REMOVE_PATH)).toBe(true)
     expect(registeredRoutes.has(MANAGEMENT_VERIFY_PATH)).toBe(true)
+    expect(registeredRoutes.has(MANAGEMENT_ACTIVATE_CUSTOM_PATH)).toBe(true)
+    expect(registeredRoutes.has(MANAGEMENT_SELECT_MODE_PATH)).toBe(true)
 
     // Verify status route returns activeMode: 'fixture'
     const statusHandler = registeredRoutes.get(MANAGEMENT_STATUS_PATH)!
@@ -179,13 +183,15 @@ describe('Cordis Host Lifecycle Management Integration', () => {
     expect(effectDisposer).toBeDefined()
     await effectDisposer!()
 
-    expect(disposersCalled).toHaveLength(6)
+    expect(disposersCalled).toHaveLength(8)
     expect(disposersCalled).toContain(LOOKUP_PATH)
     expect(disposersCalled).toContain(MANAGEMENT_STATUS_PATH)
     expect(disposersCalled).toContain(MANAGEMENT_INSTALL_PATH)
     expect(disposersCalled).toContain(MANAGEMENT_CANCEL_PATH)
     expect(disposersCalled).toContain(MANAGEMENT_REMOVE_PATH)
     expect(disposersCalled).toContain(MANAGEMENT_VERIFY_PATH)
+    expect(disposersCalled).toContain(MANAGEMENT_ACTIVATE_CUSTOM_PATH)
+    expect(disposersCalled).toContain(MANAGEMENT_SELECT_MODE_PATH)
   })
 
   it('rolls back registered routes and closes handles if a route registration throws during startup', () => {
@@ -390,7 +396,7 @@ describe('Cordis Host Lifecycle Management Integration', () => {
       await harness.getDisposer()()
 
       expect(instances.manager!.snapshot().lifecycle).toBe('closed')
-      expect(harness.disposersCalled).toHaveLength(6)
+      expect(harness.disposersCalled).toHaveLength(8)
       expect(instances.operationManager!.isDisposed).toBe(true)
     })
 

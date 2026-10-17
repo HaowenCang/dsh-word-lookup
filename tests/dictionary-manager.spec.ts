@@ -894,9 +894,9 @@ describe('Host Startup & Lifecycle Invariants', () => {
     const resBefore = await (registeredFetch as any)(post({ query: 'derive' }))
     expect(resBefore.status).toBe(200)
 
-    // Execute cleanup disposer (1 lookup route + 5 dictionary management routes = 6 total)
+    // Execute cleanup disposer (1 lookup route + 7 dictionary management routes = 8 total)
     if (cleanup) await cleanup()
-    expect(registeredDisposerCalls).toBe(6)
+    expect(registeredDisposerCalls).toBe(8)
 
     // Lookup after cleanup fails with 500 dictionary-unavailable
     const resAfter = await (registeredFetch as any)(post({ query: 'derive' }))
