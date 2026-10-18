@@ -1,0 +1,121 @@
+{
+  "timestamp": "2026-10-18T04:25:56.974Z",
+  "probe": "RC-A",
+  "verdict": "PASS",
+  "platform": {
+    "os": "win32",
+    "arch": "x64",
+    "node": "v24.13.0"
+  },
+  "databaseSamples": {
+    "sampleA": {
+      "name": "Sample A (Fixture scale)",
+      "path": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-rc-a-100mb-bench\\samples\\sample-a-fixture.sqlite3",
+      "byteSize": 45056,
+      "sha256": "063fbf6b650afecc6a52f6790fb89956a9a7e07bd6985269324191e399dfd930",
+      "schemaVersion": 1,
+      "entryCount": 15,
+      "integrityCheck": "ok"
+    },
+    "sampleB": {
+      "path": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-rc-a-100mb-bench\\samples\\sample-b-100mb.sqlite3",
+      "byteSize": 110301184,
+      "sha256": "159889cedf59ef3530062244713032d2c9402ce6b9fa0ee18315ddca563e9b65",
+      "schemaVersion": 1,
+      "entryCount": 1750,
+      "formCount": 1750,
+      "integrityCheck": {
+        "integrity_check": "ok"
+      },
+      "representativeLookups": [
+        {
+          "query": "bench_word_0",
+          "found": true,
+          "headword": "bench_word_0"
+        },
+        {
+          "query": "bench_word_0s",
+          "found": true,
+          "headword": "bench_word_0"
+        },
+        {
+          "query": "bench_word_1749",
+          "found": true,
+          "headword": "bench_word_1749"
+        }
+      ]
+    }
+  },
+  "workloadCases": [
+    {
+      "case": "CASE_A_CANDIDATE_VALIDATION",
+      "durationMs": 555,
+      "peakRss": 324149248,
+      "p99": 5.39,
+      "maxLag": 5.39,
+      "heartbeatStall": 5.39
+    },
+    {
+      "case": "CASE_B_PUBLISH_AND_ACTIVATE",
+      "durationMs": 2112,
+      "peakRss": 320270336,
+      "p99": 86.36,
+      "maxLag": 97.22,
+      "heartbeatStall": 97.22
+    },
+    {
+      "case": "CASE_C_SWITCH_CUSTOM_ACTIVE",
+      "durationMs": 626,
+      "peakRss": 335011840,
+      "p99": 66.52,
+      "maxLag": 66.52,
+      "heartbeatStall": 66.52
+    },
+    {
+      "case": "CASE_D_GRACEFUL_STOP",
+      "durationMs": 1598
+    },
+    {
+      "case": "CASE_EF_RECOVERY_AND_CASE_G_LOOKUP",
+      "restartDurationMs": 3518,
+      "timeToFirstLookupMs": 8,
+      "peakRss": 308293632,
+      "p50": 5.53,
+      "p95": 9.34,
+      "p99": 44.14,
+      "maxLag": 55.25,
+      "heartbeatStall": 55.25
+    }
+  ],
+  "resourceMetrics": {
+    "baselineRssBytes": 308961280,
+    "baselineRssMb": 294.65,
+    "absolutePeakRssBytes": 335011840,
+    "absolutePeakRssMb": 319.49,
+    "peakRssAboveBaselineBytes": 26050560,
+    "peakRssAboveBaselineMb": 24.84,
+    "eventLoop": {
+      "p50Ms": 5.53,
+      "p95Ms": 9.34,
+      "p99Ms": 86.36,
+      "maxLagMs": 97.22,
+      "maxHeartbeatStallMs": 97.22
+    },
+    "latencies": {
+      "startupRecoveryLatencyMs": 3518,
+      "timeToFirstSuccessfulLookupMs": 8
+    },
+    "workerThreadState": {
+      "workerUsedForIntegrity": true,
+      "workerExitedCleanly": true,
+      "ghostLeases": 0
+    }
+  },
+  "slaEvaluation": {
+    "peakRssLessThan512MiB": true,
+    "eventLoopP99LessThan100Ms": true,
+    "eventLoopMaxLessThan500Ms": true,
+    "heartbeatStallLessThan1000Ms": true,
+    "verdict": "PASS"
+  }
+}

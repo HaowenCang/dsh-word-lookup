@@ -1,0 +1,299 @@
+{
+  "timestamp": "2026-10-18T04:39:54.577Z",
+  "probe": "RC-C",
+  "verdict": "PASS",
+  "platform": {
+    "os": "win32",
+    "arch": "x64",
+    "node": "v24.13.0"
+  },
+  "sourceIntegrity": {
+    "customSourceA": {
+      "path": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-rc-c-multi-ui\\user-data\\custom-dict-alpha.sqlite3",
+      "initialSha256": "b6edf3fcc91250fb7a2beca84d5da479ebaf0875256be53d1964fa00c745cb16",
+      "finalSha256": "b6edf3fcc91250fb7a2beca84d5da479ebaf0875256be53d1964fa00c745cb16",
+      "invariant": true
+    },
+    "customSourceB": {
+      "path": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-rc-c-multi-ui\\user-data\\custom-dict-beta.sqlite3",
+      "initialSha256": "326155d554fef19e44117b6a0b8492cd42b8af6120a46314ed19600044e12fef",
+      "finalSha256": "326155d554fef19e44117b6a0b8492cd42b8af6120a46314ed19600044e12fef",
+      "invariant": true
+    }
+  },
+  "snapshots": {
+    "snapshotA": {
+      "snapshotId": "5362f3a0-c092-4dff-9657-e079c53c55b1",
+      "identity": "dict-alpha"
+    },
+    "snapshotB": {
+      "snapshotId": "17e31805-b489-4f26-a8bb-331368af4a56",
+      "identity": "dict-beta"
+    }
+  },
+  "steps": [
+    {
+      "step": "INSTALL_ACTIVATE_CUSTOM_A",
+      "activeSnapshotId": "5362f3a0-c092-4dff-9657-e079c53c55b1",
+      "lookupResult": {
+        "ok": true,
+        "found": true,
+        "query": "astronomy",
+        "headword": "astronomy",
+        "phonetic": "/astronomy/",
+        "meanings": [
+          {
+            "partOfSpeech": "n",
+            "definition": "Custom English definition for astronomy",
+            "translation": "自定义中文释义: astronomy"
+          }
+        ],
+        "forms": [
+          {
+            "form": "astronomys",
+            "kind": "p"
+          }
+        ],
+        "matchedForm": null,
+        "examples": [
+          {
+            "en": "This is an authentic example sentence for astronomy.",
+            "zh": "这是 astronomy 的示例句子。"
+          }
+        ],
+        "source": "custom-local",
+        "settings": {
+          "autoDoubleClick": false,
+          "autoSelection": false
+        }
+      },
+      "verdict": "PASS"
+    },
+    {
+      "step": "INSTALL_ACTIVATE_CUSTOM_B",
+      "activeSnapshotId": "17e31805-b489-4f26-a8bb-331368af4a56",
+      "lookupResult": {
+        "ok": true,
+        "found": true,
+        "query": "neuroscience",
+        "headword": "neuroscience",
+        "phonetic": "/neuroscience/",
+        "meanings": [
+          {
+            "partOfSpeech": "n",
+            "definition": "Custom English definition for neuroscience",
+            "translation": "自定义中文释义: neuroscience"
+          }
+        ],
+        "forms": [
+          {
+            "form": "neurosciences",
+            "kind": "p"
+          }
+        ],
+        "matchedForm": null,
+        "examples": [
+          {
+            "en": "This is an authentic example sentence for neuroscience.",
+            "zh": "这是 neuroscience 的示例句子。"
+          }
+        ],
+        "source": "custom-local",
+        "settings": {
+          "autoDoubleClick": false,
+          "autoSelection": false
+        }
+      },
+      "verdict": "PASS"
+    },
+    {
+      "step": "SWITCH_TO_FIXTURE",
+      "lookupResult": {
+        "ok": true,
+        "found": true,
+        "query": "derive",
+        "headword": "derive",
+        "phonetic": "/dɪˈraɪv/",
+        "meanings": [
+          {
+            "partOfSpeech": "verb",
+            "definition": "obtain something from a specified source; originate in",
+            "translation": "导出；派生；源自"
+          }
+        ],
+        "forms": [
+          {
+            "form": "derived",
+            "kind": "past"
+          },
+          {
+            "form": "derives",
+            "kind": "third-person singular"
+          },
+          {
+            "form": "deriving",
+            "kind": "present participle"
+          }
+        ],
+        "matchedForm": null,
+        "examples": [
+          {
+            "en": "The result must derive from the boundary conditions alone.",
+            "zh": "该结果只能由边界条件导出。"
+          },
+          {
+            "en": "This identity derives from Gauss’s law.",
+            "zh": "这一恒等式源自高斯定律。"
+          }
+        ],
+        "source": "sqlite-fixture",
+        "settings": {
+          "autoDoubleClick": false,
+          "autoSelection": false
+        }
+      },
+      "verdict": "PASS"
+    },
+    {
+      "step": "SELECT_CUSTOM_A_VIA_PICKER",
+      "selectedSnapshotId": "5362f3a0-c092-4dff-9657-e079c53c55b1",
+      "lookupResult": {
+        "ok": true,
+        "found": true,
+        "query": "constellation",
+        "headword": "constellation",
+        "phonetic": "/constellation/",
+        "meanings": [
+          {
+            "partOfSpeech": "n",
+            "definition": "Custom English definition for constellation",
+            "translation": "自定义中文释义: constellation"
+          }
+        ],
+        "forms": [
+          {
+            "form": "constellations",
+            "kind": "p"
+          }
+        ],
+        "matchedForm": null,
+        "examples": [
+          {
+            "en": "This is an authentic example sentence for constellation.",
+            "zh": "这是 constellation 的示例句子。"
+          }
+        ],
+        "source": "custom-local",
+        "settings": {
+          "autoDoubleClick": false,
+          "autoSelection": false
+        }
+      },
+      "verdict": "PASS"
+    },
+    {
+      "step": "SELECT_CUSTOM_B_VIA_PICKER",
+      "selectedSnapshotId": "17e31805-b489-4f26-a8bb-331368af4a56",
+      "lookupResult": {
+        "ok": true,
+        "found": true,
+        "query": "synapse",
+        "headword": "synapse",
+        "phonetic": "/synapse/",
+        "meanings": [
+          {
+            "partOfSpeech": "n",
+            "definition": "Custom English definition for synapse",
+            "translation": "自定义中文释义: synapse"
+          }
+        ],
+        "forms": [
+          {
+            "form": "synapses",
+            "kind": "p"
+          }
+        ],
+        "matchedForm": null,
+        "examples": [
+          {
+            "en": "This is an authentic example sentence for synapse.",
+            "zh": "这是 synapse 的示例句子。"
+          }
+        ],
+        "source": "custom-local",
+        "settings": {
+          "autoDoubleClick": false,
+          "autoSelection": false
+        }
+      },
+      "verdict": "PASS"
+    }
+  ],
+  "screenshots": [
+    {
+      "stepId": "S01",
+      "filename": "rcc-S01-initial-settings.png",
+      "sha256": "16125dbc43b9aff149b56863f958f17b13c87fb7d07ad02042e15bd47eef32cd"
+    },
+    {
+      "stepId": "S02",
+      "filename": "rcc-S02-custom-a-activated.png",
+      "sha256": "538569c78e904d07e1575090fdb37dfdbcf66bb4c6b3d9ac23c91aee2f6475d7"
+    },
+    {
+      "stepId": "S03",
+      "filename": "rcc-S03-custom-b-activated.png",
+      "sha256": "65c57c18085a198418ef78992d8ae135e6d4820873ad91b3893523d836050b2b"
+    },
+    {
+      "stepId": "S04",
+      "filename": "rcc-S04-switched-to-fixture.png",
+      "sha256": "184ff2b925a97417ed49909354797c6317a42a040e1d44f72582b7b92648d3b8"
+    },
+    {
+      "stepId": "S05",
+      "filename": "rcc-S05-snapshot-picker-modal-open.png",
+      "sha256": "2bac3cd833df2adcdaa6ee7bf896b367e98a3f2fcd62b4d1d62f17e548de80c7"
+    },
+    {
+      "stepId": "S06",
+      "filename": "rcc-S06-custom-b-selected-via-picker.png",
+      "sha256": "49ff168ba801ca07a547784d8ffb932110b565ab82b1b3a19512cce126bf1f4d"
+    },
+    {
+      "stepId": "S07",
+      "filename": "rcc-S07-rebooted-settings.png",
+      "sha256": "c85a8e96afa0dd57708535665908c690485770248f58952e4701fa004cb6f548"
+    },
+    {
+      "stepId": "S08",
+      "filename": "rcc-S08-post-reboot-custom-a-selected.png",
+      "sha256": "89af7d0174ff8ef1a067dd7416608f2f2c8948297046a7be3ea3f2daa005fcb8"
+    },
+    {
+      "stepId": "S09",
+      "filename": "rcc-S09-post-reboot-custom-b-selected.png",
+      "sha256": "8647094a2740a5cb344672ccd0749af9b89fb7cd4de3af869aa0885d5b9b7141"
+    },
+    {
+      "stepId": "S10_modal",
+      "filename": "rcc-S10_modal-delete-modal-open.png",
+      "sha256": "726d8628c1f732d70ea9f6d9abc0c021eb627d68df18fd617345e9e169caa04d"
+    },
+    {
+      "stepId": "S10_after",
+      "filename": "rcc-S10_after-custom-a-deleted-b-remains.png",
+      "sha256": "40f8e9fe64350e834a71ade22c7ddabcf89cf1f60839db5adfb1bc0636bc8623"
+    }
+  ],
+  "verifications": {
+    "selectorListsBothAB": true,
+    "clickAPassesExactSnapshotId": true,
+    "noWrongSnapshotSelected": true,
+    "bothABSelectableAcrossRestart": true,
+    "activeSnapshotProtectedFromDeletion": true,
+    "inactiveADeletionSuccessful": true,
+    "bRemainsFunctionalAfterDeletion": true,
+    "rawSourcesUnmodified": true
+  }
+}

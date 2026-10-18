@@ -1,0 +1,22 @@
+{
+  "timestamp": "2026-10-18T04:43:23.256Z",
+  "probe": "RC-E.2",
+  "verdict": "PASS",
+  "tarballInstalled": "dsh-word-lookup-0.2.0.tgz",
+  "isolatedProfile": "rc-e-install",
+  "installedDirectory": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-rc-e-install-lifecycle\\home\\profiles\\rc-e-install\\node_modules\\dsh-word-lookup",
+  "lookupVerification": {
+    "query": "derive",
+    "found": true,
+    "source": "sqlite-fixture",
+    "headword": "derive"
+  },
+  "settingsUiVerification": {
+    "rendered": true,
+    "selectorFound": ".dsh-wl-settings"
+  },
+  "uninstallVerification": {
+    "uninstalledCleanly": true,
+    "routeDisarmed": true
+  }
+}

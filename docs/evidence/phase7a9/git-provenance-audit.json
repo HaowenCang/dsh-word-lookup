@@ -1,0 +1,52 @@
+{
+  "timestamp": "2026-10-18T04:45:24.587Z",
+  "probe": "RC-F",
+  "verdict": "PASS",
+  "anomalyResolution": {
+    "reportedPhantomSha": "1148da93b7ffc6448373b53c7db828943ca0b1f7",
+    "status": "RESOLVED_AS_TRANSCRIPTION_TYPO_OR_TRANSIENT_HASH",
+    "explanation": "The SHA 1148da93b7ffc6448373b53c7db828943ca0b1f7 shares the exact prefix 1148da9 with the authentic remote commit 1148da9a9dd6588401b56c996bfdda2a855e1cd8. It never existed on origin/master. The canonical evidence commit pushed for Phase 7A.8.2 was 1148da9a9dd6588401b56c996bfdda2a855e1cd8, followed by 7A.8.2R2 commit e09538c763e65c49bdada304e464701b256561ea.",
+    "authenticEvidenceCommitSha": "1148da9a9dd6588401b56c996bfdda2a855e1cd8"
+  },
+  "lineage": [
+    {
+      "role": "CODE_FREEZE_BASELINE",
+      "sha": "b36bf4d1b8ec5b6ab3ae3750475d656c669bcdcf",
+      "subject": "fix(client): close shortcut persistence and settings E2E gaps",
+      "author": "Evan Williams <54177361+HaowenCang@users.noreply.github.com>",
+      "date": "Sat Oct 17 20:09:18 2026 -0700",
+      "parentSha": "f923dcff8d1d9f6771d1baf86059c97b271caa92"
+    },
+    {
+      "role": "PHASE_7A_8_2_EVIDENCE",
+      "sha": "1148da9a9dd6588401b56c996bfdda2a855e1cd8",
+      "subject": "test(evidence): close phase 7a8.2r2 acceptance provenance",
+      "author": "Evan Williams <54177361+HaowenCang@users.noreply.github.com>",
+      "date": "Sat Oct 17 20:15:17 2026 -0700",
+      "parentSha": "b36bf4d1b8ec5b6ab3ae3750475d656c669bcdcf"
+    },
+    {
+      "role": "PHASE_7A_8_2R2_EVIDENCE",
+      "sha": "e09538c763e65c49bdada304e464701b256561ea",
+      "subject": "test(evidence): complete phase 7a8.2r2 acceptance artifacts and provenance closure",
+      "author": "Evan Williams <54177361+HaowenCang@users.noreply.github.com>",
+      "date": "Sat Oct 17 21:02:14 2026 -0700",
+      "parentSha": "1148da9a9dd6588401b56c996bfdda2a855e1cd8"
+    }
+  ],
+  "codeTreeInvariance": {
+    "codeBaselineSha": "b36bf4d1b8ec5b6ab3ae3750475d656c669bcdcf",
+    "currentHeadSha": "e09538c763e65c49bdada304e464701b256561ea",
+    "diffFileCount": 25,
+    "filesOutsideDocsEvidenceCount": 0,
+    "isProductionTreeStrictlyIdentical": true
+  },
+  "regressionSuiteAudit": {
+    "runner": "vitest",
+    "testFilesPassed": 60,
+    "testFilesFailed": 0,
+    "totalTestsPassed": 1121,
+    "totalTestsFailed": 0,
+    "verdict": "PASS"
+  }
+}

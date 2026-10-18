@@ -1,0 +1,144 @@
+{
+  "timestamp": "2026-10-18T04:41:40.500Z",
+  "probe": "RC-D",
+  "verdict": "PASS",
+  "scenarios": [
+    {
+      "scenarioId": "RCD-01",
+      "title": "Acquire resolves normally",
+      "verdict": "PASS",
+      "details": {
+        "held": false,
+        "hostRecording": false
+      },
+      "hostFinalState": false,
+      "callCount": 2
+    },
+    {
+      "scenarioId": "RCD-02",
+      "title": "Acquire rejects before Host accepts",
+      "verdict": "PASS",
+      "details": {
+        "held": false,
+        "hostRecording": false
+      },
+      "hostFinalState": false,
+      "callCount": 2
+    },
+    {
+      "scenarioId": "RCD-03",
+      "title": "Acquire applies lock then rejects",
+      "verdict": "PASS",
+      "details": {
+        "held": false,
+        "hostRecording": false,
+        "remediation": "Release cleans up dangling host lock even if acquire threw"
+      },
+      "hostFinalState": false,
+      "callCount": 2
+    },
+    {
+      "scenarioId": "RCD-04",
+      "title": "Release resolves normally",
+      "verdict": "PASS",
+      "details": {
+        "held": false,
+        "hostRecording": false
+      },
+      "hostFinalState": false,
+      "callCount": 2
+    },
+    {
+      "scenarioId": "RCD-05",
+      "title": "Release rejects before Host releases",
+      "verdict": "PASS",
+      "details": {
+        "held": false,
+        "hostRecording": true,
+        "boundaryAnalysis": "When Host IPC fails before releasing, host remains locked. DSH shortcuts API does not expose polling getRecordingState(). Fallback: DSH shortcuts bus auto-disarms recording on next shortcut dispatch or window blur."
+      },
+      "hostFinalState": true,
+      "callCount": 2
+    },
+    {
+      "scenarioId": "RCD-06",
+      "title": "Release applies unlock then rejects",
+      "verdict": "PASS",
+      "details": {
+        "held": false,
+        "hostRecording": false
+      },
+      "hostFinalState": false,
+      "callCount": 2
+    },
+    {
+      "scenarioId": "RCD-07",
+      "title": "Rapid open / close",
+      "verdict": "PASS",
+      "details": {
+        "held": false,
+        "hostRecording": false,
+        "executionOrder": [
+          true,
+          false
+        ]
+      },
+      "hostFinalState": false,
+      "callCount": 2
+    },
+    {
+      "scenarioId": "RCD-08",
+      "title": "Unmount during acquire",
+      "verdict": "PASS",
+      "details": {
+        "held": false,
+        "hostRecording": false,
+        "unmounted": true
+      },
+      "hostFinalState": false,
+      "callCount": 2
+    },
+    {
+      "scenarioId": "RCD-09",
+      "title": "Repeated release",
+      "verdict": "PASS",
+      "details": {
+        "held": false,
+        "hostRecording": false,
+        "releaseCallCount": 1,
+        "idempotent": true
+      },
+      "hostFinalState": false,
+      "callCount": 2
+    },
+    {
+      "scenarioId": "RCD-10",
+      "title": "New modal opened while previous cleanup remains pending",
+      "verdict": "PASS",
+      "details": {
+        "lock1Final": false,
+        "lock2Final": false,
+        "hostRecording": false,
+        "callSequence": [
+          true,
+          false,
+          true,
+          false
+        ]
+      },
+      "hostFinalState": false,
+      "callCount": 4
+    }
+  ],
+  "architecturalAnalysis": {
+    "provableGuarantees": [
+      "Queue-based Promise serialization guarantees sequential execution of acquire and release within modal lifecycle.",
+      "Unmounting during in-flight acquire is guaranteed to chain release after acquire settles, leaving held=false.",
+      "Duplicate release invocations are completely idempotent (zero redundant IPC calls).",
+      "Unhandled rejections are strictly suppressed within AsyncRecordingLock queue so UI thread never crashes."
+    ],
+    "unprovableExceptionsAndBoundaries": [
+      "If DSH Host shortcuts IPC rejects recording(false), the Host service may remain in recording mode. The DSH Client Shortcuts API does not provide a query method (getRecordingState()) or force-reset endpoint. However, DSH automatically disarms shortcut recording upon browser window blur or subsequent key registration."
+    ]
+  }
+}

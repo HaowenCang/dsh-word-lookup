@@ -1,0 +1,91 @@
+{
+  "timestamp": "2026-10-18T04:43:00.197Z",
+  "probe": "RC-E.1",
+  "verdict": "PASS",
+  "tarball": {
+    "filename": "dsh-word-lookup-0.2.0.tgz",
+    "path": "build/rc-v0.2.0/dsh-word-lookup-0.2.0.tgz",
+    "byteSize": 135326,
+    "sha256": "56f9f2277efa3163110e155b22c42be17f1e3126da00a6666a824c241bd90d48"
+  },
+  "packageManifest": {
+    "name": "dsh-word-lookup",
+    "version": "0.2.0",
+    "peerDependencies": {
+      "@deepseek-ai/cordis": "~4.0.4",
+      "@deepseek-ai/schemastery": "~3.18.4",
+      "react": "^18.2.0"
+    },
+    "dshCompatibility": {
+      "dsh": "0.2.0-rc.2",
+      "dshReleases": {
+        "0.2.0-rc.1": "unknown",
+        "0.2.0-rc.2": "compatible",
+        "0.2.1-alpha.1": "unknown"
+      },
+      "dshOperations": {
+        "0.2.0-rc.2": {
+          "install": "passed",
+          "start": "passed",
+          "uninstall": "passed",
+          "rollback": "passed"
+        }
+      },
+      "profiles": [
+        "web"
+      ]
+    }
+  },
+  "eightFilesWhitelist": [
+    {
+      "path": "LICENSE",
+      "byteSize": 1089,
+      "sha256": "99922c2a61954f0eaef1591241bcaaac4d3c8984a9866840180d65f7a1ff8101"
+    },
+    {
+      "path": "README.md",
+      "byteSize": 13978,
+      "sha256": "4f8e6a036ec7dc7f1a1ccd111021fd0dbad6f44433ed436942b7a9623a0444ff"
+    },
+    {
+      "path": "cordis.patch.yml",
+      "byteSize": 415,
+      "sha256": "df9851e21b59cafc69f91b0839c7cd56cb53104c57644813d9001e1a76c7d868"
+    },
+    {
+      "path": "corpus/ecdict.manifest.json",
+      "byteSize": 566,
+      "sha256": "03cba27d42cb43551d7b51fa12e4a07a869c5d4b65ac07f4fa3d105d9c944044"
+    },
+    {
+      "path": "lib/client.js",
+      "byteSize": 185043,
+      "sha256": "2a1425a94a782cb382ce031dd85d09627eba680f6baac2479dd32127e13e7952"
+    },
+    {
+      "path": "lib/ecdict-integrity-worker.js",
+      "byteSize": 23193,
+      "sha256": "0d6bda562785797d36e64fa9567125072c6e7626c77c25211ba9dd223294d2b6"
+    },
+    {
+      "path": "lib/index.js",
+      "byteSize": 345905,
+      "sha256": "f426d1ba68fe548867d46affc028690c6393d571fd77af457cc342ecd49abf2e"
+    },
+    {
+      "path": "package.json",
+      "byteSize": 5488,
+      "sha256": "e79d9176a09a8ee10f0c0c97c04e12e224c479b002483c0f32ad47dab229f996"
+    }
+  ],
+  "securityChecks": {
+    "noCredentials": true,
+    "noLifecycleScripts": true,
+    "noDynamicEval": true,
+    "noUnauthorizedCommands": true,
+    "noUnexpectedRuntimeDependencies": true,
+    "noEmbeddedEcdictDatabase": true,
+    "noTestFixturePackaged": true,
+    "noProductionUserHomePaths": true
+  }
+}

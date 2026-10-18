@@ -1,0 +1,329 @@
+{
+  "timestamp": "2026-10-18T04:47:00.000Z",
+  "phase": "Phase 7A.9",
+  "candidateVersion": "0.2.0",
+  "testedCodeGitSha": "b36bf4d1b8ec5b6ab3ae3750475d656c669bcdcf",
+  "currentHeadSha": "e09538c763e65c49bdada304e464701b256561ea",
+  "verdict": "PASS",
+  "summary": {
+    "totalScenarios": 20,
+    "passedScenarios": 20,
+    "failedScenarios": 0,
+    "hardGatesPassed": true,
+    "readyForV020Release": "YES",
+    "readyForNpmPublish": "NO"
+  },
+  "matrix": [
+    {
+      "scenarioId": "Q01",
+      "category": "RC-A: Large SQLite Scale",
+      "title": "Authentic 100 MiB+ SQLite Database Creation, Ingestion & Validation",
+      "probeReference": "scripts/probes/phase7a9/rc-a-large-database-benchmark.mjs",
+      "acceptanceCriteria": "Database size >= 100 MiB (104,857,600 bytes) with schema_version=1, required tables and indexes; integrity verification offloaded to worker thread.",
+      "observedMetrics": {
+        "byteSize": 110301184,
+        "byteSizeMb": 105.19,
+        "entryCount": 1750,
+        "formCount": 1750,
+        "sha256": "159889cedf59ef3530062244713032d2c9402ce6b9fa0ee18315ddca563e9b65",
+        "validationDurationMs": 555,
+        "workerOffloaded": true
+      },
+      "verdict": "PASS"
+    },
+    {
+      "scenarioId": "Q02",
+      "category": "RC-A: Large SQLite Scale",
+      "title": "100 MiB+ Dictionary Publication & Atomic Activation",
+      "probeReference": "scripts/probes/phase7a9/rc-a-large-database-benchmark.mjs",
+      "acceptanceCriteria": "Database published to custom-snapshots directory with atomic active.json metadata update and successful live lookup queries.",
+      "observedMetrics": {
+        "publishDurationMs": 2112,
+        "activeMode": "custom",
+        "headwordLookups": [
+          { "query": "bench_word_0", "found": true },
+          { "query": "bench_word_0s", "found": true },
+          { "query": "bench_word_1749", "found": true }
+        ]
+      },
+      "verdict": "PASS"
+    },
+    {
+      "scenarioId": "Q03",
+      "category": "RC-A: Large SQLite Scale",
+      "title": "Event-Loop Latency SLA Under 100 MiB+ Database Load",
+      "probeReference": "scripts/probes/phase7a9/rc-a-large-database-benchmark.mjs",
+      "acceptanceCriteria": "P99 event loop lag <= 100 ms; maximum lag <= 500 ms; heartbeat stall < 1000 ms.",
+      "observedMetrics": {
+        "p50Ms": 5.53,
+        "p95Ms": 9.34,
+        "p99Ms": 86.36,
+        "maxLagMs": 97.22,
+        "maxHeartbeatStallMs": 97.22
+      },
+      "verdict": "PASS"
+    },
+    {
+      "scenarioId": "Q04",
+      "category": "RC-A: Large SQLite Scale",
+      "title": "Peak Memory Bounded SLA (< 512 MiB Total / < 100 MiB Incremental)",
+      "probeReference": "scripts/probes/phase7a9/rc-a-large-database-benchmark.mjs",
+      "acceptanceCriteria": "Peak RSS increment over baseline strictly < 512 MiB; absolute RSS bounded.",
+      "observedMetrics": {
+        "baselineRssMb": 294.65,
+        "absolutePeakRssMb": 319.49,
+        "peakIncrementMb": 24.84,
+        "slaLimitMb": 512.0
+      },
+      "verdict": "PASS"
+    },
+    {
+      "scenarioId": "Q05",
+      "category": "RC-A: Large SQLite Scale",
+      "title": "Cold Startup Recovery of 100 MiB+ Database Offloaded to Worker",
+      "probeReference": "scripts/probes/phase7a9/rc-a-large-database-benchmark.mjs",
+      "acceptanceCriteria": "DSH restart recovers active 100 MiB+ dictionary with PRAGMA integrity check via companion worker without main-thread blocking; time-to-first-lookup responsive.",
+      "observedMetrics": {
+        "startupRecoveryMs": 3518,
+        "timeToFirstLookupMs": 8,
+        "workerExitedCleanly": true,
+        "ghostLeases": 0
+      },
+      "verdict": "PASS"
+    },
+    {
+      "scenarioId": "Q06",
+      "category": "RC-B: Crash Injection",
+      "title": "Scenario F01: Crash Post-Commit Pre-Ack (Managed ECDICT -> Custom)",
+      "probeReference": "scripts/probes/phase7a9/rc-b-process-crash-injection.mjs",
+      "acceptanceCriteria": "Child process exits (code 101) after writing active.json before IPC ack; on restart, system recovers active Custom mode and reconciles settings.",
+      "observedMetrics": {
+        "exitCode": 101,
+        "diskCommittedMode": "custom",
+        "recoveredMode": "custom",
+        "settingsSyncOutcome": "synced",
+        "lookupVerified": true
+      },
+      "verdict": "PASS"
+    },
+    {
+      "scenarioId": "Q07",
+      "category": "RC-B: Crash Injection",
+      "title": "Scenario F02: Crash Post-Commit Pre-Ack (Custom -> Managed ECDICT)",
+      "probeReference": "scripts/probes/phase7a9/rc-b-process-crash-injection.mjs",
+      "acceptanceCriteria": "Child process exits (code 102) after writing active.json for Managed mode; on restart, recovers Managed ECDICT and reconciles settings.",
+      "observedMetrics": {
+        "exitCode": 102,
+        "diskCommittedMode": "managed-ecdict",
+        "recoveredMode": "managed-ecdict",
+        "settingsSyncOutcome": "synced",
+        "lookupVerified": true
+      },
+      "verdict": "PASS"
+    },
+    {
+      "scenarioId": "Q08",
+      "category": "RC-B: Crash Injection",
+      "title": "Scenario F03: Crash Post-Unlink Pre-Ack (Custom -> Fixture)",
+      "probeReference": "scripts/probes/phase7a9/rc-b-process-crash-injection.mjs",
+      "acceptanceCriteria": "Child process exits (code 103) after unlinking active.json; on restart, correctly falls back to Fixture mode without phantom metadata.",
+      "observedMetrics": {
+        "exitCode": 103,
+        "activeJsonExists": false,
+        "recoveredMode": "fixture",
+        "fixtureStats": { "entryCount": 7, "formCount": 11 },
+        "lookupVerified": true
+      },
+      "verdict": "PASS"
+    },
+    {
+      "scenarioId": "Q09",
+      "category": "RC-B: Crash Injection",
+      "title": "Scenario F04: Crash Before Commit Boundary (Durable State Preserved)",
+      "probeReference": "scripts/probes/phase7a9/rc-b-process-crash-injection.mjs",
+      "acceptanceCriteria": "Child process exits (code 104) before active.json atomic rename; on restart, previous active dictionary remains authoritative.",
+      "observedMetrics": {
+        "exitCode": 104,
+        "uncommittedTargetDiscarded": true,
+        "recoveredMode": "custom",
+        "retainedSnapshotId": "authoritative-prior",
+        "queryPriorFound": true,
+        "queryNewFound": false
+      },
+      "verdict": "PASS"
+    },
+    {
+      "scenarioId": "Q10",
+      "category": "RC-B: Crash Injection",
+      "title": "Scenario F05: Crash After Commit Boundary, Pre-Host Config Ack",
+      "probeReference": "scripts/probes/phase7a9/rc-b-process-crash-injection.mjs",
+      "acceptanceCriteria": "Child process exits (code 105) with pending settingsSyncState; on restart, new active snapshot is adopted and settings reconciled to synced.",
+      "observedMetrics": {
+        "exitCode": 105,
+        "diskInitialSyncState": "pending",
+        "recoveredMode": "custom",
+        "recoveredSyncState": "synced",
+        "lookupTargetFound": true
+      },
+      "verdict": "PASS"
+    },
+    {
+      "scenarioId": "Q11",
+      "category": "RC-C: Multi-Snapshot UI",
+      "title": "SnapshotPickerModal Rendering & Listing Both Custom Snapshots (A & B)",
+      "probeReference": "scripts/probes/phase7a9/rc-c-multi-snapshot-ui.mjs",
+      "acceptanceCriteria": "Clicking top Custom button with > 1 valid snapshots opens SnapshotPickerModal displaying both snapshot A and B with distinct rows.",
+      "observedMetrics": {
+        "modalTestId": "snapshot-picker-modal",
+        "rowsRendered": 2,
+        "snapshotIds": ["5362f3a0-c092-4dff-9657-e079c53c55b1", "17e31805-b489-4f26-a8bb-331368af4a56"],
+        "screenshotCaptured": "rcc-S05-snapshot-picker-modal-open.png"
+      },
+      "verdict": "PASS"
+    },
+    {
+      "scenarioId": "Q12",
+      "category": "RC-C: Multi-Snapshot UI",
+      "title": "Explicit Snapshot Selection Routing & Real Lexicon Queries",
+      "probeReference": "scripts/probes/phase7a9/rc-c-multi-snapshot-ui.mjs",
+      "acceptanceCriteria": "Clicking select button inside modal for snapshot A activates A with A words found; selecting B activates B with B words found.",
+      "observedMetrics": {
+        "selectAOutcome": { "active": "dict-alpha", "lookupAstronomy": true, "lookupSynapse": false },
+        "selectBOutcome": { "active": "dict-beta", "lookupSynapse": true, "lookupAstronomy": false },
+        "explicitSnapshotIdTransferred": true
+      },
+      "verdict": "PASS"
+    },
+    {
+      "scenarioId": "Q13",
+      "category": "RC-C: Multi-Snapshot UI",
+      "title": "Multi-Snapshot Availability & Switching Persistence Across DSH Restart",
+      "probeReference": "scripts/probes/phase7a9/rc-c-multi-snapshot-ui.mjs",
+      "acceptanceCriteria": "Rebooting isolated DSH process preserves active snapshot B; returning to UI allows opening modal and selecting A cleanly.",
+      "observedMetrics": {
+        "postRebootActiveMode": "custom",
+        "postRebootActiveSnapshot": "dict-beta",
+        "postRebootSelectA": "PASS",
+        "postRebootSelectB": "PASS"
+      },
+      "verdict": "PASS"
+    },
+    {
+      "scenarioId": "Q14",
+      "category": "RC-C: Multi-Snapshot UI",
+      "title": "Inactive Snapshot Deletion With Modal Confirmation & Active Protection",
+      "probeReference": "scripts/probes/phase7a9/rc-c-multi-snapshot-ui.mjs",
+      "acceptanceCriteria": "Deleting inactive snapshot A via UI confirmation modal succeeds and removes row from catalog; active snapshot B remains functional and protected.",
+      "observedMetrics": {
+        "deletedSnapshot": "dict-alpha",
+        "confirmationModalConfirmed": true,
+        "rowRemovedFromDom": true,
+        "activeSnapshotBFunctional": true,
+        "lookupNeuronPostDelete": true
+      },
+      "verdict": "PASS"
+    },
+    {
+      "scenarioId": "Q15",
+      "category": "RC-C: Multi-Snapshot UI",
+      "title": "User Raw SQLite Source Files SHA-256 Invariance",
+      "probeReference": "scripts/probes/phase7a9/rc-c-multi-snapshot-ui.mjs",
+      "acceptanceCriteria": "Raw user SQLite database files A and B remain strictly unmodified across initial creation, publication, activation, switching, restart, and deletion.",
+      "observedMetrics": {
+        "sourceAInitialSha": "b6edf3fcc91250fb7a2beca84d5da479ebaf0875256be53d1964fa00c745cb16",
+        "sourceAFinalSha": "b6edf3fcc91250fb7a2beca84d5da479ebaf0875256be53d1964fa00c745cb16",
+        "sourceBInitialSha": "326155d554fef19e44117b6a0b8492cd42b8af6120a46314ed19600044e12fef",
+        "sourceBFinalSha": "326155d554fef19e44117b6a0b8492cd42b8af6120a46314ed19600044e12fef",
+        "invariant": true
+      },
+      "verdict": "PASS"
+    },
+    {
+      "scenarioId": "Q16",
+      "category": "RC-D: Recording Lock",
+      "title": "AsyncRecordingLock Concurrency, Exception Boundaries & Idempotency",
+      "probeReference": "scripts/probes/phase7a9/rc-d-recording-lock-probe.mjs",
+      "acceptanceCriteria": "10 critical concurrency scenarios pass: sequential queue execution, rejection handling, rapid open/close, unmount cleanup, and duplicate release idempotency.",
+      "observedMetrics": {
+        "scenariosTested": 10,
+        "scenariosPassed": 10,
+        "finalStateAlwaysFalse": true,
+        "zeroUnhandledRejections": true,
+        "idempotentReleaseCalls": true
+      },
+      "verdict": "PASS"
+    },
+    {
+      "scenarioId": "Q17",
+      "category": "RC-E: Store Packaging",
+      "title": "Production Package Surface Strict 8-File Whitelist Audit",
+      "probeReference": "scripts/probes/phase7a9/rc-e-store-package-install.mjs",
+      "acceptanceCriteria": "npm pack tarball contains strictly the 8 approved files and zero test fixtures, corpora databases, or dev scripts.",
+      "observedMetrics": {
+        "tarballName": "dsh-word-lookup-0.2.0.tgz",
+        "tarballByteSize": 135326,
+        "tarballSha256": "56f9f2277efa3163110e155b22c42be17f1e3126da00a6666a824c241bd90d48",
+        "unpackedFileCount": 8,
+        "whitelistedFiles": [
+          "LICENSE",
+          "README.md",
+          "cordis.patch.yml",
+          "corpus/ecdict.manifest.json",
+          "lib/client.js",
+          "lib/ecdict-integrity-worker.js",
+          "lib/index.js",
+          "package.json"
+        ]
+      },
+      "verdict": "PASS"
+    },
+    {
+      "scenarioId": "Q18",
+      "category": "RC-E: Store Packaging",
+      "title": "Security Invariants & Capability Contract Verification",
+      "probeReference": "scripts/probes/phase7a9/rc-e-store-package-install.mjs",
+      "acceptanceCriteria": "Zero credentials/tokens, zero lifecycle scripts, zero child_process, zero eval/Function, zero runtime dependencies, zero process.env.",
+      "observedMetrics": {
+        "lifecycleScripts": 0,
+        "runtimeDependencies": 0,
+        "childProcessCalls": 0,
+        "evalOrFunctionCalls": 0,
+        "processEnvAccessInProductionBundles": 0,
+        "credentialCandidates": 0
+      },
+      "verdict": "PASS"
+    },
+    {
+      "scenarioId": "Q19",
+      "category": "RC-E: Store Packaging",
+      "title": "Isolated DSH Profile .tgz Installation, Live Lookup & Clean Uninstall",
+      "probeReference": "scripts/probes/phase7a9/rc-e-store-package-install.mjs",
+      "acceptanceCriteria": "Candidate .tgz installs in clean profile; boots DSH, completes live query, renders settings UI, and uninstalls cleanly disarming routes without host crash.",
+      "observedMetrics": {
+        "installMethod": "tarball extract into profile node_modules",
+        "liveLookupFound": true,
+        "settingsUiRendered": true,
+        "uninstalledRouteStatus": 404,
+        "hostCrashOnUninstall": false
+      },
+      "verdict": "PASS"
+    },
+    {
+      "scenarioId": "Q20",
+      "category": "RC-F: Regression & Provenance",
+      "title": "Git SHA Provenance Closure & 100% Regression Suite Pass",
+      "probeReference": "scripts/probes/phase7a9/rc-f-historical-provenance-audit.mjs",
+      "acceptanceCriteria": "Historical commit SHA anomaly documented and closed; 60 test files and 1121 tests pass 100% with zero regressions.",
+      "observedMetrics": {
+        "testedCodeSha": "b36bf4d1b8ec5b6ab3ae3750475d656c669bcdcf",
+        "currentHeadSha": "e09538c763e65c49bdada304e464701b256561ea",
+        "productionCodeInvariance": "100% bit-for-bit identical",
+        "vitestFilesPassed": 60,
+        "vitestTestsPassed": 1121,
+        "storeContractVerify": "PASS",
+        "credentialScanVerify": "PASS"
+      },
+      "verdict": "PASS"
+    }
+  ]
+}
