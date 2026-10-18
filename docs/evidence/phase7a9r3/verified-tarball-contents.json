@@ -1,0 +1,88 @@
+{
+  "timestamp": "2026-10-18T08:29:15.294Z",
+  "phase": "PHASE7A9R3",
+  "verdict": "PASS",
+  "tarball": {
+    "filename": "dsh-word-lookup-0.2.0.tgz",
+    "path": "build/rc-v0.2.0/dsh-word-lookup-0.2.0.tgz",
+    "byteSize": 135731,
+    "sha256": "ce51e0e233d2b93b8b3d3f61548e0634debdedd0b20ac423a150037abf887f34",
+    "matchesHistoricalAnchor": true
+  },
+  "preExtractSecurityChecks": {
+    "memberCount": 8,
+    "pathTraversalDetected": false,
+    "symlinksOrHardlinksDetected": false,
+    "abnormalPathsDetected": false,
+    "allMembersInPackageRoot": true
+  },
+  "extractionVerification": {
+    "isolatedDirectoryPattern": "dsh-tarball-verify-* (tmpdir)",
+    "extractedFilesCount": 8,
+    "extractedSymlinksCount": 0,
+    "extractedOthersCount": 0,
+    "unpackedTotalBytes": 576913,
+    "extractedMembers": [
+      {
+        "path": "LICENSE",
+        "byteSize": 1089,
+        "sha256": "99922c2a61954f0eaef1591241bcaaac4d3c8984a9866840180d65f7a1ff8101",
+        "isSymbolicLink": false
+      },
+      {
+        "path": "README.md",
+        "byteSize": 15214,
+        "sha256": "478320e56539e88cddca40b1cde570e2e7f98bc44e840b1c4515330ef6160bd1",
+        "isSymbolicLink": false
+      },
+      {
+        "path": "cordis.patch.yml",
+        "byteSize": 415,
+        "sha256": "df9851e21b59cafc69f91b0839c7cd56cb53104c57644813d9001e1a76c7d868",
+        "isSymbolicLink": false
+      },
+      {
+        "path": "corpus/ecdict.manifest.json",
+        "byteSize": 566,
+        "sha256": "03cba27d42cb43551d7b51fa12e4a07a869c5d4b65ac07f4fa3d105d9c944044",
+        "isSymbolicLink": false
+      },
+      {
+        "path": "lib/client.js",
+        "byteSize": 185043,
+        "sha256": "2a1425a94a782cb382ce031dd85d09627eba680f6baac2479dd32127e13e7952",
+        "isSymbolicLink": false
+      },
+      {
+        "path": "lib/ecdict-integrity-worker.js",
+        "byteSize": 23193,
+        "sha256": "0d6bda562785797d36e64fa9567125072c6e7626c77c25211ba9dd223294d2b6",
+        "isSymbolicLink": false
+      },
+      {
+        "path": "lib/index.js",
+        "byteSize": 345905,
+        "sha256": "f426d1ba68fe548867d46affc028690c6393d571fd77af457cc342ecd49abf2e",
+        "isSymbolicLink": false
+      },
+      {
+        "path": "package.json",
+        "byteSize": 5488,
+        "sha256": "e79d9176a09a8ee10f0c0c97c04e12e224c479b002483c0f32ad47dab229f996",
+        "isSymbolicLink": false
+      }
+    ]
+  },
+  "assertions": {
+    "hasZeroSymlinks": true,
+    "hasZeroOthers": true,
+    "exact8Files": true,
+    "matchesExpectedWhitelist": true,
+    "missingFilesCount": 0,
+    "extraFilesCount": 0,
+    "allWorkspaceFilesMatch": true,
+    "allFrozenFilesMatch": true,
+    "whitelistVerification": "STRICT_PASS",
+    "verdict": "PASS"
+  }
+}

@@ -1,0 +1,204 @@
+{
+  "timestamp": "2026-10-18T08:30:06.470Z",
+  "probe": "RC-F",
+  "verdict": "PASS",
+  "anomalyResolution": {
+    "reportedPhantomSha": "1148da93b7ffc6448373b53c7db828943ca0b1f7",
+    "status": "RESOLVED_AS_TRANSCRIPTION_TYPO_OR_TRANSIENT_HASH",
+    "explanation": "The SHA 1148da93b7ffc6448373b53c7db828943ca0b1f7 shares the exact prefix 1148da9 with the authentic remote commit 1148da9a9dd6588401b56c996bfdda2a855e1cd8. It never existed on origin/master. The canonical evidence commit pushed for Phase 7A.8.2 was 1148da9a9dd6588401b56c996bfdda2a855e1cd8.",
+    "authenticEvidenceCommitSha": "1148da9a9dd6588401b56c996bfdda2a855e1cd8"
+  },
+  "lineage": [
+    {
+      "step": 1,
+      "role": "CODE_FREEZE_BASELINE",
+      "sha": "b36bf4d1b8ec5b6ab3ae3750475d656c669bcdcf",
+      "subject": "fix(client): close shortcut persistence and settings E2E gaps",
+      "author": "Evan Williams <54177361+HaowenCang@users.noreply.github.com>",
+      "date": "Sat Oct 17 20:09:18 2026 -0700",
+      "parentSha": "f923dcff8d1d9f6771d1baf86059c97b271caa92"
+    },
+    {
+      "step": 2,
+      "role": "PHASE_7A_8_2_EVIDENCE",
+      "sha": "1148da9a9dd6588401b56c996bfdda2a855e1cd8",
+      "subject": "test(evidence): close phase 7a8.2r2 acceptance provenance",
+      "author": "Evan Williams <54177361+HaowenCang@users.noreply.github.com>",
+      "date": "Sat Oct 17 20:15:17 2026 -0700",
+      "parentSha": "b36bf4d1b8ec5b6ab3ae3750475d656c669bcdcf"
+    },
+    {
+      "step": 3,
+      "role": "PHASE_7A_8_2R2_EVIDENCE",
+      "sha": "e09538c763e65c49bdada304e464701b256561ea",
+      "subject": "test(evidence): complete phase 7a8.2r2 acceptance artifacts and provenance closure",
+      "author": "Evan Williams <54177361+HaowenCang@users.noreply.github.com>",
+      "date": "Sat Oct 17 21:02:14 2026 -0700",
+      "parentSha": "1148da9a9dd6588401b56c996bfdda2a855e1cd8"
+    },
+    {
+      "step": 4,
+      "role": "PHASE_7A_9_RC_PROBES",
+      "sha": "4c74aaab98ffa9fa633f857c893a3d06ee01c9ea",
+      "subject": "test(phase7a9): add release candidate QA acceptance probes",
+      "author": "Evan Williams <54177361+HaowenCang@users.noreply.github.com>",
+      "date": "Sat Oct 17 21:48:44 2026 -0700",
+      "parentSha": "e09538c763e65c49bdada304e464701b256561ea"
+    },
+    {
+      "step": 5,
+      "role": "PHASE_7A_9_RC_EVIDENCE",
+      "sha": "7dbfb43d7eeb608e6ea45ccc579c63c588b854ad",
+      "subject": "docs(evidence): record phase 7a9 release candidate QA evidence and readiness report",
+      "author": "Evan Williams <54177361+HaowenCang@users.noreply.github.com>",
+      "date": "Sat Oct 17 21:48:54 2026 -0700",
+      "parentSha": "4c74aaab98ffa9fa633f857c893a3d06ee01c9ea"
+    },
+    {
+      "step": 6,
+      "role": "PHASE_7A_9R_EVIDENCE",
+      "sha": "fd2ec8cc9f0d638ba5e5d125f21f61f79fc63acd",
+      "subject": "fix(release): remediate release candidate audit findings and close phase 7a9r evidence",
+      "author": "Evan Williams <54177361+HaowenCang@users.noreply.github.com>",
+      "date": "Sat Oct 17 23:39:17 2026 -0700",
+      "parentSha": "7dbfb43d7eeb608e6ea45ccc579c63c588b854ad"
+    },
+    {
+      "step": 7,
+      "role": "PHASE_7A_9R_AUDIT_PROVENANCE_UPDATE",
+      "sha": "d538d073b582dd910867b0e7466909573e0b2190",
+      "subject": "test(evidence): update provenance audit probe and evidence for validation scripts",
+      "author": "Evan Williams <54177361+HaowenCang@users.noreply.github.com>",
+      "date": "Sat Oct 17 23:41:16 2026 -0700",
+      "parentSha": "fd2ec8cc9f0d638ba5e5d125f21f61f79fc63acd"
+    },
+    {
+      "step": 8,
+      "role": "PHASE_7A_9R2_EVIDENCE",
+      "sha": "b341ff1b8a8ab2107129bb5efd68cea97fb0f109",
+      "subject": "test(evidence): record Phase 7A.9R2 independent re-audit closure and empirical remediation",
+      "author": "Evan Williams <54177361+HaowenCang@users.noreply.github.com>",
+      "date": "Sun Oct 18 00:35:22 2026 -0700",
+      "parentSha": "d538d073b582dd910867b0e7466909573e0b2190"
+    },
+    {
+      "step": 9,
+      "role": "CURRENT_HEAD",
+      "sha": "fc1c5b64c56629cf0395121b8c76a3ddfc811ddc",
+      "subject": "test(phase7a9): remediate package identity and regression execution audit probes for phase 7a9r3",
+      "author": "Evan Williams <54177361+HaowenCang@users.noreply.github.com>",
+      "date": "Sun Oct 18 01:28:38 2026 -0700",
+      "parentSha": "b341ff1b8a8ab2107129bb5efd68cea97fb0f109"
+    }
+  ],
+  "changeClassification": {
+    "codeBaselineSha": "b36bf4d1b8ec5b6ab3ae3750475d656c669bcdcf",
+    "currentHeadSha": "fc1c5b64c56629cf0395121b8c76a3ddfc811ddc",
+    "totalDiffFiles": 117,
+    "classA_evidenceCount": 107,
+    "classB_rcProbesCount": 9,
+    "classC_approvedDocCount": 1,
+    "forbiddenCount": 0
+  },
+  "productionInvariance": {
+    "srcTreeSha": "24d78dfbb54ae62882aa661d4819f6397068e303",
+    "isSrcTreeIdentical": true,
+    "eightPackageFiles": [
+      {
+        "file": "LICENSE",
+        "baselineBlob": "6a131d2d0848a3f49d961523c8e2fdfb29d18307",
+        "headBlob": "6a131d2d0848a3f49d961523c8e2fdfb29d18307",
+        "identical": true,
+        "classification": "FROZEN_IDENTICAL"
+      },
+      {
+        "file": "README.md",
+        "baselineBlob": "035432d23d39222054ee19710a63aed372a3deba",
+        "headBlob": "4583fdf69758c828ed426d3fffdbc5e9dd15f425",
+        "identical": false,
+        "classification": "CLASS_C_APPROVED_DOCUMENTATION_CORRECTION"
+      },
+      {
+        "file": "cordis.patch.yml",
+        "baselineBlob": "6ac6d4a9dd95ee631a0556bb63bc57f8713d3044",
+        "headBlob": "6ac6d4a9dd95ee631a0556bb63bc57f8713d3044",
+        "identical": true,
+        "classification": "FROZEN_IDENTICAL"
+      },
+      {
+        "file": "corpus/ecdict.manifest.json",
+        "baselineBlob": "1d1d3f332900bc7e30680b4f6e50ff70ffeed4f6",
+        "headBlob": "1d1d3f332900bc7e30680b4f6e50ff70ffeed4f6",
+        "identical": true,
+        "classification": "FROZEN_IDENTICAL"
+      },
+      {
+        "file": "lib/client.js",
+        "baselineBlob": "1a4c9a74e212905a30925421b3eb4a66f6fa3117",
+        "headBlob": "1a4c9a74e212905a30925421b3eb4a66f6fa3117",
+        "identical": true,
+        "classification": "FROZEN_IDENTICAL"
+      },
+      {
+        "file": "lib/ecdict-integrity-worker.js",
+        "baselineBlob": "c035297927f80e3b91adc47df5f526a1ace35c07",
+        "headBlob": "c035297927f80e3b91adc47df5f526a1ace35c07",
+        "identical": true,
+        "classification": "FROZEN_IDENTICAL"
+      },
+      {
+        "file": "lib/index.js",
+        "baselineBlob": "afbce97c13b7707ec381ffc5fb3021f2e3c94149",
+        "headBlob": "afbce97c13b7707ec381ffc5fb3021f2e3c94149",
+        "identical": true,
+        "classification": "FROZEN_IDENTICAL"
+      },
+      {
+        "file": "package.json",
+        "baselineBlob": "0114f310e322f41ae39b46c9f762c1ef244ab8f7",
+        "headBlob": "0114f310e322f41ae39b46c9f762c1ef244ab8f7",
+        "identical": true,
+        "classification": "FROZEN_IDENTICAL"
+      }
+    ],
+    "frozenRuntimeCodeChanged": false
+  },
+  "regressionSuiteAudit": {
+    "runner": "vitest",
+    "source": "vitest-results.json",
+    "command": "npx vitest run --reporter=json",
+    "exitCode": 0,
+    "testExecutionSourceSha": "fc1c5b64c56629cf0395121b8c76a3ddfc811ddc",
+    "testedImplementationSha": "b36bf4d1b8ec5b6ab3ae3750475d656c669bcdcf",
+    "workingTreeCleanAtExecution": true,
+    "trackedFilesClean": true,
+    "startTime": "2026-10-18T08:29:23.049Z",
+    "endTime": "2026-10-18T08:30:04.769Z",
+    "durationMs": 41720,
+    "testFilesPassed": 264,
+    "testFilesFailed": 0,
+    "totalTestsPassed": 1121,
+    "totalTestsFailed": 0,
+    "storeContractVerdict": "PASS",
+    "credentialScanVerdict": "PASS",
+    "verdict": "PASS"
+  },
+  "provenanceStagingStructure": {
+    "CODE_FREEZE_SHA": "b36bf4d1b8ec5b6ab3ae3750475d656c669bcdcf",
+    "TESTED_IMPLEMENTATION_SHA": "b36bf4d1b8ec5b6ab3ae3750475d656c669bcdcf",
+    "TESTED_PROBE_SHA": "fc1c5b64c56629cf0395121b8c76a3ddfc811ddc",
+    "TEST_EXECUTION_SOURCE_SHA": "fc1c5b64c56629cf0395121b8c76a3ddfc811ddc",
+    "EVIDENCE_COMMIT_SHA": "Pending PHASE7A9R3 evidence commit (uncommitted during probe execution)",
+    "FINAL_OBSERVED_REMOTE_HEAD": "Observed on origin/master post-push to avoid circular reference",
+    "historicalLineage": {
+      "codeFreezeSha": "b36bf4d1b8ec5b6ab3ae3750475d656c669bcdcf",
+      "phase7a8_2_evidenceSha": "1148da9a9dd6588401b56c996bfdda2a855e1cd8",
+      "phase7a8_2r2_evidenceSha": "e09538c763e65c49bdada304e464701b256561ea",
+      "phase7a9_rcProbesSha": "4c74aaab98ffa9fa633f857c893a3d06ee01c9ea",
+      "phase7a9_rcEvidenceSha": "7dbfb43d7eeb608e6ea45ccc579c63c588b854ad",
+      "phase7a9r_evidenceSha": "fd2ec8cc9f0d638ba5e5d125f21f61f79fc63acd",
+      "phase7a9r_auditUpdateSha": "d538d073b582dd910867b0e7466909573e0b2190",
+      "phase7a9r2_evidenceSha": "b341ff1b8a8ab2107129bb5efd68cea97fb0f109"
+    }
+  }
+}
