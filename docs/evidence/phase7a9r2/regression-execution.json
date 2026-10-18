@@ -1,0 +1,25 @@
+{
+  "timestamp": "2026-10-18T07:33:23.757Z",
+  "testedCommitSha": "d538d073b582dd910867b0e7466909573e0b2190",
+  "verdict": "PASS",
+  "vitest": {
+    "source": "test-results.json",
+    "runner": "vitest",
+    "testFilesPassed": 60,
+    "testFilesFailed": 0,
+    "totalTestsPassed": 1121,
+    "totalTestsFailed": 0,
+    "success": true,
+    "verdict": "PASS"
+  },
+  "storeContract": {
+    "command": "node scripts/verify-store-contract.mjs",
+    "exitCode": 0,
+    "verdict": "PASS"
+  },
+  "credentialScan": {
+    "command": "node scripts/scan-credentials.mjs",
+    "exitCode": 0,
+    "verdict": "PASS"
+  }
+}

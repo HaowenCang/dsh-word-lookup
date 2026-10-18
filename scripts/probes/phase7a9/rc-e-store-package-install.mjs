@@ -253,8 +253,7 @@ async function main() {
 
   // Write store-package-sha256.json
   const evidenceDirs = [
-    join(REPO_ROOT, 'docs', 'evidence', 'phase7a9'),
-    join(REPO_ROOT, 'docs', 'evidence', 'phase7a9r'),
+    join(REPO_ROOT, 'docs', 'evidence', 'phase7a9r2'),
   ]
   for (const dir of evidenceDirs) {
     mkdirSync(dir, { recursive: true })
@@ -297,6 +296,15 @@ async function main() {
     )
     console.log(`\nWritten: ${join(dir, 'store-package-sha256.json')}`)
   }
+
+  // Also write package-identity.json for Phase 7A.9R2
+  const r2Dir = join(REPO_ROOT, 'docs', 'evidence', 'phase7a9r2')
+  writeFileSync(
+    join(r2Dir, 'package-identity.json'),
+    JSON.stringify(packageSha256Report, null, 2),
+    'utf8',
+  )
+  console.log(`Written: ${join(r2Dir, 'package-identity.json')}`)
 
   // 4. Isolated Profile Installation & Lifecycle Verification
   console.log('\n[4/5] Executing isolated Profile Installation & Lifecycle...')

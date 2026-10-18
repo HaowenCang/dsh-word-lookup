@@ -1,0 +1,40 @@
+{
+  "timestamp": "2026-10-18T07:29:17.594Z",
+  "probe": "RC-B F03 Settings Reconciliation",
+  "scenarioId": "F03",
+  "verdict": "PASS",
+  "analysis": {
+    "pendingDefinition": "settingsSyncState: 'pending' indicates that durable disk state has transitioned (active.json unlinked, making fixture mode permanent on disk), but synchronization to the Host Settings service (HostConfig via settings.update) was interrupted by the crash before acknowledgment.",
+    "isIntermediateAllowed": true,
+    "intermediateStateJustification": "In a post-unlink crash, active.json is deleted before the RPC to Host settings can be dispatched. On restart, the absence of active.json cleanly activates fixture mode. Because no active metadata intent file exists, startup recovery does not proactively overwrite Host settings, leaving settingsSyncState as 'pending'. This accurately reports the real state rather than falsely claiming synchronization.",
+    "doesConvergeEventually": "Remains 'pending' across idle restarts without external trigger; converges to 'synced' upon explicit mode selection or settings save reconciliation.",
+    "dataPlaneIntegrity": "100% correct and operational; queries succeed against fixture database, catalog digests remain invariant.",
+    "priorReportOverstatementCorrection": "Phase 7A.9R report claimed '5/5 scenarios recovered cleanly with atomic consistency and settings reconciliation'. This was an overstatement: F01, F02, F04, F05 reconciled to 'synced', whereas F03 durably recovered to 'fixture' with settingsSyncOutcome: 'pending'. F03 is compliant with the crash recovery protocol as an allowed intermediate state."
+  },
+  "recoveryTimeline": {
+    "preCrashActiveMode": "custom",
+    "requestedTransition": "fixture",
+    "crashStage": "post_unlink_pre_ack (exit 103)",
+    "diskStatePostCrash": {
+      "activeJsonExists": false
+    },
+    "postRestartStatus": {
+      "activeMode": "fixture",
+      "configuredMode": "custom",
+      "settingsSyncState": "pending",
+      "fixtureQueryDerive": true
+    },
+    "idleObservationPeriodMs": 1500,
+    "idleObservationStatus": {
+      "activeMode": "fixture",
+      "configuredMode": "custom",
+      "settingsSyncState": "pending"
+    },
+    "reconciliationAction": "select-mode: 'fixture'",
+    "reconciledStatus": {
+      "activeMode": "fixture",
+      "configuredMode": "fixture",
+      "settingsSyncState": "synced"
+    }
+  }
+}

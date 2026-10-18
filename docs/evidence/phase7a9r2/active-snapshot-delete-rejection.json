@@ -1,0 +1,60 @@
+{
+  "timestamp": "2026-10-18T07:28:39.353Z",
+  "probe": "RC-C",
+  "contractGate": "RC_C_ACTIVE_SNAPSHOT_PROTECTION",
+  "verdict": "PASS",
+  "endpoint": "/api/dsh-word-lookup/dictionary/remove-custom",
+  "requestMethod": "POST",
+  "requestContentType": "application/json",
+  "activeSnapshotId": "6a30d59e-a505-4047-8bbb-5254b985ddcb",
+  "uiDeleteButtonGating": {
+    "testedSnapshotId": "6a30d59e-a505-4047-8bbb-5254b985ddcb",
+    "disabled": true,
+    "title": "不能删除当前激活的词典快照，请先切换至其他词典"
+  },
+  "apiRejectionResponse": {
+    "status": 409,
+    "ok": false,
+    "headers": {
+      "contentType": "application/json; charset=utf-8"
+    },
+    "body": {
+      "ok": false,
+      "error": "SNAPSHOT_ACTIVE",
+      "message": "Cannot remove currently active custom dictionary snapshot \"6a30d59e-a505-4047-8bbb-5254b985ddcb\". Switch to another dictionary before removing."
+    }
+  },
+  "negativeControlsSummary": {
+    "wrongRoute": {
+      "status": 404,
+      "ok": false
+    },
+    "missingBody": {
+      "status": 400,
+      "ok": false,
+      "body": {
+        "ok": false,
+        "error": "INVALID_ARGUMENT",
+        "message": "Request body must contain non-empty \"snapshotId\""
+      }
+    }
+  },
+  "hostStateInvariance": {
+    "activeModeRemainsCustom": true,
+    "activeSnapshotIdRemainsB": true,
+    "snapshotBInCatalog": true,
+    "lexiconQueryValid": true,
+    "rawSourcesIntact": true,
+    "managedSnapshotIntact": true
+  },
+  "assertionVerification": {
+    "httpStatus409": true,
+    "responseOkFalse": true,
+    "bodyOkFalse": true,
+    "errorCodeSnapshotActive": true,
+    "noFalsePositive404": true,
+    "noFalsePositive400": true,
+    "noFalsePositive401": true,
+    "noFalsePositive500": true
+  }
+}

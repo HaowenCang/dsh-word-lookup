@@ -1,0 +1,195 @@
+{
+  "timestamp": "2026-10-18T07:20:36.016Z",
+  "probe": "RC-C Negative Controls",
+  "contractGate": "RC_C_NEGATIVE_CONTROLS",
+  "verdict": "PASS",
+  "totalCases": 11,
+  "casesPassed": 11,
+  "casesFailed": 0,
+  "falsePositivePreventionConfirmed": true,
+  "rulesVerified": [
+    "HTTP 404 (wrong route) must FAIL",
+    "HTTP 400 (missing body) must FAIL and not be mistaken for SNAPSHOT_ACTIVE",
+    "HTTP 401 (unauthorized) must FAIL",
+    "HTTP 405 (method not allowed) must FAIL",
+    "HTTP 500 (server crash) must FAIL",
+    "Network error must FAIL",
+    "HTTP 200 (deletion accepted) must FAIL as critical invariant breach",
+    "HTTP 409 with non-SNAPSHOT_ACTIVE code must FAIL",
+    "Only HTTP 409 + SNAPSHOT_ACTIVE + body.ok=false is accepted as PASS"
+  ],
+  "cases": [
+    {
+      "caseId": "NC-01",
+      "scenario": "Legacy wrong route (404 Not Found)",
+      "simulatedResponse": {
+        "status": 404,
+        "ok": false,
+        "body": null
+      },
+      "expectedEvaluation": false,
+      "actualEvaluation": false,
+      "reason": "Endpoint returned 404 NOT FOUND (unregistered route or missing entity); false positive prevented",
+      "verdict": "PASS"
+    },
+    {
+      "caseId": "NC-02",
+      "scenario": "Missing request body (400 Bad Request / INVALID_ARGUMENT)",
+      "simulatedResponse": {
+        "status": 400,
+        "ok": false,
+        "body": {
+          "ok": false,
+          "error": "INVALID_ARGUMENT",
+          "message": "Request body must contain non-empty \"snapshotId\""
+        }
+      },
+      "expectedEvaluation": false,
+      "actualEvaluation": false,
+      "reason": "Endpoint returned 400 BAD REQUEST (missing or invalid body); cannot be accepted as SNAPSHOT_ACTIVE",
+      "verdict": "PASS"
+    },
+    {
+      "caseId": "NC-03",
+      "scenario": "Unauthenticated request (401 Unauthorized)",
+      "simulatedResponse": {
+        "status": 401,
+        "ok": false,
+        "body": {
+          "ok": false,
+          "error": "UNAUTHORIZED"
+        }
+      },
+      "expectedEvaluation": false,
+      "actualEvaluation": false,
+      "reason": "Endpoint returned 401 UNAUTHORIZED (unauthenticated session); assertion failed",
+      "verdict": "PASS"
+    },
+    {
+      "caseId": "NC-04",
+      "scenario": "Method not allowed (405 Method Not Allowed)",
+      "simulatedResponse": {
+        "status": 405,
+        "ok": false,
+        "body": {
+          "ok": false,
+          "error": "METHOD_NOT_ALLOWED"
+        }
+      },
+      "expectedEvaluation": false,
+      "actualEvaluation": false,
+      "reason": "Endpoint returned 405 METHOD NOT ALLOWED; assertion failed",
+      "verdict": "PASS"
+    },
+    {
+      "caseId": "NC-05",
+      "scenario": "Internal Server Error (500)",
+      "simulatedResponse": {
+        "status": 500,
+        "ok": false,
+        "body": {
+          "ok": false,
+          "error": "INTERNAL_ERROR"
+        }
+      },
+      "expectedEvaluation": false,
+      "actualEvaluation": false,
+      "reason": "Endpoint returned 500 INTERNAL SERVER ERROR; assertion failed",
+      "verdict": "PASS"
+    },
+    {
+      "caseId": "NC-06",
+      "scenario": "Network / Transport exception (Fetch failed)",
+      "simulatedResponse": {
+        "error": "TypeError: Failed to fetch"
+      },
+      "expectedEvaluation": false,
+      "actualEvaluation": false,
+      "reason": "Network or fetch exception: TypeError: Failed to fetch",
+      "verdict": "PASS"
+    },
+    {
+      "caseId": "NC-07",
+      "scenario": "Deletion unexpectedly succeeded (200 OK)",
+      "simulatedResponse": {
+        "status": 200,
+        "ok": true,
+        "body": {
+          "ok": true,
+          "removed": true
+        }
+      },
+      "expectedEvaluation": false,
+      "actualEvaluation": false,
+      "reason": "Endpoint returned 200 OK (deletion was accepted!); critical invariant breach",
+      "verdict": "PASS"
+    },
+    {
+      "caseId": "NC-08",
+      "scenario": "409 Conflict with wrong business error code (OPERATION_IN_PROGRESS)",
+      "simulatedResponse": {
+        "status": 409,
+        "ok": false,
+        "body": {
+          "ok": false,
+          "error": "OPERATION_IN_PROGRESS",
+          "message": "Busy"
+        }
+      },
+      "expectedEvaluation": false,
+      "actualEvaluation": false,
+      "reason": "Expected error code \"SNAPSHOT_ACTIVE\", received \"OPERATION_IN_PROGRESS\"",
+      "verdict": "PASS"
+    },
+    {
+      "caseId": "NC-09",
+      "scenario": "409 Conflict with SNAPSHOT_LEASED instead of SNAPSHOT_ACTIVE",
+      "simulatedResponse": {
+        "status": 409,
+        "ok": false,
+        "body": {
+          "ok": false,
+          "error": "SNAPSHOT_LEASED",
+          "message": "Snapshot has active leases"
+        }
+      },
+      "expectedEvaluation": false,
+      "actualEvaluation": false,
+      "reason": "Expected error code \"SNAPSHOT_ACTIVE\", received \"SNAPSHOT_LEASED\"",
+      "verdict": "PASS"
+    },
+    {
+      "caseId": "NC-10",
+      "scenario": "409 Conflict but body.ok is unexpectedly true",
+      "simulatedResponse": {
+        "status": 409,
+        "ok": false,
+        "body": {
+          "ok": true,
+          "error": "SNAPSHOT_ACTIVE"
+        }
+      },
+      "expectedEvaluation": false,
+      "actualEvaluation": false,
+      "reason": "Expected body.ok === false, received true",
+      "verdict": "PASS"
+    },
+    {
+      "caseId": "PC-01",
+      "scenario": "Canonical production active snapshot refusal (409 + SNAPSHOT_ACTIVE + body.ok === false)",
+      "simulatedResponse": {
+        "status": 409,
+        "ok": false,
+        "body": {
+          "ok": false,
+          "error": "SNAPSHOT_ACTIVE",
+          "message": "Cannot remove currently active custom dictionary snapshot \"b58255d4b425\". Switch to another dictionary before removing."
+        }
+      },
+      "expectedEvaluation": true,
+      "actualEvaluation": true,
+      "reason": "Strict protocol compliance: HTTP 409 + SNAPSHOT_ACTIVE + body.ok === false",
+      "verdict": "PASS"
+    }
+  ]
+}

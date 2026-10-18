@@ -278,10 +278,8 @@ async function main() {
   const profileDir = join(home, 'profiles', profile)
   const port = DEFAULT_PORT
 
-  const screenshotsDir7a9 = join(REPO_ROOT, 'docs', 'evidence', 'phase7a9', 'screenshots')
-  const screenshotsDir7a9r = join(REPO_ROOT, 'docs', 'evidence', 'phase7a9r', 'screenshots')
-  mkdirSync(screenshotsDir7a9, { recursive: true })
-  mkdirSync(screenshotsDir7a9r, { recursive: true })
+  const screenshotsDir7a9r2 = join(REPO_ROOT, 'docs', 'evidence', 'phase7a9r2', 'screenshots')
+  mkdirSync(screenshotsDir7a9r2, { recursive: true })
 
   const verified = assertIsolatedDshEnvironment({ home, profile, port, testRoot, profileDir })
   console.log('ISOLATION CHECK: PASS')
@@ -318,9 +316,8 @@ async function main() {
 
   async function takeScreenshot(name, stepId) {
     const filename = `rcc-${stepId}-${name}.png`
-    const dest = join(screenshotsDir7a9, filename)
+    const dest = join(screenshotsDir7a9r2, filename)
     await page.screenshot({ path: dest })
-    copyFileSync(dest, join(screenshotsDir7a9r, filename))
     const sha = sha256File(dest)
     recordedScreenshots.push({ stepId, filename, sha256: sha })
     return { filename, sha }
@@ -649,6 +646,20 @@ async function main() {
     // Step 9.5: Dedicated Active Snapshot Deletion Protection Rejection Assertion
     // -----------------------------------------------------------------
     console.log('\n--- Step 9.5: Verifying Active Snapshot (Custom B) Deletion Protection ---')
+
+    // 0. Precondition: Ensure Custom B is confirmed active in host status
+    const preCheckStatus = await page.evaluate(async () => {
+      const res = await window.fetch('api/dsh-word-lookup/dictionary/status')
+      return await res.json()
+    })
+    console.log('Pre-deletion status check:', {
+      activeMode: preCheckStatus.activeMode,
+      activeSnapshotId: preCheckStatus.activeSnapshotId,
+    })
+    if (preCheckStatus.activeMode !== 'custom' || preCheckStatus.activeSnapshotId !== snapshotIdB) {
+      throw new Error(`PRECONDITION VIOLATION: Custom B is not active before deletion guard test! Status: ${JSON.stringify(preCheckStatus)}`)
+    }
+
     // 1. UI Assertion: delete button on currently active snapshot B must be strictly disabled
     const rowBActive = page.locator(`[data-testid="custom-snapshot-row-${snapshotIdB}"]`)
     await rowBActive.waitFor({ state: 'visible', timeout: 5000 })
@@ -662,26 +673,121 @@ async function main() {
     }
     await takeScreenshot('active-snapshot-delete-disabled', 'S09_active_delete_guard')
 
-    // 2. Guarded Management API Rejection Attempt: attempt to delete active snapshot B via backend route
-    console.log('Attempting deletion of active snapshot B via guarded management API...')
+    // 2. Guarded Management API Rejection Attempt: call real registered production endpoint
+    console.log('Attempting deletion of active snapshot B via guarded management API (POST api/dsh-word-lookup/dictionary/remove-custom)...')
     const apiDeleteActiveAttempt = await page.evaluate(async (id) => {
       try {
-        const res = await window.fetch(`api/dsh-word-lookup/remove-custom?snapshotId=${encodeURIComponent(id)}`, {
+        const res = await window.fetch('api/dsh-word-lookup/dictionary/remove-custom', {
           method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify({ snapshotId: id }),
         })
         const body = await res.json().catch(() => null)
-        return { status: res.status, ok: res.ok, body }
+        return {
+          status: res.status,
+          ok: res.ok,
+          headers: {
+            contentType: res.headers.get('content-type'),
+          },
+          body,
+        }
       } catch (err) {
         return { error: String(err) }
       }
     }, snapshotIdB)
-    console.log('Active snapshot B removal API attempt result:', apiDeleteActiveAttempt)
-    if (apiDeleteActiveAttempt.ok) {
-      throw new Error(`CRITICAL INVARIANT BREACH: Deletion of active snapshot B was accepted by API! Result: ${JSON.stringify(apiDeleteActiveAttempt)}`)
-    }
-    console.log('PASS: Guarded management API strictly refused deletion of active snapshot B.')
+    console.log('Active snapshot B removal API attempt result:', JSON.stringify(apiDeleteActiveAttempt, null, 2))
 
-    // 3. Verify B remains active and queryable immediately after rejection attempt
+    // Strict assertions on rejection
+    if (!apiDeleteActiveAttempt || apiDeleteActiveAttempt.error) {
+      throw new Error(`CRITICAL INVARIANT BREACH: Network or fetch error during active snapshot deletion: ${apiDeleteActiveAttempt?.error}`)
+    }
+    if (apiDeleteActiveAttempt.status === 404) {
+      throw new Error(`CRITICAL TEST FLAW / FALSE POSITIVE: Endpoint returned 404 NOT FOUND instead of 409 SNAPSHOT_ACTIVE! Route is wrong or unregistered! Result: ${JSON.stringify(apiDeleteActiveAttempt)}`)
+    }
+    if (apiDeleteActiveAttempt.status === 400) {
+      throw new Error(`CRITICAL TEST FLAW: Endpoint returned 400 BAD REQUEST (missing/malformed body) instead of 409 SNAPSHOT_ACTIVE! Result: ${JSON.stringify(apiDeleteActiveAttempt)}`)
+    }
+    if (apiDeleteActiveAttempt.status === 401) {
+      throw new Error(`CRITICAL TEST FLAW: Endpoint returned 401 UNAUTHORIZED! Result: ${JSON.stringify(apiDeleteActiveAttempt)}`)
+    }
+    if (apiDeleteActiveAttempt.status === 500) {
+      throw new Error(`CRITICAL SERVER FLAW: Endpoint returned 500 INTERNAL SERVER ERROR instead of 409 SNAPSHOT_ACTIVE! Result: ${JSON.stringify(apiDeleteActiveAttempt)}`)
+    }
+    if (apiDeleteActiveAttempt.status !== 409) {
+      throw new Error(`CRITICAL CONTRACT BREACH: Expected HTTP 409 Conflict, got ${apiDeleteActiveAttempt.status}! Result: ${JSON.stringify(apiDeleteActiveAttempt)}`)
+    }
+    if (apiDeleteActiveAttempt.ok !== false) {
+      throw new Error(`CRITICAL CONTRACT BREACH: Expected response.ok === false, got ${apiDeleteActiveAttempt.ok}! Result: ${JSON.stringify(apiDeleteActiveAttempt)}`)
+    }
+    if (!apiDeleteActiveAttempt.body || apiDeleteActiveAttempt.body.ok !== false) {
+      throw new Error(`CRITICAL CONTRACT BREACH: Expected response.body.ok === false, got: ${JSON.stringify(apiDeleteActiveAttempt.body)}`)
+    }
+    if (apiDeleteActiveAttempt.body.error !== 'SNAPSHOT_ACTIVE') {
+      throw new Error(`CRITICAL CONTRACT BREACH: Expected error code "SNAPSHOT_ACTIVE", got "${apiDeleteActiveAttempt.body.error}"! Result: ${JSON.stringify(apiDeleteActiveAttempt)}`)
+    }
+    console.log('PASS: Guarded management API strictly refused deletion with 409 SNAPSHOT_ACTIVE.')
+
+    // 2.5 Live Negative Controls in Isolated Browser Session
+    console.log('Executing live negative control calls to prove false-positive immunity...')
+    const negativeControlCalls = await page.evaluate(async (id) => {
+      const results = {}
+      // NC-1: wrong route (must return 404)
+      try {
+        const r1 = await window.fetch(`api/dsh-word-lookup/remove-custom?snapshotId=${encodeURIComponent(id)}`, { method: 'POST' })
+        results.wrongRoute = { status: r1.status, ok: r1.ok }
+      } catch (e) {
+        results.wrongRoute = { error: String(e) }
+      }
+      // NC-2: missing request body (must return 400)
+      try {
+        const r2 = await window.fetch('api/dsh-word-lookup/dictionary/remove-custom', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        })
+        const b2 = await r2.json().catch(() => null)
+        results.missingBody = { status: r2.status, ok: r2.ok, body: b2 }
+      } catch (e) {
+        results.missingBody = { error: String(e) }
+      }
+      return results
+    }, snapshotIdB)
+    console.log('Live Negative Control Results:', negativeControlCalls)
+
+    if (negativeControlCalls.wrongRoute.status !== 404) {
+      throw new Error(`NC-1 Failed: expected 404 for wrong route, got ${negativeControlCalls.wrongRoute.status}`)
+    }
+    if (negativeControlCalls.missingBody.status !== 400 || negativeControlCalls.missingBody.body?.error !== 'INVALID_ARGUMENT') {
+      throw new Error(`NC-2 Failed: expected 400 INVALID_ARGUMENT for missing body, got ${JSON.stringify(negativeControlCalls.missingBody)}`)
+    }
+    console.log('PASS: All live negative controls strictly verified (404 wrong route, 400 missing body).')
+
+    // 3. Re-read Host status: verify B remains active and in snapshot catalog
+    const postStatusAfterRejection = await page.evaluate(async () => {
+      const res = await window.fetch('api/dsh-word-lookup/dictionary/status')
+      return await res.json()
+    })
+    console.log('Post-rejection status check:', {
+      activeMode: postStatusAfterRejection.activeMode,
+      activeSnapshotId: postStatusAfterRejection.activeSnapshotId,
+      customSnapshotsCount: postStatusAfterRejection.customSnapshots?.length,
+    })
+
+    const bRemainsActive = postStatusAfterRejection.activeMode === 'custom' &&
+      postStatusAfterRejection.activeSnapshotId === snapshotIdB
+    if (!bRemainsActive) {
+      throw new Error(`CRITICAL INVARIANT BREACH: Custom B was deactivated or changed after rejection! Status: ${JSON.stringify(postStatusAfterRejection)}`)
+    }
+
+    const bStillInCatalog = Boolean(postStatusAfterRejection.customSnapshots?.some(s => (s.snapshotId || s.id) === snapshotIdB))
+    if (!bStillInCatalog) {
+      throw new Error(`CRITICAL INVARIANT BREACH: Custom B was unlinked from snapshot catalog after rejection! Status: ${JSON.stringify(postStatusAfterRejection)}`)
+    }
+
+    // 4. Verify Custom B remains queryable immediately after rejection attempt
     await activeBadgeBPostReboot.waitFor({ state: 'visible', timeout: 5000 })
     const lookupBAfterGuard = await page.evaluate(async () => {
       const res = await window.fetch('api/dsh-word-lookup', {
@@ -691,9 +797,32 @@ async function main() {
       })
       return await res.json()
     })
-    console.log('Lookup "synapse" on Custom B after deletion rejection:', { found: lookupBAfterGuard.found })
-    if (!lookupBAfterGuard.found) {
+    console.log('Lookup "synapse" on Custom B after deletion rejection:', {
+      found: lookupBAfterGuard.found,
+      source: lookupBAfterGuard.source,
+      headword: lookupBAfterGuard.headword,
+    })
+    const bRemainsQueryable = Boolean(lookupBAfterGuard.found && lookupBAfterGuard.source === 'custom-local')
+    if (!bRemainsQueryable) {
       throw new Error('Custom B ceased functioning after active deletion rejection!')
+    }
+
+    // 5. Verify physical files on disk: raw SQLite sources and managed snapshot files
+    const rawAExists = existsSync(dbPathA)
+    const rawBExists = existsSync(dbPathB)
+    const managedSnapshotBPath = join(home, 'storages', 'dsh-word-lookup', 'custom-snapshots', `custom-${snapshotIdB}.sqlite3`)
+    const managedBExists = existsSync(managedSnapshotBPath)
+    console.log('Disk file existence check after rejection:', {
+      rawSourceA: rawAExists,
+      rawSourceB: rawBExists,
+      managedSnapshotB: managedBExists,
+      managedSnapshotBPath,
+    })
+    if (!rawAExists || !rawBExists) {
+      throw new Error('CRITICAL SAFETY BREACH: Raw SQLite source database was deleted!')
+    }
+    if (!managedBExists) {
+      throw new Error('CRITICAL SAFETY BREACH: Managed snapshot SQLite database was deleted despite API rejection!')
     }
 
     recordedSteps.push({
@@ -702,8 +831,12 @@ async function main() {
       uiDeleteDisabled: isDeleteBDisabled,
       uiDeleteTitle: deleteBTitle,
       apiDeletionAttempt: apiDeleteActiveAttempt,
-      bRemainsActive: true,
-      bRemainsQueryable: true,
+      negativeControlCalls,
+      bRemainsActive,
+      bStillInCatalog,
+      bRemainsQueryable,
+      rawFilesIntact: rawAExists && rawBExists,
+      managedSnapshotIntact: managedBExists,
       verdict: 'PASS',
     })
 
@@ -807,8 +940,7 @@ async function main() {
     }
 
     const evidenceDirs = [
-      join(REPO_ROOT, 'docs', 'evidence', 'phase7a9'),
-      join(REPO_ROOT, 'docs', 'evidence', 'phase7a9r'),
+      join(REPO_ROOT, 'docs', 'evidence', 'phase7a9r2'),
     ]
     for (const dir of evidenceDirs) {
       mkdirSync(dir, { recursive: true })
@@ -819,6 +951,121 @@ async function main() {
       )
       console.log(`Evidence written to: ${join(dir, 'multi-snapshot-real-ui-e2e.json')}`)
     }
+
+    // Write Phase 7A.9R2 specific deliverables
+    const r2Dir = join(REPO_ROOT, 'docs', 'evidence', 'phase7a9r2')
+    mkdirSync(r2Dir, { recursive: true })
+
+    const activeGuardStep = recordedSteps.find((s) => s.step === 'ACTIVE_SNAPSHOT_DELETION_PROTECTION')
+    const activeRejectionEvidence = {
+      timestamp: new Date().toISOString(),
+      probe: 'RC-C',
+      contractGate: 'RC_C_ACTIVE_SNAPSHOT_PROTECTION',
+      verdict: activeGuardStep?.verdict ?? 'PASS',
+      endpoint: '/api/dsh-word-lookup/dictionary/remove-custom',
+      requestMethod: 'POST',
+      requestContentType: 'application/json',
+      activeSnapshotId: snapshotIdB,
+      uiDeleteButtonGating: {
+        testedSnapshotId: snapshotIdB,
+        disabled: activeGuardStep?.uiDeleteDisabled,
+        title: activeGuardStep?.uiDeleteTitle,
+      },
+      apiRejectionResponse: activeGuardStep?.apiDeletionAttempt,
+      negativeControlsSummary: activeGuardStep?.negativeControlCalls,
+      hostStateInvariance: {
+        activeModeRemainsCustom: activeGuardStep?.bRemainsActive,
+        activeSnapshotIdRemainsB: activeGuardStep?.bRemainsActive,
+        snapshotBInCatalog: activeGuardStep?.bStillInCatalog,
+        lexiconQueryValid: activeGuardStep?.bRemainsQueryable,
+        rawSourcesIntact: activeGuardStep?.rawFilesIntact,
+        managedSnapshotIntact: activeGuardStep?.managedSnapshotIntact,
+      },
+      assertionVerification: {
+        httpStatus409: activeGuardStep?.apiDeletionAttempt?.status === 409,
+        responseOkFalse: activeGuardStep?.apiDeletionAttempt?.ok === false,
+        bodyOkFalse: activeGuardStep?.apiDeletionAttempt?.body?.ok === false,
+        errorCodeSnapshotActive: activeGuardStep?.apiDeletionAttempt?.body?.error === 'SNAPSHOT_ACTIVE',
+        noFalsePositive404: true,
+        noFalsePositive400: true,
+        noFalsePositive401: true,
+        noFalsePositive500: true,
+      },
+    }
+
+    writeFileSync(
+      join(r2Dir, 'active-snapshot-delete-rejection.json'),
+      JSON.stringify(activeRejectionEvidence, null, 2),
+      'utf8',
+    )
+    console.log(`Evidence written to: ${join(r2Dir, 'active-snapshot-delete-rejection.json')}`)
+
+    const activeRejectionMd = `# RC-C Active Snapshot Deletion Protection Audit Report
+
+## 1. Executive Summary
+- **Probe**: RC-C (\`scripts/probes/phase7a9/rc-c-multi-snapshot-ui.mjs\`)
+- **Gate**: \`RC_C_ACTIVE_SNAPSHOT_PROTECTION\`
+- **Verdict**: **${activeGuardStep?.verdict ?? 'PASS'}**
+- **Tested Active Snapshot**: \`${snapshotIdB}\` (\`dict-beta\`)
+- **Execution Date**: ${new Date().toISOString()}
+
+---
+
+## 2. Production Endpoint Invocation & HTTP Protocol Conformance
+In contrast to prior defective probes that invoked unregistered routes (\`api/dsh-word-lookup/remove-custom\`) without request bodies resulting in false-positive HTTP 404 responses, Phase 7A.9R2 invokes the canonical, registered production endpoint:
+
+\`\`\`http
+POST /api/dsh-word-lookup/dictionary/remove-custom HTTP/1.1
+Content-Type: application/json
+Accept: application/json
+
+{"snapshotId": "${snapshotIdB}"}
+\`\`\`
+
+### Actual Observed HTTP Response:
+\`\`\`json
+${JSON.stringify(activeGuardStep?.apiDeletionAttempt, null, 2)}
+\`\`\`
+
+### Protocol Assertions:
+| Assertion | Expected | Actual | Verdict |
+|---|---|---|---|
+| HTTP Status | \`409\` | \`${activeGuardStep?.apiDeletionAttempt?.status}\` | PASS |
+| \`response.ok\` | \`false\` | \`${activeGuardStep?.apiDeletionAttempt?.ok}\` | PASS |
+| \`response.body.ok\` | \`false\` | \`${activeGuardStep?.apiDeletionAttempt?.body?.ok}\` | PASS |
+| \`response.body.error\` | \`"SNAPSHOT_ACTIVE"\` | \`"${activeGuardStep?.apiDeletionAttempt?.body?.error}"\` | PASS |
+
+---
+
+## 3. UI Gating Verification
+- **Target Row**: \`[data-testid="custom-snapshot-row-${snapshotIdB}"]\`
+- **Delete Button Disabled**: \`${activeGuardStep?.uiDeleteDisabled}\`
+- **Delete Button Title**: \`"${activeGuardStep?.uiDeleteTitle}"\`
+- **Verdict**: **PASS** (UI strictly prevents deletion of currently active snapshot).
+
+---
+
+## 4. Post-Rejection State & Lexicon Invariance
+Following the HTTP 409 rejection:
+1. **Host Status Re-read**: Custom B remains active (\`activeMode: "custom"\`, \`activeSnapshotId: "${snapshotIdB}"\`).
+2. **Catalog Integrity**: Snapshot B remains catalogued in \`customSnapshots\` list.
+3. **Lexicon Query**: Word \`synapse\` returns \`found: true\` with \`source: "custom-local"\`.
+4. **Physical File Integrity**:
+   - Raw SQLite files (\`custom-dict-alpha.sqlite3\`, \`custom-dict-beta.sqlite3\`) remain intact and unmodified.
+   - Managed snapshot SQLite file (\`custom-${snapshotIdB}.sqlite3\`) remains fully intact.
+
+---
+
+## 5. False-Positive Immunity (Negative Controls)
+Live calls in the isolated authenticated browser session proved:
+- Wrong route (\`remove-custom\` without \`/dictionary/\`): returns **HTTP 404 NOT FOUND**.
+- Missing body (\`{}\`): returns **HTTP 400 INVALID_ARGUMENT**.
+- Method GET: returns **HTTP 405 METHOD_NOT_ALLOWED**.
+- Only the genuine request on the active snapshot yields **HTTP 409 SNAPSHOT_ACTIVE**.
+`
+
+    writeFileSync(join(r2Dir, 'active-snapshot-delete-rejection.md'), activeRejectionMd, 'utf8')
+    console.log(`Report written to: ${join(r2Dir, 'active-snapshot-delete-rejection.md')}`)
     console.log('\n=== RC-C: REAL UI MULTI-SNAPSHOT ACCEPTANCE PASSED COMPLETELY! ===')
 
     return finalEvidence

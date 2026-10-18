@@ -29,7 +29,7 @@
  */
 
 import { spawnSync } from 'node:child_process'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -47,6 +47,109 @@ function getCommitInfo(sha) {
   const raw = runGit(['log', '-1', '--format=%H%x00%s%x00%an <%ae>%x00%ad%x00%P', sha])
   const [commitSha, subject, author, date, parentSha] = raw.split('\0')
   return { sha: commitSha, subject, author, date, parentSha }
+}
+
+function collectRealRegressionEvidence(headSha) {
+  const regExecutionPath = join(REPO_ROOT, 'docs', 'evidence', 'phase7a9r2', 'regression-execution.json')
+  const testResultsPath = join(REPO_ROOT, 'docs', 'evidence', 'phase7a9r2', 'vitest-results.json')
+
+  let vitestStats = null
+
+  // 1. Vitest results: parse machine-readable json
+  if (existsSync(testResultsPath)) {
+    try {
+      const parsed = JSON.parse(readFileSync(testResultsPath, 'utf8'))
+      const fileCount = parsed.testResults ? parsed.testResults.length : 0
+      vitestStats = {
+        source: 'test-results.json',
+        runner: 'vitest',
+        testFilesPassed: fileCount,
+        testFilesFailed: (parsed.numFailedTestSuites || 0),
+        totalTestsPassed: parsed.numPassedTests || 0,
+        totalTestsFailed: parsed.numFailedTests || 0,
+        success: parsed.success === true,
+        verdict: (parsed.success === true && (parsed.numFailedTests || 0) === 0) ? 'PASS' : 'FAIL',
+      }
+    } catch {
+      vitestStats = null
+    }
+  }
+
+  if (!vitestStats) {
+    console.log('Running real Vitest suite to capture machine-readable output...')
+    const start = Date.now()
+    const npxCmd = process.platform === 'win32' ? 'npx.cmd' : 'npx'
+    const vitestRes = spawnSync(npxCmd, ['vitest', 'run', '--reporter=json', `--outputFile=${testResultsPath}`], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      shell: true,
+      maxBuffer: 50 * 1024 * 1024,
+    })
+    const durationMs = Date.now() - start
+    if (existsSync(testResultsPath)) {
+      try {
+        const parsed = JSON.parse(readFileSync(testResultsPath, 'utf8'))
+        const fileCount = parsed.testResults ? parsed.testResults.length : 0
+        vitestStats = {
+          source: 'real-execution',
+          command: 'npx vitest run --reporter=json',
+          exitCode: vitestRes.status,
+          durationMs,
+          runner: 'vitest',
+          testFilesPassed: fileCount,
+          testFilesFailed: (parsed.numFailedTestSuites || 0),
+          totalTestsPassed: parsed.numPassedTests || 0,
+          totalTestsFailed: parsed.numFailedTests || 0,
+          success: parsed.success === true,
+          verdict: (parsed.success === true && (parsed.numFailedTests || 0) === 0) ? 'PASS' : 'FAIL',
+        }
+      } catch (err) {
+        vitestStats = { status: 'NOT_VERIFIED', error: String(err) }
+      }
+    } else {
+      vitestStats = { status: 'NOT_VERIFIED', exitCode: vitestRes.status }
+    }
+  }
+
+  // 2. Store contract verification
+  console.log('Running store contract verification...')
+  const storeRes = spawnSync('node', ['scripts/verify-store-contract.mjs'], { cwd: REPO_ROOT, encoding: 'utf8', shell: true })
+  const storeContractStats = {
+    command: 'node scripts/verify-store-contract.mjs',
+    exitCode: storeRes.status,
+    verdict: storeRes.status === 0 ? 'PASS' : 'FAIL',
+  }
+
+  // 3. Credential scan
+  console.log('Running credential scan...')
+  const credRes = spawnSync('node', ['scripts/scan-credentials.mjs'], { cwd: REPO_ROOT, encoding: 'utf8', shell: true })
+  const credentialScanStats = {
+    command: 'node scripts/scan-credentials.mjs',
+    exitCode: credRes.status,
+    verdict: credRes.status === 0 ? 'PASS' : 'FAIL',
+  }
+
+  const overallVerdict = (
+    vitestStats?.verdict === 'PASS' &&
+    storeContractStats?.verdict === 'PASS' &&
+    credentialScanStats?.verdict === 'PASS'
+  ) ? 'PASS' : (vitestStats?.status === 'NOT_VERIFIED' ? 'NOT_VERIFIED' : 'FAIL')
+
+  const fullRegressionExecution = {
+    timestamp: new Date().toISOString(),
+    testedCommitSha: headSha,
+    verdict: overallVerdict,
+    vitest: vitestStats,
+    storeContract: storeContractStats,
+    credentialScan: credentialScanStats,
+  }
+
+  const r2Dir = join(REPO_ROOT, 'docs', 'evidence', 'phase7a9r2')
+  mkdirSync(r2Dir, { recursive: true })
+  writeFileSync(regExecutionPath, JSON.stringify(fullRegressionExecution, null, 2), 'utf8')
+  console.log(`Regression execution saved to: ${regExecutionPath}`)
+
+  return fullRegressionExecution
 }
 
 async function main() {
@@ -167,13 +270,11 @@ async function main() {
   console.log('PASS: Production package files strictly verified against Code Freeze baseline!')
 
   // 4. Trace authentic commit lineage dynamically
-  const commitChainShas = [
-    codeBaselineSha,
-    '1148da9a9dd6588401b56c996bfdda2a855e1cd8',
-    'e09538c763e65c49bdada304e464701b256561ea',
-    '4c74aaab98ffa9fa633f857c893a3d06ee01c9ea',
-    '7dbfb43d7eeb608e6ea45ccc579c63c588b854ad',
-  ]
+  const commitChainShas = runGit(['rev-list', '--topo-order', '--reverse', `${codeBaselineSha}^..HEAD`])
+    .split(/\r?\n/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+
   if (!commitChainShas.includes(currentHeadSha)) {
     commitChainShas.push(currentHeadSha)
   }
@@ -186,6 +287,8 @@ async function main() {
     else if (sha === 'e09538c763e65c49bdada304e464701b256561ea') role = 'PHASE_7A_8_2R2_EVIDENCE'
     else if (sha === '4c74aaab98ffa9fa633f857c893a3d06ee01c9ea') role = 'PHASE_7A_9_RC_PROBES'
     else if (sha === '7dbfb43d7eeb608e6ea45ccc579c63c588b854ad') role = 'PHASE_7A_9_RC_EVIDENCE'
+    else if (sha === 'fd2ec8cc9f0d638ba5e5d125f21f61f79fc63acd') role = 'PHASE_7A_9R_EVIDENCE'
+    else if (sha === 'd538d073b582dd910867b0e7466909573e0b2190') role = 'PHASE_7A_9R_AUDIT_PROVENANCE_UPDATE'
     else if (sha === currentHeadSha) role = 'CURRENT_HEAD'
 
     return {
@@ -195,10 +298,14 @@ async function main() {
     }
   })
 
+  // 5. Real regression test execution & verification
+  console.log('\n--- Real Regression Suite Execution & Output Parsing ---')
+  const regressionData = collectRealRegressionEvidence(currentHeadSha)
+
   const auditReport = {
     timestamp: new Date().toISOString(),
     probe: 'RC-F',
-    verdict: 'PASS',
+    verdict: regressionData.verdict === 'PASS' ? 'PASS' : 'FAIL',
     anomalyResolution: {
       reportedPhantomSha: phantomSha,
       status: 'RESOLVED_AS_TRANSCRIPTION_TYPO_OR_TRANSIENT_HASH',
@@ -224,26 +331,37 @@ async function main() {
     },
     regressionSuiteAudit: {
       runner: 'vitest',
-      testFilesPassed: 60,
-      testFilesFailed: 0,
-      totalTestsPassed: 1121,
-      totalTestsFailed: 0,
-      storeContractVerdict: 'PASS',
-      credentialScanVerdict: 'PASS',
-      verdict: 'PASS',
+      source: regressionData.vitest?.source ?? 'NOT_VERIFIED',
+      command: regressionData.vitest?.command ?? 'NOT_VERIFIED',
+      exitCode: regressionData.vitest?.exitCode ?? (regressionData.vitest?.verdict === 'PASS' ? 0 : 1),
+      testFilesPassed: regressionData.vitest?.testFilesPassed ?? 'NOT_VERIFIED',
+      testFilesFailed: regressionData.vitest?.testFilesFailed ?? 'NOT_VERIFIED',
+      totalTestsPassed: regressionData.vitest?.totalTestsPassed ?? 'NOT_VERIFIED',
+      totalTestsFailed: regressionData.vitest?.totalTestsFailed ?? 'NOT_VERIFIED',
+      storeContractVerdict: regressionData.storeContract?.verdict ?? 'NOT_VERIFIED',
+      credentialScanVerdict: regressionData.credentialScan?.verdict ?? 'NOT_VERIFIED',
+      verdict: regressionData.verdict,
     },
     provenanceStagingStructure: {
-      sourceBaselineSha: codeBaselineSha,
-      testedCodeSha: currentHeadSha,
-      rcProbesSha: '4c74aaab98ffa9fa633f857c893a3d06ee01c9ea',
-      priorEvidenceSha: '7dbfb43d7eeb608e6ea45ccc579c63c588b854ad',
-      finalObservedRemoteHeadNote: 'Distinguished externally post-commit to avoid circular SHA reference.',
+      CODE_FREEZE_SHA: codeBaselineSha,
+      TESTED_IMPLEMENTATION_SHA: codeBaselineSha,
+      TESTED_PROBE_SHA: currentHeadSha,
+      EVIDENCE_COMMIT_SHA: 'Pending Phase 7A.9R2 evidence commit (uncommitted during probe execution)',
+      FINAL_OBSERVED_REMOTE_HEAD: 'Observed on origin/master post-push to avoid circular reference',
+      historicalLineage: {
+        codeFreezeSha: codeBaselineSha,
+        phase7a8_2_evidenceSha: '1148da9a9dd6588401b56c996bfdda2a855e1cd8',
+        phase7a8_2r2_evidenceSha: 'e09538c763e65c49bdada304e464701b256561ea',
+        phase7a9_rcProbesSha: '4c74aaab98ffa9fa633f857c893a3d06ee01c9ea',
+        phase7a9_rcEvidenceSha: '7dbfb43d7eeb608e6ea45ccc579c63c588b854ad',
+        phase7a9r_evidenceSha: 'fd2ec8cc9f0d638ba5e5d125f21f61f79fc63acd',
+        phase7a9r_auditUpdateSha: 'd538d073b582dd910867b0e7466909573e0b2190',
+      },
     },
   }
 
   const evidenceDirs = [
-    join(REPO_ROOT, 'docs', 'evidence', 'phase7a9'),
-    join(REPO_ROOT, 'docs', 'evidence', 'phase7a9r'),
+    join(REPO_ROOT, 'docs', 'evidence', 'phase7a9r2'),
   ]
   for (const dir of evidenceDirs) {
     mkdirSync(dir, { recursive: true })
@@ -254,6 +372,15 @@ async function main() {
     )
     console.log(`Written: ${join(dir, 'git-provenance-audit.json')}`)
   }
+
+  // Also write git-provenance-final.json for Phase 7A.9R2
+  const r2Dir = join(REPO_ROOT, 'docs', 'evidence', 'phase7a9r2')
+  writeFileSync(
+    join(r2Dir, 'git-provenance-final.json'),
+    JSON.stringify(auditReport, null, 2),
+    'utf8',
+  )
+  console.log(`Written: ${join(r2Dir, 'git-provenance-final.json')}`)
 
   const mdReport = `# Git Provenance & Historical Evidence Closure Report (RC-F)
 
@@ -310,14 +437,16 @@ All 7 production runtime code and config files remain 100% bit-for-bit identical
 
 ---
 
-## 4. Full Regression Test Verification
-- **Test Runner**: Vitest v3.2.4
-- **Test Files**: 60 passed (60 total)
-- **Individual Tests**: 1121 passed (1121 total)
-- **Failures**: 0
-- **Store Contract Audit**: PASS
-- **Credential & Secret Scan**: PASS (0 exposed tokens)
-- **Isolation Check**: PASS
+## 4. Full Regression Test Verification (Real Execution Parsing)
+- **Test Runner**: ${auditReport.regressionSuiteAudit.runner}
+- **Evidence Source**: ${auditReport.regressionSuiteAudit.source}
+- **Test Files Passed**: ${auditReport.regressionSuiteAudit.testFilesPassed}
+- **Test Files Failed**: ${auditReport.regressionSuiteAudit.testFilesFailed}
+- **Individual Tests Passed**: ${auditReport.regressionSuiteAudit.totalTestsPassed}
+- **Individual Tests Failed**: ${auditReport.regressionSuiteAudit.totalTestsFailed}
+- **Store Contract Audit**: ${auditReport.regressionSuiteAudit.storeContractVerdict}
+- **Credential & Secret Scan**: ${auditReport.regressionSuiteAudit.credentialScanVerdict}
+- **Regression Suite Verdict**: **${auditReport.regressionSuiteAudit.verdict}**
 
 ---
 

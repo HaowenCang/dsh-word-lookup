@@ -1,0 +1,115 @@
+{
+  "timestamp": "2026-10-18T07:26:00.201Z",
+  "phase": "Phase 7A.9R2",
+  "verdict": "PASS",
+  "tarball": {
+    "filename": "dsh-word-lookup-0.2.0.tgz",
+    "path": "build/rc-v0.2.0/dsh-word-lookup-0.2.0.tgz",
+    "byteSize": 135731,
+    "sha256": "ce51e0e233d2b93b8b3d3f61548e0634debdedd0b20ac423a150037abf887f34"
+  },
+  "packageMetadata": {
+    "name": "dsh-word-lookup",
+    "version": "0.2.0",
+    "license": "MIT",
+    "peerDependencies": {
+      "@deepseek-ai/cordis": "~4.0.4",
+      "@deepseek-ai/schemastery": "~3.18.4",
+      "react": "^18.2.0"
+    },
+    "dshCompatibility": {
+      "dsh": "0.2.0-rc.2",
+      "dshReleases": {
+        "0.2.0-rc.1": "unknown",
+        "0.2.0-rc.2": "compatible",
+        "0.2.1-alpha.1": "unknown"
+      },
+      "dshOperations": {
+        "0.2.0-rc.2": {
+          "install": "passed",
+          "start": "passed",
+          "uninstall": "passed",
+          "rollback": "passed"
+        }
+      },
+      "profiles": [
+        "web"
+      ]
+    }
+  },
+  "unpackedTotalBytes": 576913,
+  "whitelist8FilesCount": 8,
+  "whitelistVerification": "STRICT_PASS",
+  "eightFiles": [
+    {
+      "file": "LICENSE",
+      "byteSize": 1089,
+      "sha256": "99922c2a61954f0eaef1591241bcaaac4d3c8984a9866840180d65f7a1ff8101",
+      "gitBlobSha": "6a131d2d0848a3f49d961523c8e2fdfb29d18307",
+      "baselineGitBlobSha": "6a131d2d0848a3f49d961523c8e2fdfb29d18307",
+      "status": "FROZEN_BIT_FOR_BIT"
+    },
+    {
+      "file": "README.md",
+      "byteSize": 15214,
+      "sha256": "478320e56539e88cddca40b1cde570e2e7f98bc44e840b1c4515330ef6160bd1",
+      "gitBlobSha": "4583fdf69758c828ed426d3fffdbc5e9dd15f425",
+      "baselineGitBlobSha": "035432d23d39222054ee19710a63aed372a3deba",
+      "status": "CLASS_C_APPROVED_DOCUMENTATION_CORRECTION"
+    },
+    {
+      "file": "cordis.patch.yml",
+      "byteSize": 415,
+      "sha256": "df9851e21b59cafc69f91b0839c7cd56cb53104c57644813d9001e1a76c7d868",
+      "gitBlobSha": "6ac6d4a9dd95ee631a0556bb63bc57f8713d3044",
+      "baselineGitBlobSha": "6ac6d4a9dd95ee631a0556bb63bc57f8713d3044",
+      "status": "FROZEN_BIT_FOR_BIT"
+    },
+    {
+      "file": "corpus/ecdict.manifest.json",
+      "byteSize": 566,
+      "sha256": "03cba27d42cb43551d7b51fa12e4a07a869c5d4b65ac07f4fa3d105d9c944044",
+      "gitBlobSha": "1d1d3f332900bc7e30680b4f6e50ff70ffeed4f6",
+      "baselineGitBlobSha": "1d1d3f332900bc7e30680b4f6e50ff70ffeed4f6",
+      "status": "FROZEN_BIT_FOR_BIT"
+    },
+    {
+      "file": "lib/client.js",
+      "byteSize": 185043,
+      "sha256": "2a1425a94a782cb382ce031dd85d09627eba680f6baac2479dd32127e13e7952",
+      "gitBlobSha": "1a4c9a74e212905a30925421b3eb4a66f6fa3117",
+      "baselineGitBlobSha": "1a4c9a74e212905a30925421b3eb4a66f6fa3117",
+      "status": "FROZEN_BIT_FOR_BIT"
+    },
+    {
+      "file": "lib/ecdict-integrity-worker.js",
+      "byteSize": 23193,
+      "sha256": "0d6bda562785797d36e64fa9567125072c6e7626c77c25211ba9dd223294d2b6",
+      "gitBlobSha": "c035297927f80e3b91adc47df5f526a1ace35c07",
+      "baselineGitBlobSha": "c035297927f80e3b91adc47df5f526a1ace35c07",
+      "status": "FROZEN_BIT_FOR_BIT"
+    },
+    {
+      "file": "lib/index.js",
+      "byteSize": 345905,
+      "sha256": "f426d1ba68fe548867d46affc028690c6393d571fd77af457cc342ecd49abf2e",
+      "gitBlobSha": "afbce97c13b7707ec381ffc5fb3021f2e3c94149",
+      "baselineGitBlobSha": "afbce97c13b7707ec381ffc5fb3021f2e3c94149",
+      "status": "FROZEN_BIT_FOR_BIT"
+    },
+    {
+      "file": "package.json",
+      "byteSize": 5488,
+      "sha256": "e79d9176a09a8ee10f0c0c97c04e12e224c479b002483c0f32ad47dab229f996",
+      "gitBlobSha": "0114f310e322f41ae39b46c9f762c1ef244ab8f7",
+      "baselineGitBlobSha": "0114f310e322f41ae39b46c9f762c1ef244ab8f7",
+      "status": "FROZEN_BIT_FOR_BIT"
+    }
+  ],
+  "invarianceSummary": {
+    "frozenProductionFilesUnchanged": 7,
+    "approvedDocCorrections": 1,
+    "unauthorizedModifications": 0,
+    "productionSourceTreeUnchanged": true
+  }
+}
