@@ -29,6 +29,7 @@ import {
 } from '../src/client/settings/dictionary-settings-components.js'
 import { DictionaryManagementStore } from '../src/client/settings/dictionary-management-store.js'
 import type { DictionaryStatusResponse } from '../src/shared/dictionary-management-protocol.js'
+import type { Shortcuts } from '../src/client/contracts.js'
 
 function createStatus(overrides: Partial<DictionaryStatusResponse> = {}): DictionaryStatusResponse {
   return {
@@ -133,9 +134,33 @@ function mountSection(props: {
   return { container, root, render, unmount, store: mockStore }
 }
 
+function createMockShortcuts(keys: readonly string[] = ['Ctrl', 'Shift', 'L']) {
+  return {
+    catalog: {
+      getSnapshot: () => [
+        {
+          id: 'wordLookup.lookupSelection',
+          label: 'Lookup Selection',
+          keys,
+          modified: false,
+        },
+      ],
+      subscribe: () => () => {},
+    },
+    config: {
+      getSnapshot: () => ({ revision: 1 }),
+      subscribe: () => () => {},
+    },
+    edit: vi.fn(),
+    recording: vi.fn(),
+    describeBinding: vi.fn(),
+  } as unknown as Shortcuts
+}
+
 function renderSection(props: {
   storeState?: Partial<DictionaryStatusResponse>
   form?: ReturnType<typeof createMockForm>
+  shortcuts?: Shortcuts
   platform?: 'windows' | 'macos' | 'linux'
 }): string {
   const mockStore = new DictionaryManagementStore({ autoStart: false })
@@ -153,6 +178,7 @@ function renderSection(props: {
     React.createElement(DictionarySettingsSection, {
       store: mockStore,
       form: props.form as never,
+      shortcuts: props.shortcuts,
       testPlatform: props.platform ?? 'windows',
     }),
   )
@@ -320,18 +346,26 @@ describe('DictionarySettingsSection Rendering', () => {
   })
 
   describe('Section D: Shortcuts & Advanced Features', () => {
-    it('renders Ctrl + Shift + L on Windows', () => {
-      const html = renderSection({ platform: 'windows' })
+    it('renders shortcut service unavailable when shortcuts service is missing', () => {
+      const html = renderSection({})
+      expect(html).toContain('快捷键服务暂不可用')
+    })
+
+    it('renders Ctrl + Shift + L on Windows with active shortcuts', () => {
+      const shortcuts = createMockShortcuts(['Ctrl', 'Shift', 'L'])
+      const html = renderSection({ shortcuts, platform: 'windows' })
       expect(html).toContain('Ctrl + Shift + L')
     })
 
-    it('renders ⌘ + Shift + L on macOS', () => {
-      const html = renderSection({ platform: 'macos' })
+    it('renders ⌘ + Shift + L on macOS with active shortcuts', () => {
+      const shortcuts = createMockShortcuts(['⌘', 'Shift', 'L'])
+      const html = renderSection({ shortcuts, platform: 'macos' })
       expect(html).toContain('⌘ + Shift + L')
     })
 
-    it('renders 未绑定 (Unbound) on Linux Web', () => {
-      const html = renderSection({ platform: 'linux' })
+    it('renders 未绑定 (Unbound) on Linux Web when unbound', () => {
+      const shortcuts = createMockShortcuts([])
+      const html = renderSection({ shortcuts, platform: 'linux' })
       expect(html).toContain('未绑定 (Unbound)')
       expect(html).toContain('Linux Web 平台受浏览器系统快捷键限制')
     })

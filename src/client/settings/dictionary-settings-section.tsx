@@ -15,7 +15,7 @@
  * @module dsh-word-lookup/client/settings/dictionary-settings-section
  */
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ConfigForm, ConfigFormSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client'
 
@@ -47,6 +47,14 @@ export interface DictionaryHostSettings {
   readonly dictionaryMode?: 'fixture' | 'managed-ecdict' | 'custom'
 }
 
+/** Authoritative lifecycle state for DSH shortcut integration. */
+export type ShortcutServiceState =
+  | 'SERVICE_UNAVAILABLE'
+  | 'CATALOG_NOT_READY'
+  | 'COMMAND_NOT_REGISTERED'
+  | 'READ_ONLY'
+  | 'READY'
+
 /** Props passed to DictionarySettingsSection. */
 export type DictionarySettingsSectionProps = Partial<PropsRuntime<'settings.section'>> & {
   /** Optional pre-configured management store. */
@@ -67,6 +75,15 @@ function detectPlatform(override?: 'windows' | 'macos' | 'linux'): 'windows' | '
   if (p.includes('mac')) return 'macos'
   if (p.includes('linux')) return 'linux'
   return 'windows'
+}
+
+/** Helper to format keys cleanly whether already punctuated or raw. */
+function formatShortcutKeys(keys?: readonly string[]): string {
+  if (!keys || keys.length === 0) return '未绑定 (Unbound)'
+  if (keys.includes('+')) {
+    return keys.join(' ')
+  }
+  return keys.join(' + ')
 }
 
 export function DictionarySettingsSection({
@@ -238,6 +255,26 @@ export function DictionarySettingsSection({
 
   const lookupShortcutEntry = catalogSnapshot?.find((e) => e.id === LOOKUP_COMMAND_ID)
 
+  // Authoritative shortcut service state determination (D1)
+  const shortcutServiceState: ShortcutServiceState = useMemo(() => {
+    if (!activeShortcuts) {
+      return 'SERVICE_UNAVAILABLE'
+    }
+    if (!activeShortcuts.catalog || catalogSnapshot === null) {
+      return 'CATALOG_NOT_READY'
+    }
+    const entry = catalogSnapshot.find((e) => e.id === LOOKUP_COMMAND_ID)
+    if (!entry) {
+      return 'COMMAND_NOT_REGISTERED'
+    }
+    if (typeof activeShortcuts.edit !== 'function' || typeof activeShortcuts.recording !== 'function') {
+      return 'READ_ONLY'
+    }
+    return 'READY'
+  }, [activeShortcuts, catalogSnapshot])
+
+  const isShortcutEditable = shortcutServiceState === 'READY'
+
   // Stable callback for recording lock
   const handleRecording = useCallback(
     async (active: boolean) => {
@@ -252,7 +289,9 @@ export function DictionarySettingsSection({
   const handleSaveShortcut = async (
     binding: { code: string; modifiers: readonly string[] },
   ): Promise<{ ok: boolean; error?: string }> => {
-    if (!activeShortcuts) return { ok: false, error: '快捷键服务暂不可用' }
+    if (!activeShortcuts || typeof activeShortcuts.edit !== 'function') {
+      return { ok: false, error: '快捷键服务暂不可用' }
+    }
     const configSnap = activeShortcuts.config?.getSnapshot ? activeShortcuts.config.getSnapshot() : null
     const revision = (configSnap as { revision?: number } | null)?.revision ?? 1
     const res = await activeShortcuts.edit(
@@ -276,7 +315,9 @@ export function DictionarySettingsSection({
   }
 
   const handleResetShortcut = async (): Promise<{ ok: boolean; error?: string }> => {
-    if (!activeShortcuts) return { ok: false, error: '快捷键服务暂不可用' }
+    if (!activeShortcuts || typeof activeShortcuts.edit !== 'function') {
+      return { ok: false, error: '快捷键服务暂不可用' }
+    }
     const configSnap = activeShortcuts.config?.getSnapshot ? activeShortcuts.config.getSnapshot() : null
     const revision = (configSnap as { revision?: number } | null)?.revision ?? 1
     const res = await activeShortcuts.edit(
@@ -447,10 +488,6 @@ export function DictionarySettingsSection({
     }
   }
 
-  // Check if shortcut service / catalog is unavailable (UI-5)
-  const isCatalogUnavailable = Boolean(
-    activeShortcuts && (catalogSnapshot === null || !activeShortcuts.catalog),
-  )
 
   return (
     <div className="dsh-wl-settings" style={{ maxWidth: '800px', width: '100%', boxSizing: 'border-box' }}>
@@ -1251,13 +1288,19 @@ export function DictionarySettingsSection({
         <SettingRow
           title="划词查询快捷键"
           description={
-            platform === 'linux' && !lookupShortcutEntry
-              ? 'Linux Web 平台受浏览器系统快捷键限制，默认未绑定。支持通过自定义配置按键。'
-              : '选中任意文本后按下快捷键即可发起词典查询。支持在此重新绑定自定义按键。'
+            shortcutServiceState === 'SERVICE_UNAVAILABLE'
+              ? '快捷键服务暂不可用。'
+              : shortcutServiceState === 'CATALOG_NOT_READY'
+                ? '快捷键目录尚未就绪。'
+                : shortcutServiceState === 'COMMAND_NOT_REGISTERED'
+                  ? '划词查询命令尚未注册至快捷键服务。'
+                  : platform === 'linux' && (!lookupShortcutEntry?.keys || lookupShortcutEntry.keys.length === 0)
+                    ? 'Linux Web 平台受浏览器系统快捷键限制，默认未绑定。支持通过自定义配置按键。'
+                    : '选中任意文本后按下快捷键即可发起词典查询。支持在此重新绑定自定义按键。'
           }
           control={
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              {isCatalogUnavailable ? (
+              {shortcutServiceState === 'SERVICE_UNAVAILABLE' ? (
                 <span
                   data-testid="shortcut-service-unavailable"
                   style={{
@@ -1267,7 +1310,27 @@ export function DictionarySettingsSection({
                 >
                   快捷键服务暂不可用
                 </span>
-              ) : lookupShortcutEntry ? (
+              ) : shortcutServiceState === 'CATALOG_NOT_READY' ? (
+                <span
+                  data-testid="shortcut-catalog-not-ready"
+                  style={{
+                    fontSize: '13px',
+                    color: 'var(--wl-set-text-muted, #6c6c7a)',
+                  }}
+                >
+                  快捷键服务未就绪
+                </span>
+              ) : shortcutServiceState === 'COMMAND_NOT_REGISTERED' ? (
+                <span
+                  data-testid="shortcut-command-not-registered"
+                  style={{
+                    fontSize: '13px',
+                    color: 'var(--wl-set-text-muted, #6c6c7a)',
+                  }}
+                >
+                  划词命令未注册
+                </span>
+              ) : (
                 <>
                   <span
                     data-testid="shortcut-key-display"
@@ -1281,57 +1344,39 @@ export function DictionarySettingsSection({
                       color: 'var(--wl-set-text-main, #f2f2f7)',
                     }}
                   >
-                    {lookupShortcutEntry.keys && lookupShortcutEntry.keys.length > 0
-                      ? lookupShortcutEntry.keys.join(' + ')
-                      : '未绑定'}
+                    {formatShortcutKeys(lookupShortcutEntry?.keys)}
                   </span>
-                  {lookupShortcutEntry.modified ? (
+                  {shortcutServiceState === 'READ_ONLY' ? (
+                    <StatusBadge variant="neutral" label="只读" />
+                  ) : lookupShortcutEntry?.modified ? (
                     <StatusBadge variant="warning" label="已自定义" />
                   ) : (
                     <StatusBadge variant="neutral" label="默认绑定" />
                   )}
                 </>
-              ) : platform === 'linux' ? (
-                <StatusBadge variant="neutral" label="未绑定 (Unbound)" />
-              ) : platform === 'macos' ? (
-                <span
-                  data-testid="shortcut-key-display"
-                  style={{
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    fontFamily: 'monospace',
-                    padding: '3px 8px',
-                    borderRadius: '6px',
-                    background: 'rgba(255, 255, 255, 0.08)',
-                    color: 'var(--wl-set-text-main, #f2f2f7)',
-                  }}
-                >
-                  ⌘ + Shift + L
-                </span>
-              ) : (
-                <span
-                  data-testid="shortcut-key-display"
-                  style={{
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    fontFamily: 'monospace',
-                    padding: '3px 8px',
-                    borderRadius: '6px',
-                    background: 'rgba(255, 255, 255, 0.08)',
-                    color: 'var(--wl-set-text-main, #f2f2f7)',
-                  }}
-                >
-                  Ctrl + Shift + L
-                </span>
               )}
 
               <ActionButton
                 data-testid="btn-edit-shortcut"
                 size="small"
                 variant="secondary"
-                disabled={isCatalogUnavailable}
-                title={isCatalogUnavailable ? '快捷键服务暂不可用' : '修改划词查询快捷键'}
-                onClick={() => setShowShortcutRecorder(true)}
+                disabled={!isShortcutEditable}
+                title={
+                  shortcutServiceState === 'SERVICE_UNAVAILABLE'
+                    ? '快捷键服务暂不可用'
+                    : shortcutServiceState === 'CATALOG_NOT_READY'
+                      ? '快捷键服务未就绪'
+                      : shortcutServiceState === 'COMMAND_NOT_REGISTERED'
+                        ? '划词命令未注册'
+                        : shortcutServiceState === 'READ_ONLY'
+                          ? '快捷键处于只读状态'
+                          : '修改划词查询快捷键'
+                }
+                onClick={() => {
+                  if (isShortcutEditable) {
+                    setShowShortcutRecorder(true)
+                  }
+                }}
               >
                 修改快捷键
               </ActionButton>

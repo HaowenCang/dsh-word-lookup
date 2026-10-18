@@ -87,6 +87,26 @@ export interface TextInputProps {
     readonly onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
 }
 export declare function TextInput({ id, label, placeholder, value, onChange, disabled, error, helpText, width, 'data-testid': testId, onKeyDown, }: TextInputProps): import("react/jsx-runtime").JSX.Element;
+/**
+ * Concurrency coordinator for DSH shortcut recording lock.
+ *
+ * Guarantees:
+ * - Single ownership per modal instance.
+ * - Strict serial execution: acquire and release never race or overlap.
+ * - If release is requested while acquire is pending, release waits for acquire to settle before calling recording(false).
+ * - If disposed before acquire starts, acquire is safely canceled.
+ * - Errors in acquire or release do not cause unhandled rejections.
+ * - Idempotent cleanup: duplicate release calls are no-ops.
+ * - Final state is guaranteed to be false after release.
+ */
+export declare class AsyncRecordingLock {
+    private queue;
+    private held;
+    private released;
+    acquire(recordingFn?: (active: boolean) => Promise<void>): Promise<void>;
+    release(recordingFn?: (active: boolean) => Promise<void>): Promise<void>;
+    isHeld(): boolean;
+}
 export interface ShortcutRecorderModalProps {
     readonly currentKeys: readonly string[];
     readonly isModified: boolean;

@@ -22,6 +22,11 @@ import { createHash } from 'node:crypto'
 import { DatabaseSync } from 'node:sqlite'
 
 import { DictionarySettingsSection } from '../src/client/settings/dictionary-settings-section.js'
+import {
+  AsyncRecordingLock,
+  ShortcutRecorderModal,
+  SnapshotPickerModal,
+} from '../src/client/settings/dictionary-settings-components.js'
 import { DictionaryManagementStore } from '../src/client/settings/dictionary-management-store.js'
 import { LOOKUP_COMMAND_ID, type Shortcuts } from '../src/client/contracts.js'
 import type { DictionaryStatusResponse, CustomSnapshotSummary } from '../src/shared/dictionary-management-protocol.js'
@@ -907,16 +912,23 @@ describe('Phase 7A.8.2 Native Settings Acceptance Matrix (U01–U32)', () => {
       await unmount()
     })
 
-    it('U25: Shortcut section presents default Ctrl+Shift+L on Windows and ⌘+Shift+L on macOS', () => {
+    it('U25: Shortcut section presents default Ctrl+Shift+L on Windows and ⌘+Shift+L on macOS with active shortcuts, and service unavailable when absent', () => {
+      const shortcutsWin = createMockShortcuts(['Ctrl', 'Shift', 'L'], false)
       const htmlWin = renderToStaticMarkup(
-        React.createElement(DictionarySettingsSection, { testPlatform: 'windows' }),
+        React.createElement(DictionarySettingsSection, { shortcuts: shortcutsWin, testPlatform: 'windows' }),
       )
       expect(htmlWin).toContain('Ctrl + Shift + L')
 
+      const shortcutsMac = createMockShortcuts(['⌘', 'Shift', 'L'], false)
       const htmlMac = renderToStaticMarkup(
-        React.createElement(DictionarySettingsSection, { testPlatform: 'macos' }),
+        React.createElement(DictionarySettingsSection, { shortcuts: shortcutsMac, testPlatform: 'macos' }),
       )
       expect(htmlMac).toContain('⌘ + Shift + L')
+
+      const htmlNoShortcuts = renderToStaticMarkup(
+        React.createElement(DictionarySettingsSection, { testPlatform: 'windows' }),
+      )
+      expect(htmlNoShortcuts).toContain('快捷键服务暂不可用')
     })
 
     it('U26: Opening shortcut recorder modal engages ctx.shortcuts.recording(true)', async () => {
@@ -1547,7 +1559,18 @@ describe('Phase 7A.8.2 Native Settings Acceptance Matrix (U01–U32)', () => {
       await unmount()
     })
 
-    it('V23: UI-5 shortcut service unavailable: When shortcuts catalog is unavailable/null, displays "快捷键服务暂不可用" and disables edit button', async () => {
+    it('V23: UI-5 shortcut service unavailable: When shortcuts service is missing or catalog is null, displays unavailable notice and disables edit button', async () => {
+      // 1. Missing shortcuts service
+      const { container: c1, render: r1, unmount: u1 } = mount({ shortcuts: undefined })
+      await r1()
+      const unavailBadge1 = c1.querySelector('[data-testid="shortcut-service-unavailable"]')
+      expect(unavailBadge1).not.toBeNull()
+      expect(unavailBadge1?.textContent).toBe('快捷键服务暂不可用')
+      const editBtn1 = c1.querySelector('[data-testid="btn-edit-shortcut"]') as HTMLButtonElement
+      expect(editBtn1.disabled).toBe(true)
+      await u1()
+
+      // 2. Catalog null
       const unavailShortcuts = {
         catalog: null,
         config: { subscribe: () => () => {}, getSnapshot: () => ({ revision: 1 }) },
@@ -1555,18 +1578,510 @@ describe('Phase 7A.8.2 Native Settings Acceptance Matrix (U01–U32)', () => {
         recording: vi.fn(),
         describeBinding: vi.fn(),
       } as unknown as Shortcuts
+      const { container: c2, render: r2, unmount: u2 } = mount({ shortcuts: unavailShortcuts })
+      await r2()
+      const notReadyBadge = c2.querySelector('[data-testid="shortcut-catalog-not-ready"]')
+      expect(notReadyBadge).not.toBeNull()
+      expect(notReadyBadge?.textContent).toBe('快捷键服务未就绪')
+      const editBtn2 = c2.querySelector('[data-testid="btn-edit-shortcut"]') as HTMLButtonElement
+      expect(editBtn2.disabled).toBe(true)
+      await u2()
+    })
+  })
 
-      const { container, render, unmount } = mount({ shortcuts: unavailShortcuts })
+  describe('Phase 7A.8.2R2 Matrix: W01–W08, W14–W17', () => {
+    it('W01: Shortcuts service does not exist -> UI displays "快捷键服务暂不可用", edit button disabled, no fake defaults', async () => {
+      const { container, render, unmount } = mount({ shortcuts: undefined })
       await render()
 
-      const unavailBadge = container.querySelector('[data-testid="shortcut-service-unavailable"]')
-      expect(unavailBadge).not.toBeNull()
-      expect(unavailBadge?.textContent).toBe('快捷键服务暂不可用')
+      const unavail = container.querySelector('[data-testid="shortcut-service-unavailable"]')
+      expect(unavail).not.toBeNull()
+      expect(unavail?.textContent).toBe('快捷键服务暂不可用')
+
+      const editBtn = container.querySelector('[data-testid="btn-edit-shortcut"]') as HTMLButtonElement
+      expect(editBtn.disabled).toBe(true)
+      expect(editBtn.title).toBe('快捷键服务暂不可用')
+
+      // Ensure no masqueraded default key display
+      expect(container.querySelector('[data-testid="shortcut-key-display"]')).toBeNull()
+
+      await unmount()
+    })
+
+    it('W02: Shortcuts Catalog not ready -> UI displays "快捷键服务未就绪", edit button disabled', async () => {
+      const shortcuts = {
+        catalog: {
+          getSnapshot: () => null,
+          subscribe: () => () => {},
+        },
+        config: { getSnapshot: () => ({ revision: 1 }), subscribe: () => () => {} },
+        edit: vi.fn(),
+        recording: vi.fn(),
+        describeBinding: vi.fn(),
+      } as unknown as Shortcuts
+
+      const { container, render, unmount } = mount({ shortcuts })
+      await render()
+
+      const notReady = container.querySelector('[data-testid="shortcut-catalog-not-ready"]')
+      expect(notReady).not.toBeNull()
+      expect(notReady?.textContent).toBe('快捷键服务未就绪')
 
       const editBtn = container.querySelector('[data-testid="btn-edit-shortcut"]') as HTMLButtonElement
       expect(editBtn.disabled).toBe(true)
 
       await unmount()
+    })
+
+    it('W03: Lookup command not registered -> UI displays "划词命令未注册", edit button disabled', async () => {
+      const catalogData = [
+        { id: 'session.search', label: 'Search', keys: ['Ctrl', 'K'] },
+      ]
+      const shortcuts = {
+        catalog: {
+          getSnapshot: () => catalogData,
+          subscribe: () => () => {},
+        },
+        config: { getSnapshot: () => ({ revision: 1 }), subscribe: () => () => {} },
+        edit: vi.fn(),
+        recording: vi.fn(),
+        describeBinding: vi.fn(),
+      } as unknown as Shortcuts
+
+      const { container, render, unmount } = mount({ shortcuts })
+      await render()
+
+      const notReg = container.querySelector('[data-testid="shortcut-command-not-registered"]')
+      expect(notReg).not.toBeNull()
+      expect(notReg?.textContent).toBe('划词命令未注册')
+
+      const editBtn = container.querySelector('[data-testid="btn-edit-shortcut"]') as HTMLButtonElement
+      expect(editBtn.disabled).toBe(true)
+
+      await unmount()
+    })
+
+    it('W04: Shortcuts service recovers -> dynamically shows real binding and enables edit button', async () => {
+      const listeners = new Set<() => void>()
+      let snapshotData: any = null
+
+      const dynamicShortcuts = {
+        catalog: {
+          getSnapshot: () => snapshotData,
+          subscribe: (fn: () => void) => {
+            listeners.add(fn)
+            return () => listeners.delete(fn)
+          },
+        },
+        config: { getSnapshot: () => ({ revision: 1 }), subscribe: () => () => {} },
+        edit: vi.fn().mockResolvedValue({ status: 'saved' }),
+        recording: vi.fn().mockResolvedValue(undefined),
+        describeBinding: vi.fn(),
+      } as unknown as Shortcuts
+
+      const { container, render, unmount } = mount({ shortcuts: dynamicShortcuts })
+      await render()
+
+      // Initially not ready
+      expect(container.querySelector('[data-testid="shortcut-catalog-not-ready"]')).not.toBeNull()
+      expect((container.querySelector('[data-testid="btn-edit-shortcut"]') as HTMLButtonElement).disabled).toBe(true)
+
+      // Service recovers and publishes catalog
+      await act(async () => {
+        snapshotData = [
+          {
+            id: LOOKUP_COMMAND_ID,
+            label: 'Lookup Selection',
+            keys: ['Ctrl', 'Alt', 'J'],
+            modified: true,
+          },
+        ]
+        listeners.forEach((l) => l())
+      })
+
+      // Now ready with real binding
+      expect(container.querySelector('[data-testid="shortcut-catalog-not-ready"]')).toBeNull()
+      const keyDisplay = container.querySelector('[data-testid="shortcut-key-display"]')
+      expect(keyDisplay?.textContent).toBe('Ctrl + Alt + J')
+      expect(container.textContent).toContain('已自定义')
+
+      const editBtn = container.querySelector('[data-testid="btn-edit-shortcut"]') as HTMLButtonElement
+      expect(editBtn.disabled).toBe(false)
+
+      await unmount()
+    })
+
+    it('W05: Rapid open and close of recorder does not leak lock', async () => {
+      const lock = new AsyncRecordingLock()
+      let currentState = false
+      const recordingCalls: boolean[] = []
+
+      const mockRecording = async (active: boolean) => {
+        recordingCalls.push(active)
+        currentState = active
+      }
+
+      // Fast acquire then release
+      const p1 = lock.acquire(mockRecording)
+      const p2 = lock.release(mockRecording)
+      await Promise.all([p1, p2])
+
+      expect(recordingCalls).toEqual([true, false])
+      expect(currentState).toBe(false)
+      expect(lock.isHeld()).toBe(false)
+    })
+
+    it('W06: Recording acquire delay and cleanup race guarantee final state false', async () => {
+      const lock = new AsyncRecordingLock()
+      let currentState = false
+      const executionOrder: string[] = []
+
+      let resolveAcquire!: () => void
+      const acquirePromise = new Promise<void>((r) => {
+        resolveAcquire = r
+      })
+
+      const mockRecording = async (active: boolean) => {
+        executionOrder.push(`start:${active}`)
+        if (active) {
+          await acquirePromise
+        }
+        executionOrder.push(`finish:${active}`)
+        currentState = active
+      }
+
+      // 1. Mount starts acquire (pending)
+      const acquireTask = lock.acquire(mockRecording)
+
+      // 2. Unmount calls release while acquire is pending
+      const releaseTask = lock.release(mockRecording)
+
+      // 3. Acquire resolves later
+      resolveAcquire()
+      await Promise.all([acquireTask, releaseTask])
+
+      // Verification: acquire must finish before release starts, and final state is false
+      expect(executionOrder).toEqual(['start:true', 'finish:true', 'start:false', 'finish:false'])
+      expect(currentState).toBe(false)
+      expect(lock.isHeld()).toBe(false)
+    })
+
+    it('W07: Recording API rejection does not crash and allows clean release', async () => {
+      const lock = new AsyncRecordingLock()
+      let currentState: boolean | null = null
+
+      const faultyRecording = async (active: boolean) => {
+        if (active) {
+          throw new Error('DSH shortcuts bus error')
+        }
+        currentState = false
+      }
+
+      // Acquire rejects internally
+      await lock.acquire(faultyRecording)
+      expect(lock.isHeld()).toBe(false)
+
+      // Release executes without unhandled rejection
+      await lock.release(faultyRecording)
+      expect(currentState).toBe(false)
+      expect(lock.isHeld()).toBe(false)
+    })
+
+    it('W08: Key events in ShortcutRecorderModal do not trigger normal commands, Escape cancels', async () => {
+      const mockRecording = vi.fn().mockResolvedValue(undefined)
+      const mockOnClose = vi.fn()
+      const mockOnSave = vi.fn().mockResolvedValue(true)
+      const mockOnReset = vi.fn().mockResolvedValue(true)
+
+      const container = document.createElement('div')
+      document.body.appendChild(container)
+      const root = createRoot(container)
+
+      await act(async () => {
+        root.render(
+          React.createElement(ShortcutRecorderModal, {
+            currentKeys: ['Ctrl', 'Shift', 'L'],
+            isModified: false,
+            onClose: mockOnClose,
+            onSave: mockOnSave,
+            onReset: mockOnReset,
+            recording: mockRecording,
+          }),
+        )
+      })
+
+      const recorderBox = container.querySelector('[data-testid="shortcut-recorder-box"]') as HTMLElement
+      expect(recorderBox).not.toBeNull()
+
+      // Press Ctrl+Alt+J
+      await act(async () => {
+        recorderBox.dispatchEvent(
+          new KeyboardEvent('keydown', {
+            key: 'j',
+            code: 'KeyJ',
+            ctrlKey: true,
+            altKey: true,
+            bubbles: true,
+            cancelable: true,
+          }),
+        )
+      })
+
+      // Candidate updated
+      expect(container.textContent).toContain('Ctrl')
+      expect(container.textContent).toContain('Alt')
+      expect(container.textContent).toContain('J')
+
+      // Escape key cancels and closes modal
+      await act(async () => {
+        recorderBox.dispatchEvent(
+          new KeyboardEvent('keydown', {
+            key: 'Escape',
+            code: 'Escape',
+            bubbles: true,
+            cancelable: true,
+          }),
+        )
+      })
+
+      expect(mockOnClose).toHaveBeenCalledTimes(1)
+
+      await act(async () => {
+        root.unmount()
+      })
+      container.remove()
+    })
+
+    it('W14: Multiple snapshot picker explicitly selects snapshot B and passes exact snapshotId', async () => {
+      const snapA: CustomSnapshotSummary = {
+        snapshotId: 'snap-alpha-1111',
+        identity: 'physics-alpha',
+        schemaVersion: 1,
+        entryCount: 100,
+        formCount: 150,
+        byteSize: 40960,
+        status: 'active',
+        isActive: true,
+        isValid: true,
+        createdAt: new Date().toISOString(),
+      }
+      const snapB: CustomSnapshotSummary = {
+        snapshotId: 'snap-beta-2222',
+        identity: 'physics-beta',
+        schemaVersion: 1,
+        entryCount: 200,
+        formCount: 250,
+        byteSize: 40960,
+        status: 'dormant',
+        isActive: false,
+        isValid: true,
+        createdAt: new Date().toISOString(),
+      }
+
+      const onSelect = vi.fn()
+      const onClose = vi.fn()
+
+      const container = document.createElement('div')
+      document.body.appendChild(container)
+      const root = createRoot(container)
+
+      await act(async () => {
+        root.render(
+          React.createElement(SnapshotPickerModal, {
+            snapshots: [snapA, snapB],
+            activeSnapshotId: 'snap-alpha-1111',
+            onClose,
+            onSelect,
+          }),
+        )
+      })
+
+      // Verify both rows rendered
+      expect(container.querySelector('[data-testid="snapshot-picker-row-snap-alpha-1111"]')).not.toBeNull()
+      expect(container.querySelector('[data-testid="snapshot-picker-row-snap-beta-2222"]')).not.toBeNull()
+
+      // Select button for snapB
+      const selectBtnB = container.querySelector('[data-testid="snapshot-picker-select-snap-beta-2222"]') as HTMLButtonElement
+      expect(selectBtnB).not.toBeNull()
+      expect(selectBtnB.disabled).toBe(false)
+
+      await act(async () => {
+        selectBtnB.click()
+      })
+
+      expect(onSelect).toHaveBeenCalledWith('snap-beta-2222')
+      expect(onClose).toHaveBeenCalled()
+
+      await act(async () => {
+        root.unmount()
+      })
+      container.remove()
+    })
+
+    it('W15: SnapshotPickerModal traps Tab focus and handles Escape', async () => {
+      const snapA: CustomSnapshotSummary = {
+        snapshotId: 'snap-1',
+        identity: 'dict-1',
+        schemaVersion: 1,
+        entryCount: 10,
+        formCount: 10,
+        byteSize: 40960,
+        status: 'dormant',
+        isActive: false,
+        isValid: true,
+        createdAt: new Date().toISOString(),
+      }
+      const onClose = vi.fn()
+      const onSelect = vi.fn()
+
+      const container = document.createElement('div')
+      document.body.appendChild(container)
+      const root = createRoot(container)
+
+      await act(async () => {
+        root.render(
+          React.createElement(SnapshotPickerModal, {
+            snapshots: [snapA],
+            activeSnapshotId: null,
+            onClose,
+            onSelect,
+          }),
+        )
+      })
+
+      const cancelBtn = container.querySelector('[data-testid="snapshot-picker-cancel"]') as HTMLButtonElement
+      const selectBtn = container.querySelector('[data-testid="snapshot-picker-select-snap-1"]') as HTMLButtonElement
+
+      expect(cancelBtn).not.toBeNull()
+      expect(selectBtn).not.toBeNull()
+
+      // Focus last element (cancel button) and press Tab -> should wrap to selectBtn
+      cancelBtn.focus()
+      expect(document.activeElement).toBe(cancelBtn)
+
+      await act(async () => {
+        const tabEvent = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
+        window.dispatchEvent(tabEvent)
+      })
+      expect(document.activeElement).toBe(selectBtn)
+
+      // Press Escape -> calls onClose
+      await act(async () => {
+        const escEvent = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+        window.dispatchEvent(escEvent)
+      })
+      expect(onClose).toHaveBeenCalled()
+
+      await act(async () => {
+        root.unmount()
+      })
+      container.remove()
+    })
+
+    it('W16: Parent re-render does not reset SnapshotPickerModal focus', async () => {
+      const snapA: CustomSnapshotSummary = {
+        snapshotId: 'snap-1',
+        identity: 'dict-1',
+        schemaVersion: 1,
+        entryCount: 10,
+        formCount: 10,
+        byteSize: 40960,
+        status: 'dormant',
+        isActive: false,
+        isValid: true,
+        createdAt: new Date().toISOString(),
+      }
+
+      const container = document.createElement('div')
+      document.body.appendChild(container)
+      const root = createRoot(container)
+
+      // Initial render
+      await act(async () => {
+        root.render(
+          React.createElement(SnapshotPickerModal, {
+            snapshots: [snapA],
+            activeSnapshotId: null,
+            onClose: () => {},
+            onSelect: () => {},
+          }),
+        )
+      })
+
+      const cancelBtn = container.querySelector('[data-testid="snapshot-picker-cancel"]') as HTMLButtonElement
+      cancelBtn.focus()
+      expect(document.activeElement).toBe(cancelBtn)
+
+      // Re-render with new function identities (simulating parent polling)
+      await act(async () => {
+        root.render(
+          React.createElement(SnapshotPickerModal, {
+            snapshots: [snapA],
+            activeSnapshotId: null,
+            onClose: () => {},
+            onSelect: () => {},
+          }),
+        )
+      })
+
+      // Focus should remain on cancelBtn, not reset to dialog container
+      expect(document.activeElement).toBe(cancelBtn)
+
+      await act(async () => {
+        root.unmount()
+      })
+      container.remove()
+    })
+
+    it('W17: Corrupt snapshot displays badge and cannot be enabled in SnapshotPickerModal', async () => {
+      const corruptSnap: CustomSnapshotSummary = {
+        snapshotId: 'snap-corrupt-999',
+        identity: 'corrupt-db',
+        schemaVersion: 1,
+        entryCount: 0,
+        formCount: 0,
+        byteSize: 40960,
+        status: 'corrupt',
+        isActive: false,
+        isValid: false,
+        corrupt: true,
+        createdAt: new Date().toISOString(),
+      }
+      const onSelect = vi.fn()
+      const onClose = vi.fn()
+
+      const container = document.createElement('div')
+      document.body.appendChild(container)
+      const root = createRoot(container)
+
+      await act(async () => {
+        root.render(
+          React.createElement(SnapshotPickerModal, {
+            snapshots: [corruptSnap],
+            activeSnapshotId: null,
+            onClose,
+            onSelect,
+          }),
+        )
+      })
+
+      const row = container.querySelector('[data-testid="snapshot-picker-row-snap-corrupt-999"]')
+      expect(row).not.toBeNull()
+      expect(row?.textContent).toContain('快照损坏')
+
+      const selectBtn = container.querySelector('[data-testid="snapshot-picker-select-snap-corrupt-999"]') as HTMLButtonElement
+      expect(selectBtn.disabled).toBe(true)
+      expect(selectBtn.textContent).toBe('快照损坏')
+
+      await act(async () => {
+        selectBtn.click()
+      })
+      expect(onSelect).not.toHaveBeenCalled()
+
+      await act(async () => {
+        root.unmount()
+      })
+      container.remove()
     })
   })
 })

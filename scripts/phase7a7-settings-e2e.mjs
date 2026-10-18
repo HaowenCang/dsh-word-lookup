@@ -310,7 +310,7 @@ async function main() {
     console.log(`DSH booted at: ${dsh.url}`)
 
     browser = await chromium.launch({ headless: true })
-    const context = await browser.newContext({ viewport: { width: 1280, height: 800 } })
+    const context = await browser.newContext({ viewport: { width: 1280, height: 800 }, colorScheme: 'dark' })
     const page = await context.newPage()
     page.on('console', (msg) => console.log(`[BROWSER ${msg.type()}]`, msg.text()))
     page.on('pageerror', (err) => console.error('[BROWSER PAGEERROR]', err))

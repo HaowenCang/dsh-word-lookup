@@ -771,6 +771,56 @@ export function TextInput({
 
 // --- Accessible Shortcut Recorder Modal ---
 
+/**
+ * Concurrency coordinator for DSH shortcut recording lock.
+ *
+ * Guarantees:
+ * - Single ownership per modal instance.
+ * - Strict serial execution: acquire and release never race or overlap.
+ * - If release is requested while acquire is pending, release waits for acquire to settle before calling recording(false).
+ * - If disposed before acquire starts, acquire is safely canceled.
+ * - Errors in acquire or release do not cause unhandled rejections.
+ * - Idempotent cleanup: duplicate release calls are no-ops.
+ * - Final state is guaranteed to be false after release.
+ */
+export class AsyncRecordingLock {
+  private queue: Promise<void> = Promise.resolve()
+  private held = false
+  private released = false
+
+  acquire(recordingFn?: (active: boolean) => Promise<void>): Promise<void> {
+    if (!recordingFn) return Promise.resolve()
+    this.queue = this.queue
+      .catch(() => {})
+      .then(async () => {
+        await recordingFn(true)
+        this.held = true
+      })
+      .catch(() => {})
+    return this.queue
+  }
+
+  release(recordingFn?: (active: boolean) => Promise<void>): Promise<void> {
+    if (this.released || !recordingFn) return this.queue
+    this.released = true
+    this.queue = this.queue
+      .catch(() => {})
+      .then(async () => {
+        try {
+          await recordingFn(false)
+        } finally {
+          this.held = false
+        }
+      })
+      .catch(() => {})
+    return this.queue
+  }
+
+  isHeld(): boolean {
+    return this.held
+  }
+}
+
 export interface ShortcutRecorderModalProps {
   readonly currentKeys: readonly string[]
   readonly isModified: boolean
@@ -805,6 +855,13 @@ export function ShortcutRecorderModal({
   const recorderBoxRef = React.useRef<HTMLDivElement>(null)
   const dialogRef = React.useRef<HTMLDivElement>(null)
   const previousActiveElementRef = React.useRef<HTMLElement | null>(null)
+  const onCloseRef = React.useRef(onClose)
+  onCloseRef.current = onClose
+
+  const lockRef = React.useRef<AsyncRecordingLock | null>(null)
+  if (!lockRef.current) {
+    lockRef.current = new AsyncRecordingLock()
+  }
   const recordingRef = React.useRef(recording)
   recordingRef.current = recording
 
@@ -813,11 +870,8 @@ export function ShortcutRecorderModal({
       previousActiveElementRef.current = document.activeElement as HTMLElement | null
     }
 
-    let lockAcquired = false
-    if (recordingRef.current) {
-      lockAcquired = true
-      void recordingRef.current(true).catch(() => {})
-    }
+    const lock = lockRef.current!
+    void lock.acquire(recordingRef.current)
 
     const timer = setTimeout(() => {
       recorderBoxRef.current?.focus()
@@ -825,9 +879,7 @@ export function ShortcutRecorderModal({
 
     return () => {
       clearTimeout(timer)
-      if (lockAcquired && recordingRef.current) {
-        void recordingRef.current(false).catch(() => {})
-      }
+      void lock.release(recordingRef.current)
       if (previousActiveElementRef.current && typeof previousActiveElementRef.current.focus === 'function') {
         try {
           previousActiveElementRef.current.focus()
@@ -845,7 +897,7 @@ export function ShortcutRecorderModal({
     if (e.key === 'Escape' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
       e.preventDefault()
       e.stopPropagation()
-      onClose()
+      onCloseRef.current()
       return
     }
 
@@ -919,16 +971,43 @@ export function ShortcutRecorderModal({
   }
 
   const handleDialogKeyDown = (e: React.KeyboardEvent) => {
-    // If key originates on a button, do not capture as shortcut recording
-    if ((e.target as HTMLElement)?.closest('button')) {
-      return
-    }
-
     // Escape closes modal safely from anywhere
     if (e.key === 'Escape' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
       e.preventDefault()
       e.stopPropagation()
-      onClose()
+      onCloseRef.current()
+      return
+    }
+
+    // Tab trap
+    if (e.key === 'Tab') {
+      if (!dialogRef.current) return
+      const focusable = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(
+          '[data-testid="shortcut-recorder-box"], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      )
+      if (focusable.length > 0) {
+        const first = focusable[0]
+        const last = focusable[focusable.length - 1]
+        if (e.shiftKey) {
+          if (document.activeElement === first) {
+            e.preventDefault()
+            last?.focus()
+            return
+          }
+        } else {
+          if (document.activeElement === last) {
+            e.preventDefault()
+            first?.focus()
+            return
+          }
+        }
+      }
+    }
+
+    // If key originates on a button, do not capture as shortcut recording
+    if ((e.target as HTMLElement)?.closest('button')) {
       return
     }
 
@@ -946,7 +1025,7 @@ export function ShortcutRecorderModal({
       const res = await onSave(candidate)
       const ok = typeof res === 'boolean' ? res : res.ok
       if (ok) {
-        onClose()
+        onCloseRef.current()
       } else {
         const errMsg = typeof res === 'object' && res.error ? res.error : '保存快捷键失败，Host 未接受该配置'
         setSaveError(errMsg)
@@ -966,7 +1045,7 @@ export function ShortcutRecorderModal({
       const res = await onReset()
       const ok = typeof res === 'boolean' ? res : res.ok
       if (ok) {
-        onClose()
+        onCloseRef.current()
       } else {
         const errMsg = typeof res === 'object' && res.error ? res.error : '恢复默认快捷键失败'
         setSaveError(errMsg)
@@ -1161,6 +1240,12 @@ export function SnapshotPickerModal({
 }: SnapshotPickerModalProps) {
   const dialogRef = React.useRef<HTMLDivElement>(null)
   const previousActiveElementRef = React.useRef<HTMLElement | null>(null)
+  const onCloseRef = React.useRef(onClose)
+  onCloseRef.current = onClose
+  const onSelectRef = React.useRef(onSelect)
+  onSelectRef.current = onSelect
+
+  const [submittingId, setSubmittingId] = React.useState<string | null>(null)
 
   React.useEffect(() => {
     if (typeof document !== 'undefined') {
@@ -1168,14 +1253,51 @@ export function SnapshotPickerModal({
     }
 
     const timer = setTimeout(() => {
-      dialogRef.current?.focus()
+      // Focus first selectable button or dialog container
+      const firstFocusable = dialogRef.current?.querySelector<HTMLElement>(
+        'button:not([disabled])',
+      )
+      if (firstFocusable) {
+        firstFocusable.focus()
+      } else {
+        dialogRef.current?.focus()
+      }
     }, 20)
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault()
         e.stopPropagation()
-        onClose()
+        onCloseRef.current()
+        return
+      }
+
+      if (e.key === 'Tab') {
+        if (!dialogRef.current) return
+        const focusableElements = Array.from(
+          dialogRef.current.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+          ),
+        )
+        if (focusableElements.length === 0) {
+          e.preventDefault()
+          return
+        }
+
+        const firstElement = focusableElements[0]
+        const lastElement = focusableElements[focusableElements.length - 1]
+
+        if (e.shiftKey) {
+          if (document.activeElement === firstElement || document.activeElement === dialogRef.current) {
+            e.preventDefault()
+            lastElement?.focus()
+          }
+        } else {
+          if (document.activeElement === lastElement) {
+            e.preventDefault()
+            firstElement?.focus()
+          }
+        }
       }
     }
 
@@ -1194,9 +1316,21 @@ export function SnapshotPickerModal({
         } catch {
           // ignore
         }
+      } else if (typeof document !== 'undefined') {
+        const topCustomBtn = document.querySelector<HTMLElement>('[data-testid="btn-mode-custom"]')
+        topCustomBtn?.focus()
       }
     }
-  }, [onClose])
+  }, [])
+
+  const handleSelectSnapshot = (snapshotId: string) => {
+    if (isActing || submittingId !== null) return
+    const target = snapshots.find((s) => s.snapshotId === snapshotId)
+    if (!target || target.corrupt) return
+    setSubmittingId(snapshotId)
+    onSelectRef.current(snapshotId)
+    onCloseRef.current()
+  }
 
   const backdropStyle: CSSProperties = {
     position: 'fixed',
@@ -1225,7 +1359,7 @@ export function SnapshotPickerModal({
   }
 
   return (
-    <div style={backdropStyle} role="presentation" onClick={onClose}>
+    <div style={backdropStyle} role="presentation" onClick={() => onCloseRef.current()}>
       <div
         ref={dialogRef}
         tabIndex={-1}
@@ -1283,13 +1417,10 @@ export function SnapshotPickerModal({
                   data-testid={`snapshot-picker-select-${snap.snapshotId}`}
                   size="small"
                   variant={isActive ? 'ghost' : 'primary'}
-                  disabled={isActive || isCorrupt || isActing}
-                  onClick={() => {
-                    onSelect(snap.snapshotId)
-                    onClose()
-                  }}
+                  disabled={isActive || isCorrupt || isActing || submittingId !== null}
+                  onClick={() => handleSelectSnapshot(snap.snapshotId)}
                 >
-                  {isActive ? '已激活' : '启用'}
+                  {isActive ? '已激活' : isCorrupt ? '快照损坏' : '启用'}
                 </ActionButton>
               </div>
             )
@@ -1297,7 +1428,7 @@ export function SnapshotPickerModal({
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '18px' }}>
-          <ActionButton data-testid="snapshot-picker-cancel" variant="secondary" onClick={onClose}>
+          <ActionButton data-testid="snapshot-picker-cancel" variant="secondary" onClick={() => onCloseRef.current()}>
             取消
           </ActionButton>
         </div>

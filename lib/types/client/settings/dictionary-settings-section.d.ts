@@ -24,6 +24,8 @@ export interface DictionaryHostSettings {
     readonly autoSelection?: boolean;
     readonly dictionaryMode?: 'fixture' | 'managed-ecdict' | 'custom';
 }
+/** Authoritative lifecycle state for DSH shortcut integration. */
+export type ShortcutServiceState = 'SERVICE_UNAVAILABLE' | 'CATALOG_NOT_READY' | 'COMMAND_NOT_REGISTERED' | 'READ_ONLY' | 'READY';
 /** Props passed to DictionarySettingsSection. */
 export type DictionarySettingsSectionProps = Partial<PropsRuntime<'settings.section'>> & {
     /** Optional pre-configured management store. */
