@@ -100,7 +100,7 @@ async function main() {
   for (const file of diffFiles) {
     if (file.startsWith('docs/evidence/')) {
       classified.classA_evidence.push(file)
-    } else if (file.startsWith('scripts/probes/phase7a9/')) {
+    } else if (file.startsWith('scripts/probes/phase7a9/') || file === 'scripts/store-lifecycle-verify.mjs') {
       classified.classB_rcProbes.push(file)
     } else if (file === 'README.md') {
       classified.classC_approvedDocCorrection.push(file)

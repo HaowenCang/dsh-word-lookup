@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-10-18T06:34:24.832Z",
+  "timestamp": "2026-10-18T06:40:56.939Z",
   "probe": "RC-F",
   "verdict": "PASS",
   "anomalyResolution": {
@@ -53,15 +53,24 @@
       "author": "Evan Williams <54177361+HaowenCang@users.noreply.github.com>",
       "date": "Sat Oct 17 21:48:54 2026 -0700",
       "parentSha": "4c74aaab98ffa9fa633f857c893a3d06ee01c9ea"
+    },
+    {
+      "step": 6,
+      "role": "CURRENT_HEAD",
+      "sha": "fd2ec8cc9f0d638ba5e5d125f21f61f79fc63acd",
+      "subject": "fix(release): remediate release candidate audit findings and close phase 7a9r evidence",
+      "author": "Evan Williams <54177361+HaowenCang@users.noreply.github.com>",
+      "date": "Sat Oct 17 23:39:17 2026 -0700",
+      "parentSha": "7dbfb43d7eeb608e6ea45ccc579c63c588b854ad"
     }
   ],
   "changeClassification": {
     "codeBaselineSha": "b36bf4d1b8ec5b6ab3ae3750475d656c669bcdcf",
-    "currentHeadSha": "7dbfb43d7eeb608e6ea45ccc579c63c588b854ad",
-    "totalDiffFiles": 54,
-    "classA_evidenceCount": 48,
-    "classB_rcProbesCount": 6,
-    "classC_approvedDocCount": 0,
+    "currentHeadSha": "fd2ec8cc9f0d638ba5e5d125f21f61f79fc63acd",
+    "totalDiffFiles": 90,
+    "classA_evidenceCount": 82,
+    "classB_rcProbesCount": 7,
+    "classC_approvedDocCount": 1,
     "forbiddenCount": 0
   },
   "productionInvariance": {
@@ -78,9 +87,9 @@
       {
         "file": "README.md",
         "baselineBlob": "035432d23d39222054ee19710a63aed372a3deba",
-        "headBlob": "035432d23d39222054ee19710a63aed372a3deba",
-        "identical": true,
-        "classification": "FROZEN_IDENTICAL"
+        "headBlob": "4583fdf69758c828ed426d3fffdbc5e9dd15f425",
+        "identical": false,
+        "classification": "CLASS_C_APPROVED_DOCUMENTATION_CORRECTION"
       },
       {
         "file": "cordis.patch.yml",
@@ -139,7 +148,7 @@
   },
   "provenanceStagingStructure": {
     "sourceBaselineSha": "b36bf4d1b8ec5b6ab3ae3750475d656c669bcdcf",
-    "testedCodeSha": "7dbfb43d7eeb608e6ea45ccc579c63c588b854ad",
+    "testedCodeSha": "fd2ec8cc9f0d638ba5e5d125f21f61f79fc63acd",
     "rcProbesSha": "4c74aaab98ffa9fa633f857c893a3d06ee01c9ea",
     "priorEvidenceSha": "7dbfb43d7eeb608e6ea45ccc579c63c588b854ad",
     "finalObservedRemoteHeadNote": "Distinguished externally post-commit to avoid circular SHA reference."

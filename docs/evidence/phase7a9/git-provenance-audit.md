@@ -1,10 +1,10 @@
 # Git Provenance & Historical Evidence Closure Report (RC-F)
 
 ## 1. Executive Summary
-- **Audit Date**: 2026-10-18T06:34:24.834Z
+- **Audit Date**: 2026-10-18T06:40:56.941Z
 - **Scope**: Release Candidate v0.2.0 QA & Safety Acceptance
 - **Code Baseline**: `b36bf4d1b8ec5b6ab3ae3750475d656c669bcdcf`
-- **Current HEAD**: `7dbfb43d7eeb608e6ea45ccc579c63c588b854ad`
+- **Current HEAD**: `fd2ec8cc9f0d638ba5e5d125f21f61f79fc63acd`
 - **Audit Verdict**: **PASS — FULL PROVENANCE CLOSURE ACHIEVED**
 
 ---
@@ -33,10 +33,10 @@ In earlier prompt notes, commit SHA `1148da93b7ffc6448373b53c7db828943ca0b1f7` w
 
 ## 3. Strict Code Tree & Production Surface Invariance Audit
 
-### 3.1 Change Classification between Baseline (`b36bf4d1b8ec5b6ab3ae3750475d656c669bcdcf`) and HEAD (`7dbfb43d7eeb608e6ea45ccc579c63c588b854ad`):
-- **Class A (Evidence)**: 48 files under `docs/evidence/`
-- **Class B (RC Probes)**: 6 scripts under `scripts/probes/phase7a9/`
-- **Class C (Approved Doc Correction)**: 0 file (`README.md`)
+### 3.1 Change Classification between Baseline (`b36bf4d1b8ec5b6ab3ae3750475d656c669bcdcf`) and HEAD (`fd2ec8cc9f0d638ba5e5d125f21f61f79fc63acd`):
+- **Class A (Evidence)**: 82 files under `docs/evidence/`
+- **Class B (RC Probes)**: 7 scripts under `scripts/probes/phase7a9/`
+- **Class C (Approved Doc Correction)**: 1 file (`README.md`)
 - **Forbidden Changes**: **0 (ZERO)**
 
 ### 3.2 Production Source Tree (`src/`) Tree Object:
@@ -48,7 +48,7 @@ In earlier prompt notes, commit SHA `1148da93b7ffc6448373b53c7db828943ca0b1f7` w
 | File | Baseline Blob SHA | HEAD Blob SHA | Status |
 |---|---|---|---|
 | `LICENSE` | `6a131d2d0848a3f49d961523c8e2fdfb29d18307` | `6a131d2d0848a3f49d961523c8e2fdfb29d18307` | FROZEN_IDENTICAL |
-| `README.md` | `035432d23d39222054ee19710a63aed372a3deba` | `035432d23d39222054ee19710a63aed372a3deba` | FROZEN_IDENTICAL |
+| `README.md` | `035432d23d39222054ee19710a63aed372a3deba` | `4583fdf69758c828ed426d3fffdbc5e9dd15f425` | CLASS_C_APPROVED_DOCUMENTATION_CORRECTION |
 | `cordis.patch.yml` | `6ac6d4a9dd95ee631a0556bb63bc57f8713d3044` | `6ac6d4a9dd95ee631a0556bb63bc57f8713d3044` | FROZEN_IDENTICAL |
 | `corpus/ecdict.manifest.json` | `1d1d3f332900bc7e30680b4f6e50ff70ffeed4f6` | `1d1d3f332900bc7e30680b4f6e50ff70ffeed4f6` | FROZEN_IDENTICAL |
 | `lib/client.js` | `1a4c9a74e212905a30925421b3eb4a66f6fa3117` | `1a4c9a74e212905a30925421b3eb4a66f6fa3117` | FROZEN_IDENTICAL |
@@ -97,4 +97,9 @@ All 7 production runtime code and config files remain 100% bit-for-bit identical
   Author: Evan Williams <54177361+HaowenCang@users.noreply.github.com>
   Date:   Sat Oct 17 21:48:54 2026 -0700
   Role:   PHASE_7A_9_RC_EVIDENCE
+
+[fd2ec8cc9f] fix(release): remediate release candidate audit findings and close phase 7a9r evidence
+  Author: Evan Williams <54177361+HaowenCang@users.noreply.github.com>
+  Date:   Sat Oct 17 23:39:17 2026 -0700
+  Role:   CURRENT_HEAD
 ```
