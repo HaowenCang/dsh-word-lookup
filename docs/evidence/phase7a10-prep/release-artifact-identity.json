@@ -1,0 +1,96 @@
+{
+  "timestamp": "2026-10-18T05:15:00Z",
+  "phase": "PHASE7A10",
+  "status": "PREPARED_PENDING_AUTHORIZATION",
+  "package": {
+    "name": "dsh-word-lookup",
+    "version": "0.2.0",
+    "type": "module",
+    "license": "MIT",
+    "engines": {
+      "node": ">=22"
+    },
+    "peerDependencies": {
+      "@deepseek-ai/cordis": "~4.0.4",
+      "@deepseek-ai/schemastery": "~3.18.4",
+      "react": "^18.2.0"
+    },
+    "dsh": {
+      "pluginType": "feature",
+      "client": {
+        "platform": "web"
+      },
+      "compatibility": {
+        "dsh": "0.2.0-rc.2",
+        "profiles": [
+          "web"
+        ]
+      }
+    }
+  },
+  "candidateTarball": {
+    "relativePath": "build/rc-v0.2.0/dsh-word-lookup-0.2.0.tgz",
+    "byteSize": 135731,
+    "sha256": "ce51e0e233d2b93b8b3d3f61548e0634debdedd0b20ac423a150037abf887f34",
+    "sha1": "9f9a66c7f354b76bd46f4cbc21d0ca667796dbb3",
+    "npmIntegrity": "sha512-aRXtW5DdiAVTPFYppuFRENyQ8EIg1otondIoIw4R5P7uMjs43GQhYBfslTo0E3rCyz/FA3wdRfCZF15hEzSyEg==",
+    "totalUnpackedBytes": 576913,
+    "filesCount": 8,
+    "members": [
+      {
+        "path": "LICENSE",
+        "byteSize": 1089,
+        "sha256": "99922c2a61954f0eaef1591241bcaaac4d3c8984a9866840180d65f7a1ff8101"
+      },
+      {
+        "path": "README.md",
+        "byteSize": 15214,
+        "sha256": "478320e56539e88cddca40b1cde570e2e7f98bc44e840b1c4515330ef6160bd1"
+      },
+      {
+        "path": "cordis.patch.yml",
+        "byteSize": 415,
+        "sha256": "df9851e21b59cafc69f91b0839c7cd56cb53104c57644813d9001e1a76c7d868"
+      },
+      {
+        "path": "corpus/ecdict.manifest.json",
+        "byteSize": 566,
+        "sha256": "03cba27d42cb43551d7b51fa12e4a07a869c5d4b65ac07f4fa3d105d9c944044"
+      },
+      {
+        "path": "lib/client.js",
+        "byteSize": 185043,
+        "sha256": "2a1425a94a782cb382ce031dd85d09627eba680f6baac2479dd32127e13e7952"
+      },
+      {
+        "path": "lib/ecdict-integrity-worker.js",
+        "byteSize": 23193,
+        "sha256": "0d6bda562785797d36e64fa9567125072c6e7626c77c25211ba9dd223294d2b6"
+      },
+      {
+        "path": "lib/index.js",
+        "byteSize": 345905,
+        "sha256": "f426d1ba68fe548867d46affc028690c6393d571fd77af457cc342ecd49abf2e"
+      },
+      {
+        "path": "package.json",
+        "byteSize": 5488,
+        "sha256": "e79d9176a09a8ee10f0c0c97c04e12e224c479b002483c0f32ad47dab229f996"
+      }
+    ]
+  },
+  "provenance": {
+    "repositoryUrl": "https://github.com/HaowenCang/dsh-word-lookup",
+    "productionFreezeCommit": "b36bf4d1b8ec5b6ab3ae3750475d656c669bcdcf",
+    "productionSourceTreeSha": "24d78dfbb54ae62882aa661d4819f6397068e303",
+    "testedProbeCommit": "fc1c5b64c56629cf0395121b8c76a3ddfc811ddc",
+    "evidenceCommit": "5c863335afdc4b71ee18f41340d852f378a2bee2",
+    "plannedTagTargetCommit": "5c863335afdc4b71ee18f41340d852f378a2bee2"
+  },
+  "authorizationGate": {
+    "readyForPublicationAuthorization": true,
+    "npmPublishAuthorized": false,
+    "gitTagCreationAuthorized": false,
+    "gitHubReleaseCreationAuthorized": false
+  }
+}
