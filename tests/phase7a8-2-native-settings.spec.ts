@@ -15,15 +15,18 @@ import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
-import { existsSync, unlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, unlinkSync, statSync, readFileSync, rmSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { createHash } from 'node:crypto'
 import { DatabaseSync } from 'node:sqlite'
 
 import { DictionarySettingsSection } from '../src/client/settings/dictionary-settings-section.js'
 import { DictionaryManagementStore } from '../src/client/settings/dictionary-management-store.js'
 import { LOOKUP_COMMAND_ID, type Shortcuts } from '../src/client/contracts.js'
 import type { DictionaryStatusResponse, CustomSnapshotSummary } from '../src/shared/dictionary-management-protocol.js'
+import { CustomSnapshotManager } from '../src/host/custom-snapshot-manager.js'
+import { resolveManagedStoragePaths } from '../src/host/managed-storage.js'
 
 function setInputValue(input: HTMLInputElement, value: string) {
   const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set
@@ -177,6 +180,7 @@ function mount(props: {
   store?: DictionaryManagementStore
   shortcuts?: Shortcuts
   platform?: 'windows' | 'macos' | 'linux'
+  actionError?: string | null
 }) {
   const container = document.createElement('div')
   document.body.appendChild(container)
@@ -188,7 +192,7 @@ function mount(props: {
     status,
     isLoading: false,
     isActing: false,
-    actionError: null,
+    actionError: props.actionError ?? null,
     connectionError: null,
     lastRefreshedAt: 1000,
   })
@@ -401,7 +405,7 @@ describe('Phase 7A.8.2 Native Settings Acceptance Matrix (U01–U32)', () => {
       await act(async () => {
         btnCustom.click()
       })
-      expect(selectModeSpy).toHaveBeenCalledWith('custom')
+      expect(selectModeSpy).toHaveBeenCalledWith('custom', customSnap.snapshotId)
       await unmount()
     })
 
@@ -840,11 +844,55 @@ describe('Phase 7A.8.2 Native Settings Acceptance Matrix (U01–U32)', () => {
       await unmount()
     })
 
-    it('U23: Custom snapshot deletion never touches original source database file', () => {
-      const userFile = join(tmpdir(), `u23-keep-${Date.now()}.db`)
-      writeFileSync(userFile, 'dummy content')
-      expect(existsSync(userFile)).toBe(true)
-      unlinkSync(userFile)
+    it('U23: Custom snapshot deletion never touches original source database file', async () => {
+      const tmp = join(tmpdir(), `u23-real-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+      mkdirSync(tmp, { recursive: true })
+      const userSrc = join(tmp, 'user-source.sqlite3')
+      const db = new DatabaseSync(userSrc)
+      db.exec('PRAGMA journal_mode = DELETE;')
+      db.exec(`
+        CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+        INSERT INTO meta VALUES ('schema_version', '1'), ('corpus_name', 'U23_TEST');
+        CREATE TABLE entries (word TEXT PRIMARY KEY COLLATE NOCASE, phonetic TEXT, definition_en TEXT, translation_zh TEXT, pos TEXT, exchange TEXT, frequency INTEGER);
+        CREATE TABLE forms (form TEXT PRIMARY KEY COLLATE NOCASE, headword TEXT NOT NULL, kind TEXT);
+        CREATE TABLE examples (id INTEGER PRIMARY KEY, headword TEXT NOT NULL COLLATE NOCASE, english TEXT NOT NULL, chinese TEXT, source TEXT, source_id TEXT, score REAL);
+        CREATE INDEX idx_forms_headword ON forms (headword);
+        CREATE INDEX idx_examples_headword ON examples (headword);
+        INSERT INTO entries VALUES ('electron', '/ɪˈlektrɒn/', 'Subatomic particle', '电子', 'n.', '', 100);
+      `)
+      db.close()
+
+      const origBytes = readFileSync(userSrc)
+      const origHash = createHash('sha256').update(origBytes).digest('hex')
+      const origStat = statSync(userSrc)
+
+      const homeDir = join(tmp, 'home')
+      const paths = resolveManagedStoragePaths({ home: homeDir })
+      const manager = new CustomSnapshotManager({ paths })
+
+      try {
+        // Source SQLite A -> Publish snapshot A
+        const rec = await manager.createAndPublishSnapshot(userSrc, { identity: 'electron-dict' })
+        expect(rec.state).toBe('PUBLISHED_INACTIVE')
+
+        // Verify source SQLite A exists and hash is unchanged after publish
+        expect(existsSync(userSrc)).toBe(true)
+        expect(createHash('sha256').update(readFileSync(userSrc)).digest('hex')).toBe(origHash)
+
+        // Remove snapshot A
+        await manager.cleanupSnapshot(rec.id)
+        expect(manager.getSnapshot(rec.id)?.state).toBe('DELETED')
+
+        // Verify source SQLite A remains completely unchanged (exists, size, SHA-256)
+        expect(existsSync(userSrc)).toBe(true)
+        const postStat = statSync(userSrc)
+        expect(postStat.size).toBe(origStat.size)
+        const postHash = createHash('sha256').update(readFileSync(userSrc)).digest('hex')
+        expect(postHash).toBe(origHash)
+      } finally {
+        await manager.dispose()
+        rmSync(tmp, { recursive: true, force: true })
+      }
     })
   })
 
@@ -1072,6 +1120,452 @@ describe('Phase 7A.8.2 Native Settings Acceptance Matrix (U01–U32)', () => {
 
       expect(mockShortcuts.recording).toHaveBeenCalledWith(false)
       expect(mockShortcuts.isRecording).toBe(false)
+      await unmount()
+    })
+  })
+
+  describe('Phase 7A.8.2R: Native Settings Interaction Repair Matrix (V01–V14, V22, V23)', () => {
+    const snap1: CustomSnapshotSummary = {
+      snapshotId: '11111111-0000-0000-0000-111111111111',
+      identity: 'dict-alpha',
+      schemaVersion: 1,
+      entryCount: 1200,
+      formCount: 300,
+      byteSize: 102400,
+      status: 'PUBLISHED_INACTIVE',
+      isActive: false,
+      isValid: true,
+      createdAt: new Date().toISOString(),
+    }
+
+    const snap2: CustomSnapshotSummary = {
+      snapshotId: '22222222-0000-0000-0000-222222222222',
+      identity: 'dict-beta',
+      schemaVersion: 1,
+      entryCount: 3400,
+      formCount: 800,
+      byteSize: 204800,
+      status: 'PUBLISHED_INACTIVE',
+      isActive: false,
+      isValid: true,
+      createdAt: new Date().toISOString(),
+    }
+
+    it('V01: Top Custom switch button opens SnapshotPickerModal when multiple snapshots exist without calling store.selectMode directly', async () => {
+      const store = new DictionaryManagementStore({ autoStart: false })
+      const selectModeSpy = vi.spyOn(store, 'selectMode').mockResolvedValue(true)
+      const { container, render, unmount } = mount({
+        store,
+        storeState: { activeMode: 'fixture', customSnapshots: [snap1, snap2] },
+      })
+      await render()
+
+      const btnCustom = container.querySelector('[data-testid="btn-mode-custom"]') as HTMLButtonElement
+      expect(btnCustom).not.toBeNull()
+      expect(btnCustom.disabled).toBe(false)
+
+      await act(async () => {
+        btnCustom.click()
+      })
+
+      // Must NOT call selectMode directly without snapshotId (C1 fix)
+      expect(selectModeSpy).not.toHaveBeenCalled()
+
+      // Modal must be displayed
+      const modal = container.querySelector('[data-testid="snapshot-picker-modal"]')
+      expect(modal).not.toBeNull()
+      expect(container.textContent).toContain('选择要启用的自定义词典')
+
+      await unmount()
+    })
+
+    it('V02: SnapshotPickerModal renders all available custom snapshots with identities, stats and radio selection', async () => {
+      const store = new DictionaryManagementStore({ autoStart: false })
+      const { container, render, unmount } = mount({
+        store,
+        storeState: { activeMode: 'fixture', customSnapshots: [snap1, snap2] },
+      })
+      await render()
+
+      const btnCustom = container.querySelector('[data-testid="btn-mode-custom"]') as HTMLButtonElement
+      await act(async () => {
+        btnCustom.click()
+      })
+
+      const modal = container.querySelector('[data-testid="snapshot-picker-modal"]')
+      expect(modal).not.toBeNull()
+      expect(modal?.textContent).toContain('dict-alpha')
+      expect(modal?.textContent).toContain('dict-beta')
+      expect(modal?.textContent).toContain('1,200')
+      expect(modal?.textContent).toContain('3,400')
+
+      const row1 = container.querySelector(`[data-testid="snapshot-picker-row-${snap1.snapshotId}"]`)
+      const row2 = container.querySelector(`[data-testid="snapshot-picker-row-${snap2.snapshotId}"]`)
+      expect(row1).not.toBeNull()
+      expect(row2).not.toBeNull()
+
+      await unmount()
+    })
+
+    it('V03: Selecting a snapshot in SnapshotPickerModal and confirming calls store.selectMode("custom", snapshotId)', async () => {
+      const store = new DictionaryManagementStore({ autoStart: false })
+      const selectModeSpy = vi.spyOn(store, 'selectMode').mockResolvedValue(true)
+      const { container, render, unmount } = mount({
+        store,
+        storeState: { activeMode: 'fixture', customSnapshots: [snap1, snap2] },
+      })
+      await render()
+
+      // Open picker
+      const btnCustom = container.querySelector('[data-testid="btn-mode-custom"]') as HTMLButtonElement
+      await act(async () => {
+        btnCustom.click()
+      })
+
+      // Click snap2 select button to enable it
+      const selectBtn2 = container.querySelector(`[data-testid="snapshot-picker-select-${snap2.snapshotId}"]`) as HTMLButtonElement
+      expect(selectBtn2).not.toBeNull()
+      expect(selectBtn2.disabled).toBe(false)
+      await act(async () => {
+        selectBtn2.click()
+      })
+
+      expect(selectModeSpy).toHaveBeenCalledWith('custom', snap2.snapshotId)
+      await unmount()
+    })
+
+    it('V04: When exactly 1 valid snapshot exists, clicking top Custom button switches directly with snapshotId', async () => {
+      const store = new DictionaryManagementStore({ autoStart: false })
+      const selectModeSpy = vi.spyOn(store, 'selectMode').mockResolvedValue(true)
+      const { container, render, unmount } = mount({
+        store,
+        storeState: { activeMode: 'fixture', customSnapshots: [snap1] },
+      })
+      await render()
+
+      const btnCustom = container.querySelector('[data-testid="btn-mode-custom"]') as HTMLButtonElement
+      await act(async () => {
+        btnCustom.click()
+      })
+
+      expect(selectModeSpy).toHaveBeenCalledWith('custom', snap1.snapshotId)
+      expect(container.querySelector('[data-testid="snapshot-picker-modal"]')).toBeNull()
+
+      await unmount()
+    })
+
+    it('V05: When 0 custom snapshots exist, top Custom button is disabled with descriptive tooltip', async () => {
+      const store = new DictionaryManagementStore({ autoStart: false })
+      const { container, render, unmount } = mount({
+        store,
+        storeState: { activeMode: 'fixture', customSnapshots: [] },
+      })
+      await render()
+
+      const btnCustom = container.querySelector('[data-testid="btn-mode-custom"]') as HTMLButtonElement
+      expect(btnCustom.disabled).toBe(true)
+      expect(btnCustom.title).toContain('需先在下方导入自定义 SQLite 词典')
+
+      await unmount()
+    })
+
+    it('V06: Redundant switch is prevented when selecting already-active snapshot or clicking top Custom in active single snapshot state', async () => {
+      const activeSnap: CustomSnapshotSummary = { ...snap1, isActive: true }
+      const store = new DictionaryManagementStore({ autoStart: false })
+      const selectModeSpy = vi.spyOn(store, 'selectMode').mockResolvedValue(true)
+      const { container, render, unmount } = mount({
+        store,
+        storeState: {
+          activeMode: 'custom',
+          activeSnapshotId: activeSnap.snapshotId,
+          customSnapshots: [activeSnap],
+        },
+      })
+      await render()
+
+      const btnCustom = container.querySelector('[data-testid="btn-mode-custom"]') as HTMLButtonElement
+      await act(async () => {
+        btnCustom.click()
+      })
+
+      expect(selectModeSpy).not.toHaveBeenCalled()
+      await unmount()
+    })
+
+    it('V07: ShortcutRecorderModal isolates keydown events to shortcut-recorder-box', async () => {
+      const mockShortcuts = createMockShortcuts()
+      const { container, render, unmount } = mount({ shortcuts: mockShortcuts })
+      await render()
+
+      const editBtn = container.querySelector('[data-testid="btn-edit-shortcut"]') as HTMLButtonElement
+      await act(async () => {
+        editBtn.click()
+      })
+
+      const recorderBox = container.querySelector('[data-testid="shortcut-recorder-box"]') as HTMLElement
+      expect(recorderBox).not.toBeNull()
+
+      // Keydown on document.body should NOT be captured by recorder
+      await act(async () => {
+        document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'h', code: 'KeyH', bubbles: true }))
+      })
+      expect(mockShortcuts.describeBinding).not.toHaveBeenCalledWith(expect.objectContaining({ code: 'KeyH' }))
+
+      // Keydown on recorder box IS captured
+      await act(async () => {
+        recorderBox.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', code: 'KeyK', ctrlKey: true, bubbles: true }))
+      })
+      expect(mockShortcuts.describeBinding).toHaveBeenCalledWith(expect.objectContaining({ code: 'KeyK' }))
+
+      await unmount()
+    })
+
+    it('V08: Pressing Space or Enter on ActionButtons inside modal triggers button and does NOT record shortcut', async () => {
+      const mockShortcuts = createMockShortcuts()
+      const { container, render, unmount } = mount({ shortcuts: mockShortcuts })
+      await render()
+
+      const editBtn = container.querySelector('[data-testid="btn-edit-shortcut"]') as HTMLButtonElement
+      await act(async () => {
+        editBtn.click()
+      })
+
+      const dialog = container.querySelector('[role="dialog"]') as HTMLElement
+      const cancelBtn = Array.from(dialog.querySelectorAll('button')).find((b) => b.textContent?.includes('取消')) as HTMLButtonElement
+      expect(cancelBtn).toBeDefined()
+
+      // Trigger Space key on Cancel button
+      await act(async () => {
+        cancelBtn.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true }))
+      })
+
+      // Dialog should be closed (modal unmounted)
+      expect(container.querySelector('[role="dialog"]')).toBeNull()
+      // Should NOT have called describeBinding with Space
+      expect(mockShortcuts.describeBinding).not.toHaveBeenCalledWith(expect.objectContaining({ code: 'Space' }))
+
+      await unmount()
+    })
+
+    it('V09: Pressing Escape inside modal closes modal without recording Escape', async () => {
+      const mockShortcuts = createMockShortcuts()
+      const { container, render, unmount } = mount({ shortcuts: mockShortcuts })
+      await render()
+
+      const editBtn = container.querySelector('[data-testid="btn-edit-shortcut"]') as HTMLButtonElement
+      await act(async () => {
+        editBtn.click()
+      })
+
+      const dialog = container.querySelector('[role="dialog"]') as HTMLElement
+      expect(dialog).not.toBeNull()
+
+      // Press Escape inside dialog
+      await act(async () => {
+        dialog.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }))
+      })
+
+      expect(container.querySelector('[role="dialog"]')).toBeNull()
+      expect(mockShortcuts.describeBinding).not.toHaveBeenCalledWith(expect.objectContaining({ code: 'Escape' }))
+
+      await unmount()
+    })
+
+    it('V10: Recording lock recording(true)/recording(false) lifecycle is ref-stable across re-renders', async () => {
+      const mockShortcuts = createMockShortcuts()
+      const { container, render, unmount } = mount({ shortcuts: mockShortcuts })
+      await render()
+
+      const editBtn = container.querySelector('[data-testid="btn-edit-shortcut"]') as HTMLButtonElement
+      await act(async () => {
+        editBtn.click()
+      })
+
+      // Must be called with true once
+      expect(mockShortcuts.recording).toHaveBeenCalledTimes(1)
+      expect(mockShortcuts.recording).toHaveBeenCalledWith(true)
+
+      // Type keys in recorder box (causes component re-renders)
+      const recorderBox = container.querySelector('[data-testid="shortcut-recorder-box"]') as HTMLElement
+      await act(async () => {
+        recorderBox.dispatchEvent(new KeyboardEvent('keydown', { key: 'j', code: 'KeyJ', ctrlKey: true, bubbles: true }))
+      })
+
+      // Re-renders must NOT toggle recording lock
+      expect(mockShortcuts.recording).toHaveBeenCalledTimes(1)
+
+      // Close modal
+      const cancelBtn = Array.from(container.querySelectorAll('button')).find((b) => b.textContent?.includes('取消')) as HTMLButtonElement
+      await act(async () => {
+        cancelBtn.click()
+      })
+
+      // Now recording(false) called once
+      expect(mockShortcuts.recording).toHaveBeenCalledTimes(2)
+      expect(mockShortcuts.recording).toHaveBeenLastCalledWith(false)
+
+      await unmount()
+    })
+
+    it('V11: Conflict detection with other DSH commands displays warning text and conflict badge', async () => {
+      const mockShortcuts = createMockShortcuts()
+      const { container, render, unmount } = mount({ shortcuts: mockShortcuts })
+      await render()
+
+      const editBtn = container.querySelector('[data-testid="btn-edit-shortcut"]') as HTMLButtonElement
+      await act(async () => {
+        editBtn.click()
+      })
+
+      const recorderBox = container.querySelector('[data-testid="shortcut-recorder-box"]') as HTMLElement
+      // Trigger Ctrl+Q which in mockShortcuts produces a conflict with 'workbench.action.quit'
+      await act(async () => {
+        recorderBox.dispatchEvent(new KeyboardEvent('keydown', { key: 'q', code: 'KeyQ', ctrlKey: true, bubbles: true }))
+      })
+
+      expect(container.textContent).toContain('workbench.action.quit')
+      expect(container.textContent).toContain('该快捷键与现有命令冲突')
+
+      await unmount()
+    })
+
+    it('V12: Invalid shortcut missing modifier displays validation error and disables Save button', async () => {
+      const mockShortcuts = createMockShortcuts()
+      const { container, render, unmount } = mount({ shortcuts: mockShortcuts })
+      await render()
+
+      const editBtn = container.querySelector('[data-testid="btn-edit-shortcut"]') as HTMLButtonElement
+      await act(async () => {
+        editBtn.click()
+      })
+
+      const recorderBox = container.querySelector('[data-testid="shortcut-recorder-box"]') as HTMLElement
+      // Trigger bare 'P' without any modifier
+      await act(async () => {
+        recorderBox.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', code: 'KeyP', bubbles: true }))
+      })
+
+      const saveBtn = Array.from(container.querySelectorAll('button')).find((b) => b.textContent?.includes('保存修改')) as HTMLButtonElement
+      expect(saveBtn).toBeDefined()
+      expect(saveBtn.disabled).toBe(true)
+      expect(container.textContent).toContain('快捷键必须包含至少一个修饰键')
+
+      await unmount()
+    })
+
+    it('V13: UI-1 stale verification safety: Changing custom path input invalidates pending verify result and clears outcome box', async () => {
+      const store = new DictionaryManagementStore({ autoStart: false })
+      let resolveVerify: (val: any) => void = () => {}
+      vi.spyOn(store, 'verifyCustom').mockImplementation(() => {
+        return new Promise((resolve) => {
+          resolveVerify = resolve
+        })
+      })
+
+      const { container, render, unmount } = mount({ store })
+      await render()
+
+      const pathInput = container.querySelector('[data-testid="input-custom-dict-path"]') as HTMLInputElement
+      await act(async () => {
+        setInputValue(pathInput, 'C:\\dict\\first.sqlite3')
+      })
+
+      const verifyBtn = container.querySelector('[data-testid="btn-verify-custom"]') as HTMLButtonElement
+      await act(async () => {
+        verifyBtn.click()
+      })
+
+      // User changes path to a different one before verification completes
+      await act(async () => {
+        setInputValue(pathInput, 'C:\\dict\\second.sqlite3')
+      })
+
+      // First verification resolves now
+      await act(async () => {
+        resolveVerify({
+          valid: true,
+          entryCount: 5000,
+          formCount: 1000,
+          schemaVersion: 1,
+          headwords: ['alpha', 'beta'],
+        })
+      })
+
+      // The outcome box must NOT display results for the stale path!
+      const outcome = container.querySelector('[data-testid="verify-outcome-box"]')
+      expect(outcome).toBeNull()
+
+      await unmount()
+    })
+
+    it('V14: UI-2 mode button disabled state: During ongoing operation (isActing, isOperationRunning, canSwitchMode=false), mode buttons and row buttons are disabled', async () => {
+      const store = new DictionaryManagementStore({ autoStart: false })
+      const { container, render, unmount } = mount({
+        store,
+        storeState: {
+          activeMode: 'fixture',
+          installed: true,
+          customSnapshots: [snap1],
+          canSwitchMode: false, // UI-2 gating
+        },
+      })
+      await render()
+
+      const btnFixture = container.querySelector('[data-testid="btn-mode-fixture"]') as HTMLButtonElement
+      const btnEcdict = container.querySelector('[data-testid="btn-mode-ecdict"]') as HTMLButtonElement
+      const btnCustom = container.querySelector('[data-testid="btn-mode-custom"]') as HTMLButtonElement
+
+      expect(btnFixture.disabled).toBe(true)
+      expect(btnEcdict.disabled).toBe(true)
+      expect(btnCustom.disabled).toBe(true)
+
+      await unmount()
+    })
+
+    it('V22: UI-4 custom error notice: When store operation fails (actionError), error is displayed in custom-action-error-box with dismiss button', async () => {
+      const store = new DictionaryManagementStore({ autoStart: false })
+      const clearSpy = vi.spyOn(store, 'clearActionError')
+
+      const { container, render, unmount } = mount({
+        store,
+        storeState: { customSnapshots: [snap1] },
+        actionError: 'Database snapshot verification failed: disk I/O error',
+      })
+      await render()
+
+      const errorBox = container.querySelector('[data-testid="custom-action-error-box"]')
+      expect(errorBox).not.toBeNull()
+      expect(errorBox?.textContent).toContain('Database snapshot verification failed: disk I/O error')
+
+      const dismissBtn = errorBox?.querySelector('button') as HTMLButtonElement
+      expect(dismissBtn).not.toBeNull()
+      await act(async () => {
+        dismissBtn.click()
+      })
+      expect(clearSpy).toHaveBeenCalled()
+
+      await unmount()
+    })
+
+    it('V23: UI-5 shortcut service unavailable: When shortcuts catalog is unavailable/null, displays "快捷键服务暂不可用" and disables edit button', async () => {
+      const unavailShortcuts = {
+        catalog: null,
+        config: { subscribe: () => () => {}, getSnapshot: () => ({ revision: 1 }) },
+        edit: vi.fn(),
+        recording: vi.fn(),
+        describeBinding: vi.fn(),
+      } as unknown as Shortcuts
+
+      const { container, render, unmount } = mount({ shortcuts: unavailShortcuts })
+      await render()
+
+      const unavailBadge = container.querySelector('[data-testid="shortcut-service-unavailable"]')
+      expect(unavailBadge).not.toBeNull()
+      expect(unavailBadge?.textContent).toBe('快捷键服务暂不可用')
+
+      const editBtn = container.querySelector('[data-testid="btn-edit-shortcut"]') as HTMLButtonElement
+      expect(editBtn.disabled).toBe(true)
+
       await unmount()
     })
   })
