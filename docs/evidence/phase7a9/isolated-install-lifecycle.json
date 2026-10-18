@@ -1,10 +1,17 @@
 {
-  "timestamp": "2026-10-18T04:43:23.256Z",
+  "timestamp": "2026-10-18T06:34:05.575Z",
   "probe": "RC-E.2",
   "verdict": "PASS",
   "tarballInstalled": "dsh-word-lookup-0.2.0.tgz",
   "isolatedProfile": "rc-e-install",
   "installedDirectory": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-rc-e-install-lifecycle\\home\\profiles\\rc-e-install\\node_modules\\dsh-word-lookup",
+  "installationDetails": {
+    "testType": "ISOLATED_UNPACK_AND_REGISTER",
+    "isSymbolicLinkOrJunction": false,
+    "isRealIsolatedCopy": true,
+    "notRepoRoot": true,
+    "note": "Tested via isolated package unpack and profile registration (not native CLI invocation)"
+  },
   "lookupVerification": {
     "query": "derive",
     "found": true,
@@ -18,5 +25,13 @@
   "uninstallVerification": {
     "uninstalledCleanly": true,
     "routeDisarmed": true
+  },
+  "rollbackVerification": {
+    "verified": true,
+    "rolledBackToVersion": "0.1.0",
+    "v010TarballSha256": "22d3cdffd9f73790adebb707cf36a258453a4813db981d19d9d5cffb249458cc",
+    "v010LookupHeadword": "derive",
+    "found": true,
+    "verdict": "PASS"
   }
 }

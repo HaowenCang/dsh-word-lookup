@@ -1,12 +1,12 @@
 {
-  "timestamp": "2026-10-18T04:43:00.197Z",
+  "timestamp": "2026-10-18T06:33:32.400Z",
   "probe": "RC-E.1",
   "verdict": "PASS",
   "tarball": {
     "filename": "dsh-word-lookup-0.2.0.tgz",
     "path": "build/rc-v0.2.0/dsh-word-lookup-0.2.0.tgz",
-    "byteSize": 135326,
-    "sha256": "56f9f2277efa3163110e155b22c42be17f1e3126da00a6666a824c241bd90d48"
+    "byteSize": 135731,
+    "sha256": "ce51e0e233d2b93b8b3d3f61548e0634debdedd0b20ac423a150037abf887f34"
   },
   "packageManifest": {
     "name": "dsh-word-lookup",
@@ -44,8 +44,8 @@
     },
     {
       "path": "README.md",
-      "byteSize": 13978,
-      "sha256": "4f8e6a036ec7dc7f1a1ccd111021fd0dbad6f44433ed436942b7a9623a0444ff"
+      "byteSize": 15214,
+      "sha256": "478320e56539e88cddca40b1cde570e2e7f98bc44e840b1c4515330ef6160bd1"
     },
     {
       "path": "cordis.patch.yml",

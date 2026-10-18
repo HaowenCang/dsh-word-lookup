@@ -1,0 +1,163 @@
+{
+  "timestamp": "2026-10-18T06:33:31.123Z",
+  "probe": "RC-D",
+  "verdict": "PASS",
+  "scenarios": [
+    {
+      "scenarioId": "RCD-01",
+      "title": "Acquire resolves normally",
+      "verdict": "PASS",
+      "details": {
+        "held": false,
+        "hostRecording": false
+      },
+      "hostFinalState": false,
+      "callCount": 2
+    },
+    {
+      "scenarioId": "RCD-02",
+      "title": "Acquire rejects before Host accepts",
+      "verdict": "PASS",
+      "details": {
+        "held": false,
+        "hostRecording": false
+      },
+      "hostFinalState": false,
+      "callCount": 2
+    },
+    {
+      "scenarioId": "RCD-03",
+      "title": "Acquire applies lock then rejects",
+      "verdict": "PASS",
+      "details": {
+        "held": false,
+        "hostRecording": false,
+        "remediation": "Release cleans up dangling host lock even if acquire threw"
+      },
+      "hostFinalState": false,
+      "callCount": 2
+    },
+    {
+      "scenarioId": "RCD-04",
+      "title": "Release resolves normally",
+      "verdict": "PASS",
+      "details": {
+        "held": false,
+        "hostRecording": false
+      },
+      "hostFinalState": false,
+      "callCount": 2
+    },
+    {
+      "scenarioId": "RCD-05",
+      "title": "Release rejects before Host releases (Stateful Desktop IPC Fault Boundary)",
+      "verdict": "PASS_WITH_BOUNDARY_LIMITATION",
+      "details": {
+        "verdict": "PASS_WITH_BOUNDARY_LIMITATION",
+        "held": false,
+        "hostRecording": true,
+        "runtimeScope": "Desktop IPC (non-Web)",
+        "boundaryAnalysis": "When a stateful Desktop Host IPC rejects recording(false), the Host service remains in recording mode. Upstream DSH Shortcuts API does not expose polling getRecordingState() or a host reset endpoint. Client-side AsyncRecordingLock guarantees local lock cleanup (held = false) and suppresses unhandled rejections to prevent UI deadlock, but cannot remotely clear remote host-side state if Host IPC transport fails. Upstream DSH does not implement auto-recovery on window blur or shortcut dispatch. Note: This failure mode cannot occur in the supported DSH Web runtime.",
+        "guarantee": "Local lock held is strictly false; UI thread does not hang or reject unhandled.",
+        "limitation": "Host recording state in stateful Desktop adapter cannot be cleared when host IPC transport rejects."
+      },
+      "hostFinalState": true,
+      "callCount": 2
+    },
+    {
+      "scenarioId": "RCD-05W",
+      "title": "DSH Web Runtime native recording contract (webShortcutStorage)",
+      "verdict": "PASS",
+      "details": {
+        "verdict": "PASS",
+        "held": false,
+        "runtimeScope": "DSH Web (Supported Target)",
+        "analysis": "In DSH Web runtime (the supported platform), webShortcutStorage implements recording as an asynchronous no-op (async () => {}). It is guaranteed never to reject, never to hang, and never leaves dangling host recording state."
+      },
+      "hostFinalState": false,
+      "callCount": 0
+    },
+    {
+      "scenarioId": "RCD-06",
+      "title": "Release applies unlock then rejects",
+      "verdict": "PASS",
+      "details": {
+        "held": false,
+        "hostRecording": false
+      },
+      "hostFinalState": false,
+      "callCount": 2
+    },
+    {
+      "scenarioId": "RCD-07",
+      "title": "Rapid open / close",
+      "verdict": "PASS",
+      "details": {
+        "held": false,
+        "hostRecording": false,
+        "executionOrder": [
+          true,
+          false
+        ]
+      },
+      "hostFinalState": false,
+      "callCount": 2
+    },
+    {
+      "scenarioId": "RCD-08",
+      "title": "Unmount during acquire",
+      "verdict": "PASS",
+      "details": {
+        "held": false,
+        "hostRecording": false,
+        "unmounted": true
+      },
+      "hostFinalState": false,
+      "callCount": 2
+    },
+    {
+      "scenarioId": "RCD-09",
+      "title": "Repeated release",
+      "verdict": "PASS",
+      "details": {
+        "held": false,
+        "hostRecording": false,
+        "releaseCallCount": 1,
+        "idempotent": true
+      },
+      "hostFinalState": false,
+      "callCount": 2
+    },
+    {
+      "scenarioId": "RCD-10",
+      "title": "New modal opened while previous cleanup remains pending",
+      "verdict": "PASS",
+      "details": {
+        "lock1Final": false,
+        "lock2Final": false,
+        "hostRecording": false,
+        "callSequence": [
+          true,
+          false,
+          true,
+          false
+        ]
+      },
+      "hostFinalState": false,
+      "callCount": 4
+    }
+  ],
+  "architecturalAnalysis": {
+    "provableGuarantees": [
+      "Queue-based Promise serialization guarantees sequential execution of acquire and release within modal lifecycle.",
+      "Unmounting during in-flight acquire is guaranteed to chain release after acquire settles, leaving held=false.",
+      "Duplicate release invocations are completely idempotent (zero redundant IPC calls).",
+      "Unhandled rejections are strictly suppressed within AsyncRecordingLock queue so UI thread never crashes.",
+      "In DSH Web (the supported target runtime), webShortcutStorage implements recording as a safe asynchronous no-op (async () => {}), making host recording divergence impossible in Web mode.",
+      "In all failure modes, local lock state is guaranteed to reset to held=false via try-finally, preventing client UI deadlock."
+    ],
+    "unprovableExceptionsAndBoundaries": [
+      "In an unverified stateful Desktop runtime, if Host shortcuts IPC rejects recording(false), the Host service remains in recording mode. The DSH Client Shortcuts API does not provide a query method (getRecordingState()) or force-reset endpoint. Upstream DSH does NOT guarantee automatic recovery on window blur or shortcut dispatch. This limitation is inherent to the external stateful Desktop bridge, not the supported DSH Web runtime."
+    ]
+  }
+}

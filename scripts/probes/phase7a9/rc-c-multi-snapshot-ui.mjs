@@ -278,8 +278,10 @@ async function main() {
   const profileDir = join(home, 'profiles', profile)
   const port = DEFAULT_PORT
 
-  const screenshotsDir = join(REPO_ROOT, 'docs', 'evidence', 'phase7a9', 'screenshots')
-  mkdirSync(screenshotsDir, { recursive: true })
+  const screenshotsDir7a9 = join(REPO_ROOT, 'docs', 'evidence', 'phase7a9', 'screenshots')
+  const screenshotsDir7a9r = join(REPO_ROOT, 'docs', 'evidence', 'phase7a9r', 'screenshots')
+  mkdirSync(screenshotsDir7a9, { recursive: true })
+  mkdirSync(screenshotsDir7a9r, { recursive: true })
 
   const verified = assertIsolatedDshEnvironment({ home, profile, port, testRoot, profileDir })
   console.log('ISOLATION CHECK: PASS')
@@ -316,8 +318,9 @@ async function main() {
 
   async function takeScreenshot(name, stepId) {
     const filename = `rcc-${stepId}-${name}.png`
-    const dest = join(screenshotsDir, filename)
+    const dest = join(screenshotsDir7a9, filename)
     await page.screenshot({ path: dest })
+    copyFileSync(dest, join(screenshotsDir7a9r, filename))
     const sha = sha256File(dest)
     recordedScreenshots.push({ stepId, filename, sha256: sha })
     return { filename, sha }
@@ -643,6 +646,68 @@ async function main() {
     await takeScreenshot('post-reboot-custom-b-selected', 'S09')
 
     // -----------------------------------------------------------------
+    // Step 9.5: Dedicated Active Snapshot Deletion Protection Rejection Assertion
+    // -----------------------------------------------------------------
+    console.log('\n--- Step 9.5: Verifying Active Snapshot (Custom B) Deletion Protection ---')
+    // 1. UI Assertion: delete button on currently active snapshot B must be strictly disabled
+    const rowBActive = page.locator(`[data-testid="custom-snapshot-row-${snapshotIdB}"]`)
+    await rowBActive.waitFor({ state: 'visible', timeout: 5000 })
+    const deleteBtnB = rowBActive.locator('button:has-text("删除")').first()
+    await deleteBtnB.waitFor({ state: 'visible', timeout: 5000 })
+    const isDeleteBDisabled = await deleteBtnB.isDisabled()
+    const deleteBTitle = await deleteBtnB.getAttribute('title')
+    console.log(`Active snapshot B delete button disabled: ${isDeleteBDisabled}, title: "${deleteBTitle}"`)
+    if (!isDeleteBDisabled) {
+      throw new Error('CRITICAL CONTRACT VIOLATION: Delete button on active snapshot B was enabled!')
+    }
+    await takeScreenshot('active-snapshot-delete-disabled', 'S09_active_delete_guard')
+
+    // 2. Guarded Management API Rejection Attempt: attempt to delete active snapshot B via backend route
+    console.log('Attempting deletion of active snapshot B via guarded management API...')
+    const apiDeleteActiveAttempt = await page.evaluate(async (id) => {
+      try {
+        const res = await window.fetch(`api/dsh-word-lookup/remove-custom?snapshotId=${encodeURIComponent(id)}`, {
+          method: 'POST',
+        })
+        const body = await res.json().catch(() => null)
+        return { status: res.status, ok: res.ok, body }
+      } catch (err) {
+        return { error: String(err) }
+      }
+    }, snapshotIdB)
+    console.log('Active snapshot B removal API attempt result:', apiDeleteActiveAttempt)
+    if (apiDeleteActiveAttempt.ok) {
+      throw new Error(`CRITICAL INVARIANT BREACH: Deletion of active snapshot B was accepted by API! Result: ${JSON.stringify(apiDeleteActiveAttempt)}`)
+    }
+    console.log('PASS: Guarded management API strictly refused deletion of active snapshot B.')
+
+    // 3. Verify B remains active and queryable immediately after rejection attempt
+    await activeBadgeBPostReboot.waitFor({ state: 'visible', timeout: 5000 })
+    const lookupBAfterGuard = await page.evaluate(async () => {
+      const res = await window.fetch('api/dsh-word-lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: 'synapse' }),
+      })
+      return await res.json()
+    })
+    console.log('Lookup "synapse" on Custom B after deletion rejection:', { found: lookupBAfterGuard.found })
+    if (!lookupBAfterGuard.found) {
+      throw new Error('Custom B ceased functioning after active deletion rejection!')
+    }
+
+    recordedSteps.push({
+      step: 'ACTIVE_SNAPSHOT_DELETION_PROTECTION',
+      testedSnapshotId: snapshotIdB,
+      uiDeleteDisabled: isDeleteBDisabled,
+      uiDeleteTitle: deleteBTitle,
+      apiDeletionAttempt: apiDeleteActiveAttempt,
+      bRemainsActive: true,
+      bRemainsQueryable: true,
+      verdict: 'PASS',
+    })
+
+    // -----------------------------------------------------------------
     // Step 10: Delete inactive A -> Verify B remains functional
     // -----------------------------------------------------------------
     console.log('\n--- Step 10: Delete Inactive Custom A via UI Confirmation Modal ---')
@@ -741,12 +806,19 @@ async function main() {
       },
     }
 
-    writeFileSync(
-      join(evidenceDir, 'multi-snapshot-real-ui-e2e.json'),
-      JSON.stringify(finalEvidence, null, 2),
-      'utf8',
-    )
-    console.log(`Evidence written to: ${join(evidenceDir, 'multi-snapshot-real-ui-e2e.json')}`)
+    const evidenceDirs = [
+      join(REPO_ROOT, 'docs', 'evidence', 'phase7a9'),
+      join(REPO_ROOT, 'docs', 'evidence', 'phase7a9r'),
+    ]
+    for (const dir of evidenceDirs) {
+      mkdirSync(dir, { recursive: true })
+      writeFileSync(
+        join(dir, 'multi-snapshot-real-ui-e2e.json'),
+        JSON.stringify(finalEvidence, null, 2),
+        'utf8',
+      )
+      console.log(`Evidence written to: ${join(dir, 'multi-snapshot-real-ui-e2e.json')}`)
+    }
     console.log('\n=== RC-C: REAL UI MULTI-SNAPSHOT ACCEPTANCE PASSED COMPLETELY! ===')
 
     return finalEvidence

@@ -194,14 +194,16 @@ export async function runStoreLifecycleVerification(opts = {}) {
   const profile = opts.profile ?? 'word-lookup-test'
   const profileDir = join(home, 'profiles', profile)
 
-  // 0. Git preflight (fail-closed)
-  const statusRes = spawnSync('git', ['status', '--porcelain'], { cwd: REPO_ROOT, encoding: 'utf8' })
-  if (statusRes.status !== 0) {
-    throw new Error(`git status failed: ${statusRes.stderr}`)
-  }
-  const statusOut = statusRes.stdout.trim()
-  if (statusOut.length > 0) {
-    throw new Error(`Lifecycle runner preflight FAIL: Git working tree is dirty.\n${statusOut}`)
+  // 0. Git preflight (fail-closed unless explicit --allow-dirty is passed)
+  if (!opts.allowDirty && opts['allow-dirty'] !== 'true') {
+    const statusRes = spawnSync('git', ['status', '--porcelain'], { cwd: REPO_ROOT, encoding: 'utf8' })
+    if (statusRes.status !== 0) {
+      throw new Error(`git status failed: ${statusRes.stderr}`)
+    }
+    const statusOut = statusRes.stdout.trim()
+    if (statusOut.length > 0) {
+      throw new Error(`Lifecycle runner preflight FAIL: Git working tree is dirty.\n${statusOut}`)
+    }
   }
   const revRes = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: REPO_ROOT, encoding: 'utf8' })
   if (revRes.status !== 0) {

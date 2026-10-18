@@ -1,0 +1,171 @@
+{
+  "timestamp": "2026-10-18T06:33:50.000Z",
+  "phase": "Phase 7A.9R",
+  "candidateVersion": "0.2.0",
+  "testedCodeGitSha": "7dbfb43d7eeb608e6ea45ccc579c63c588b854ad",
+  "verdict": "PASS_WITH_QUALIFICATIONS",
+  "matrix": [
+    {
+      "key": "GIT_PROVENANCE",
+      "verdict": "PASS",
+      "evidenceSource": "DIRECT_GIT_VERIFICATION",
+      "acceptanceCriteria": "Linear ancestry from CODE_FREEZE_SHA through all intermediate commits; no history rewriting or phantom commits.",
+      "observedResult": "Linear commit graph confirmed from b36bf4d to HEAD. Phantom SHA 1148da93b7ffc6448373b53c7db828943ca0b1f7 resolved as typo of authentic commit 1148da9a9dd6588401b56c996bfdda2a855e1cd8.",
+      "limitations": "None.",
+      "independentlyReproducedLocally": true
+    },
+    {
+      "key": "RC_A_PERFORMANCE",
+      "verdict": "PASS",
+      "evidenceSource": "REAL_ISOLATED_DSH_E2E",
+      "acceptanceCriteria": "Peak RSS < 512 MiB; Event-loop P99 <= 100 ms; Event-loop Max <= 500 ms; Heartbeat stall < 1000 ms. Sampler startup timeline and database structural limitations documented.",
+      "observedResult": "Replicated across 3 cold restart runs. Absolute peak RSS 312.66 MiB; Event-loop P99 79.97 ms; Max lag 103.12 ms; Heartbeat stall 103.12 ms. Pre-plugin bootstrap (~1.5s) distinguished from in-process sampling.",
+      "limitations": "Synthetic 105 MiB benchmark DB contains 1,750 large entries (~64 KiB definition each), verifying memory buffers and SQLite pages but not 770k-entry ECDICT b-tree depth.",
+      "independentlyReproducedLocally": true
+    },
+    {
+      "key": "RC_B_CRASH_RECOVERY",
+      "verdict": "PASS",
+      "evidenceSource": "CONTROLLED_FAULT_INJECTION",
+      "acceptanceCriteria": "Process crash injection at commit boundaries (F01–F05); durable metadata recovery on restart across all mode transitions.",
+      "observedResult": "All 5 crash scenarios passed with authentic process kills (exit codes 101–105) and 100% durable recovery.",
+      "limitations": "Requires process kill permissions.",
+      "independentlyReproducedLocally": true
+    },
+    {
+      "key": "RC_C_MULTI_SNAPSHOT_UI",
+      "verdict": "PASS",
+      "evidenceSource": "REAL_ISOLATED_DSH_E2E",
+      "acceptanceCriteria": "Multi-custom snapshot switching, reboot persistence, inactive snapshot deletion, and dedicated active snapshot deletion protection rejection.",
+      "observedResult": "All 11 UI steps passed. Step 9.5 confirmed active snapshot delete button is disabled and API deletion attempt is strictly rejected. Raw sources invariant.",
+      "limitations": "Requires Playwright and Chromium.",
+      "independentlyReproducedLocally": true
+    },
+    {
+      "key": "RC_D_RECORDING_LOCK",
+      "verdict": "PASS_WITH_BOUNDARY_LIMITATION",
+      "evidenceSource": "SOURCE_CODE_AUDIT & CONTROLLED_FAULT_INJECTION",
+      "acceptanceCriteria": "Local lock guarantees held=false via try-finally; suppression of unhandled rejections; clear distinction between supported Web runtime (recording: async () => {}) and unverified Desktop IPC.",
+      "observedResult": "RCD-05 reclassified as PASS_WITH_BOUNDARY_LIMITATION. RCD-05W verifies DSH Web native contract. Zero deadlock or uncaught rejection.",
+      "limitations": "Host recording state in stateful Desktop IPC cannot be cleared remotely when transport rejects. Failure mode cannot occur in supported DSH Web.",
+      "independentlyReproducedLocally": true
+    },
+    {
+      "key": "RC_E_STORE_PACKAGE",
+      "verdict": "PASS",
+      "evidenceSource": "REAL_ISOLATED_DSH_E2E",
+      "acceptanceCriteria": "Candidate .tgz generated via npm pack, exact 8 files, binary SHA-256 verified, install, start, uninstall, and rollback exercised in isolated profile.",
+      "observedResult": "Tarball ce51e0e233d2b93b8b3d3f61548e0634debdedd0b20ac423a150037abf887f34 (135,731 bytes). 8-file whitelist verified. Full lifecycle passed.",
+      "limitations": "Installed via isolated unpack-and-register, not native CLI command.",
+      "independentlyReproducedLocally": true
+    },
+    {
+      "key": "RC_F_EVIDENCE_PROVENANCE",
+      "verdict": "PASS",
+      "evidenceSource": "DIRECT_GIT_VERIFICATION",
+      "acceptanceCriteria": "Class A (evidence), Class B (RC probes), Class C (approved doc correction) categorization; Git blob/tree object comparison for production invariance.",
+      "observedResult": "src/ tree identical. 7 production code/config files identical to CODE_FREEZE_SHA. README.md classified as approved Class C doc correction.",
+      "limitations": "None.",
+      "independentlyReproducedLocally": true
+    },
+    {
+      "key": "PRODUCTION_RUNTIME_CODE_CHANGED",
+      "verdict": "NO",
+      "evidenceSource": "DIRECT_GIT_VERIFICATION",
+      "acceptanceCriteria": "Zero changes to src/ and lib/ production bundles.",
+      "observedResult": "src/ tree object 24d78dfbb54ae62882aa661d4819f6397068e303 is 100% bit-for-bit identical to CODE_FREEZE_SHA.",
+      "limitations": "None.",
+      "independentlyReproducedLocally": true
+    },
+    {
+      "key": "PRODUCTION_PACKAGE_CONTENT_CHANGED",
+      "verdict": "YES (DOCUMENTATION ONLY)",
+      "evidenceSource": "DIRECT_GIT_VERIFICATION",
+      "acceptanceCriteria": "README.md updated for release accuracy; no runtime behavior change.",
+      "observedResult": "README.md updated to remove obsolete Phase 7A.4 statements and document completed Phase 7A.5-7A.7 features. Classified as Class C.",
+      "limitations": "README.md is packaged, altering tarball SHA-256.",
+      "independentlyReproducedLocally": true
+    },
+    {
+      "key": "STRICT_EIGHT_FILE_PACKAGE",
+      "verdict": "PASS",
+      "evidenceSource": "LOCALLY_EXECUTED_TEST",
+      "acceptanceCriteria": "Package unpacked archive contains exactly the 8 whitelisted files.",
+      "observedResult": "LICENSE, README.md, cordis.patch.yml, corpus/ecdict.manifest.json, lib/client.js, lib/ecdict-integrity-worker.js, lib/index.js, package.json verified.",
+      "limitations": "None.",
+      "independentlyReproducedLocally": true
+    },
+    {
+      "key": "FINAL_TARBALL_SHA256_VERIFIED",
+      "verdict": "PASS",
+      "evidenceSource": "LOCALLY_EXECUTED_TEST",
+      "acceptanceCriteria": "Tarball SHA-256 computed directly from binary bytes and reproducible.",
+      "observedResult": "SHA-256: ce51e0e233d2b93b8b3d3f61548e0634debdedd0b20ac423a150037abf887f34 (135,731 bytes).",
+      "limitations": "None.",
+      "independentlyReproducedLocally": true
+    },
+    {
+      "key": "ISOLATED_INSTALL_VERIFIED",
+      "verdict": "PASS",
+      "evidenceSource": "REAL_ISOLATED_DSH_E2E",
+      "acceptanceCriteria": "Installed package is genuine copy in isolated profile node_modules (not repo junction); boots DSH; answers live lookups; renders settings.",
+      "observedResult": "Installed in scratch profile, booted DSH, live lookup for 'derive' succeeded (found: true), settings page rendered.",
+      "limitations": "Isolated unpack-and-register.",
+      "independentlyReproducedLocally": true
+    },
+    {
+      "key": "ISOLATED_ROLLBACK_VERIFIED",
+      "verdict": "PASS",
+      "evidenceSource": "REAL_ISOLATED_DSH_E2E",
+      "acceptanceCriteria": "Plugin removed cleanly (404 verification); rolled back to verified v0.1.0 release tarball; v0.1.0 boots and answers lookups.",
+      "observedResult": "Route returned 404 after uninstall. Verified v0.1.0 tarball (SHA-256: 22d3cdffd9f73790adebb707cf36a258453a4813db981d19d9d5cffb249458cc) unpacked, booted DSH, live lookup succeeded.",
+      "limitations": "Uses local verified v0.1.0 tarball fixture.",
+      "independentlyReproducedLocally": true
+    },
+    {
+      "key": "FULL_REGRESSION_VERIFIED",
+      "verdict": "PASS",
+      "evidenceSource": "LOCALLY_EXECUTED_TEST",
+      "acceptanceCriteria": "Full Vitest suite passing with zero failures; store contract passing; credential scan passing.",
+      "observedResult": "60 test files passed (1,121 tests, 0 failures). Store contract 28/28 passed. 0 leaked credentials.",
+      "limitations": "None.",
+      "independentlyReproducedLocally": true
+    },
+    {
+      "key": "UNRESOLVED_BLOCKERS",
+      "verdict": "NONE (STANDALONE REMEDIATION COMPLETE)",
+      "evidenceSource": "SOURCE_CODE_AUDIT",
+      "acceptanceCriteria": "All 10 independent audit findings resolved or explicitly bounded.",
+      "observedResult": "All findings remediated: RCD-05 reclassified and Web contract documented; Git provenance audit uses blob equality; stale IDs corrected; tarball rehashed; Store rollback verified; README updated; sampler timeline documented; active deletion rejection added.",
+      "limitations": "Known release limitation: autoSelection portability remains opt-in and experimental (default off).",
+      "independentlyReproducedLocally": true
+    },
+    {
+      "key": "READY_FOR_FINAL_INDEPENDENT_REAUDIT",
+      "verdict": "YES",
+      "evidenceSource": "SOURCE_CODE_AUDIT & LOCALLY_EXECUTED_TEST",
+      "acceptanceCriteria": "All evidence closed, auditable, and reproducible.",
+      "observedResult": "Authoritative evidence, probes, and ledgers preserved under docs/evidence/phase7a9r/.",
+      "limitations": "Subject to independent reviewer acceptance.",
+      "independentlyReproducedLocally": true
+    },
+    {
+      "key": "READY_FOR_V0_2_0_RELEASE",
+      "verdict": "YES (PENDING INDEPENDENT RE-AUDIT APPROVAL)",
+      "evidenceSource": "SOURCE_CODE_AUDIT & LOCALLY_EXECUTED_TEST",
+      "acceptanceCriteria": "All release candidate gates satisfied.",
+      "observedResult": "Release candidate meets all functional, safety, performance, and contract requirements for DSH Web v0.2.0-rc.2.",
+      "limitations": "Requires final independent audit sign-off.",
+      "independentlyReproducedLocally": true
+    },
+    {
+      "key": "NPM_PUBLISH_AUTHORIZED",
+      "verdict": "NO",
+      "evidenceSource": "MANDATE_ENFORCEMENT",
+      "acceptanceCriteria": "npm publish is strictly prohibited during remediation.",
+      "observedResult": "NO PUBLISH EXECUTED. Package remains UNRELEASED.",
+      "limitations": "Explicitly forbidden in prompt mandate.",
+      "independentlyReproducedLocally": true
+    }
+  ]
+}

@@ -9,20 +9,23 @@ nothing leaves your machine and no model is involved.
 **Current development target: v0.2.0 — unreleased.**
 The latest published release is **v0.1.0**.
 
-The plugin is local-first and uses SQLite for dictionary lookup. The public package does not redistribute the full ECDICT corpus. In Phase 7A.4, a pinned, HTTPS-only ECDICT downloader primitive is implemented with streaming size, SHA-256, and fatal UTF-8 verification, cancellation, and safe cache publication; host startup performs no automatic download (fixture-only on startup), and user-facing installation UI orchestration remains pending.
+The plugin is local-first and uses SQLite for dictionary lookup. The public package does not redistribute the full ECDICT corpus (manifest status: `REDISTRIBUTION REVIEW REQUIRED`). On startup, the plugin immediately provides a deterministic, zero-dependency built-in fixture dictionary with zero external network requests. Full lexicon coverage is available via one-click user-orchestrated Managed ECDICT installation from the pinned public corpus source with streaming SHA-256 and UTF-8 verification, or via user-provided custom SQLite dictionary imports staged into immutable managed snapshots.
 
 | Area | State |
 | --- | --- |
 | Target client | DSH Web (`0.2.0-rc.2`) |
-| DSH baseline | `0.2.0-rc.2`, Web only — the desktop client is not a tested target |
+| DSH baseline | `0.2.0-rc.2`, Web only — Desktop adapters and earlier DSH versions are unverified / unsupported |
 | Development version | `0.2.0` (unreleased) |
 | Latest published release | `0.1.0` |
-| Manual shortcut lookup | works; primary supported path (`Primary+Shift+L`) |
-| Settings persistence | works, verified across full restart |
+| Manual shortcut lookup | works; primary supported path (`Primary+Shift+L` by default, fully customizable) |
+| Settings persistence | works, verified across full restart and reboot |
 | Automatic lookup on double-click | works when `autoDoubleClick` is on (default off), verified in a real browser |
 | Automatic lookup on drag-select | works when `autoSelection` is on (default off); portability outside the measured environment remains a known release limitation |
-| Dictionary storage | local SQLite (`node:sqlite`), package-owned deterministic fixture in Phase 7A.1 |
-| Dictionary configuration | Host Config model (`dictionaryMode`, `customDictionaryPath`, `autoDoubleClick`, `autoSelection`) |
+| Dictionary storage | local SQLite (`node:sqlite`) — package-owned deterministic fixture, one-click managed ECDICT, or immutable custom SQLite snapshots |
+| Dictionary configuration | Host Config model (`dictionaryMode`, `customDictionaryPath`, `autoDoubleClick`, `autoSelection`, `activeSnapshotId`) |
+| Multi-snapshot management | works; settings UI supports importing, switching, and deleting custom snapshots |
+| Snapshot protection | active snapshot is strictly protected against deletion until deactivated |
+| User source safety | custom SQLite import creates an isolated managed snapshot; user source files are never modified, moved, or deleted |
 | Dictionary card UI | headword, phonetic, POS, Chinese meaning, forms and examples |
 | Pointer devices | mouse only — automatic lookup is refused for pen, touch and an unidentifiable pointer |
 
@@ -116,7 +119,11 @@ lookup route → DictionaryManager → active Dictionary
 - **DictionaryManager Lifecycle & Hot Switching**:
   The route maintains a stable reference to `DictionaryManager`, which implements the `Dictionary` interface. Candidate dictionaries are opened and validated prior to atomic active reference replacement.
 - **Deterministic Fixture Mode Startup & Zero Automatic Network**:
-  The host runtime continues to start strictly on the built-in deterministic fixture database (`sqlite-fixture`) and makes zero external network requests on startup. Network access occurs only when an explicit future install action invokes the downloader. User-facing installation UI orchestration remains pending (Phase 7A.6/7A.7). The full ECDICT corpus is not redistributed in the repository or npm packages.
+  The host runtime starts strictly on the built-in deterministic fixture database (`sqlite-fixture`) and makes zero external network requests on startup. Network access occurs only when a user explicitly initiates the Managed ECDICT download through the settings UI. The full ECDICT corpus is not bundled in the npm package (`redistributionStatus: REDISTRIBUTION REVIEW REQUIRED`).
+- **One-Click Managed ECDICT Installation**:
+  Users can trigger the managed ECDICT dictionary installation from Settings. The host streams the corpus from the pinned public source with strict hash/size/encoding verification and compiles the SQLite database in an isolated worker thread.
+- **Custom SQLite Import & Immutable Managed Snapshots**:
+  Users can import their own SQLite dictionaries matching the schema. The plugin creates an isolated, verified snapshot via `VACUUM INTO`, preserving user source databases untouched. Multi-snapshot switching is supported, with active snapshot deletion strictly prevented.
 - **Zero Legacy Environment Variables**:
   Legacy environment variable database activation has been completely removed. Host startup and dictionary resolution no longer inspect any process environment variables.
 - **Fail-Closed Guarantee**:

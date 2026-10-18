@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-10-18T04:35:21.627Z",
+  "timestamp": "2026-10-18T06:31:33.788Z",
   "probe": "RC-B",
   "verdict": "PASS",
   "platform": {
@@ -11,7 +11,7 @@
     {
       "scenarioId": "F01",
       "description": "Managed ECDICT -> Custom (Crash post-commit, pre-ack)",
-      "processPid": 9316,
+      "processPid": 27252,
       "isolatedHome": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-rc-b-crash-injection\\home",
       "previousActiveMode": "managed-ecdict",
       "requestedMode": "custom",
@@ -19,9 +19,9 @@
       "durableMetadataState": {
         "version": 1,
         "activeMode": "custom",
-        "identity": "snap-ff87c9312154494a",
-        "snapshotId": "ff87c931-2154-494a-bc9f-bffeeb4df125",
-        "databaseFile": "custom-ff87c931-2154-494a-bc9f-bffeeb4df125.sqlite3",
+        "identity": "snap-a88c0a95126d478e",
+        "snapshotId": "a88c0a95-126d-478e-b582-55d4b42531b4",
+        "databaseFile": "custom-a88c0a95-126d-478e-b582-55d4b42531b4.sqlite3",
         "source": "custom-local",
         "schemaVersion": 1,
         "sha256": "2743fc61d2759323b2e3c17424c4e73f86dc1fe35749a201d9052858a42fafb6",
@@ -29,11 +29,11 @@
         "settingsSynced": false,
         "settingsSyncState": "pending",
         "settingsSyncError": null,
-        "lastActivatedAt": "2026-10-18T04:34:57.372Z"
+        "lastActivatedAt": "2026-10-18T06:31:10.048Z"
       },
       "terminationMethod": "process.exit(101) inside commit boundary hook",
       "terminationExitStatus": 101,
-      "restartProcessPid": 53892,
+      "restartProcessPid": 58892,
       "recoveredMode": "custom",
       "settingsSyncOutcome": "synced",
       "lookupResult": {
@@ -41,14 +41,14 @@
         "found": true,
         "headword": "superposition"
       },
-      "catalogDigest": "7592a9eea257c887a70572023e97dee8019607bea6ea89af6260cfeb5c726f96",
+      "catalogDigest": "3762af789b6b516347ff049a0dff2cb2a1bb226d21a20f72b94210e5afe56c35",
       "sourceFileSha256": "e9fba8cee32a3f33b58cb8dc307b148ad8413f89f13e1d79ffd33b4d17cdc7da",
       "verdict": "PASS"
     },
     {
       "scenarioId": "F02",
       "description": "Custom -> Managed ECDICT (Crash post-commit, pre-ack)",
-      "processPid": 53892,
+      "processPid": 58892,
       "isolatedHome": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-rc-b-crash-injection\\home",
       "previousActiveMode": "custom",
       "requestedMode": "managed-ecdict",
@@ -67,11 +67,11 @@
         "settingsSynced": false,
         "settingsSyncState": "pending",
         "settingsSyncError": null,
-        "lastActivatedAt": "2026-10-18T04:35:02.034Z"
+        "lastActivatedAt": "2026-10-18T06:31:14.567Z"
       },
       "terminationMethod": "process.exit(102) inside commit boundary hook",
       "terminationExitStatus": 102,
-      "restartProcessPid": 21152,
+      "restartProcessPid": 51788,
       "recoveredMode": "managed-ecdict",
       "settingsSyncOutcome": "synced",
       "lookupResult": {
@@ -79,14 +79,14 @@
         "found": true,
         "headword": "managed_alpha"
       },
-      "catalogDigest": "7592a9eea257c887a70572023e97dee8019607bea6ea89af6260cfeb5c726f96",
+      "catalogDigest": "3762af789b6b516347ff049a0dff2cb2a1bb226d21a20f72b94210e5afe56c35",
       "sourceFileSha256": "e9fba8cee32a3f33b58cb8dc307b148ad8413f89f13e1d79ffd33b4d17cdc7da",
       "verdict": "PASS"
     },
     {
       "scenarioId": "F03",
       "description": "Custom -> Fixture (Crash post-unlink, pre-ack)",
-      "processPid": 21152,
+      "processPid": 51788,
       "isolatedHome": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-rc-b-crash-injection\\home",
       "previousActiveMode": "custom",
       "requestedMode": "fixture",
@@ -97,7 +97,7 @@
       },
       "terminationMethod": "process.exit(103) inside commit boundary hook",
       "terminationExitStatus": 103,
-      "restartProcessPid": 54576,
+      "restartProcessPid": 14560,
       "recoveredMode": "fixture",
       "settingsSyncOutcome": "pending",
       "lookupResult": {
@@ -105,14 +105,14 @@
         "found": true,
         "headword": "derive"
       },
-      "catalogDigest": "7592a9eea257c887a70572023e97dee8019607bea6ea89af6260cfeb5c726f96",
+      "catalogDigest": "3762af789b6b516347ff049a0dff2cb2a1bb226d21a20f72b94210e5afe56c35",
       "sourceFileSha256": "e9fba8cee32a3f33b58cb8dc307b148ad8413f89f13e1d79ffd33b4d17cdc7da",
       "verdict": "PASS"
     },
     {
       "scenarioId": "F04",
       "description": "Crash BEFORE durable metadata commit (Previous active remains authoritative)",
-      "processPid": 54576,
+      "processPid": 14560,
       "isolatedHome": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-rc-b-crash-injection\\home",
       "previousActiveMode": "custom",
       "requestedMode": "custom",
@@ -120,9 +120,9 @@
       "durableMetadataState": {
         "version": 1,
         "activeMode": "custom",
-        "identity": "snap-ff87c9312154494a",
-        "snapshotId": "ff87c931-2154-494a-bc9f-bffeeb4df125",
-        "databaseFile": "custom-ff87c931-2154-494a-bc9f-bffeeb4df125.sqlite3",
+        "identity": "snap-a88c0a95126d478e",
+        "snapshotId": "a88c0a95-126d-478e-b582-55d4b42531b4",
+        "databaseFile": "custom-a88c0a95-126d-478e-b582-55d4b42531b4.sqlite3",
         "source": "custom-local",
         "schemaVersion": 1,
         "sha256": "2743fc61d2759323b2e3c17424c4e73f86dc1fe35749a201d9052858a42fafb6",
@@ -130,11 +130,11 @@
         "settingsSynced": true,
         "settingsSyncState": "synced",
         "settingsSyncError": null,
-        "lastActivatedAt": "2026-10-18T04:35:11.703Z"
+        "lastActivatedAt": "2026-10-18T06:31:24.031Z"
       },
       "terminationMethod": "process.exit(104) inside before-commit hook",
       "terminationExitStatus": 104,
-      "restartProcessPid": 57436,
+      "restartProcessPid": 8872,
       "recoveredMode": "custom",
       "settingsSyncOutcome": "synced",
       "lookupResult": {
@@ -142,14 +142,14 @@
         "found": true,
         "headword": "superposition"
       },
-      "catalogDigest": "943558ac63da182a98a1a8a5477328c51bc2837cfabc1cb637f94554a6e0a113",
+      "catalogDigest": "55961aaf317c6c5091bd844ec6180ab08490b85865f0a567a1365996fb564fcc",
       "sourceFileSha256": "ab65059550026b6ff899ba7963e00686451eb4b667a52b5729dc07095ff5dcd1",
       "verdict": "PASS"
     },
     {
       "scenarioId": "F05",
       "description": "Crash AFTER durable commit, before Host Config acknowledgment (New committed selection wins)",
-      "processPid": 57436,
+      "processPid": 8872,
       "isolatedHome": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-rc-b-crash-injection\\home",
       "previousActiveMode": "custom-A",
       "requestedMode": "custom-B",
@@ -157,9 +157,9 @@
       "durableMetadataState": {
         "version": 1,
         "activeMode": "custom",
-        "identity": "snap-05d10e438d0540a7",
-        "snapshotId": "05d10e43-8d05-40a7-a631-30e8d0b648e9",
-        "databaseFile": "custom-05d10e43-8d05-40a7-a631-30e8d0b648e9.sqlite3",
+        "identity": "snap-3323cbf70f1e45bd",
+        "snapshotId": "3323cbf7-0f1e-45bd-bbd7-533d354cd8ba",
+        "databaseFile": "custom-3323cbf7-0f1e-45bd-bbd7-533d354cd8ba.sqlite3",
         "source": "custom-local",
         "schemaVersion": 1,
         "sha256": "39e2d41f898998bbec992a3cea56c98d8dba43c4c24ffab253fab9c0f5ed4e30",
@@ -167,11 +167,11 @@
         "settingsSynced": false,
         "settingsSyncState": "pending",
         "settingsSyncError": null,
-        "lastActivatedAt": "2026-10-18T04:35:17.020Z"
+        "lastActivatedAt": "2026-10-18T06:31:29.320Z"
       },
       "terminationMethod": "process.exit(105) inside post-commit hook",
       "terminationExitStatus": 105,
-      "restartProcessPid": 57548,
+      "restartProcessPid": 58680,
       "recoveredMode": "custom",
       "settingsSyncOutcome": "synced",
       "lookupResult": {
@@ -179,7 +179,7 @@
         "found": true,
         "headword": "teleportation"
       },
-      "catalogDigest": "d0acdee648c58943b032dffb1369351323b92414a4e24c1b0d9d53685ba67241",
+      "catalogDigest": "5b7f078b99b403eb7233c733c832851d27fd5f9f2be0f4441ae51d8733a01bc9",
       "sourceFileSha256": "ab65059550026b6ff899ba7963e00686451eb4b667a52b5729dc07095ff5dcd1",
       "verdict": "PASS"
     }

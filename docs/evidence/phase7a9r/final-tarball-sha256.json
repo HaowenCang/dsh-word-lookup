@@ -1,0 +1,51 @@
+{
+  "timestamp": "2026-10-18T06:33:50.000Z",
+  "evidenceClassification": "LOCALLY_EXECUTED_TEST",
+  "phase": "Phase 7A.9R",
+  "tarball": {
+    "filename": "dsh-word-lookup-0.2.0.tgz",
+    "path": "build/rc-v0.2.0/dsh-word-lookup-0.2.0.tgz",
+    "byteSize": 135731,
+    "sha256": "ce51e0e233d2b93b8b3d3f61548e0634debdedd0b20ac423a150037abf887f34",
+    "verifiedBy": "Get-FileHash & node:crypto binary stream rehash"
+  },
+  "packageManifest": {
+    "name": "dsh-word-lookup",
+    "version": "0.2.0",
+    "license": "MIT",
+    "type": "module",
+    "engines": {
+      "node": ">=22"
+    },
+    "main": "./lib/index.js",
+    "exports": {
+      ".": {
+        "default": "./lib/index.js"
+      },
+      "./client": {
+        "default": "./lib/client.js"
+      },
+      "./package.json": "./package.json"
+    },
+    "runtimeDependenciesCount": 0,
+    "lifecycleScriptsCount": 0,
+    "dshCompatibility": {
+      "dsh": "0.2.0-rc.2",
+      "profiles": [
+        "web"
+      ]
+    }
+  },
+  "verifications": {
+    "strictlyEightFiles": true,
+    "zeroCredentials": true,
+    "zeroLifecycleScripts": true,
+    "zeroDynamicEval": true,
+    "zeroChildProcessInBundle": true,
+    "zeroProcessEnvInHostBundle": true,
+    "zeroUnauthorizedCommands": true,
+    "zeroEmbeddedSqliteDatabases": true,
+    "zeroSourceCsvPackaged": true,
+    "userSourcesProtected": true
+  }
+}

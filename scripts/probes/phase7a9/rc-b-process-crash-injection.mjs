@@ -1012,8 +1012,13 @@ async function main() {
     console.log('F05: PASS\n')
 
     // Write Evidence Files
-    const evidenceDir = join(REPO_ROOT, 'docs', 'evidence', 'phase7a9')
-    mkdirSync(evidenceDir, { recursive: true })
+    const evidenceDirs = [
+      join(REPO_ROOT, 'docs', 'evidence', 'phase7a9'),
+      join(REPO_ROOT, 'docs', 'evidence', 'phase7a9r'),
+    ]
+    for (const dir of evidenceDirs) {
+      mkdirSync(dir, { recursive: true })
+    }
 
     const finalReport = {
       timestamp: new Date().toISOString(),
@@ -1027,12 +1032,14 @@ async function main() {
       scenarios: scenarioResults,
     }
 
-    writeFileSync(
-      join(evidenceDir, 'process-crash-injection.json'),
-      JSON.stringify(finalReport, null, 2),
-      'utf8',
-    )
-    console.log(`Evidence written to: ${join(evidenceDir, 'process-crash-injection.json')}`)
+    for (const dir of evidenceDirs) {
+      writeFileSync(
+        join(dir, 'process-crash-injection.json'),
+        JSON.stringify(finalReport, null, 2),
+        'utf8',
+      )
+      console.log(`Evidence written to: ${join(dir, 'process-crash-injection.json')}`)
+    }
     console.log('\n=== ALL SCENARIOS (F01–F05) PASSED COMPLETELY! ===')
 
     return finalReport

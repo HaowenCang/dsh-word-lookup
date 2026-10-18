@@ -578,51 +578,93 @@ async function main() {
     })
 
     // CASE E & F: Restart DSH with same isolated Home & Recover active 100 MiB+ Custom snapshot
-    console.log('\n[5/7] CASE E & F: Restarting DSH with same isolated Home & recovering 100 MiB+ Custom snapshot...')
-    const t0Restart = performance.now()
-    dsh = await bootDsh(verified, port)
-    const restartBootDuration = Math.round(performance.now() - t0Restart)
-    console.log(`DSH rebooted at ${dsh.url} (New PID: ${dsh.child.pid}) in ${restartBootDuration}ms`)
+    // Repeat across 3 independent cold-start runs to verify measurement reproducibility
+    console.log('\n[5/7] CASE E & F: Executing 3 independent cold-start recovery benchmark runs...')
+    const recoveryRuns = []
+    let primaryMetricsRecovery = null
+    let primaryRestartBootDuration = 0
+    let primaryTimeToFirstLookup = 0
+    let lastLookupResult = null
 
-    browser = await chromium.launch({ headless: true })
-    page = await browser.newPage()
-    await page.goto(dsh.url, { waitUntil: 'domcontentloaded', timeout: 60_000 })
-    await page.waitForFunction(() => {
-      return typeof window.__DSH_WORD_LOOKUP__ === 'object' && window.__DSH_WORD_LOOKUP__ !== null
-    }, undefined, { timeout: 45_000 })
+    for (let runIndex = 1; runIndex <= 3; runIndex++) {
+      console.log(`\n--- Cold-Start Recovery Run ${runIndex} of 3 ---`)
+      const t0Restart = performance.now()
+      dsh = await bootDsh(verified, port)
+      const restartBootDuration = Math.round(performance.now() - t0Restart)
+      console.log(`Run ${runIndex}: DSH rebooted at ${dsh.url} (PID: ${dsh.child.pid}) in ${restartBootDuration}ms`)
 
-    // Query metrics immediately after boot (covers entire startup recovery window)
-    const metricsRecoveryRes = await testSessionFetch(page, 'GET', '/api/test/perf-metrics')
-    if (!metricsRecoveryRes.ok) throw new Error(`Failed to get recovery metrics: ${metricsRecoveryRes.rawText}`)
-    const metricsRecovery = metricsRecoveryRes.body
-    console.log('Startup Recovery Performance Metrics:')
-    console.log(`  Absolute Peak RSS: ${(metricsRecovery.peakRss / (1024 * 1024)).toFixed(2)} MiB`)
-    console.log(`  Peak Heap Used: ${(metricsRecovery.peakHeapUsed / (1024 * 1024)).toFixed(2)} MiB`)
-    console.log(`  Event-loop p50: ${metricsRecovery.p50}ms, p95: ${metricsRecovery.p95}ms, p99: ${metricsRecovery.p99}ms, max: ${metricsRecovery.max}ms`)
-    console.log(`  Heartbeat max stall: ${metricsRecovery.maxHeartbeatStall}ms`)
+      browser = await chromium.launch({ headless: true })
+      page = await browser.newPage()
+      await page.goto(dsh.url, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+      await page.waitForFunction(() => {
+        return typeof window.__DSH_WORD_LOOKUP__ === 'object' && window.__DSH_WORD_LOOKUP__ !== null
+      }, undefined, { timeout: 45_000 })
 
-    // Verify dictionary status shows Custom active
-    const statusRes = await testSessionFetch(page, 'GET', '/api/dsh-word-lookup/dictionary/status')
-    console.log('Recovered dictionary status:', statusRes.body)
-    if (statusRes.body?.activeMode !== 'custom') {
-      throw new Error(`Expected recovered mode 'custom', got '${statusRes.body?.activeMode}'`)
+      // Query metrics immediately after boot (covers entire startup recovery window)
+      const metricsRecoveryRes = await testSessionFetch(page, 'GET', '/api/test/perf-metrics')
+      if (!metricsRecoveryRes.ok) throw new Error(`Run ${runIndex}: Failed to get recovery metrics: ${metricsRecoveryRes.rawText}`)
+      const metricsRecovery = metricsRecoveryRes.body
+      console.log(`Run ${runIndex} Recovery Performance:`)
+      console.log(`  Absolute Peak RSS: ${(metricsRecovery.peakRss / (1024 * 1024)).toFixed(2)} MiB`)
+      console.log(`  Peak Heap Used: ${(metricsRecovery.peakHeapUsed / (1024 * 1024)).toFixed(2)} MiB`)
+      console.log(`  Event-loop p50: ${metricsRecovery.p50}ms, p95: ${metricsRecovery.p95}ms, p99: ${metricsRecovery.p99}ms, max: ${metricsRecovery.max}ms`)
+      console.log(`  Heartbeat max stall: ${metricsRecovery.maxHeartbeatStall}ms`)
+
+      // Verify dictionary status shows Custom active
+      const statusRes = await testSessionFetch(page, 'GET', '/api/dsh-word-lookup/dictionary/status')
+      if (statusRes.body?.activeMode !== 'custom' || statusRes.body?.activeSnapshotId !== publishedSnapshotId) {
+        throw new Error(`Run ${runIndex}: Expected recovered mode 'custom' (${publishedSnapshotId}), got '${statusRes.body?.activeMode}' (${statusRes.body?.activeSnapshotId})`)
+      }
+
+      // CASE G: Lookup immediately after recovery
+      const t0Lookup = performance.now()
+      const lookupFirst = await testSessionFetch(page, 'POST', '/api/dsh-word-lookup', {
+        query: 'bench_word_0',
+      })
+      const timeToFirstLookupMs = Math.round(performance.now() - t0Lookup)
+      console.log(`Run ${runIndex} Time to first successful lookup: ${timeToFirstLookupMs}ms`)
+      if (!lookupFirst.body?.found) throw new Error(`Run ${runIndex}: bench_word_0 lookup failed after recovery`)
+
+      const sampleSpanMs = metricsRecovery.samples?.length > 1
+        ? metricsRecovery.samples[metricsRecovery.samples.length - 1].t - metricsRecovery.samples[0].t
+        : 0
+
+      recoveryRuns.push({
+        runIndex,
+        externalProcessStartupMs: restartBootDuration,
+        inProcessSampledSpanMs: sampleSpanMs,
+        sampleCount: metricsRecovery.samples?.length ?? 0,
+        timeToFirstLookupMs,
+        peakRss: metricsRecovery.peakRss,
+        peakRssMb: Number((metricsRecovery.peakRss / (1024 * 1024)).toFixed(2)),
+        peakHeapUsed: metricsRecovery.peakHeapUsed,
+        peakHeapUsedMb: Number((metricsRecovery.peakHeapUsed / (1024 * 1024)).toFixed(2)),
+        p50: metricsRecovery.p50,
+        p95: metricsRecovery.p95,
+        p99: metricsRecovery.p99,
+        maxLag: metricsRecovery.max,
+        heartbeatStall: metricsRecovery.maxHeartbeatStall,
+      })
+
+      if (runIndex === 1) {
+        primaryMetricsRecovery = metricsRecovery
+        primaryRestartBootDuration = restartBootDuration
+        primaryTimeToFirstLookup = timeToFirstLookupMs
+        lastLookupResult = lookupFirst
+      }
+
+      // If not last run, cleanly stop and close browser
+      if (runIndex < 3) {
+        await browser.close()
+        browser = null
+        page = null
+        await stopDsh(dsh.child)
+        dsh = null
+      }
     }
-    if (statusRes.body?.activeSnapshotId !== publishedSnapshotId) {
-      throw new Error(`Expected recovered snapshot '${publishedSnapshotId}', got '${statusRes.body?.activeSnapshotId}'`)
-    }
 
-    // CASE G: Lookup immediately after recovery
-    console.log('\n[6/7] CASE G: Lookup immediately after recovery...')
-    const t0Lookup = performance.now()
-    const lookupFirst = await testSessionFetch(page, 'POST', '/api/dsh-word-lookup', {
-      query: 'bench_word_0',
-    })
-    const timeToFirstLookupMs = Math.round(performance.now() - t0Lookup)
-    console.log(`Time to first successful lookup: ${timeToFirstLookupMs}ms`)
-    console.log('First lookup response:', lookupFirst.body)
-    if (!lookupFirst.body?.found) throw new Error('bench_word_0 lookup failed after recovery')
-
-    // Test form and tail word lookups
+    // Test form and tail word lookups on the running instance
+    console.log('\n[6/7] CASE G: Verifying tail and morphological lookups...')
     const lookupForm = await testSessionFetch(page, 'POST', '/api/dsh-word-lookup', {
       query: 'bench_word_0s',
     })
@@ -635,32 +677,40 @@ async function main() {
 
     workloadTimeline.push({
       case: 'CASE_EF_RECOVERY_AND_CASE_G_LOOKUP',
-      restartDurationMs: restartBootDuration,
-      timeToFirstLookupMs,
-      peakRss: metricsRecovery.peakRss,
-      p50: metricsRecovery.p50,
-      p95: metricsRecovery.p95,
-      p99: metricsRecovery.p99,
-      maxLag: metricsRecovery.max,
-      heartbeatStall: metricsRecovery.maxHeartbeatStall,
+      runs: recoveryRuns,
+      primaryRun: {
+        restartDurationMs: primaryRestartBootDuration,
+        timeToFirstLookupMs: primaryTimeToFirstLookup,
+        peakRss: primaryMetricsRecovery.peakRss,
+        p50: primaryMetricsRecovery.p50,
+        p95: primaryMetricsRecovery.p95,
+        p99: primaryMetricsRecovery.p99,
+        maxLag: primaryMetricsRecovery.max,
+        heartbeatStall: primaryMetricsRecovery.maxHeartbeatStall,
+      },
     })
 
     // Check SLAs
-    console.log('\n[7/7] Evaluating SLA Contracts...')
+    console.log('\n[7/7] Evaluating SLA Contracts Across All Runs...')
+    const maxRecoveryPeakRss = Math.max(...recoveryRuns.map((r) => r.peakRss))
+    const maxRecoveryP99 = Math.max(...recoveryRuns.map((r) => r.p99))
+    const maxRecoveryLag = Math.max(...recoveryRuns.map((r) => r.maxLag))
+    const maxRecoveryHeartbeat = Math.max(...recoveryRuns.map((r) => r.heartbeatStall))
+
     const absolutePeakRss = Math.max(
       metricsA.peakRss,
       metricsB.peakRss,
       metricsC.peakRss,
-      metricsRecovery.peakRss,
+      maxRecoveryPeakRss,
     )
     const peakRssAboveBaseline = absolutePeakRss - baselineRss
-    const maxP99 = Math.max(metricsA.p99, metricsB.p99, metricsC.p99, metricsRecovery.p99)
-    const absoluteMaxLag = Math.max(metricsA.max, metricsB.max, metricsC.max, metricsRecovery.max)
+    const maxP99 = Math.max(metricsA.p99, metricsB.p99, metricsC.p99, maxRecoveryP99)
+    const absoluteMaxLag = Math.max(metricsA.max, metricsB.max, metricsC.max, maxRecoveryLag)
     const maxHeartbeatStall = Math.max(
       metricsA.maxHeartbeatStall,
       metricsB.maxHeartbeatStall,
       metricsC.maxHeartbeatStall,
-      metricsRecovery.maxHeartbeatStall,
+      maxRecoveryHeartbeat,
     )
 
     console.log(`Absolute Peak RSS: ${(absolutePeakRss / (1024 * 1024)).toFixed(2)} MiB (Target < 512 MiB)`)
@@ -681,8 +731,13 @@ async function main() {
     console.log('\nALL SLA CONTRACTS SATISFIED: PASS!')
 
     // Write Evidence Files
-    const evidenceDir = join(REPO_ROOT, 'docs', 'evidence', 'phase7a9')
-    mkdirSync(evidenceDir, { recursive: true })
+    const evidenceDirs = [
+      join(REPO_ROOT, 'docs', 'evidence', 'phase7a9'),
+      join(REPO_ROOT, 'docs', 'evidence', 'phase7a9r'),
+    ]
+    for (const dir of evidenceDirs) {
+      mkdirSync(dir, { recursive: true })
+    }
 
     const resultPayload = {
       timestamp: new Date().toISOString(),
@@ -704,7 +759,7 @@ async function main() {
           formCount: sampleB.formCount,
           integrityCheck: sampleB.integrityCheck,
           representativeLookups: [
-            { query: 'bench_word_0', found: true, headword: lookupFirst.body.headword },
+            { query: 'bench_word_0', found: true, headword: lastLookupResult.body.headword },
             { query: 'bench_word_0s', found: true, headword: lookupForm.body.headword },
             { query: 'bench_word_1749', found: true, headword: lookupTail.body.headword },
           ],
@@ -719,20 +774,26 @@ async function main() {
         peakRssAboveBaselineBytes: peakRssAboveBaseline,
         peakRssAboveBaselineMb: Number((peakRssAboveBaseline / (1024 * 1024)).toFixed(2)),
         eventLoop: {
-          p50Ms: metricsRecovery.p50,
-          p95Ms: metricsRecovery.p95,
+          p50Ms: primaryMetricsRecovery.p50,
+          p95Ms: primaryMetricsRecovery.p95,
           p99Ms: maxP99,
           maxLagMs: absoluteMaxLag,
           maxHeartbeatStallMs: maxHeartbeatStall,
         },
         latencies: {
-          startupRecoveryLatencyMs: restartBootDuration,
-          timeToFirstSuccessfulLookupMs: timeToFirstLookupMs,
+          startupRecoveryLatencyMs: primaryRestartBootDuration,
+          timeToFirstSuccessfulLookupMs: primaryTimeToFirstLookup,
         },
         workerThreadState: {
           workerUsedForIntegrity: true,
           workerExitedCleanly: true,
           ghostLeases: 0,
+        },
+        samplerStartupAnalysis: {
+          samplerPlugin: 'dsh-perf-sampler',
+          explanation: 'In-process sampler starts when dsh-perf-sampler.apply(ctx) is called by Cordis loader. Pre-plugin initialization (Node.js runtime boot, V8 initialization, core bundles loading, ~1.5s on Windows) occurs prior to in-process sampling and is measured externally via externalProcessStartupMs. In-process sampling (25ms memory interval, 10ms lag interval) starts synchronously during Cordis apply and captures active custom snapshot recovery through status verification.',
+          memoryScope: 'process.memoryUsage().rss measures total OS resident set size of the Node.js process. Worker threads share process memory and are included in process RSS.',
+          benchmarkDatabaseLimitation: 'The synthetic 105 MiB benchmark database contains 1,750 entries with ~64 KiB definitions each. It validates large SQLite file handling, memory buffers, VACUUM INTO staging, and SHA-256 verification, but does not simulate the key density of the realistic 770,611-entry ECDICT corpus.',
         },
       },
       slaEvaluation: {
@@ -744,24 +805,25 @@ async function main() {
       },
     }
 
-    writeFileSync(
-      join(evidenceDir, 'large-database-performance.json'),
-      JSON.stringify(resultPayload, null, 2),
-      'utf8',
-    )
-
     // Write raw CSV time series
     const csvHeader = 'timestamp,rss_bytes,rss_mb,heap_used_bytes,heap_used_mb,external_bytes,array_buffers_bytes\n'
-    const csvRows = (metricsRecovery.samples || []).map((s) => {
+    const csvRows = (primaryMetricsRecovery.samples || []).map((s) => {
       const rssMb = (s.rss / (1024 * 1024)).toFixed(2)
       const heapMb = (s.heapUsed / (1024 * 1024)).toFixed(2)
       return `${s.t},${s.rss},${rssMb},${s.heapUsed},${heapMb},${s.external},${s.arrayBuffers}`
     }).join('\n')
-    writeFileSync(join(evidenceDir, 'large-database-performance-raw.csv'), csvHeader + csvRows + '\n', 'utf8')
 
-    console.log(`\nEvidence written to:`)
-    console.log(`  ${join(evidenceDir, 'large-database-performance.json')}`)
-    console.log(`  ${join(evidenceDir, 'large-database-performance-raw.csv')}`)
+    for (const dir of evidenceDirs) {
+      writeFileSync(
+        join(dir, 'large-database-performance.json'),
+        JSON.stringify(resultPayload, null, 2),
+        'utf8',
+      )
+      writeFileSync(join(dir, 'large-database-performance-raw.csv'), csvHeader + csvRows + '\n', 'utf8')
+      console.log(`\nEvidence written to:`)
+      console.log(`  ${join(dir, 'large-database-performance.json')}`)
+      console.log(`  ${join(dir, 'large-database-performance-raw.csv')}`)
+    }
 
     return resultPayload
   } finally {

@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-10-18T04:39:54.577Z",
+  "timestamp": "2026-10-18T06:22:41.018Z",
   "probe": "RC-C",
   "verdict": "PASS",
   "platform": {
@@ -23,18 +23,18 @@
   },
   "snapshots": {
     "snapshotA": {
-      "snapshotId": "5362f3a0-c092-4dff-9657-e079c53c55b1",
+      "snapshotId": "d437cbca-2a1f-4897-80d0-555e13836bf9",
       "identity": "dict-alpha"
     },
     "snapshotB": {
-      "snapshotId": "17e31805-b489-4f26-a8bb-331368af4a56",
+      "snapshotId": "4af8ca6c-13db-462b-8edb-f9e651085cba",
       "identity": "dict-beta"
     }
   },
   "steps": [
     {
       "step": "INSTALL_ACTIVATE_CUSTOM_A",
-      "activeSnapshotId": "5362f3a0-c092-4dff-9657-e079c53c55b1",
+      "activeSnapshotId": "d437cbca-2a1f-4897-80d0-555e13836bf9",
       "lookupResult": {
         "ok": true,
         "found": true,
@@ -71,7 +71,7 @@
     },
     {
       "step": "INSTALL_ACTIVATE_CUSTOM_B",
-      "activeSnapshotId": "17e31805-b489-4f26-a8bb-331368af4a56",
+      "activeSnapshotId": "4af8ca6c-13db-462b-8edb-f9e651085cba",
       "lookupResult": {
         "ok": true,
         "found": true,
@@ -156,7 +156,7 @@
     },
     {
       "step": "SELECT_CUSTOM_A_VIA_PICKER",
-      "selectedSnapshotId": "5362f3a0-c092-4dff-9657-e079c53c55b1",
+      "selectedSnapshotId": "d437cbca-2a1f-4897-80d0-555e13836bf9",
       "lookupResult": {
         "ok": true,
         "found": true,
@@ -193,7 +193,7 @@
     },
     {
       "step": "SELECT_CUSTOM_B_VIA_PICKER",
-      "selectedSnapshotId": "17e31805-b489-4f26-a8bb-331368af4a56",
+      "selectedSnapshotId": "4af8ca6c-13db-462b-8edb-f9e651085cba",
       "lookupResult": {
         "ok": true,
         "found": true,
@@ -227,6 +227,20 @@
         }
       },
       "verdict": "PASS"
+    },
+    {
+      "step": "ACTIVE_SNAPSHOT_DELETION_PROTECTION",
+      "testedSnapshotId": "4af8ca6c-13db-462b-8edb-f9e651085cba",
+      "uiDeleteDisabled": true,
+      "uiDeleteTitle": "不能删除当前激活的词典快照，请先切换至其他词典",
+      "apiDeletionAttempt": {
+        "status": 404,
+        "ok": false,
+        "body": null
+      },
+      "bRemainsActive": true,
+      "bRemainsQueryable": true,
+      "verdict": "PASS"
     }
   ],
   "screenshots": [
@@ -238,27 +252,27 @@
     {
       "stepId": "S02",
       "filename": "rcc-S02-custom-a-activated.png",
-      "sha256": "538569c78e904d07e1575090fdb37dfdbcf66bb4c6b3d9ac23c91aee2f6475d7"
+      "sha256": "a1da7597cb4d38fdf445ad98e9511f0c78dcad036d406f9db65cdf5804a8baac"
     },
     {
       "stepId": "S03",
       "filename": "rcc-S03-custom-b-activated.png",
-      "sha256": "65c57c18085a198418ef78992d8ae135e6d4820873ad91b3893523d836050b2b"
+      "sha256": "465f3753e00b38c04b2540929f7e7f029956dd44685815a62dea3b5eb81ba469"
     },
     {
       "stepId": "S04",
       "filename": "rcc-S04-switched-to-fixture.png",
-      "sha256": "184ff2b925a97417ed49909354797c6317a42a040e1d44f72582b7b92648d3b8"
+      "sha256": "bf9696d04fbe217240f50d5bf6a5b460833baf36741eaf153239f8ec33a1d6d2"
     },
     {
       "stepId": "S05",
       "filename": "rcc-S05-snapshot-picker-modal-open.png",
-      "sha256": "2bac3cd833df2adcdaa6ee7bf896b367e98a3f2fcd62b4d1d62f17e548de80c7"
+      "sha256": "f4b58e36e242523f079c208a54f42e84c9355a449f17d705fa8ab43dfcb2e0e4"
     },
     {
       "stepId": "S06",
       "filename": "rcc-S06-custom-b-selected-via-picker.png",
-      "sha256": "49ff168ba801ca07a547784d8ffb932110b565ab82b1b3a19512cce126bf1f4d"
+      "sha256": "9e115bb8bda471d6bd9cc46128ef6f32a3a53389026ce1aae73e7fdac49a00cf"
     },
     {
       "stepId": "S07",
@@ -268,22 +282,27 @@
     {
       "stepId": "S08",
       "filename": "rcc-S08-post-reboot-custom-a-selected.png",
-      "sha256": "89af7d0174ff8ef1a067dd7416608f2f2c8948297046a7be3ea3f2daa005fcb8"
+      "sha256": "aec3f25c9291701cbdeffbf115565976dd6e53f2dfcd5f51209ecc5bc3c242a7"
     },
     {
       "stepId": "S09",
       "filename": "rcc-S09-post-reboot-custom-b-selected.png",
-      "sha256": "8647094a2740a5cb344672ccd0749af9b89fb7cd4de3af869aa0885d5b9b7141"
+      "sha256": "e39331f95fe9a24769dda1121e2cf8107e285be305bc17915860dabe612ba1f4"
+    },
+    {
+      "stepId": "S09_active_delete_guard",
+      "filename": "rcc-S09_active_delete_guard-active-snapshot-delete-disabled.png",
+      "sha256": "c85a8e96afa0dd57708535665908c690485770248f58952e4701fa004cb6f548"
     },
     {
       "stepId": "S10_modal",
       "filename": "rcc-S10_modal-delete-modal-open.png",
-      "sha256": "726d8628c1f732d70ea9f6d9abc0c021eb627d68df18fd617345e9e169caa04d"
+      "sha256": "5c7deeb81f37672c0fd50d4d2b8befde996c82c25171c4b6714cdfceb1b3201d"
     },
     {
       "stepId": "S10_after",
       "filename": "rcc-S10_after-custom-a-deleted-b-remains.png",
-      "sha256": "40f8e9fe64350e834a71ade22c7ddabcf89cf1f60839db5adfb1bc0636bc8623"
+      "sha256": "2f506274e323e1eadffd05a42fef9eae80bc698b2dce805b78c0a710fcd8b843"
     }
   ],
   "verifications": {

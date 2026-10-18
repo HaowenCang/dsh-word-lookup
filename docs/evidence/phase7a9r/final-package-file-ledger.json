@@ -1,0 +1,59 @@
+{
+  "timestamp": "2026-10-18T06:33:50.000Z",
+  "evidenceClassification": "LOCALLY_EXECUTED_TEST",
+  "phase": "Phase 7A.9R",
+  "tarballSha256": "ce51e0e233d2b93b8b3d3f61548e0634debdedd0b20ac423a150037abf887f34",
+  "tarballByteSize": 135731,
+  "unpackedTotalBytes": 576913,
+  "fileCount": 8,
+  "files": [
+    {
+      "path": "LICENSE",
+      "byteSize": 1089,
+      "sha256": "99922c2a61954f0eaef1591241bcaaac4d3c8984a9866840180d65f7a1ff8101",
+      "status": "FROZEN_BIT_FOR_BIT"
+    },
+    {
+      "path": "README.md",
+      "byteSize": 15214,
+      "sha256": "478320e56539e88cddca40b1cde570e2e7f98bc44e840b1c4515330ef6160bd1",
+      "status": "CLASS_C_APPROVED_DOCUMENTATION_CORRECTION"
+    },
+    {
+      "path": "cordis.patch.yml",
+      "byteSize": 415,
+      "sha256": "df9851e21b59cafc69f91b0839c7cd56cb53104c57644813d9001e1a76c7d868",
+      "status": "FROZEN_BIT_FOR_BIT"
+    },
+    {
+      "path": "corpus/ecdict.manifest.json",
+      "byteSize": 566,
+      "sha256": "03cba27d42cb43551d7b51fa12e4a07a869c5d4b65ac07f4fa3d105d9c944044",
+      "status": "FROZEN_BIT_FOR_BIT"
+    },
+    {
+      "path": "lib/client.js",
+      "byteSize": 185043,
+      "sha256": "2a1425a94a782cb382ce031dd85d09627eba680f6baac2479dd32127e13e7952",
+      "status": "FROZEN_BIT_FOR_BIT"
+    },
+    {
+      "path": "lib/ecdict-integrity-worker.js",
+      "byteSize": 23193,
+      "sha256": "0d6bda562785797d36e64fa9567125072c6e7626c77c25211ba9dd223294d2b6",
+      "status": "FROZEN_BIT_FOR_BIT"
+    },
+    {
+      "path": "lib/index.js",
+      "byteSize": 345905,
+      "sha256": "f426d1ba68fe548867d46affc028690c6393d571fd77af457cc342ecd49abf2e",
+      "status": "FROZEN_BIT_FOR_BIT"
+    },
+    {
+      "path": "package.json",
+      "byteSize": 5488,
+      "sha256": "e79d9176a09a8ee10f0c0c97c04e12e224c479b002483c0f32ad47dab229f996",
+      "status": "FROZEN_BIT_FOR_BIT"
+    }
+  ]
+}

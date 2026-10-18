@@ -252,8 +252,13 @@ async function main() {
   console.log('PASS: lib/client.js contains zero dynamic code evaluation')
 
   // Write store-package-sha256.json
-  const evidenceDir = join(REPO_ROOT, 'docs', 'evidence', 'phase7a9')
-  mkdirSync(evidenceDir, { recursive: true })
+  const evidenceDirs = [
+    join(REPO_ROOT, 'docs', 'evidence', 'phase7a9'),
+    join(REPO_ROOT, 'docs', 'evidence', 'phase7a9r'),
+  ]
+  for (const dir of evidenceDirs) {
+    mkdirSync(dir, { recursive: true })
+  }
 
   const packageSha256Report = {
     timestamp: new Date().toISOString(),
@@ -284,12 +289,14 @@ async function main() {
     },
   }
 
-  writeFileSync(
-    join(evidenceDir, 'store-package-sha256.json'),
-    JSON.stringify(packageSha256Report, null, 2),
-    'utf8',
-  )
-  console.log(`\nWritten: ${join(evidenceDir, 'store-package-sha256.json')}`)
+  for (const dir of evidenceDirs) {
+    writeFileSync(
+      join(dir, 'store-package-sha256.json'),
+      JSON.stringify(packageSha256Report, null, 2),
+      'utf8',
+    )
+    console.log(`\nWritten: ${join(dir, 'store-package-sha256.json')}`)
+  }
 
   // 4. Isolated Profile Installation & Lifecycle Verification
   console.log('\n[4/5] Executing isolated Profile Installation & Lifecycle...')
@@ -446,6 +453,82 @@ async function main() {
     await stopDsh(dsh.child)
     dsh = null
 
+    // 6. Test Rollback to verified v0.1.0 release artifact
+    console.log('\n[6/6] Executing Store Rollback to verified v0.1.0 release artifact...')
+    const v010TarballPath = join(tmpdir(), 'dsh-word-lookup-0.1.0.tgz')
+    if (!existsSync(v010TarballPath)) {
+      spawnSync(npmCmd, ['pack', 'dsh-word-lookup@0.1.0', '--pack-destination', tmpdir()], {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+        shell: true,
+      })
+    }
+    if (!existsSync(v010TarballPath)) {
+      throw new Error(`Could not locate verified v0.1.0 tarball at ${v010TarballPath}`)
+    }
+    const v010Sha = sha256File(v010TarballPath)
+    const expectedV010Sha = '22d3cdffd9f73790adebb707cf36a258453a4813db981d19d9d5cffb249458cc'
+    console.log(`v0.1.0 tarball SHA-256: ${v010Sha}`)
+    if (v010Sha !== expectedV010Sha) {
+      throw new Error(`v0.1.0 SHA-256 mismatch! Got ${v010Sha}, expected ${expectedV010Sha}`)
+    }
+
+    mkdirSync(installedPluginDir, { recursive: true })
+    const rollbackStageDir = join(tmpdir(), `rc-e-rollback-stage-${Date.now()}`)
+    mkdirSync(rollbackStageDir, { recursive: true })
+    const rollbackTarRes = spawnSync('tar', ['-xzf', v010TarballPath, '-C', rollbackStageDir], { encoding: 'utf8', shell: true })
+    if (rollbackTarRes.status !== 0) throw new Error(`tar -xzf failed on v0.1.0: ${rollbackTarRes.stderr}`)
+    cpSync(join(rollbackStageDir, 'package'), installedPluginDir, { recursive: true })
+    rmSync(rollbackStageDir, { recursive: true, force: true })
+
+    const rollbackProfilePkg = {
+      name: `dsh-profile-${profile}`,
+      private: true,
+      dsh: {
+        profile: {
+          bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', 'dsh-word-lookup'],
+        },
+      },
+      dependencies: {
+        'dsh-word-lookup': './node_modules/dsh-word-lookup',
+      },
+    }
+    writeFileSync(join(profileDir, 'package.json'), JSON.stringify(rollbackProfilePkg, null, 2) + '\n', 'utf8')
+
+    // Boot DSH with rolled-back v0.1.0
+    dsh = await bootDsh(verified, port)
+    console.log(`DSH rebooted with rolled-back v0.1.0 (PID: ${dsh.child.pid})`)
+
+    const rollbackContext = await chromium.launchPersistentContext(browserUserDataDir, {
+      headless: true,
+      viewport: { width: 1280, height: 800 },
+    })
+    const rollbackPage = rollbackContext.pages().length > 0 ? rollbackContext.pages()[0] : await rollbackContext.newPage()
+    await rollbackPage.goto(dsh.url, { waitUntil: 'networkidle' })
+    await rollbackPage.waitForTimeout(1000)
+
+    const rollbackLookup = await rollbackPage.evaluate(async () => {
+      try {
+        const res = await window.fetch('api/dsh-word-lookup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: 'derive' }),
+        })
+        return await res.json()
+      } catch (err) {
+        return { error: String(err) }
+      }
+    })
+    console.log('Rollback v0.1.0 lookup result:', rollbackLookup)
+    if (!rollbackLookup?.found || rollbackLookup?.headword !== 'derive') {
+      throw new Error(`Rollback lookup failed on v0.1.0: ${JSON.stringify(rollbackLookup)}`)
+    }
+    console.log('PASS: Store Rollback to v0.1.0 verified successfully!')
+
+    await rollbackContext.close()
+    await stopDsh(dsh.child)
+    dsh = null
+
     const installLifecycleReport = {
       timestamp: new Date().toISOString(),
       probe: 'RC-E.2',
@@ -453,6 +536,13 @@ async function main() {
       tarballInstalled: tarballName,
       isolatedProfile: profile,
       installedDirectory: installedPluginDir,
+      installationDetails: {
+        testType: 'ISOLATED_UNPACK_AND_REGISTER',
+        isSymbolicLinkOrJunction: false,
+        isRealIsolatedCopy: true,
+        notRepoRoot: installedPluginDir !== REPO_ROOT,
+        note: 'Tested via isolated package unpack and profile registration (not native CLI invocation)',
+      },
       lookupVerification: {
         query: 'derive',
         found: lookupRes.found,
@@ -467,15 +557,25 @@ async function main() {
         uninstalledCleanly: true,
         routeDisarmed: postUninstallLookup.status !== 200,
       },
+      rollbackVerification: {
+        verified: true,
+        rolledBackToVersion: '0.1.0',
+        v010TarballSha256: v010Sha,
+        v010LookupHeadword: rollbackLookup.headword,
+        found: rollbackLookup.found,
+        verdict: 'PASS',
+      },
     }
 
-    writeFileSync(
-      join(evidenceDir, 'isolated-install-lifecycle.json'),
-      JSON.stringify(installLifecycleReport, null, 2),
-      'utf8',
-    )
-    console.log(`Written: ${join(evidenceDir, 'isolated-install-lifecycle.json')}`)
-    console.log('\n=== RC-E: ALL PACKAGING, SECURITY & LIFECYCLE AUDITS PASSED! ===')
+    for (const dir of evidenceDirs) {
+      writeFileSync(
+        join(dir, 'isolated-install-lifecycle.json'),
+        JSON.stringify(installLifecycleReport, null, 2),
+        'utf8',
+      )
+      console.log(`Written: ${join(dir, 'isolated-install-lifecycle.json')}`)
+    }
+    console.log('\n=== RC-E: ALL PACKAGING, SECURITY & LIFECYCLE (INSTALL/START/UNINSTALL/ROLLBACK) AUDITS PASSED! ===')
 
     return { packageSha256Report, installLifecycleReport }
   } finally {

@@ -1,0 +1,179 @@
+{
+  "timestamp": "2026-10-18T06:29:01.493Z",
+  "probe": "RC-A",
+  "verdict": "PASS",
+  "platform": {
+    "os": "win32",
+    "arch": "x64",
+    "node": "v24.13.0"
+  },
+  "databaseSamples": {
+    "sampleA": {
+      "name": "Sample A (Fixture scale)",
+      "path": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-rc-a-100mb-bench\\samples\\sample-a-fixture.sqlite3",
+      "byteSize": 45056,
+      "sha256": "063fbf6b650afecc6a52f6790fb89956a9a7e07bd6985269324191e399dfd930",
+      "schemaVersion": 1,
+      "entryCount": 15,
+      "integrityCheck": "ok"
+    },
+    "sampleB": {
+      "path": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-rc-a-100mb-bench\\samples\\sample-b-100mb.sqlite3",
+      "byteSize": 110301184,
+      "sha256": "159889cedf59ef3530062244713032d2c9402ce6b9fa0ee18315ddca563e9b65",
+      "schemaVersion": 1,
+      "entryCount": 1750,
+      "formCount": 1750,
+      "integrityCheck": {
+        "integrity_check": "ok"
+      },
+      "representativeLookups": [
+        {
+          "query": "bench_word_0",
+          "found": true,
+          "headword": "bench_word_0"
+        },
+        {
+          "query": "bench_word_0s",
+          "found": true,
+          "headword": "bench_word_0"
+        },
+        {
+          "query": "bench_word_1749",
+          "found": true,
+          "headword": "bench_word_1749"
+        }
+      ]
+    }
+  },
+  "workloadCases": [
+    {
+      "case": "CASE_A_CANDIDATE_VALIDATION",
+      "durationMs": 535,
+      "peakRss": 325472256,
+      "p99": 10.51,
+      "maxLag": 10.51,
+      "heartbeatStall": 10.51
+    },
+    {
+      "case": "CASE_B_PUBLISH_AND_ACTIVATE",
+      "durationMs": 2396,
+      "peakRss": 305295360,
+      "p99": 17.56,
+      "maxLag": 103.12,
+      "heartbeatStall": 103.12
+    },
+    {
+      "case": "CASE_C_SWITCH_CUSTOM_ACTIVE",
+      "durationMs": 717,
+      "peakRss": 327847936,
+      "p99": 79.97,
+      "maxLag": 79.97,
+      "heartbeatStall": 79.97
+    },
+    {
+      "case": "CASE_D_GRACEFUL_STOP",
+      "durationMs": 1591
+    },
+    {
+      "case": "CASE_EF_RECOVERY_AND_CASE_G_LOOKUP",
+      "runs": [
+        {
+          "runIndex": 1,
+          "externalProcessStartupMs": 3581,
+          "inProcessSampledSpanMs": 1906,
+          "sampleCount": 61,
+          "timeToFirstLookupMs": 35,
+          "peakRss": 309948416,
+          "peakRssMb": 295.59,
+          "peakHeapUsed": 152372312,
+          "peakHeapUsedMb": 145.31,
+          "p50": 5.49,
+          "p95": 11.29,
+          "p99": 38.79,
+          "maxLag": 52.17,
+          "heartbeatStall": 52.17
+        },
+        {
+          "runIndex": 2,
+          "externalProcessStartupMs": 3528,
+          "inProcessSampledSpanMs": 1916,
+          "sampleCount": 60,
+          "timeToFirstLookupMs": 8,
+          "peakRss": 309501952,
+          "peakRssMb": 295.16,
+          "peakHeapUsed": 152375416,
+          "peakHeapUsedMb": 145.32,
+          "p50": 5.49,
+          "p95": 9.87,
+          "p99": 42.5,
+          "maxLag": 64.98,
+          "heartbeatStall": 64.98
+        },
+        {
+          "runIndex": 3,
+          "externalProcessStartupMs": 3569,
+          "inProcessSampledSpanMs": 1862,
+          "sampleCount": 60,
+          "timeToFirstLookupMs": 25,
+          "peakRss": 309616640,
+          "peakRssMb": 295.27,
+          "peakHeapUsed": 152477384,
+          "peakHeapUsedMb": 145.41,
+          "p50": 5.53,
+          "p95": 9.82,
+          "p99": 40.8,
+          "maxLag": 54.37,
+          "heartbeatStall": 54.37
+        }
+      ],
+      "primaryRun": {
+        "restartDurationMs": 3581,
+        "timeToFirstLookupMs": 35,
+        "peakRss": 309948416,
+        "p50": 5.49,
+        "p95": 11.29,
+        "p99": 38.79,
+        "maxLag": 52.17,
+        "heartbeatStall": 52.17
+      }
+    }
+  ],
+  "resourceMetrics": {
+    "baselineRssBytes": 308621312,
+    "baselineRssMb": 294.32,
+    "absolutePeakRssBytes": 327847936,
+    "absolutePeakRssMb": 312.66,
+    "peakRssAboveBaselineBytes": 19226624,
+    "peakRssAboveBaselineMb": 18.34,
+    "eventLoop": {
+      "p50Ms": 5.49,
+      "p95Ms": 11.29,
+      "p99Ms": 79.97,
+      "maxLagMs": 103.12,
+      "maxHeartbeatStallMs": 103.12
+    },
+    "latencies": {
+      "startupRecoveryLatencyMs": 3581,
+      "timeToFirstSuccessfulLookupMs": 35
+    },
+    "workerThreadState": {
+      "workerUsedForIntegrity": true,
+      "workerExitedCleanly": true,
+      "ghostLeases": 0
+    },
+    "samplerStartupAnalysis": {
+      "samplerPlugin": "dsh-perf-sampler",
+      "explanation": "In-process sampler starts when dsh-perf-sampler.apply(ctx) is called by Cordis loader. Pre-plugin initialization (Node.js runtime boot, V8 initialization, core bundles loading, ~1.5s on Windows) occurs prior to in-process sampling and is measured externally via externalProcessStartupMs. In-process sampling (25ms memory interval, 10ms lag interval) starts synchronously during Cordis apply and captures active custom snapshot recovery through status verification.",
+      "memoryScope": "process.memoryUsage().rss measures total OS resident set size of the Node.js process. Worker threads share process memory and are included in process RSS.",
+      "benchmarkDatabaseLimitation": "The synthetic 105 MiB benchmark database contains 1,750 entries with ~64 KiB definitions each. It validates large SQLite file handling, memory buffers, VACUUM INTO staging, and SHA-256 verification, but does not simulate the key density of the realistic 770,611-entry ECDICT corpus."
+    }
+  },
+  "slaEvaluation": {
+    "peakRssLessThan512MiB": true,
+    "eventLoopP99LessThan100Ms": true,
+    "eventLoopMaxLessThan500Ms": true,
+    "heartbeatStallLessThan1000Ms": true,
+    "verdict": "PASS"
+  }
+}
