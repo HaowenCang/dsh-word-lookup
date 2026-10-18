@@ -1,6 +1,6 @@
 {
-  "timestamp": "2026-10-18T05:15:00Z",
-  "phase": "PHASE7A10",
+  "timestamp": "2026-10-18T06:35:00Z",
+  "phase": "PHASE7A10R",
   "status": "PREPARED_PENDING_AUTHORIZATION",
   "package": {
     "name": "dsh-word-lookup",
@@ -85,6 +85,7 @@
     "productionSourceTreeSha": "24d78dfbb54ae62882aa661d4819f6397068e303",
     "testedProbeCommit": "fc1c5b64c56629cf0395121b8c76a3ddfc811ddc",
     "evidenceCommit": "5c863335afdc4b71ee18f41340d852f378a2bee2",
+    "publicationPrepDocCommit": "5305a934851934e39fd505057ece9a258950ed68",
     "plannedTagTargetCommit": "5c863335afdc4b71ee18f41340d852f378a2bee2"
   },
   "authorizationGate": {
