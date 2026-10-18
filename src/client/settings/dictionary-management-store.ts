@@ -369,6 +369,12 @@ export class DictionaryManagementStore {
   async selectMode(mode: 'fixture' | 'managed-ecdict' | 'custom', snapshotId?: string): Promise<boolean> {
     if (this.#disposed || this.#state.isActing) return false
 
+    if (mode === 'custom' && (!snapshotId || typeof snapshotId !== 'string' || !snapshotId.trim())) {
+      this.#state = { ...this.#state, actionError: '切换至自定义词典必须指定明确的快照 ID' }
+      this.#emit()
+      return false
+    }
+
     this.#state = { ...this.#state, isActing: true, actionError: null }
     this.#emit()
 

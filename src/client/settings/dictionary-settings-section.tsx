@@ -15,7 +15,7 @@
  * @module dsh-word-lookup/client/settings/dictionary-settings-section
  */
 
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ConfigForm, ConfigFormSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client'
 
@@ -28,6 +28,7 @@ import {
   SettingRow,
   SETTINGS_THEME_STYLES,
   ShortcutRecorderModal,
+  SnapshotPickerModal,
   StatusBadge,
   Switch,
   TextInput,
@@ -194,6 +195,11 @@ export function DictionarySettingsSection({
 
   // Shortcut recorder state
   const [showShortcutRecorder, setShowShortcutRecorder] = useState(false)
+  const [showSnapshotPicker, setShowSnapshotPicker] = useState(false)
+
+  // Track the path for which the current verification outcome was generated (UI-1)
+  const [verifiedPath, setVerifiedPath] = useState<string | null>(null)
+  const pendingVerifyPathRef = useRef<string | null>(null)
 
   const { status, isLoading, isActing, actionError, connectionError } = storeState
   const currentOp = status?.currentOperation
@@ -232,27 +238,59 @@ export function DictionarySettingsSection({
 
   const lookupShortcutEntry = catalogSnapshot?.find((e) => e.id === LOOKUP_COMMAND_ID)
 
+  // Stable callback for recording lock
+  const handleRecording = useCallback(
+    async (active: boolean) => {
+      if (activeShortcuts?.recording) {
+        await activeShortcuts.recording(active)
+      }
+    },
+    [activeShortcuts],
+  )
+
   // Shortcut actions
-  const handleSaveShortcut = async (binding: { code: string; modifiers: readonly string[] }): Promise<boolean> => {
-    if (!activeShortcuts) return false
+  const handleSaveShortcut = async (
+    binding: { code: string; modifiers: readonly string[] },
+  ): Promise<{ ok: boolean; error?: string }> => {
+    if (!activeShortcuts) return { ok: false, error: '快捷键服务暂不可用' }
     const configSnap = activeShortcuts.config?.getSnapshot ? activeShortcuts.config.getSnapshot() : null
     const revision = (configSnap as { revision?: number } | null)?.revision ?? 1
     const res = await activeShortcuts.edit(
       { type: 'set', id: LOOKUP_COMMAND_ID as never, binding: binding as never },
       revision as never,
     )
-    return res.status === 'saved'
+    if (res.status === 'saved') {
+      return { ok: true }
+    }
+    const errText =
+      res.status === 'conflict'
+        ? `保存失败：快捷键与现有命令冲突 (${res.conflicts?.join(', ') || '未知冲突'})`
+        : res.status === 'stale'
+          ? '保存失败：快捷键配置已被其他操作修改（版本过期），已刷新最新状态'
+          : res.status === 'not-ready'
+            ? '保存失败：快捷键配置服务尚未就绪'
+            : res.status === 'unreadable'
+              ? '保存失败：快捷键配置存储损坏或无法读取'
+              : `保存失败：Host 拒绝了该快捷键 (${res.status})`
+    return { ok: false, error: errText }
   }
 
-  const handleResetShortcut = async (): Promise<boolean> => {
-    if (!activeShortcuts) return false
+  const handleResetShortcut = async (): Promise<{ ok: boolean; error?: string }> => {
+    if (!activeShortcuts) return { ok: false, error: '快捷键服务暂不可用' }
     const configSnap = activeShortcuts.config?.getSnapshot ? activeShortcuts.config.getSnapshot() : null
     const revision = (configSnap as { revision?: number } | null)?.revision ?? 1
     const res = await activeShortcuts.edit(
       { type: 'reset', id: LOOKUP_COMMAND_ID as never },
       revision as never,
     )
-    return res.status === 'saved'
+    if (res.status === 'saved') {
+      return { ok: true }
+    }
+    const errText =
+      res.status === 'stale'
+        ? '恢复默认失败：快捷键配置已被其他操作修改，已刷新最新状态'
+        : `恢复默认失败：${res.status}`
+    return { ok: false, error: errText }
   }
 
   // Custom dictionary verification handler
@@ -261,9 +299,18 @@ export function DictionarySettingsSection({
     if (!trimmedPath || isVerifying || isActing) return
     setIsVerifying(true)
     setVerifyOutcome(null)
+    setVerifiedPath(null)
+    pendingVerifyPathRef.current = trimmedPath
+
     try {
       const res = await store.verifyCustom(trimmedPath)
+      // UI-1: Stale response protection
+      if (pendingVerifyPathRef.current !== trimmedPath || customPath.trim() !== trimmedPath) {
+        return
+      }
+
       if (res.ok) {
+        setVerifiedPath(trimmedPath)
         setVerifyOutcome({
           valid: true,
           schemaVersion: res.data.schemaVersion,
@@ -273,6 +320,7 @@ export function DictionarySettingsSection({
           message: res.data.message || 'SQLite 数据库架构校验通过',
         })
       } else {
+        setVerifiedPath(trimmedPath)
         setVerifyOutcome({
           valid: false,
           message:
@@ -290,13 +338,26 @@ export function DictionarySettingsSection({
         })
       }
     } catch (err) {
-      setVerifyOutcome({
-        valid: false,
-        message: err instanceof Error ? err.message : String(err),
-        error: 'INTERNAL_ERROR',
-      })
+      if (pendingVerifyPathRef.current === trimmedPath && customPath.trim() === trimmedPath) {
+        setVerifiedPath(trimmedPath)
+        setVerifyOutcome({
+          valid: false,
+          message: err instanceof Error ? err.message : String(err),
+          error: 'INTERNAL_ERROR',
+        })
+      }
     } finally {
       setIsVerifying(false)
+    }
+  }
+
+  // Handler for customPath change (UI-1: invalidate stale verification outcome)
+  const handleCustomPathChange = (newVal: string) => {
+    setCustomPath(newVal)
+    pendingVerifyPathRef.current = null
+    if (verifiedPath !== null && newVal.trim() !== verifiedPath) {
+      setVerifyOutcome(null)
+      setVerifiedPath(null)
     }
   }
 
@@ -360,6 +421,36 @@ export function DictionarySettingsSection({
     status?.activeMode === 'custom' && status.customSnapshots
       ? status.customSnapshots.find((s) => s.snapshotId === status.activeSnapshotId)
       : null
+
+  // Custom snapshot calculation & mode switch capability
+  const customSnapshots = status?.customSnapshots ?? []
+  const validCustomSnapshots = customSnapshots.filter(
+    (s) => s.corrupt !== true && s.isValid !== false,
+  )
+
+  const canSwitchMode = status?.canSwitchMode !== false && !isActing && !isOperationRunning
+
+  const handleCustomTopButtonClick = () => {
+    if (!canSwitchMode || customSnapshots.length === 0 || validCustomSnapshots.length === 0) return
+
+    // CASE B: Exactly 1 valid custom snapshot -> directly switch with explicit snapshotId
+    if (validCustomSnapshots.length === 1 && validCustomSnapshots[0]) {
+      const single = validCustomSnapshots[0]
+      // CASE D: Already active with this snapshot -> do nothing
+      if (status?.activeMode === 'custom' && status?.activeSnapshotId === single.snapshotId) {
+        return
+      }
+      void store.selectMode('custom', single.snapshotId)
+    } else {
+      // CASE C: Multiple valid snapshots -> open SnapshotPickerModal
+      setShowSnapshotPicker(true)
+    }
+  }
+
+  // Check if shortcut service / catalog is unavailable (UI-5)
+  const isCatalogUnavailable = Boolean(
+    activeShortcuts && (catalogSnapshot === null || !activeShortcuts.catalog),
+  )
 
   return (
     <div className="dsh-wl-settings" style={{ maxWidth: '800px', width: '100%', boxSizing: 'border-box' }}>
@@ -469,7 +560,7 @@ export function DictionarySettingsSection({
             data-testid="btn-mode-fixture"
             variant={status?.activeMode === 'fixture' ? 'primary' : 'secondary'}
             size="small"
-            disabled={isActing}
+            disabled={!canSwitchMode}
             onClick={() => void store.selectMode('fixture')}
             ariaLabel="切换至内置基础词典"
           >
@@ -480,7 +571,7 @@ export function DictionarySettingsSection({
             data-testid="btn-mode-ecdict"
             variant={status?.activeMode === 'managed-ecdict' ? 'primary' : 'secondary'}
             size="small"
-            disabled={!status?.installed || isActing}
+            disabled={!status?.installed || !canSwitchMode}
             onClick={() => void store.selectMode('managed-ecdict')}
             title={!status?.installed ? '需先在一键安装 ECDICT 后方可切换' : '切换至本地全量 ECDICT 词典'}
             ariaLabel="切换至本地 ECDICT 词典"
@@ -492,12 +583,14 @@ export function DictionarySettingsSection({
             data-testid="btn-mode-custom"
             variant={status?.activeMode === 'custom' ? 'primary' : 'secondary'}
             size="small"
-            disabled={!status?.customSnapshots || status.customSnapshots.length === 0 || isActing}
-            onClick={() => void store.selectMode('custom')}
+            disabled={!canSwitchMode || customSnapshots.length === 0 || validCustomSnapshots.length === 0}
+            onClick={handleCustomTopButtonClick}
             title={
-              !status?.customSnapshots || status.customSnapshots.length === 0
+              customSnapshots.length === 0
                 ? '需先在下方导入自定义 SQLite 词典'
-                : '切换至自定义 SQLite 词典'
+                : validCustomSnapshots.length === 0
+                  ? '暂无有效可用的自定义词典快照，请重新导入或校验'
+                  : '切换至自定义 SQLite 词典'
             }
             ariaLabel="切换至自定义词典"
           >
@@ -898,7 +991,7 @@ export function DictionarySettingsSection({
             label="SQLite 数据库绝对路径 (MANUAL_HOST_PATH)"
             placeholder="例如: C:\dictionaries\my-dict.sqlite3 或 /path/to/dict.db"
             value={customPath}
-            onChange={setCustomPath}
+            onChange={handleCustomPathChange}
             disabled={isActing || isVerifying}
           />
 
@@ -934,6 +1027,31 @@ export function DictionarySettingsSection({
             </ActionButton>
           </div>
         </div>
+
+        {/* Custom Action Error / Failure Notice (UI-4) */}
+        {actionError && (
+          <div
+            data-testid="custom-action-error-box"
+            role="alert"
+            style={{
+              padding: '10px 14px',
+              borderRadius: '8px',
+              marginBottom: '16px',
+              background: 'rgba(239, 68, 68, 0.12)',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              color: 'var(--wl-set-error, #ef4444)',
+              fontSize: '12.5px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <span>操作异常: {actionError}</span>
+            <ActionButton size="small" variant="ghost" onClick={() => store.clearActionError()}>
+              忽略
+            </ActionButton>
+          </div>
+        )}
 
         {/* Live Verification Feedback */}
         {verifyOutcome && (
@@ -1013,9 +1131,10 @@ export function DictionarySettingsSection({
                         </span>
                         {isCurrentActive && <StatusBadge variant="success" label="当前激活" />}
                         {isLeased && <StatusBadge variant="warning" label={`查询中 (${leases})`} />}
+                        {snap.corrupt && <StatusBadge variant="error" label="快照损坏" />}
                       </div>
                       <div style={{ fontSize: '11.5px', color: 'var(--wl-set-text-muted, #6c6c7a)', fontFamily: 'monospace' }}>
-                        ID: {snap.snapshotId.slice(0, 8)}... | {snap.entryCount.toLocaleString()} 词条 | {snap.formCount.toLocaleString()} 形态
+                        ID: {snap.snapshotId.slice(0, 8)}... | {snap.entryCount?.toLocaleString?.() ?? snap.entryCount} 词条 | {snap.formCount?.toLocaleString?.() ?? snap.formCount} 形态
                       </div>
                     </div>
 
@@ -1023,7 +1142,8 @@ export function DictionarySettingsSection({
                       <ActionButton
                         size="small"
                         variant="secondary"
-                        disabled={isCurrentActive || isActing}
+                        disabled={isCurrentActive || isActing || !canSwitchMode || snap.corrupt === true}
+                        title={snap.corrupt ? '快照文件已损坏，不可激活' : undefined}
                         onClick={() => void store.selectMode('custom', snap.snapshotId)}
                       >
                         启用
@@ -1137,7 +1257,17 @@ export function DictionarySettingsSection({
           }
           control={
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              {lookupShortcutEntry ? (
+              {isCatalogUnavailable ? (
+                <span
+                  data-testid="shortcut-service-unavailable"
+                  style={{
+                    fontSize: '13px',
+                    color: 'var(--wl-set-text-muted, #6c6c7a)',
+                  }}
+                >
+                  快捷键服务暂不可用
+                </span>
+              ) : lookupShortcutEntry ? (
                 <>
                   <span
                     data-testid="shortcut-key-display"
@@ -1199,6 +1329,8 @@ export function DictionarySettingsSection({
                 data-testid="btn-edit-shortcut"
                 size="small"
                 variant="secondary"
+                disabled={isCatalogUnavailable}
+                title={isCatalogUnavailable ? '快捷键服务暂不可用' : '修改划词查询快捷键'}
                 onClick={() => setShowShortcutRecorder(true)}
               >
                 修改快捷键
@@ -1268,7 +1400,20 @@ export function DictionarySettingsSection({
               ? (b) => activeShortcuts.describeBinding(b as never) as never
               : undefined
           }
-          recording={activeShortcuts?.recording ? (act) => activeShortcuts.recording(act) : undefined}
+          recording={handleRecording}
+        />
+      )}
+
+      {/* Modal: Custom Snapshot Picker (C1) */}
+      {showSnapshotPicker && (
+        <SnapshotPickerModal
+          snapshots={customSnapshots}
+          activeSnapshotId={status?.activeSnapshotId}
+          isActing={isActing}
+          onClose={() => setShowSnapshotPicker(false)}
+          onSelect={(snapshotId) => {
+            void store.selectMode('custom', snapshotId)
+          }}
         />
       )}
     </div>

@@ -11,6 +11,7 @@
  */
 
 import React, { type CSSProperties, type ReactNode } from 'react'
+import type { CustomSnapshotSummary } from '../../shared/dictionary-management-protocol.js'
 
 /** CSS styles injected for settings UI components. */
 export const SETTINGS_THEME_STYLES = `
@@ -400,6 +401,13 @@ export function ActionButton({
       style={buttonStyle}
       disabled={disabled || busy}
       onClick={onClick}
+      onKeyDown={(e) => {
+        if (!disabled && !busy && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault()
+          e.stopPropagation()
+          onClick?.()
+        }
+      }}
       aria-label={ariaLabel}
       title={title}
     >
@@ -652,10 +660,10 @@ export function ModalConfirm({
         </h4>
         <div style={messageStyle}>{message}</div>
         <div style={footerStyle}>
-          <ActionButton onClick={onCancel} variant="secondary">
+          <ActionButton data-testid="modal-cancel-btn" onClick={onCancel} variant="secondary">
             {cancelLabel}
           </ActionButton>
-          <ActionButton onClick={onConfirm} variant={isDanger ? 'danger' : 'primary'}>
+          <ActionButton data-testid="modal-confirm-btn" onClick={onConfirm} variant={isDanger ? 'danger' : 'primary'}>
             {confirmLabel}
           </ActionButton>
         </div>
@@ -767,8 +775,8 @@ export interface ShortcutRecorderModalProps {
   readonly currentKeys: readonly string[]
   readonly isModified: boolean
   readonly onClose: () => void
-  readonly onSave: (binding: { code: string; modifiers: readonly string[] }) => Promise<boolean>
-  readonly onReset: () => Promise<boolean>
+  readonly onSave: (binding: { code: string; modifiers: readonly string[] }) => Promise<boolean | { ok: boolean; error?: string }>
+  readonly onReset: () => Promise<boolean | { ok: boolean; error?: string }>
   readonly describeBinding?: (binding: { code: string; modifiers: readonly string[] } | null) => {
     binding: unknown
     keys: readonly string[]
@@ -794,26 +802,31 @@ export function ShortcutRecorderModal({
   const [isSaving, setIsSaving] = React.useState(false)
   const [saveError, setSaveError] = React.useState<string | null>(null)
 
-  const recorderRef = React.useRef<HTMLDivElement>(null)
+  const recorderBoxRef = React.useRef<HTMLDivElement>(null)
+  const dialogRef = React.useRef<HTMLDivElement>(null)
   const previousActiveElementRef = React.useRef<HTMLElement | null>(null)
+  const recordingRef = React.useRef(recording)
+  recordingRef.current = recording
 
   React.useEffect(() => {
     if (typeof document !== 'undefined') {
       previousActiveElementRef.current = document.activeElement as HTMLElement | null
     }
 
-    if (recording) {
-      void recording(true).catch(() => {})
+    let lockAcquired = false
+    if (recordingRef.current) {
+      lockAcquired = true
+      void recordingRef.current(true).catch(() => {})
     }
 
     const timer = setTimeout(() => {
-      recorderRef.current?.focus()
+      recorderBoxRef.current?.focus()
     }, 20)
 
     return () => {
       clearTimeout(timer)
-      if (recording) {
-        void recording(false).catch(() => {})
+      if (lockAcquired && recordingRef.current) {
+        void recordingRef.current(false).catch(() => {})
       }
       if (previousActiveElementRef.current && typeof previousActiveElementRef.current.focus === 'function') {
         try {
@@ -823,9 +836,9 @@ export function ShortcutRecorderModal({
         }
       }
     }
-  }, [recording])
+  }, [])
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleRecorderKeyDown = (e: React.KeyboardEvent) => {
     if (isSaving) return
 
     // Plain Escape key cancels and closes modal
@@ -867,11 +880,15 @@ export function ShortcutRecorderModal({
         setCandidateKeys(desc.keys && desc.keys.length > 0 ? desc.keys : [e.code])
         if (desc.issue) {
           setIssue(
-            desc.issue === 'requires-modifier'
+            desc.issue === 'modifier-required' || desc.issue === 'requires-modifier'
               ? '快捷键必须包含至少一个修饰键（Ctrl、Alt 或 Shift）'
-              : desc.issue === 'reserved-key'
+              : desc.issue === 'reserved' || desc.issue === 'reserved-key'
                 ? '该按键为系统保留快捷键，不可重定义'
-                : `按键不合规: ${desc.issue}`,
+                : desc.issue === 'unsupported-browser'
+                  ? '当前 Web 浏览器平台不支持该快捷键组合'
+                  : desc.issue === 'unsupported-key'
+                    ? '当前系统或浏览器不支持该按键作为快捷键'
+                    : `按键不合规: ${desc.issue}`,
           )
         } else {
           setIssue(null)
@@ -901,16 +918,38 @@ export function ShortcutRecorderModal({
     }
   }
 
+  const handleDialogKeyDown = (e: React.KeyboardEvent) => {
+    // If key originates on a button, do not capture as shortcut recording
+    if ((e.target as HTMLElement)?.closest('button')) {
+      return
+    }
+
+    // Escape closes modal safely from anywhere
+    if (e.key === 'Escape' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
+      e.preventDefault()
+      e.stopPropagation()
+      onClose()
+      return
+    }
+
+    // If keydown is dispatched directly on the dialog container (e.g. synthetic test events)
+    if (e.target === e.currentTarget) {
+      handleRecorderKeyDown(e)
+    }
+  }
+
   const handleSave = async () => {
-    if (!candidate || issue || isSaving) return
+    if (!candidate || issue || conflictWarning || isSaving) return
     setIsSaving(true)
     setSaveError(null)
     try {
-      const ok = await onSave(candidate)
+      const res = await onSave(candidate)
+      const ok = typeof res === 'boolean' ? res : res.ok
       if (ok) {
         onClose()
       } else {
-        setSaveError('保存快捷键失败，Host 未接受该配置')
+        const errMsg = typeof res === 'object' && res.error ? res.error : '保存快捷键失败，Host 未接受该配置'
+        setSaveError(errMsg)
       }
     } catch (err) {
       setSaveError(`保存失败: ${err instanceof Error ? err.message : String(err)}`)
@@ -924,11 +963,13 @@ export function ShortcutRecorderModal({
     setIsSaving(true)
     setSaveError(null)
     try {
-      const ok = await onReset()
+      const res = await onReset()
+      const ok = typeof res === 'boolean' ? res : res.ok
       if (ok) {
         onClose()
       } else {
-        setSaveError('恢复默认快捷键失败')
+        const errMsg = typeof res === 'object' && res.error ? res.error : '恢复默认快捷键失败'
+        setSaveError(errMsg)
       }
     } catch (err) {
       setSaveError(`恢复默认失败: ${err instanceof Error ? err.message : String(err)}`)
@@ -968,14 +1009,14 @@ export function ShortcutRecorderModal({
   return (
     <div style={backdropStyle} role="presentation" onClick={onClose}>
       <div
-        ref={recorderRef}
-        tabIndex={0}
+        ref={dialogRef}
+        tabIndex={-1}
         style={modalStyle}
         role="dialog"
         aria-modal="true"
         aria-labelledby="recorder-dialog-title"
         onClick={(e) => e.stopPropagation()}
-        onKeyDown={handleKeyDown}
+        onKeyDown={handleDialogKeyDown}
       >
         <h4
           id="recorder-dialog-title"
@@ -987,9 +1028,14 @@ export function ShortcutRecorderModal({
           请直接在键盘上按下您希望设置的组合键（例如 Ctrl + Alt + K 或 Command + Shift + L）。
         </p>
 
-        {/* Keycap preview */}
+        {/* Keycap preview & isolated recorder focus box */}
         <div
+          ref={recorderBoxRef}
+          tabIndex={0}
+          role="region"
+          aria-label="快捷键录制区域"
           data-testid="shortcut-recorder-box"
+          onKeyDown={handleRecorderKeyDown}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -1004,6 +1050,8 @@ export function ShortcutRecorderModal({
                 ? '1px solid var(--wl-set-accent, #4176e6)'
                 : '1px dashed var(--wl-set-stroke, rgba(255, 255, 255, 0.18))',
             marginBottom: '14px',
+            outline: 'none',
+            cursor: 'text',
           }}
         >
           <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -1058,16 +1106,28 @@ export function ShortcutRecorderModal({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '18px' }}>
           <div>
             {isModified && (
-              <ActionButton size="small" variant="ghost" onClick={handleReset} busy={isSaving}>
+              <ActionButton
+                data-testid="btn-reset-shortcut"
+                size="small"
+                variant="ghost"
+                onClick={handleReset}
+                busy={isSaving}
+              >
                 恢复默认快捷键
               </ActionButton>
             )}
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <ActionButton variant="secondary" onClick={onClose} disabled={isSaving}>
+            <ActionButton
+              data-testid="btn-cancel-shortcut"
+              variant="secondary"
+              onClick={onClose}
+              disabled={isSaving}
+            >
               取消
             </ActionButton>
             <ActionButton
+              data-testid="btn-save-shortcut"
               variant="primary"
               disabled={!candidate || Boolean(issue) || Boolean(conflictWarning) || isSaving}
               busy={isSaving}
@@ -1076,6 +1136,170 @@ export function ShortcutRecorderModal({
               保存修改
             </ActionButton>
           </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// --- Accessible Custom Snapshot Picker Modal ---
+
+export interface SnapshotPickerModalProps {
+  readonly snapshots: readonly CustomSnapshotSummary[]
+  readonly activeSnapshotId?: string | null
+  readonly isActing?: boolean
+  readonly onClose: () => void
+  readonly onSelect: (snapshotId: string) => void
+}
+
+export function SnapshotPickerModal({
+  snapshots,
+  activeSnapshotId,
+  isActing = false,
+  onClose,
+  onSelect,
+}: SnapshotPickerModalProps) {
+  const dialogRef = React.useRef<HTMLDivElement>(null)
+  const previousActiveElementRef = React.useRef<HTMLElement | null>(null)
+
+  React.useEffect(() => {
+    if (typeof document !== 'undefined') {
+      previousActiveElementRef.current = document.activeElement as HTMLElement | null
+    }
+
+    const timer = setTimeout(() => {
+      dialogRef.current?.focus()
+    }, 20)
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        e.stopPropagation()
+        onClose()
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('keydown', handleKeyDown, true)
+    }
+
+    return () => {
+      clearTimeout(timer)
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('keydown', handleKeyDown, true)
+      }
+      if (previousActiveElementRef.current && typeof previousActiveElementRef.current.focus === 'function') {
+        try {
+          previousActiveElementRef.current.focus()
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }, [onClose])
+
+  const backdropStyle: CSSProperties = {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: 'rgba(0, 0, 0, 0.6)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 99999,
+    padding: '16px',
+  }
+
+  const modalStyle: CSSProperties = {
+    background: 'var(--wl-set-bg-card, #202026)',
+    border: '1px solid var(--wl-set-stroke, rgba(255, 255, 255, 0.15))',
+    borderRadius: '12px',
+    maxWidth: '480px',
+    width: '100%',
+    padding: '22px 24px',
+    boxShadow: '0 12px 36px rgba(0, 0, 0, 0.55)',
+    boxSizing: 'border-box',
+    outline: 'none',
+  }
+
+  return (
+    <div style={backdropStyle} role="presentation" onClick={onClose}>
+      <div
+        ref={dialogRef}
+        tabIndex={-1}
+        style={modalStyle}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="snapshot-picker-dialog-title"
+        data-testid="snapshot-picker-modal"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h4
+          id="snapshot-picker-dialog-title"
+          style={{ fontSize: '16px', fontWeight: 600, margin: '0 0 8px 0', color: 'var(--wl-set-text-main, #f2f2f7)' }}
+        >
+          选择要启用的自定义词典
+        </h4>
+        <p style={{ fontSize: '12.5px', color: 'var(--wl-set-text-sub, #9898a6)', margin: '0 0 16px 0', lineHeight: '1.5' }}>
+          检测到多份已导入的自定义 SQLite 词典快照，请选择需要激活生效的词典：
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '280px', overflowY: 'auto' }}>
+          {snapshots.map((snap) => {
+            const isActive = snap.snapshotId === activeSnapshotId
+            const isCorrupt = snap.corrupt === true
+            return (
+              <div
+                key={snap.snapshotId}
+                data-testid={`snapshot-picker-row-${snap.snapshotId}`}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '10px 12px',
+                  borderRadius: '8px',
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  border: isActive
+                    ? '1px solid rgba(34, 197, 94, 0.4)'
+                    : '1px solid var(--wl-set-stroke, rgba(255, 255, 255, 0.08))',
+                }}
+              >
+                <div>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '3px' }}>
+                    <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--wl-set-text-main, #f2f2f7)' }}>
+                      {snap.identity}
+                    </span>
+                    {isActive && <StatusBadge variant="success" label="当前激活" />}
+                    {isCorrupt && <StatusBadge variant="error" label="快照损坏" />}
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--wl-set-text-muted, #6c6c7a)', fontFamily: 'monospace' }}>
+                    ID: {snap.snapshotId.slice(0, 8)}... | {snap.entryCount?.toLocaleString?.() ?? snap.entryCount} 词条 | {snap.formCount?.toLocaleString?.() ?? snap.formCount} 形态
+                  </div>
+                </div>
+
+                <ActionButton
+                  data-testid={`snapshot-picker-select-${snap.snapshotId}`}
+                  size="small"
+                  variant={isActive ? 'ghost' : 'primary'}
+                  disabled={isActive || isCorrupt || isActing}
+                  onClick={() => {
+                    onSelect(snap.snapshotId)
+                    onClose()
+                  }}
+                >
+                  {isActive ? '已激活' : '启用'}
+                </ActionButton>
+              </div>
+            )
+          })}
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '18px' }}>
+          <ActionButton data-testid="snapshot-picker-cancel" variant="secondary" onClick={onClose}>
+            取消
+          </ActionButton>
         </div>
       </div>
     </div>

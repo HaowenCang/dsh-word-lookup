@@ -10,6 +10,7 @@
  * @module dsh-word-lookup/client/settings/dictionary-settings-components
  */
 import React, { type ReactNode } from 'react';
+import type { CustomSnapshotSummary } from '../../shared/dictionary-management-protocol.js';
 /** CSS styles injected for settings UI components. */
 export declare const SETTINGS_THEME_STYLES = "\n.dsh-wl-settings {\n  --wl-set-bg-card: var(--dsw-alias-settings-card-fill, var(--dsw-alias-bg-layer-2, rgba(255, 255, 255, 0.04)));\n  --wl-set-stroke: var(--dsw-alias-settings-card-stroke, var(--dsw-alias-border-l4, var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.08))));\n  --wl-set-text-main: var(--dsw-alias-label-primary, #f2f2f7);\n  --wl-set-text-sub: var(--dsw-alias-label-secondary, #9898a6);\n  --wl-set-text-muted: var(--dsw-alias-label-tertiary, #6c6c7a);\n  --wl-set-accent: var(--dsw-alias-brand-primary, #4176e6);\n  --wl-set-accent-hover: #3463c2;\n  --wl-set-success: var(--dsw-alias-state-success-primary, #22c55e);\n  --wl-set-warn: var(--dsw-alias-state-warn-primary, #f59e0b);\n  --wl-set-error: var(--dsw-alias-state-error-primary, #ef4444);\n  --wl-set-border-row: var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.06));\n}\n\n@media (prefers-color-scheme: light) {\n  .dsh-wl-settings {\n    --wl-set-bg-card: var(--dsw-alias-settings-card-fill, var(--dsw-alias-bg-layer-2, #ffffff));\n    --wl-set-stroke: var(--dsw-alias-settings-card-stroke, var(--dsw-alias-border-l4, var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.08))));\n    --wl-set-text-main: var(--dsw-alias-label-primary, #18181c);\n    --wl-set-text-sub: var(--dsw-alias-label-secondary, #5c5c66);\n    --wl-set-text-muted: var(--dsw-alias-label-tertiary, #8c8c99);\n    --wl-set-border-row: var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.06));\n  }\n}\n\n:root[data-theme=\"light\"] .dsh-wl-settings,\nbody:not([data-ds-dark-theme]) .dsh-wl-settings,\n.light .dsh-wl-settings {\n  --wl-set-bg-card: var(--dsw-alias-settings-card-fill, var(--dsw-alias-bg-layer-2, #ffffff));\n  --wl-set-stroke: var(--dsw-alias-settings-card-stroke, var(--dsw-alias-border-l4, var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.08))));\n  --wl-set-text-main: var(--dsw-alias-label-primary, #18181c);\n  --wl-set-text-sub: var(--dsw-alias-label-secondary, #5c5c66);\n  --wl-set-text-muted: var(--dsw-alias-label-tertiary, #8c8c99);\n  --wl-set-border-row: var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.06));\n}\n\n:root[data-theme=\"dark\"] .dsh-wl-settings,\nbody[data-ds-dark-theme] .dsh-wl-settings,\n.dark .dsh-wl-settings {\n  --wl-set-bg-card: var(--dsw-alias-settings-card-fill, var(--dsw-alias-bg-layer-2, rgba(255, 255, 255, 0.04)));\n  --wl-set-stroke: var(--dsw-alias-settings-card-stroke, var(--dsw-alias-border-l4, var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.08))));\n  --wl-set-text-main: var(--dsw-alias-label-primary, #f2f2f7);\n  --wl-set-text-sub: var(--dsw-alias-label-secondary, #9898a6);\n  --wl-set-text-muted: var(--dsw-alias-label-tertiary, #6c6c7a);\n  --wl-set-border-row: var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.06));\n}\n\n@media (max-width: 600px) {\n  .dsh-wl-setting-row {\n    flex-direction: column !important;\n    align-items: flex-start !important;\n    gap: 8px !important;\n  }\n}\n";
 export interface SectionCardProps {
@@ -93,8 +94,14 @@ export interface ShortcutRecorderModalProps {
     readonly onSave: (binding: {
         code: string;
         modifiers: readonly string[];
-    }) => Promise<boolean>;
-    readonly onReset: () => Promise<boolean>;
+    }) => Promise<boolean | {
+        ok: boolean;
+        error?: string;
+    }>;
+    readonly onReset: () => Promise<boolean | {
+        ok: boolean;
+        error?: string;
+    }>;
     readonly describeBinding?: (binding: {
         code: string;
         modifiers: readonly string[];
@@ -107,3 +114,11 @@ export interface ShortcutRecorderModalProps {
     readonly recording?: (active: boolean) => Promise<void>;
 }
 export declare function ShortcutRecorderModal({ currentKeys, isModified, onClose, onSave, onReset, describeBinding, recording, }: ShortcutRecorderModalProps): import("react/jsx-runtime").JSX.Element;
+export interface SnapshotPickerModalProps {
+    readonly snapshots: readonly CustomSnapshotSummary[];
+    readonly activeSnapshotId?: string | null;
+    readonly isActing?: boolean;
+    readonly onClose: () => void;
+    readonly onSelect: (snapshotId: string) => void;
+}
+export declare function SnapshotPickerModal({ snapshots, activeSnapshotId, isActing, onClose, onSelect, }: SnapshotPickerModalProps): import("react/jsx-runtime").JSX.Element;

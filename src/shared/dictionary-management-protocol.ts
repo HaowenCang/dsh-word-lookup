@@ -169,6 +169,8 @@ export interface CustomSnapshotSummary {
   readonly isActive: boolean
   /** Whether the snapshot is valid and eligible for activation. */
   readonly isValid: boolean
+  /** Whether the snapshot physical file was detected corrupt/tampered. */
+  readonly corrupt?: boolean
   /** ISO-8601 creation/publication timestamp. */
   readonly createdAt: string
 }

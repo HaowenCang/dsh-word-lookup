@@ -759,9 +759,14 @@ export function spawnIntegrityWorker(
   }
 
   // Development/test execution from TypeScript
-  const targetUrl = options?.workerUrl ?? new URL('../../lib/ecdict-integrity-worker.js', import.meta.url)
+  const target: string | URL = options?.workerUrl
+    ? (options.workerUrl instanceof URL && options.workerUrl.protocol !== 'file:'
+      ? resolve(process.cwd(), 'lib/ecdict-integrity-worker.js')
+      : options.workerUrl)
+    : resolve(process.cwd(), 'lib/ecdict-integrity-worker.js')
+
   return new Worker(
-    targetUrl,
+    target,
     {
       workerData: request,
       execArgv: options?.execArgv ?? [],
