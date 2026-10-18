@@ -1,0 +1,33 @@
+{
+  "phase": "Phase 7A.8.2R2",
+  "scenarioId": "W19",
+  "name": "User Source SQLite Bit-for-Bit SHA-256 Invariance Proof",
+  "testedCodeSha": "b36bf4d1b8ec5b6ab3ae3750475d656c669bcdcf",
+  "timestamp": "2026-10-18T03:58:00Z",
+  "verdict": "PASS",
+  "sourceDatabase": {
+    "relativePath": "user-data/quantum-dict.db",
+    "byteSize": 49152,
+    "entryCount": 3,
+    "formCount": 0
+  },
+  "sha256LifecycleChecks": {
+    "1_InitialCreation": "c98d4eb2b33721b426cc23c3d14ba9a32bdc3b2e811991592b238120ed2fc480",
+    "2_AfterVerification": "c98d4eb2b33721b426cc23c3d14ba9a32bdc3b2e811991592b238120ed2fc480",
+    "3_AfterStagingSnapshotCreation": "c98d4eb2b33721b426cc23c3d14ba9a32bdc3b2e811991592b238120ed2fc480",
+    "4_AfterSnapshotPublication": "c98d4eb2b33721b426cc23c3d14ba9a32bdc3b2e811991592b238120ed2fc480",
+    "5_AfterModeSwitching": "c98d4eb2b33721b426cc23c3d14ba9a32bdc3b2e811991592b238120ed2fc480",
+    "6_AfterDormantSnapshotDeletion": "c98d4eb2b33721b426cc23c3d14ba9a32bdc3b2e811991592b238120ed2fc480"
+  },
+  "invariantVerdict": {
+    "identicalByteSize": true,
+    "identicalSha256": true,
+    "fileDeleted": false,
+    "fileModified": false,
+    "invarianceGuaranteed": true
+  },
+  "screenshot": {
+    "path": "screenshots/w19-dormant-snapshot-deleted.png",
+    "sha256": "9341c58dd26b0a7a2ced7f7cbef25e555bd8bbf2a2ae7095a336da2745ef9475"
+  }
+}

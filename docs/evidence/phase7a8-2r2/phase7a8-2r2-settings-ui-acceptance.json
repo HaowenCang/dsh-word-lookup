@@ -1,7 +1,7 @@
 {
   "phase": "Phase 7A.8.2R2",
   "name": "Evidence Provenance, Shortcut Persistence & Final Native UI Acceptance",
-  "timestamp": "2026-10-18T03:13:43.696Z",
+  "timestamp": "2026-10-18T03:56:54.986Z",
   "status": "PASS",
   "totalScenarios": 14,
   "passedScenarios": 14,
@@ -154,12 +154,12 @@
     {
       "id": "V17",
       "path": "screenshots/v17-custom-path-verified.png",
-      "sha256": "d382378a1d4fcfd438c850c716b4eda67d5528c20ce78414f18b6bf5dbd78c7b"
+      "sha256": "c17359895f2917303d15f8a52622cae53839c5e28d7b8c5dc83a5308f79d5382"
     },
     {
       "id": "V18",
       "path": "screenshots/v18-custom-activated.png",
-      "sha256": "c6b2bd60368ce6d3f424d51f319e3fbe2f6e7a79d0882d601a7933b8365f8355"
+      "sha256": "30ca64b160ec4406986689582ed6bbc58b1d325ad8786ce110d053428b5d8213"
     },
     {
       "id": "V19",
@@ -174,7 +174,7 @@
     {
       "id": "W09",
       "path": "screenshots/w09-shortcut-customized.png",
-      "sha256": "8b992a6eb1fd07bce91f805d7aaf2e4d1105dbba5bbb0ecd861c5eadd8295b06"
+      "sha256": "7ccf84ecf2c25834ecc1cc34544a6bba3d8b18f30d3e8c85cbfab2fb1a70e133"
     },
     {
       "id": "W10",
@@ -204,7 +204,7 @@
     {
       "id": "W19",
       "path": "screenshots/w19-dormant-snapshot-deleted.png",
-      "sha256": "71a0e019ea04b0b2f3fcc9c81246b194746f0636d7df8caa3df21274dc4d85cb"
+      "sha256": "9341c58dd26b0a7a2ced7f7cbef25e555bd8bbf2a2ae7095a336da2745ef9475"
     }
   ]
 }

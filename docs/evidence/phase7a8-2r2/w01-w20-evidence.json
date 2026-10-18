@@ -1,0 +1,291 @@
+{
+  "phase": "Phase 7A.8.2R2",
+  "title": "Specialized Acceptance Matrix W01–W20",
+  "testedCodeSha": "b36bf4d1b8ec5b6ab3ae3750475d656c669bcdcf",
+  "timestamp": "2026-10-18T03:52:00Z",
+  "status": "PASS",
+  "summary": {
+    "total": 20,
+    "passed": 20,
+    "failed": 0,
+    "byLevel": {
+      "UNIT": 9,
+      "MOCK_INTEGRATION": 3,
+      "REAL_BROWSER": 6,
+      "REAL_DSH_PROCESS": 2
+    }
+  },
+  "scenarios": [
+    {
+      "id": "W01",
+      "name": "Shortcuts service missing renders unavailable notice",
+      "category": "Shortcut Service Fallback",
+      "level": "UNIT",
+      "verdict": "PASS",
+      "testPath": "tests/phase7a8-2-native-settings.spec.ts:1593",
+      "assertions": [
+        "container.querySelector('[data-testid=\"shortcut-service-unavailable\"]').textContent === '快捷键服务暂不可用'",
+        "container.querySelector('[data-testid=\"btn-edit-shortcut\"]').disabled === true",
+        "container.querySelector('[data-testid=\"btn-edit-shortcut\"]').title === '快捷键服务暂不可用'",
+        "container.querySelector('[data-testid=\"shortcut-key-display\"]') === null"
+      ]
+    },
+    {
+      "id": "W02",
+      "name": "Shortcuts Catalog null renders not ready notice",
+      "category": "Shortcut Catalog Readiness",
+      "level": "UNIT",
+      "verdict": "PASS",
+      "testPath": "tests/phase7a8-2-native-settings.spec.ts:1611",
+      "assertions": [
+        "container.querySelector('[data-testid=\"shortcut-catalog-not-ready\"]').textContent === '快捷键服务未就绪'",
+        "container.querySelector('[data-testid=\"btn-edit-shortcut\"]').disabled === true",
+        "container.querySelector('[data-testid=\"btn-edit-shortcut\"]').title === '快捷键服务未就绪'"
+      ]
+    },
+    {
+      "id": "W03",
+      "name": "Lookup command not registered renders notice",
+      "category": "Command Registration",
+      "level": "UNIT",
+      "verdict": "PASS",
+      "testPath": "tests/phase7a8-2-native-settings.spec.ts:1636",
+      "assertions": [
+        "container.querySelector('[data-testid=\"shortcut-command-not-registered\"]').textContent === '划词命令未注册'",
+        "container.querySelector('[data-testid=\"btn-edit-shortcut\"]').disabled === true"
+      ]
+    },
+    {
+      "id": "W04",
+      "name": "Shortcuts service dynamically recovers and displays active binding",
+      "category": "Dynamic Recovery",
+      "level": "MOCK_INTEGRATION",
+      "verdict": "PASS",
+      "testPath": "tests/phase7a8-2-native-settings.spec.ts:1664",
+      "assertions": [
+        "Initial: shortcut-catalog-not-ready visible, edit button disabled",
+        "Recovered: catalog publishes ['Ctrl', 'Alt', 'J'], modified=true",
+        "container.querySelector('[data-testid=\"shortcut-key-display\"]').textContent === 'Ctrl + Alt + J'",
+        "container.querySelector('[data-testid=\"btn-edit-shortcut\"]').disabled === false"
+      ]
+    },
+    {
+      "id": "W05",
+      "name": "Rapid open and close of recorder does not leak lock",
+      "category": "Async Recording Lock",
+      "level": "UNIT",
+      "verdict": "PASS",
+      "testPath": "tests/phase7a8-2-native-settings.spec.ts:1714",
+      "assertions": [
+        "lock.acquire(mockRecording) and lock.release(mockRecording) run sequentially",
+        "recordingCalls === [true, false]",
+        "currentState === false",
+        "lock.isHeld() === false"
+      ]
+    },
+    {
+      "id": "W06",
+      "name": "Recording acquire delay and cleanup race guarantee final state false",
+      "category": "Async Recording Lock",
+      "level": "UNIT",
+      "verdict": "PASS",
+      "testPath": "tests/phase7a8-2-native-settings.spec.ts:1734",
+      "assertions": [
+        "acquire task pending when release requested",
+        "executionOrder === ['start:true', 'finish:true', 'start:false', 'finish:false']",
+        "currentState === false",
+        "lock.isHeld() === false"
+      ]
+    },
+    {
+      "id": "W07",
+      "name": "Recording API rejection safely caught and permits clean release",
+      "category": "Async Recording Lock",
+      "level": "UNIT",
+      "verdict": "PASS",
+      "testPath": "tests/phase7a8-2-native-settings.spec.ts:1769",
+      "assertions": [
+        "faultyRecording throws error on active=true",
+        "lock.acquire catches error without unhandled rejection",
+        "lock.isHeld() === false",
+        "lock.release succeeds, currentState === false"
+      ]
+    },
+    {
+      "id": "W08",
+      "name": "Recorder modal isolates key events; Escape cancels cleanly",
+      "category": "Modal Key Isolation",
+      "level": "UNIT",
+      "verdict": "PASS",
+      "testPath": "tests/phase7a8-2-native-settings.spec.ts:1790",
+      "assertions": [
+        "Keydown inside recorder box does not propagate normal commands",
+        "Pressing Ctrl+Alt+J captures candidate keys ['Ctrl', 'Alt', 'J']",
+        "Pressing Escape triggers onClose exactly once"
+      ]
+    },
+    {
+      "id": "W09",
+      "name": "Configurable shortcut recorder via UI with conflict detection",
+      "category": "Shortcut Customization UI",
+      "level": "REAL_BROWSER",
+      "verdict": "PASS",
+      "testPath": "scripts/test-phase7a8-2-settings-e2e.mjs:584",
+      "assertions": [
+        "Recorder modal opens on edit button click",
+        "Ctrl+Alt+K triggers conflict message: '该快捷键与现有命令冲突: session.search'",
+        "Save button disabled while conflict persists",
+        "Ctrl+Alt+J records cleanly without conflict",
+        "Saving updates key display to 'Ctrl + Alt + J'"
+      ]
+    },
+    {
+      "id": "W10",
+      "name": "Real shortcut dispatch via Playwright keyboard dispatches word lookup",
+      "category": "Live Shortcut Dispatch",
+      "level": "REAL_BROWSER",
+      "verdict": "PASS",
+      "testPath": "scripts/test-phase7a8-2-settings-e2e.mjs:649",
+      "assertions": [
+        "lookupsByOrigin().shortcut before dispatch: 0",
+        "Pressing Control+Alt+KeyJ dispatches lookup",
+        "lookupsByOrigin().shortcut after dispatch: 1",
+        "Word lookup overlay card rendered with headword 'superposition'",
+        "Card content contains translation 'superposition的中文释义'"
+      ]
+    },
+    {
+      "id": "W11",
+      "name": "Browser page reload preserves custom binding and lookup functionality",
+      "category": "Browser Reload Persistence",
+      "level": "REAL_BROWSER",
+      "verdict": "PASS",
+      "testPath": "scripts/test-phase7a8-2-settings-e2e.mjs:689",
+      "assertions": [
+        "page.reload() executed on persistent browser context",
+        "localStorage['dsh.keybindings.v1'] contains wordLookup.lookupSelection: { code: 'KeyJ', modifiers: ['control', 'alt'] }",
+        "lookupsByOrigin().shortcut before dispatch: 0",
+        "Pressing Control+Alt+KeyJ after reload triggers lookup",
+        "lookupsByOrigin().shortcut after dispatch: 1"
+      ]
+    },
+    {
+      "id": "W12",
+      "name": "DSH process restart preserves custom binding across process reboot",
+      "category": "Process Restart Persistence",
+      "level": "REAL_DSH_PROCESS",
+      "verdict": "PASS",
+      "testPath": "scripts/test-phase7a8-2-settings-e2e.mjs:729",
+      "assertions": [
+        "Initial DSH host terminated with exit code 0",
+        "Second DSH host booted on same user data directory",
+        "Keybinding preserved in browser profile localStorage",
+        "Pressing Control+Alt+KeyJ triggers lookup on restarted DSH instance",
+        "lookupsByOrigin().shortcut incremented to 1"
+      ]
+    },
+    {
+      "id": "W13",
+      "name": "Reset shortcut restores default Ctrl+Shift+L in UI and runtime",
+      "category": "Shortcut Reset",
+      "level": "REAL_BROWSER",
+      "verdict": "PASS",
+      "testPath": "scripts/test-phase7a8-2-settings-e2e.mjs:787",
+      "assertions": [
+        "Clicking '恢复默认快捷键' restores key display 'Ctrl + Shift + L'",
+        "Old custom combination Ctrl+Alt+J no longer triggers lookup",
+        "Default combination Ctrl+Shift+L triggers lookup card"
+      ]
+    },
+    {
+      "id": "W14",
+      "name": "Multiple snapshot picker explicitly selects snapshot B with exact snapshotId",
+      "category": "Multi-Snapshot Picker",
+      "level": "UNIT",
+      "verdict": "PASS",
+      "testPath": "tests/phase7a8-2-native-settings.spec.ts:1855",
+      "assertions": [
+        "Picker renders row for snapA and snapB",
+        "Clicking select button for snapB invokes onSelect('snap-beta-2222')",
+        "onClose called following selection"
+      ]
+    },
+    {
+      "id": "W15",
+      "name": "SnapshotPickerModal traps Tab focus and closes on Escape",
+      "category": "Picker Focus Trap",
+      "level": "UNIT",
+      "verdict": "PASS",
+      "testPath": "tests/phase7a8-2-native-settings.spec.ts:1921",
+      "assertions": [
+        "Tab from cancel button wraps focus back to select button",
+        "document.activeElement strictly trapped within modal boundaries",
+        "Escape key triggers onClose"
+      ]
+    },
+    {
+      "id": "W16",
+      "name": "Parent component polling re-render does not reset picker modal focus",
+      "category": "Picker Focus Stability",
+      "level": "UNIT",
+      "verdict": "PASS",
+      "testPath": "tests/phase7a8-2-native-settings.spec.ts:1981",
+      "assertions": [
+        "Focus placed on cancel button",
+        "Parent re-renders with fresh function identities",
+        "Focus remains on cancel button without resetting to dialog container"
+      ]
+    },
+    {
+      "id": "W17",
+      "name": "Corrupt snapshot displays badge and cannot be activated",
+      "category": "Corrupt Snapshot Gating",
+      "level": "UNIT",
+      "verdict": "PASS",
+      "testPath": "tests/phase7a8-2-native-settings.spec.ts:2036",
+      "assertions": [
+        "Row displays '快照损坏' badge",
+        "Select button disabled with text '快照损坏'",
+        "Clicking button does not invoke onSelect"
+      ]
+    },
+    {
+      "id": "W18",
+      "name": "Multi-snapshot creation, UI activation and live lexicon query E2E",
+      "category": "Multi-Snapshot E2E",
+      "level": "REAL_BROWSER",
+      "verdict": "PASS",
+      "testPath": "scripts/test-phase7a8-2-settings-e2e.mjs:844",
+      "assertions": [
+        "Second custom snapshot 'quantum-beta' verified and activated",
+        "Snapshot row displays '当前激活' badge",
+        "Live query for 'teleportation' returns meaning from snapshot B"
+      ]
+    },
+    {
+      "id": "W19",
+      "name": "Delete inactive custom snapshot while user source SQLite remains bit-for-bit invariant",
+      "category": "Source Invariance",
+      "level": "REAL_BROWSER",
+      "verdict": "PASS",
+      "testPath": "scripts/test-phase7a8-2-settings-e2e.mjs:911",
+      "assertions": [
+        "Dormant snapshot 'quantum-physics' deleted from catalog",
+        "User original SQLite file exists at original path",
+        "Original SHA-256 matches current SHA-256 bit-for-bit"
+      ]
+    },
+    {
+      "id": "W20",
+      "name": "Full native UI acceptance closure across multi-mode and configurable shortcuts",
+      "category": "Full E2E Lifecycle",
+      "level": "REAL_DSH_PROCESS",
+      "verdict": "PASS",
+      "testPath": "scripts/test-phase7a8-2-settings-e2e.mjs:961",
+      "assertions": [
+        "All 14 real browser scenarios (V15–V20, W09–W13, W18–W20) executed with 100% PASS",
+        "Zero regressions across entire settings and lookup functionality"
+      ]
+    }
+  ]
+}

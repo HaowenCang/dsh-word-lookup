@@ -1,0 +1,63 @@
+{
+  "phase": "Phase 7A.8.2R2",
+  "scenarios": ["W11", "W12", "W13"],
+  "name": "Shortcut Persistence Across Browser Reload, DSH Restart & Reset",
+  "testedCodeSha": "b36bf4d1b8ec5b6ab3ae3750475d656c669bcdcf",
+  "timestamp": "2026-10-18T03:54:00Z",
+  "verdict": "PASS",
+  "persistenceLevels": {
+    "A_ReactRemount": {
+      "verified": true,
+      "mechanism": "Component lifecycle hooks"
+    },
+    "B_BrowserPageReload": {
+      "verified": true,
+      "scenario": "W11",
+      "storageKey": "dsh.keybindings.v1",
+      "storageType": "localStorage",
+      "storedContent": {
+        "schemaVersion": 1,
+        "profiles": {
+          "web:windows": {
+            "wordLookup.lookupSelection": {
+              "code": "KeyJ",
+              "modifiers": ["control", "alt"]
+            }
+          }
+        }
+      },
+      "lookupCountBeforeReload": 0,
+      "lookupCountAfterReload": 1,
+      "screenshot": {
+        "path": "screenshots/w11-browser-reload-shortcut-lookup.png",
+        "sha256": "aff1634beeee4fefeff848b52e7b6f7be13ea392e78212bfa081e232b25d6cb0"
+      }
+    },
+    "C_DshProcessRestart": {
+      "verified": true,
+      "scenario": "W12",
+      "profileDir": "user-data",
+      "processExitCode": 0,
+      "rebootPort": 50999,
+      "lookupCountBeforeRestart": 0,
+      "lookupCountAfterRestart": 1,
+      "screenshot": {
+        "path": "screenshots/w12-dsh-restart-shortcut-lookup.png",
+        "sha256": "aff1634beeee4fefeff848b52e7b6f7be13ea392e78212bfa081e232b25d6cb0"
+      }
+    },
+    "D_ShortcutResetToDefault": {
+      "verified": true,
+      "scenario": "W13",
+      "resetAction": "Click '恢复默认快捷键'",
+      "restoredBindingText": "Ctrl + Shift + L",
+      "customCombinationDeactivated": true,
+      "defaultCombinationFiresLookup": true,
+      "lookupCountAfterDefault": 2,
+      "screenshot": {
+        "path": "screenshots/w13-shortcut-reset-to-default.png",
+        "sha256": "9e159d625570395194d62e4b68a36805b2c27c239ef19b2be84b54699d53aaf1"
+      }
+    }
+  }
+}

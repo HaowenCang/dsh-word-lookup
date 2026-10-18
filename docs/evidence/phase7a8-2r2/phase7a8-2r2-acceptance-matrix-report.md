@@ -76,17 +76,17 @@ All screenshots were captured during live Playwright Chromium execution against 
 |---|---|---|---|
 | **V15** | `screenshots/v15-settings-navigated.png` | 1280x800 | `16125dbc43b9aff149b56863f958f17b13c87fb7d07ad02042e15bd47eef32cd` |
 | **V16** | `screenshots/v16-initial-fixture-state.png` | 1280x800 | `16125dbc43b9aff149b56863f958f17b13c87fb7d07ad02042e15bd47eef32cd` |
-| **V17** | `screenshots/v17-custom-path-verified.png` | 1280x800 | `22e847951f5e2e1694863d3e678957be625a8efc23bf8e1a431fcb5b4f973769` |
-| **V18** | `screenshots/v18-custom-activated.png` | 1280x800 | `6f42ea298838258502d7f23813150a3f3a43a281571ea294ff551f3d7bf6419c` |
-| **V19** | `screenshots/v19-switched-to-fixture.png` | 1280x800 | `91bdcc7840443d023bd26370f0bbef4af985b2fab6fc98fa90bf52bdb863b754` |
-| **V20** | `screenshots/v20-switched-to-custom.png` | 1280x800 | `384e1c6de64bac7c846315354d28b35e5f227f3fbe95c63326e2e7b781ccab6f` |
-| **W09** | `screenshots/w09-shortcut-customized.png` | 1280x800 | `d1eada7c766f9b2cf7e356ab1e9d4b6974a91a01aa1f344810feeefcd422beda` |
+| **V17** | `screenshots/v17-custom-path-verified.png` | 1280x800 | `c17359895f2917303d15f8a52622cae53839c5e28d7b8c5dc83a5308f79d5382` |
+| **V18** | `screenshots/v18-custom-activated.png` | 1280x800 | `30ca64b160ec4406986689582ed6bbc58b1d325ad8786ce110d053428b5d8213` |
+| **V19** | `screenshots/v19-switched-to-fixture.png` | 1280x800 | `7df349c7639c685bc4d7ac9150e2e07672bc604a8b7c65d0f18eae90e2973c5a` |
+| **V20** | `screenshots/v20-switched-to-custom.png` | 1280x800 | `095a6521a9c395ccb7eef493032e23f00daee8f1e621cc2ab9214b33bf32f35a` |
+| **W09** | `screenshots/w09-shortcut-customized.png` | 1280x800 | `7ccf84ecf2c25834ecc1cc34544a6bba3d8b18f30d3e8c85cbfab2fb1a70e133` |
 | **W10** | `screenshots/w10-shortcut-lookup-card-opened.png` | 1280x800 | `aff1634beeee4fefeff848b52e7b6f7be13ea392e78212bfa081e232b25d6cb0` |
 | **W11** | `screenshots/w11-browser-reload-shortcut-lookup.png` | 1280x800 | `aff1634beeee4fefeff848b52e7b6f7be13ea392e78212bfa081e232b25d6cb0` |
 | **W12** | `screenshots/w12-dsh-restart-shortcut-lookup.png` | 1280x800 | `aff1634beeee4fefeff848b52e7b6f7be13ea392e78212bfa081e232b25d6cb0` |
 | **W13** | `screenshots/w13-shortcut-reset-to-default.png` | 1280x800 | `9e159d625570395194d62e4b68a36805b2c27c239ef19b2be84b54699d53aaf1` |
 | **W18** | `screenshots/w18-multi-snapshot-active.png` | 1280x800 | `befaba78994fcc5bf171e4ea81c4102bb60008d7b6aa9211f9d2c89fe25177a4` |
-| **W19** | `screenshots/w19-dormant-snapshot-deleted.png` | 1280x800 | `0f679a4fe0b6e6bc67e0a88e0c17fd86129af72cd040b7e21e92a5054005c9b8` |
+| **W19** | `screenshots/w19-dormant-snapshot-deleted.png` | 1280x800 | `9341c58dd26b0a7a2ced7f7cbef25e555bd8bbf2a2ae7095a336da2745ef9475` |
 
 ---
 

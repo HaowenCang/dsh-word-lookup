@@ -1,0 +1,44 @@
+{
+  "phase": "Phase 7A.8.2R2",
+  "scenarios": ["W05", "W06", "W07", "W08"],
+  "name": "Async Recording Lock Lifecycle, Queue Serialization & Race Prevention",
+  "testedCodeSha": "b36bf4d1b8ec5b6ab3ae3750475d656c669bcdcf",
+  "timestamp": "2026-10-18T03:55:00Z",
+  "verdict": "PASS",
+  "designProperties": {
+    "singleOwnership": true,
+    "serializedQueue": "Promise-chain queueing via AsyncRecordingLock.queue",
+    "idempotentRelease": true,
+    "unhandledRejectionSafety": true,
+    "unmountGuaranteedFalse": true
+  },
+  "testScenarios": [
+    {
+      "scenario": "W05: Rapid open and close",
+      "mechanism": "lock.acquire() followed immediately by lock.release()",
+      "resultOrder": ["start:true", "finish:true", "start:false", "finish:false"],
+      "finalLockHeld": false,
+      "verdict": "PASS"
+    },
+    {
+      "scenario": "W06: Pending acquire during unmount release",
+      "mechanism": "Unmount calls release while acquire promise is unresolved; acquire resolves later",
+      "result": "Queue chains release after acquire settles; final state strictly false",
+      "finalLockHeld": false,
+      "verdict": "PASS"
+    },
+    {
+      "scenario": "W07: Recording API rejection recovery",
+      "mechanism": "mockRecording throws error on active=true",
+      "result": "Error safely caught, lock resets held=false, release executes cleanly without crash",
+      "finalLockHeld": false,
+      "verdict": "PASS"
+    },
+    {
+      "scenario": "W08: Keydown isolation in recorder modal",
+      "mechanism": "KeyboardEvent dispatch inside recorder box",
+      "result": "Captures modifiers and code; Escape key dismisses without leaking lock",
+      "verdict": "PASS"
+    }
+  ]
+}
