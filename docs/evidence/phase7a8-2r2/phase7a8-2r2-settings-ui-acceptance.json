@@ -1,0 +1,210 @@
+{
+  "phase": "Phase 7A.8.2R2",
+  "name": "Evidence Provenance, Shortcut Persistence & Final Native UI Acceptance",
+  "timestamp": "2026-10-18T03:13:43.696Z",
+  "status": "PASS",
+  "totalScenarios": 14,
+  "passedScenarios": 14,
+  "records": [
+    {
+      "scenarioId": "V15",
+      "name": "Settings Navigation & \"词典\" Section Contribution",
+      "verdict": "PASS",
+      "details": {
+        "sectionVisible": true,
+        "container": ".dsh-wl-settings"
+      }
+    },
+    {
+      "scenarioId": "V16",
+      "name": "Initial Fixture State & Truthful Counts",
+      "verdict": "PASS",
+      "details": {
+        "entryCountText": "7 词条",
+        "formCountText": "11 记录",
+        "ecdictDisabled": true,
+        "customDisabled": true
+      }
+    },
+    {
+      "scenarioId": "V17",
+      "name": "Custom SQLite Path Verification via UI",
+      "verdict": "PASS",
+      "details": {
+        "outcomeText": "数据库架构校验通过\n架构版本: v1\n词条条目数: 3 条\n词形形态数: 0 条\n样词抽样: entanglement, qubit, superposition",
+        "customDbPath": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-word-lookup-7a8-2-test\\user-data\\quantum-dict.db"
+      }
+    },
+    {
+      "scenarioId": "V18",
+      "name": "Custom Dictionary Activation & Snapshot List Update",
+      "verdict": "PASS",
+      "details": {
+        "activeIdentity": "quantum-physics",
+        "lookupFound": true,
+        "lookupSource": "custom-local"
+      }
+    },
+    {
+      "scenarioId": "V19",
+      "name": "Three-Mode Switcher: Switch to Fixture Mode",
+      "verdict": "PASS",
+      "details": {
+        "activeMode": "fixture"
+      }
+    },
+    {
+      "scenarioId": "V20",
+      "name": "Three-Mode Switcher: Switch Back to Custom Mode",
+      "verdict": "PASS",
+      "details": {
+        "activeMode": "custom",
+        "activeIdentity": "quantum-physics"
+      }
+    },
+    {
+      "scenarioId": "W09",
+      "name": "Configurable Shortcut Recorder UI & Conflict Detection",
+      "verdict": "PASS",
+      "details": {
+        "updatedKeyText": "Ctrl + Alt + J"
+      }
+    },
+    {
+      "scenarioId": "W10",
+      "name": "Real Shortcut Dispatch & Word Lookup Card Display",
+      "verdict": "PASS",
+      "details": {
+        "countBeforeW10": 0,
+        "countAfterW10": 1,
+        "cardContent": "superposition\n/superposition/\n×\nn.superposition的中文释义 Definition for superposition"
+      }
+    },
+    {
+      "scenarioId": "W11",
+      "name": "Browser Page Reload Persistence",
+      "verdict": "PASS",
+      "details": {
+        "rawKeybindings": "{\n  \"schemaVersion\": 1,\n  \"profiles\": {\n    \"web:windows\": {\n      \"wordLookup.lookupSelection\": {\n        \"code\": \"KeyJ\",\n        \"modifiers\": [\n          \"control\",\n          \"alt\"\n        ]\n      }\n    }\n  }\n}\n",
+        "countBeforeW11": 0,
+        "countAfterW11": 1
+      }
+    },
+    {
+      "scenarioId": "W12",
+      "name": "DSH Process Restart Persistence",
+      "verdict": "PASS",
+      "details": {
+        "keybindingsAfterRestart": "{\n  \"schemaVersion\": 1,\n  \"profiles\": {\n    \"web:windows\": {\n      \"wordLookup.lookupSelection\": {\n        \"code\": \"KeyJ\",\n        \"modifiers\": [\n          \"control\",\n          \"alt\"\n        ]\n      }\n    }\n  }\n}\n",
+        "countBeforeW12": 0,
+        "countAfterW12": 1
+      }
+    },
+    {
+      "scenarioId": "W13",
+      "name": "Reset Shortcut to Default in Settings UI",
+      "verdict": "PASS",
+      "details": {
+        "restoredKeyText": "Ctrl + Shift + L",
+        "countBeforeW13": 1,
+        "countAfterDefault": 2
+      }
+    },
+    {
+      "scenarioId": "W18",
+      "name": "Multi-Snapshot Activation & Lexicon Lookup",
+      "verdict": "PASS",
+      "details": {
+        "activeIdentity": "quantum-beta",
+        "betaCardText": "teleportation\n/teleportation/\n×\nn.teleportation的中文释义 Definition for teleportation"
+      }
+    },
+    {
+      "scenarioId": "W19",
+      "name": "Delete Inactive Custom Snapshot & Source File Invariance",
+      "verdict": "PASS",
+      "details": {
+        "snapshotRemoved": "quantum-physics",
+        "sourceFileExists": true,
+        "originalSha256": "c98d4eb2b33721b426cc23c3d14ba9a32bdc3b2e811991592b238120ed2fc480",
+        "currentSha256": "c98d4eb2b33721b426cc23c3d14ba9a32bdc3b2e811991592b238120ed2fc480"
+      }
+    },
+    {
+      "scenarioId": "W20",
+      "name": "End-to-End Acceptance Closure",
+      "verdict": "PASS",
+      "details": {
+        "totalRealScenarios": 14,
+        "allPassed": true
+      }
+    }
+  ],
+  "screenshots": [
+    {
+      "id": "V15",
+      "path": "screenshots/v15-settings-navigated.png",
+      "sha256": "16125dbc43b9aff149b56863f958f17b13c87fb7d07ad02042e15bd47eef32cd"
+    },
+    {
+      "id": "V16",
+      "path": "screenshots/v16-initial-fixture-state.png",
+      "sha256": "16125dbc43b9aff149b56863f958f17b13c87fb7d07ad02042e15bd47eef32cd"
+    },
+    {
+      "id": "V17",
+      "path": "screenshots/v17-custom-path-verified.png",
+      "sha256": "d382378a1d4fcfd438c850c716b4eda67d5528c20ce78414f18b6bf5dbd78c7b"
+    },
+    {
+      "id": "V18",
+      "path": "screenshots/v18-custom-activated.png",
+      "sha256": "c6b2bd60368ce6d3f424d51f319e3fbe2f6e7a79d0882d601a7933b8365f8355"
+    },
+    {
+      "id": "V19",
+      "path": "screenshots/v19-switched-to-fixture.png",
+      "sha256": "7df349c7639c685bc4d7ac9150e2e07672bc604a8b7c65d0f18eae90e2973c5a"
+    },
+    {
+      "id": "V20",
+      "path": "screenshots/v20-switched-to-custom.png",
+      "sha256": "095a6521a9c395ccb7eef493032e23f00daee8f1e621cc2ab9214b33bf32f35a"
+    },
+    {
+      "id": "W09",
+      "path": "screenshots/w09-shortcut-customized.png",
+      "sha256": "8b992a6eb1fd07bce91f805d7aaf2e4d1105dbba5bbb0ecd861c5eadd8295b06"
+    },
+    {
+      "id": "W10",
+      "path": "screenshots/w10-shortcut-lookup-card-opened.png",
+      "sha256": "aff1634beeee4fefeff848b52e7b6f7be13ea392e78212bfa081e232b25d6cb0"
+    },
+    {
+      "id": "W11",
+      "path": "screenshots/w11-browser-reload-shortcut-lookup.png",
+      "sha256": "aff1634beeee4fefeff848b52e7b6f7be13ea392e78212bfa081e232b25d6cb0"
+    },
+    {
+      "id": "W12",
+      "path": "screenshots/w12-dsh-restart-shortcut-lookup.png",
+      "sha256": "aff1634beeee4fefeff848b52e7b6f7be13ea392e78212bfa081e232b25d6cb0"
+    },
+    {
+      "id": "W13",
+      "path": "screenshots/w13-shortcut-reset-to-default.png",
+      "sha256": "9e159d625570395194d62e4b68a36805b2c27c239ef19b2be84b54699d53aaf1"
+    },
+    {
+      "id": "W18",
+      "path": "screenshots/w18-multi-snapshot-active.png",
+      "sha256": "befaba78994fcc5bf171e4ea81c4102bb60008d7b6aa9211f9d2c89fe25177a4"
+    },
+    {
+      "id": "W19",
+      "path": "screenshots/w19-dormant-snapshot-deleted.png",
+      "sha256": "71a0e019ea04b0b2f3fcc9c81246b194746f0636d7df8caa3df21274dc4d85cb"
+    }
+  ]
+}
