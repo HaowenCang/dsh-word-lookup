@@ -1,0 +1,56 @@
+﻿{
+    "registryDownloadSha256":  "ce51e0e233d2b93b8b3d3f61548e0634debdedd0b20ac423a150037abf887f34",
+    "peerDependencies":  {
+                             "react":  "^18.2.0",
+                             "@deepseek-ai/cordis":  "~4.0.4",
+                             "@deepseek-ai/schemastery":  "~3.18.4"
+                         },
+    "registry":  "https://registry.npmjs.org/",
+    "dsh":  {
+                "bundle":  {
+                               "patch":  "./cordis.patch.yml"
+                           },
+                "client":  {
+                               "inject":  [
+                                              "@deepseek-ai/dsh-client-ui-layout",
+                                              "@deepseek-ai/dsh-client-ui-renderer",
+                                              "@deepseek-ai/dsh-client-shortcuts",
+                                              "@deepseek-ai/dsh-client-ui-settings",
+                                              "@deepseek-ai/dsh-client-locale"
+                                          ],
+                               "platform":  "web"
+                           },
+                "pluginType":  "feature",
+                "compatibility":  {
+                                      "dsh":  "0.2.0-rc.2",
+                                      "profiles":  [
+                                                       "web"
+                                                   ],
+                                      "dshReleases":  {
+                                                          "0.2.0-rc.1":  "unknown",
+                                                          "0.2.0-rc.2":  "compatible",
+                                                          "0.2.1-alpha.1":  "unknown"
+                                                      },
+                                      "dshOperations":  {
+                                                            "0.2.0-rc.2":  {
+                                                                               "start":  "passed",
+                                                                               "install":  "passed",
+                                                                               "rollback":  "passed",
+                                                                               "uninstall":  "passed"
+                                                                           }
+                                                        }
+                                  }
+            },
+    "version":  "0.2.0",
+    "package":  "dsh-word-lookup",
+    "verificationStatus":  "PASS",
+    "timestamp":  "2026-10-19T11:31:25.8476547Z",
+    "registryDownloadLength":  135731,
+    "dist":  {
+                 "shasum":  "9f9a66c7f354b76bd46f4cbc21d0ca667796dbb3",
+                 "integrity":  "sha512-aRXtW5DdiAVTPFYppuFRENyQ8EIg1otondIoIw4R5P7uMjs43GQhYBfslTo0E3rCyz/FA3wdRfCZF15hEzSyEg==",
+                 "unpackedSize":  576913,
+                 "fileCount":  8,
+                 "tarball":  "https://registry.npmjs.org/dsh-word-lookup/-/dsh-word-lookup-0.2.0.tgz"
+             }
+}

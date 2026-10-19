@@ -1,0 +1,42 @@
+﻿{
+    "assets":  [
+                   {
+                       "apiUrl":  "https://api.github.com/repos/HaowenCang/dsh-word-lookup/releases/assets/656076325",
+                       "contentType":  "application/x-gtar",
+                       "createdAt":  "2026-10-19T11:24:35Z",
+                       "digest":  "sha256:ce51e0e233d2b93b8b3d3f61548e0634debdedd0b20ac423a150037abf887f34",
+                       "downloadCount":  0,
+                       "id":  "RA_kwDOU3g5b84nGu4l",
+                       "label":  "",
+                       "name":  "dsh-word-lookup-0.2.0.tgz",
+                       "size":  135731,
+                       "state":  "uploaded",
+                       "updatedAt":  "2026-10-19T11:24:36Z",
+                       "url":  "https://github.com/HaowenCang/dsh-word-lookup/releases/download/v0.2.0/dsh-word-lookup-0.2.0.tgz"
+                   },
+                   {
+                       "apiUrl":  "https://api.github.com/repos/HaowenCang/dsh-word-lookup/releases/assets/656076316",
+                       "contentType":  "text/plain; charset=utf-8",
+                       "createdAt":  "2026-10-19T11:24:35Z",
+                       "digest":  "sha256:79e152c32312bfdd16be3ec3c5f2ffc71a2d6734707530b05738dd301a0b29dd",
+                       "downloadCount":  0,
+                       "id":  "RA_kwDOU3g5b84nGu4c",
+                       "label":  "",
+                       "name":  "SHA256SUMS.txt",
+                       "size":  92,
+                       "state":  "uploaded",
+                       "updatedAt":  "2026-10-19T11:24:35Z",
+                       "url":  "https://github.com/HaowenCang/dsh-word-lookup/releases/download/v0.2.0/SHA256SUMS.txt"
+                   }
+               ],
+    "publishedAt":  "2026-10-19T11:24:37Z",
+    "assetTarballSha256":  "ce51e0e233d2b93b8b3d3f61548e0634debdedd0b20ac423a150037abf887f34",
+    "tagName":  "v0.2.0",
+    "assetTarballSize":  135731,
+    "releaseName":  "dsh-word-lookup v0.2.0",
+    "timestamp":  "2026-10-19T11:31:34.6647932Z",
+    "verificationStatus":  "PASS",
+    "assetChecksumsEncoding":  "ASCII",
+    "assetChecksumsBom":  false,
+    "releaseUrl":  "https://github.com/HaowenCang/dsh-word-lookup/releases/tag/v0.2.0"
+}

@@ -362,16 +362,13 @@ async function main() {
 
     const downloadTemp = join(tmpdir(), `npm-download-${Date.now()}-${randomUUID().slice(0, 6)}.tgz`)
     console.log(`Downloading published tarball from ${tarballUrl}...`)
-    const dlRes = spawnSync('node', [
-      '-e',
-      `const https = require('node:https'); const fs = require('node:fs');
-       const file = fs.createWriteStream(${JSON.stringify(downloadTemp)});
-       https.get(${JSON.stringify(tarballUrl)}, (res) => {
-         res.pipe(file);
-         file.on('finish', () => { file.close(); process.exit(0); });
-       }).on('error', (err) => { process.exit(1); });`,
-    ], { shell: true })
-    if (dlRes.status !== 0 || !existsSync(downloadTemp)) {
+    const dlFetch = await fetch(tarballUrl)
+    if (!dlFetch.ok) {
+      throw new Error(`Failed to download published tarball from ${tarballUrl}: HTTP ${dlFetch.status}`)
+    }
+    const dlBuf = Buffer.from(await dlFetch.arrayBuffer())
+    writeFileSync(downloadTemp, dlBuf)
+    if (!existsSync(downloadTemp)) {
       throw new Error(`Failed to download published tarball from ${tarballUrl}`)
     }
     downloadedTarballPath = downloadTemp

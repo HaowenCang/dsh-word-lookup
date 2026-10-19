@@ -1,0 +1,34 @@
+{
+  "timestamp": "2026-10-19T11:30:05.486Z",
+  "phase": "PHASE7A10",
+  "mode": "npm",
+  "verdict": "PASS",
+  "durationMs": 102259,
+  "packageIdentity": {
+    "name": "dsh-word-lookup",
+    "version": "0.2.0",
+    "sourceMode": "npm",
+    "tarballSha256": "ce51e0e233d2b93b8b3d3f61548e0634debdedd0b20ac423a150037abf887f34",
+    "installedPath": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-release-smoke-b87d114a\\home\\profiles\\smoke-v020-4570fd\\node_modules\\dsh-word-lookup",
+    "isSymlink": false
+  },
+  "isolation": {
+    "testRoot": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-release-smoke-b87d114a",
+    "dshHome": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-release-smoke-b87d114a\\home",
+    "profile": "smoke-v020-4570fd",
+    "port": 50995
+  },
+  "verificationEvidence": {
+    "pluginLoaded": "PASS",
+    "settingsNavVisible": "PASS",
+    "settingsSectionVisible": "PASS",
+    "fixtureModeActive": "PASS",
+    "lookupSuccessful": "PASS",
+    "lookupHeadword": "derive",
+    "lookupSource": "sqlite-fixture",
+    "autoDoubleClickDefaultOff": "PASS",
+    "autoSelectionDefaultOff": "PASS",
+    "ecdictNotDownloaded": "PASS",
+    "uninstallationClean": "PASS"
+  }
+}

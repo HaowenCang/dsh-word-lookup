@@ -1,0 +1,10 @@
+﻿{
+    "targetMatch":  true,
+    "timestamp":  "2026-10-19T11:31:32.4225892Z",
+    "peeledCommit":  "5c863335afdc4b71ee18f41340d852f378a2bee2",
+    "tagObject":  "object 5c863335afdc4b71ee18f41340d852f378a2bee2\r\ntype commit\r\ntag v0.2.0\r\ntagger Evan Williams \u003c54177361+HaowenCang@users.noreply.github.com\u003e 1792409028 -0700\r\n\r\nRelease v0.2.0 (DSH 0.2.0-rc.2 Web Profile)\r\n",
+    "expectedTarget":  "5c863335afdc4b71ee18f41340d852f378a2bee2",
+    "tag":  "v0.2.0",
+    "verificationStatus":  "PASS",
+    "tagRef":  "9d969321826c484ad820f30c1c45091e34ca9afb"
+}
