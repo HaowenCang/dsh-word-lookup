@@ -55,29 +55,33 @@ No publication actions (`npm publish`, tag creation, or GitHub Release) have bee
 
 ## 3. Deliverables Inspection Ledger
 
-The Phase 7A.10 deliverables have been updated with Phase 7A.10R runbook errata corrections in `docs/evidence/phase7a10-prep/`:
+The Phase 7A.10 deliverables have been updated with Phase 7A.10R runbook errata corrections and Phase 7A.10 release smoke execution readiness fixes in `docs/evidence/phase7a10-prep/` and `scripts/probes/phase7a10/`:
 1. `npm-preflight.md`: Comprehensive audit of npm environment, permissions, manifest, and 2FA posture.
 2. `github-preflight.md`: In-depth audit of GitHub remote state, commit lineage, CLI scopes, and release assets.
 3. `release-artifact-identity.json`: Machine-readable ledger binding commits, tarball hashes, member files, and runtime baselines.
 4. `release-notes-v0.2.0.md`: Complete release notes documenting 11 major features, v0.1.0 vs v0.2.0 comparison, installation instructions, and mandatory disclosures (DSH 0.2.0-rc.2 Web Profile baseline, unverified 0.2.1/Desktop, opt-in auto-selection, Scenario F03 recovery boundary, and ECDICT manifest-only redistribution).
-5. `publication-runbook.md` (v1.1.0): Authoritative 10-step sequential runbook incorporating R1 registry identity rules (dist.shasum, dist.integrity, official dist.tarball download & SHA-256 compare, auxiliary gitHead), R2 remote Git ref resolution & `--verify-tag`, R3 ASCII SHA256SUMS encoding, and R5 interactive 2FA credential security.
-6. `release-recovery-plan.md` (v1.1.0): Contingency playbooks for all failure scenarios incorporating R4 strict recovery authorization boundaries (prohibiting automatic deprecate/unpublish/tag movement/patch publication and mandating 6-step reporting procedure) and query-before-retry on publish network timeout.
-7. `authorization-gate-report.md`: Current gate verification and authorization closure.
+5. `publication-runbook.md` (v1.2.0): Authoritative 10-step sequential runbook incorporating R1 registry identity rules, R2 remote Git ref resolution & `--verify-tag`, R3 ASCII SHA256SUMS encoding, R5 interactive 2FA credential security, strictly distinguishing registry 404 from network errors (Step 2), and establishing an operational, clean-room smoke test runner (`scripts/probes/phase7a10/release-smoke.mjs`) for both pre-publication local-tarball chain verification and post-publication official npm smoke acceptance (Step 9).
+6. `release-recovery-plan.md` (v1.2.0): Contingency playbooks for all failure scenarios incorporating R4 strict recovery authorization boundaries (prohibiting automatic deprecate/unpublish/tag movement/patch publication and mandating 6-step reporting procedure), query-before-retry on publish network timeout, and aligning Step 9 execution commands.
+7. `scripts/probes/phase7a10/release-smoke.mjs`: Standalone, clean-room isolated smoke test execution runner supporting `--source local-tarball` and `--source npm`. Enforces assertIsolatedDshEnvironment, dynamically discovers free high ports, verifies non-symlink genuine unpack, verifies real DSH Web Profile boot and word lookup, and validates clean uninstallation.
+8. `smoke-execution-report.json`: Machine-readable audit evidence recording clean execution of the release smoke test suite.
+9. `authorization-gate-report.md`: Current gate verification and authorization closure.
 
 ---
 
-## 4. Phase 7A.10R Formal Gate Declaration
+## 4. Phase 7A.10 Formal Gate Declaration
 
 ```text
-NPM_ACCOUNT_READY = PASS
-NPM_VERSION_AVAILABLE = PASS
-GITHUB_RELEASE_IDENTITY_READY = PASS
-CANDIDATE_TARBALL_SHA256_MATCH = PASS
+RELEASE_SMOKE_RUNNER_EXISTS = PASS
+RELEASE_SMOKE_RUNNER_EXECUTABLE = PASS
+LOCAL_TARBALL_SMOKE = PASS
+NPM_PACKAGE_SMOKE = NOT_EXECUTED_PRE_PUBLICATION
+ISOLATED_DSH_PROFILE_VERIFIED = PASS
+NO_WORKSPACE_LINK_IN_NPM_MODE = PASS
+RUNBOOK_STEP9_EXECUTABLE = PASS
+NPM_VERSION_PREFLIGHT_FAIL_CLOSED = PASS
 PRODUCTION_CODE_FROZEN = PASS
-RELEASE_NOTES_COMPLETE = PASS
-PUBLICATION_RUNBOOK_COMPLETE = PASS
-FAILURE_RECOVERY_PLAN_COMPLETE = PASS
-READY_FOR_PUBLICATION_AUTHORIZATION = YES
+TARBALL_SHA256_UNCHANGED = PASS
+READY_FOR_HUMAN_PUBLICATION_AUTHORIZATION = YES
 NPM_PUBLISH_AUTHORIZED = NO
 GIT_TAG_CREATION_AUTHORIZED = NO
 GITHUB_RELEASE_CREATION_AUTHORIZED = NO

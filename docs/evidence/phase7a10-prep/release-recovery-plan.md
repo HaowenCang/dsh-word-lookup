@@ -158,7 +158,7 @@
 
 ### 场景六：正式安装或冒烟测试失败 (Post-Release Install or Smoke Test Fails)
 - **触发情境**:
-  在 Step 9 的隔离 DSH 0.2.0-rc.2 环境中，执行 `dsh plugin --profile test-profile add dsh-word-lookup@0.2.0` 安装失败，或安装后插件启动崩溃、查询卡死、冒烟测试脚本失败。
+  在 Step 9 的隔离 DSH 0.2.0-rc.2 环境中，执行 `node scripts/probes/phase7a10/release-smoke.mjs --source npm` 安装失败，或安装后插件启动崩溃、查询卡死、冒烟测试失败。
 - **严禁行为**:
   - **严禁自动执行 `npm deprecate` 或 `npm unpublish`**。
   - **严禁自动修改 dist-tag、删除或替换 GitHub Release Asset、移动 Git Tag，或自行发布未经完整验收的新补丁**。

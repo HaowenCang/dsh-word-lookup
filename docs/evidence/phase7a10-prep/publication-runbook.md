@@ -1,7 +1,7 @@
 # dsh-word-lookup v0.2.0 Publication Runbook
 
 - **Package**: `dsh-word-lookup@0.2.0`
-- **Document Version**: 1.1.0 (Phase 7A.10R Publication Runbook Corrections)
+- **Document Version**: 1.2.0 (Phase 7A.10 Release Smoke Test Execution Readiness Fix)
 - **Release Engineer**: Gemini 3.8 Flash High (Release Engineering & Authorization Gate)
 - **Status**: **OPERATIONAL BLUEPRINT — STRICTLY GATED UPON USER AUTHORIZATION**
 
@@ -98,11 +98,39 @@ if ($hash -ne "ce51e0e233d2b93b8b3d3f61548e0634debdedd0b20ac423a150037abf887f34"
     throw "ABORT: Tarball SHA-256 mismatch! Found: $hash"
 }
 
-# 4. Verify npm version availability
-$existing = npm view dsh-word-lookup@0.2.0 version 2>$null
-if ($existing) {
-    throw "ABORT: Version 0.2.0 already exists on npm registry!"
+# 4. Strictly verify npm version absence & distinguish E404 from network/auth errors (FAIL-CLOSED)
+$npmViewRaw = npm view dsh-word-lookup@0.2.0 --registry=https://registry.npmjs.org/ --json 2>&1 | Out-String
+$npmViewJson = $null
+try { $npmViewJson = $npmViewRaw | ConvertFrom-Json } catch { }
+
+if ($npmViewJson -and $npmViewJson.error) {
+    $errCode = $npmViewJson.error.code
+    if ($errCode -eq "E404") {
+        Write-Host "npm version preflight PASS: Version 0.2.0 is confirmed absent from official registry (E404)."
+    } elseif ($errCode -in @("ENOTFOUND", "ETIMEDOUT", "ECONNREFUSED", "EAI_AGAIN")) {
+        throw "ABORT: npm preflight failed due to network connectivity error ($errCode). Cannot confirm publication availability!"
+    } elseif ($errCode -in @("E401", "E403")) {
+        throw "ABORT: npm preflight failed due to authentication/authorization error ($errCode)!"
+    } else {
+        throw "ABORT: npm preflight returned unexpected registry error: $errCode - $($npmViewJson.error.summary)"
+    }
+} elseif ($npmViewJson -and $npmViewJson.version -eq "0.2.0") {
+    throw "ABORT: Version 0.2.0 already exists on npm registry! Cannot overwrite an existing version."
+} else {
+    if ($npmViewRaw -match 'E404' -or $npmViewRaw -match '404 Not Found' -or $npmViewRaw -match 'No match found') {
+        Write-Host "npm version preflight PASS: Version 0.2.0 confirmed absent (E404 string match)."
+    } else {
+        throw "ABORT: npm preflight failed to confirm 404 response. Raw output:`n$npmViewRaw"
+    }
 }
+
+# 5. Pre-Publication Smoke Execution Pipeline Check (Smoke Runner Executability Verification)
+# Execute release smoke runner in local-tarball mode to prove isolated DSH Web profile smoke chain
+node scripts/probes/phase7a10/release-smoke.mjs --source local-tarball
+if ($LASTEXITCODE -ne 0) {
+    throw "ABORT: Pre-publication smoke test execution pipeline failed!"
+}
+Write-Host "Pre-publication smoke execution pipeline verification PASS."
 ```
 
 ### Step 3: Exact npm Publication Using Validated Tarball & Native Interactive 2FA
@@ -226,7 +254,7 @@ Perform independent multi-facet identity audit across npm Registry, Git Tag, and
 `5c863335afdc4b71ee18f41340d852f378a2bee2`
 ```powershell
 # Query remote Git tag peeled commit
-$remotePeeled = (git -C "E:\Projects\DSHarness\dsh-word-lookup" ls-remote origin refs/tags/v0.2.0^{} | ForEach-Object { ($_ -split '\s+')[0] })
+$remotePeeled = (git -C "E:\Projects\DSHarness\dsh-word-lookup" ls-remote origin 'refs/tags/v0.2.0^{}' | ForEach-Object { ($_ -split '\s+')[0] })
 if ($remotePeeled -ne "5c863335afdc4b71ee18f41340d852f378a2bee2") {
     throw "Remote Git tag v0.2.0 does not resolve to 5c863335afdc4b71ee18f41340d852f378a2bee2! Found: $remotePeeled"
 }
@@ -241,24 +269,36 @@ Write-Host "Remote Git Tag v0.2.0 resolved commit verified: $remotePeeled"
 4. 验证 Release 附带的 `SHA256SUMS.txt` 编码为 ASCII、无 BOM、单行且哈希值无误。
 
 ### Step 9: Clean-Room Isolated Smoke Test (DSH 0.2.0-rc.2 Web)
-Perform smoke installation in an isolated profile:
+Execute official post-publication smoke acceptance on the genuine published npm package:
 ```powershell
-# 1. Assert isolated test environment
-node scripts/assert-isolated-env.mjs
+# Execute official post-publication smoke verification from npm registry.
+# The runner handles clean-room isolation, dynamic randomized non-production profile creation,
+# free high-port selection, assertive isolation contract gates, candidate hash comparison,
+# live DSH Web Profile boot, Playwright UI/API verification, and clean uninstallation:
+node scripts/probes/phase7a10/release-smoke.mjs --source npm
 
-# 2. Create temporary isolated profile
-node scripts/create-test-profile.mjs
-
-# 3. Install published package from npm
-dsh plugin --profile test-profile add dsh-word-lookup@0.2.0
-
-# 4. Verify startup & basic fixture query
-# Execute minimal smoke verification script
-node scripts/run-smoke-verification.mjs
-
-# 5. Clean up isolated test profile
-node scripts/cleanup-test-profile.mjs --evidence-recorded
+if ($LASTEXITCODE -ne 0) {
+    throw "ABORT: Post-publication npm release smoke verification failed!"
+}
+Write-Host "Official post-publication npm release smoke verification PASS."
 ```
+
+#### 9.1 Package Source Modes in Smoke Runner:
+- **`--source local-tarball`**:
+  Executed in Step 2 before publication. Uses verified candidate `.tgz` (`build/rc-v0.2.0/dsh-word-lookup-0.2.0.tgz`), verifies byte size (`135731 bytes`) and SHA-256 (`ce51e0e233d2b93b8b3d3f61548e0634debdedd0b20ac423a150037abf887f34`), and verifies that the isolated DSH profile execution chain is completely functional. **This proves executability of the test runner, but does NOT represent npm release acceptance.**
+- **`--source npm`**:
+  Executed in Step 9 after publication. Queries official registry (`https://registry.npmjs.org/`), downloads the published tarball, verifies SHA-256 matches candidate hash bit-for-bit, installs `dsh-word-lookup@0.2.0` into the isolated profile via `dsh plugin --profile <randomProfile> add dsh-word-lookup@0.2.0 --registry=https://registry.npmjs.org/`, and executes the full smoke acceptance suite. **This is the official post-publication release smoke acceptance.**
+  If executed before publication when 0.2.0 is not published, the script strictly distinguishes E404 from network anomalies, reports `NOT_PUBLISHED` and `NOT_EXECUTED_PRE_PUBLICATION` cleanly, and fails closed without simulating success.
+
+#### 9.2 Minimum Acceptance Verification Criteria:
+1. **Clean Plugin Load**: Plugin loads without errors; `window.__DSH_WORD_LOOKUP__` diagnostics interface is exposed.
+2. **Settings Entry Rendering**: Settings navigation displays "词典/Dictionary"; clicking renders `.dsh-wl-settings` panel.
+3. **Fixture Mode Normal**: Active mode is strictly `fixture` (uninstalled: `false`).
+4. **Valid Word Lookup**: Query `derive` returns definition, phonetics, examples from `sqlite-fixture`.
+5. **Trigger Switches Default OFF**: `#switch-auto-double-click` and `#switch-auto-selection` default to `aria-checked: false` and host gates are `false`.
+6. **Corpus Safety**: Zero automatic ECDICT downloads; zero external network requests; zero access to user personal databases.
+7. **Clean Uninstallation**: Plugin removed via `dsh plugin remove`; rebooted DSH verifies lookup route returns HTTP 404.
+8. **Evidence Retention**: Comprehensive JSON evidence ledger saved to `docs/evidence/phase7a10-prep/smoke-execution-report.json`.
 
 ### Step 10: Publication Evidence Finalization & Archival
 Save the publication evidence records (including registry responses, release URLs, and smoke test outputs) into `docs/evidence/phase7b-published/`.
