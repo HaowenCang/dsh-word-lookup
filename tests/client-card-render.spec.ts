@@ -283,4 +283,301 @@ describe('WordLookupCard rendering', () => {
     expect(html).toContain('Request refused (400)')
     expect(html).not.toContain('undefined')
   })
+
+  describe('FMT-01: Line break and multiline formatting for definitions and translations', () => {
+    function countOccurrences(text: string, search: string): number {
+      let count = 0
+      let pos = text.indexOf(search)
+      while (pos !== -1) {
+        count += 1
+        pos = text.indexOf(search, pos + search.length)
+      }
+      return count
+    }
+
+    it('renders pass entry with literal \\n escape sequences as distinct visible block lines', () => {
+      const store = new LookupCardStore()
+      store.set({
+        status: 'ready',
+        query: 'pass',
+        result: {
+          kind: 'found',
+          body: baseFound({
+            headword: 'pass',
+            phonetic: '/pɑːs/',
+            meanings: [
+              {
+                partOfSpeech: null,
+                translation:
+                  'n. 穿过, 通过, 经过, 通行证, 护照, 入场券, 票, 隘口, 关口\\nvt. 通过, 经过, 穿过, 度过, 超越, 传递, 传球, 遗留, 批准\\nvi. 经过, 穿过, 变化, 终止, 传递, 被通过',
+                definition:
+                  'n. (sports) the act of throwing the ball to another member of your team\\nn. a success in a test or exam\\nv. to move past something or someone\\nv. to give something to someone using your hands',
+              },
+            ],
+            forms: [
+              { form: 'passed', kind: 'past' },
+              { form: 'passing', kind: 'participle' },
+            ],
+            examples: [],
+          }),
+        },
+      })
+      const html = renderCard(store)
+
+      // 3 translation lines and 4 definition lines in DOM structure
+      expect(countOccurrences(html, 'data-dsh-word-lookup="translation-line"')).toBe(3)
+      expect(countOccurrences(html, 'data-dsh-word-lookup="definition-line"')).toBe(4)
+
+      // Translation lines content and ordering
+      expect(html).toContain('n. 穿过, 通过, 经过, 通行证, 护照, 入场券, 票, 隘口, 关口')
+      expect(html).toContain('vt. 通过, 经过, 穿过, 度过, 超越, 传递, 传球, 遗留, 批准')
+      expect(html).toContain('vi. 经过, 穿过, 变化, 终止, 传递, 被通过')
+
+      const posN = html.indexOf('n. 穿过')
+      const posVt = html.indexOf('vt. 通过')
+      const posVi = html.indexOf('vi. 经过')
+      expect(posN).toBeGreaterThan(0)
+      expect(posVt).toBeGreaterThan(posN)
+      expect(posVi).toBeGreaterThan(posVt)
+
+      // Definition lines content and ordering
+      expect(html).toContain('the act of throwing the ball')
+      expect(html).toContain('a success in a test or exam')
+      expect(html).toContain('to move past something or someone')
+      expect(html).toContain('to give something to someone using your hands')
+
+      // Must not display literal \n in visible text
+      expect(html).not.toContain('\\n')
+    })
+
+    it('renders pass entry with real LF (\\n) line breaks identically to literal \\n', () => {
+      const store = new LookupCardStore()
+      store.set({
+        status: 'ready',
+        query: 'pass',
+        result: {
+          kind: 'found',
+          body: baseFound({
+            headword: 'pass',
+            phonetic: '/pɑːs/',
+            meanings: [
+              {
+                partOfSpeech: null,
+                translation:
+                  'n. 穿过, 通过, 经过, 通行证, 护照, 入场券, 票, 隘口, 关口\nvt. 通过, 经过, 穿过, 度过, 超越, 传递, 传球, 遗留, 批准\nvi. 经过, 穿过, 变化, 终止, 传递, 被通过',
+                definition:
+                  'n. (sports) the act of throwing the ball to another member of your team\nn. a success in a test or exam\nv. to move past something or someone\nv. to give something to someone using your hands',
+              },
+            ],
+            forms: [],
+            examples: [],
+          }),
+        },
+      })
+      const html = renderCard(store)
+
+      expect(countOccurrences(html, 'data-dsh-word-lookup="translation-line"')).toBe(3)
+      expect(countOccurrences(html, 'data-dsh-word-lookup="definition-line"')).toBe(4)
+      expect(html).toContain('n. 穿过, 通过, 经过')
+      expect(html).toContain('vt. 通过, 经过, 穿过')
+      expect(html).toContain('vi. 经过, 穿过, 变化')
+    })
+
+    it('handles CRLF, CR, and mixed line breaks cleanly', () => {
+      const store = new LookupCardStore()
+      store.set({
+        status: 'ready',
+        query: 'test',
+        result: {
+          kind: 'found',
+          body: baseFound({
+            meanings: [
+              {
+                partOfSpeech: 'v.',
+                translation: '段落一\r\n段落二\r段落三\\r\\n段落四',
+                definition: 'def 1\r\ndef 2\rdef 3\\r\\ndef 4',
+              },
+            ],
+          }),
+        },
+      })
+      const html = renderCard(store)
+
+      expect(countOccurrences(html, 'data-dsh-word-lookup="translation-line"')).toBe(4)
+      expect(countOccurrences(html, 'data-dsh-word-lookup="definition-line"')).toBe(4)
+      expect(html).toContain('段落一')
+      expect(html).toContain('段落二')
+      expect(html).toContain('段落三')
+      expect(html).toContain('段落四')
+    })
+
+    it('correctly nests semicolon glosses within multiline translation blocks', () => {
+      const store = new LookupCardStore()
+      store.set({
+        status: 'ready',
+        query: 'pass',
+        result: {
+          kind: 'found',
+          body: baseFound({
+            meanings: [
+              {
+                partOfSpeech: 'v.',
+                translation: 'n. 穿过；通行证\\nvt. 通过；传递',
+                definition: 'to move past\\nto give over',
+              },
+            ],
+          }),
+        },
+      })
+      const html = renderCard(store)
+
+      expect(countOccurrences(html, 'data-dsh-word-lookup="translation-line"')).toBe(2)
+      expect(countOccurrences(html, 'data-dsh-word-lookup="definition-line"')).toBe(2)
+      // Each line has 2 gloss spans -> 4 total
+      expect(countOccurrences(html, 'data-dsh-word-lookup="gloss"')).toBe(4)
+      expect(html).toContain('n. 穿过')
+      expect(html).toContain('通行证')
+      expect(html).toContain('vt. 通过')
+      expect(html).toContain('传递')
+    })
+
+    it('collapses consecutive empty lines and strips leading/trailing blanks', () => {
+      const store = new LookupCardStore()
+      store.set({
+        status: 'ready',
+        query: 'test',
+        result: {
+          kind: 'found',
+          body: baseFound({
+            meanings: [
+              {
+                partOfSpeech: 'n.',
+                translation: '\\n\\nline 1\\n\\n\\nline 2\\n\\n',
+                definition: '\n\ndef 1\n   \n\ndef 2\n\n',
+              },
+            ],
+          }),
+        },
+      })
+      const html = renderCard(store)
+
+      expect(countOccurrences(html, 'data-dsh-word-lookup="translation-line"')).toBe(2)
+      expect(countOccurrences(html, 'data-dsh-word-lookup="definition-line"')).toBe(2)
+      expect(html).toContain('line 1')
+      expect(html).toContain('line 2')
+      expect(html).toContain('def 1')
+      expect(html).toContain('def 2')
+    })
+
+    it('preserves legitimate and double-escaped backslashes', () => {
+      const store = new LookupCardStore()
+      store.set({
+        status: 'ready',
+        query: 'test',
+        result: {
+          kind: 'found',
+          body: baseFound({
+            meanings: [
+              {
+                partOfSpeech: null,
+                translation: '公式 \\lambda + \\mu\\n路径 C:\\path\\to\\dir',
+                definition: 'literal\\\\nnot-newline\\nactual-newline',
+              },
+            ],
+          }),
+        },
+      })
+      const html = renderCard(store)
+
+      expect(countOccurrences(html, 'data-dsh-word-lookup="translation-line"')).toBe(2)
+      expect(countOccurrences(html, 'data-dsh-word-lookup="definition-line"')).toBe(2)
+      expect(html).toContain('\\lambda + \\mu')
+      expect(html).toContain('C:\\path\\to\\dir')
+      expect(html).toContain('literal\\nnot-newline')
+      expect(html).toContain('actual-newline')
+    })
+
+    it('guarantees React safe escaping for HTML payloads (pure text, no XSS)', () => {
+      const store = new LookupCardStore()
+      store.set({
+        status: 'ready',
+        query: 'xss-probe',
+        result: {
+          kind: 'found',
+          body: baseFound({
+            headword: 'xss-probe',
+            meanings: [
+              {
+                partOfSpeech: '<script>alert(1)</script>',
+                translation: '<img src=x onerror=alert(2)>\\n<b onclick="evil()">bold</b>',
+                definition: '<iframe src="javascript:evil()"></iframe>',
+              },
+            ],
+          }),
+        },
+      })
+      const html = renderCard(store)
+
+      // Verifies HTML is strictly escaped
+      expect(html).not.toContain('<script>alert(1)</script>')
+      expect(html).not.toContain('<img src=x')
+      expect(html).not.toContain('<iframe')
+      expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
+      expect(html).toContain('&lt;img src=x onerror=alert(2)&gt;')
+      expect(html).toContain('&lt;b onclick=&quot;evil()&quot;&gt;bold&lt;/b&gt;')
+      expect(html).toContain('&lt;iframe src=&quot;javascript:evil()&quot;&gt;&lt;/iframe&gt;')
+    })
+
+    it('renders single-line entries without visual regression', () => {
+      const store = new LookupCardStore()
+      store.set({
+        status: 'ready',
+        query: 'derive',
+        result: { kind: 'found', body: baseFound() },
+      })
+      const html = renderCard(store)
+
+      expect(countOccurrences(html, 'data-dsh-word-lookup="translation-line"')).toBe(1)
+      expect(countOccurrences(html, 'data-dsh-word-lookup="definition-line"')).toBe(1)
+      expect(html).toContain('得到')
+      expect(html).toContain('源于')
+      expect(html).toContain('obtain something from a specified source.')
+    })
+
+    it('handles translation null or definition null cleanly', () => {
+      const storeTransNull = new LookupCardStore()
+      storeTransNull.set({
+        status: 'ready',
+        query: 'test',
+        result: {
+          kind: 'found',
+          body: baseFound({
+            meanings: [{ partOfSpeech: 'n.', translation: null, definition: 'only def' }],
+          }),
+        },
+      })
+      const htmlTransNull = renderCard(storeTransNull)
+      expect(countOccurrences(htmlTransNull, 'data-dsh-word-lookup="translation-line"')).toBe(0)
+      expect(countOccurrences(htmlTransNull, 'data-dsh-word-lookup="definition-line"')).toBe(1)
+      expect(htmlTransNull).toContain('only def')
+      expect(htmlTransNull).toContain('n.')
+
+      const storeDefNull = new LookupCardStore()
+      storeDefNull.set({
+        status: 'ready',
+        query: 'test',
+        result: {
+          kind: 'found',
+          body: baseFound({
+            meanings: [{ partOfSpeech: 'n.', translation: '只有翻译', definition: null }],
+          }),
+        },
+      })
+      const htmlDefNull = renderCard(storeDefNull)
+      expect(countOccurrences(htmlDefNull, 'data-dsh-word-lookup="translation-line"')).toBe(1)
+      expect(countOccurrences(htmlDefNull, 'data-dsh-word-lookup="definition-line"')).toBe(0)
+      expect(htmlDefNull).toContain('只有翻译')
+      expect(htmlDefNull).toContain('n.')
+    })
+  })
 })

@@ -1386,9 +1386,9 @@ export function DictionarySettingsSection({
 
         <SettingRow
           title="自定义外部 SQLite 词典"
-          description="允许指定本地用户自建或专业领域的 SQLite 词库文件，通过校验后无缝挂载使用。"
+          description="支持指定本地用户自建或专业领域的 SQLite 词库文件。请在上方“自定义 SQLite 词典管理”区域配置并挂载使用。"
           isLast={true}
-          control={<StatusBadge variant="success" label="Phase 7A.8 开放" />}
+          control={<StatusBadge variant="success" label="已支持" />}
         />
       </SectionCard>
 

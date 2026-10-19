@@ -22,7 +22,7 @@ import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect
 
 import { computeCardPosition, type CardPosition } from './position.js'
-import { splitGlosses } from '../shared/text.js'
+import { splitDefinitionLines, splitGlosses } from '../shared/text.js'
 import type { CardState, LookupCardStore } from './store.js'
 
 /** Props the overlay seat supplies plus the store injected at registration. */
@@ -396,40 +396,82 @@ export function WordLookupCard(props: WordLookupCardProps): ReactElement | null 
             }}
           >
             {found.meanings.map((meaning: any, index: number) => {
-              const glosses = meaning.translation ? splitGlosses(meaning.translation) : []
+              const transLines = meaning.translation ? splitDefinitionLines(meaning.translation) : []
+              const defLines = meaning.definition ? splitDefinitionLines(meaning.definition) : []
+
+              const posBadge = meaning.partOfSpeech ? (
+                <span
+                  style={{
+                    display: 'inline-block',
+                    padding: '1px 5px',
+                    marginRight: '6px',
+                    borderRadius: '3px',
+                    background: 'var(--wl-tag-bg, rgba(255,255,255,0.08))',
+                    color: 'var(--wl-tag-fg, #d0d0dc)',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    fontStyle: 'italic',
+                    verticalAlign: 'baseline',
+                  }}
+                >
+                  {meaning.partOfSpeech}
+                </span>
+              ) : null
+
               return (
                 <li key={String(index)} style={{ marginBottom: '6px', fontSize: '13px' }}>
-                  {meaning.partOfSpeech ? (
-                    <span
-                      style={{
-                        display: 'inline-block',
-                        padding: '1px 5px',
-                        marginRight: '6px',
-                        borderRadius: '3px',
-                        background: 'var(--wl-tag-bg, rgba(255,255,255,0.08))',
-                        color: 'var(--wl-tag-fg, #d0d0dc)',
-                        fontSize: '11px',
-                        fontWeight: 600,
-                        fontStyle: 'italic',
-                      }}
-                    >
-                      {meaning.partOfSpeech}
-                    </span>
+                  {transLines.length > 0 ? (
+                    <div data-dsh-word-lookup="translation-block">
+                      {transLines.map((line, lineIndex) => {
+                        const glosses = splitGlosses(line)
+                        return (
+                          <div
+                            key={String(lineIndex)}
+                            data-dsh-word-lookup="translation-line"
+                            style={{
+                              lineHeight: '1.45',
+                              marginTop: lineIndex === 0 ? 0 : '3px',
+                            }}
+                          >
+                            {lineIndex === 0 ? posBadge : null}
+                            {glosses.map((gloss, glossIndex) => (
+                              <span key={String(glossIndex)} data-dsh-word-lookup="gloss">
+                                {glossIndex === 0 ? '' : '\uff1b'}
+                                {gloss}
+                              </span>
+                            ))}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : posBadge ? (
+                    <div style={{ lineHeight: '1.45', marginBottom: '2px' }}>
+                      {posBadge}
+                    </div>
                   ) : null}
 
-                  {glosses.map((gloss, glossIndex) => (
-                    <span key={String(glossIndex)} data-dsh-word-lookup="gloss">
-                      {glossIndex === 0 ? '' : '\uff1b'}
-                      {gloss}
-                    </span>
-                  ))}
-
-                  {meaning.translation && meaning.definition ? ' ' : null}
-
-                  {meaning.definition ? (
-                    <span style={{ color: 'var(--wl-fg-muted, #9898a6)', fontSize: '12px' }}>
-                      {meaning.definition}
-                    </span>
+                  {defLines.length > 0 ? (
+                    <div
+                      data-dsh-word-lookup="definition-block"
+                      style={{
+                        marginTop: transLines.length > 0 || posBadge ? '4px' : 0,
+                        color: 'var(--wl-fg-muted, #9898a6)',
+                        fontSize: '12px',
+                        lineHeight: '1.4',
+                      }}
+                    >
+                      {defLines.map((defLine, defIndex) => (
+                        <div
+                          key={String(defIndex)}
+                          data-dsh-word-lookup="definition-line"
+                          style={{
+                            marginTop: defIndex === 0 ? 0 : '2px',
+                          }}
+                        >
+                          {defLine}
+                        </div>
+                      ))}
+                    </div>
                   ) : null}
                 </li>
               )

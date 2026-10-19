@@ -69,6 +69,21 @@ export declare function normalizeHeadword(raw: string): string;
  */
 export declare function splitGlosses(translation: string | null): readonly string[];
 /**
+ * Split dictionary definitions or translations into distinct, displayable lines.
+ *
+ * Normalizes multiple newline conventions without multiple or recursive unescaping passes:
+ * - Real LF (`\n`), CRLF (`\r\n`), CR (`\r`)
+ * - Escaped string literals `\n`, `\r\n`, `\r`
+ * - Controlled tab (`\t` and `\t`) substitution (normalized to single space)
+ * - Preserves double-escaped backslashes (`\\n` remains literal `\n`)
+ * - Preserves legitimate backslashes (e.g. `\lambda`, `C:\dir`)
+ * - Trims individual lines and collapses consecutive empty lines
+ *
+ * @param text - The raw translation or definition string, or null/undefined.
+ * @returns Array of non-empty line strings.
+ */
+export declare function splitDefinitionLines(text: string | null | undefined): readonly string[];
+/**
  * Whether a raw selection would survive normalization as a query.
  *
  * Used by the browser half to decide that `resolve()` should return

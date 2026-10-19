@@ -104,6 +104,120 @@ export function splitGlosses(translation: string | null): readonly string[] {
 }
 
 /**
+ * Split dictionary definitions or translations into distinct, displayable lines.
+ *
+ * Normalizes multiple newline conventions without multiple or recursive unescaping passes:
+ * - Real LF (`\n`), CRLF (`\r\n`), CR (`\r`)
+ * - Escaped string literals `\n`, `\r\n`, `\r`
+ * - Controlled tab (`\t` and `\t`) substitution (normalized to single space)
+ * - Preserves double-escaped backslashes (`\\n` remains literal `\n`)
+ * - Preserves legitimate backslashes (e.g. `\lambda`, `C:\dir`)
+ * - Trims individual lines and collapses consecutive empty lines
+ *
+ * @param text - The raw translation or definition string, or null/undefined.
+ * @returns Array of non-empty line strings.
+ */
+export function splitDefinitionLines(text: string | null | undefined): readonly string[] {
+  if (text === null || text === undefined) return []
+
+  const lines: string[] = []
+  let currentLine = ''
+  const len = text.length
+  let i = 0
+
+  const pushCurrentLine = (): void => {
+    const trimmed = currentLine.trim()
+    if (trimmed.length > 0) {
+      lines.push(trimmed)
+    }
+    currentLine = ''
+  }
+
+  while (i < len) {
+    const c = text[i]!
+
+    // Check for real newlines
+    if (c === '\r') {
+      if (i + 1 < len && text[i + 1] === '\n') {
+        i += 2
+      } else {
+        i += 1
+      }
+      pushCurrentLine()
+      continue
+    }
+
+    if (c === '\n') {
+      i += 1
+      pushCurrentLine()
+      continue
+    }
+
+    // Check for real tab
+    if (c === '\t') {
+      currentLine += ' '
+      i += 1
+      continue
+    }
+
+    // Check for backslash escape sequences
+    if (c === '\\') {
+      let backslashCount = 0
+      while (i < len && text[i] === '\\') {
+        backslashCount += 1
+        i += 1
+      }
+
+      // Append pairs of backslashes as literal backslashes
+      const literalBackslashes = Math.floor(backslashCount / 2)
+      if (literalBackslashes > 0) {
+        currentLine += '\\'.repeat(literalBackslashes)
+      }
+
+      // If odd number of backslashes, inspect escaped char
+      if (backslashCount % 2 === 1) {
+        if (i < len) {
+          const next = text[i]!
+          if (next === 'n') {
+            i += 1
+            pushCurrentLine()
+            continue
+          } else if (next === 'r') {
+            i += 1
+            // Check if followed by literal \n or real \n
+            if (i < len && text[i] === '\n') {
+              i += 1
+            } else if (i + 1 < len && text[i] === '\\' && text[i + 1] === 'n') {
+              i += 2
+            }
+            pushCurrentLine()
+            continue
+          } else {
+            // Legitimate backslash followed by other char (e.g. \lambda, \to, \alpha)
+            currentLine += '\\' + next
+            i += 1
+            continue
+          }
+        } else {
+          // Trailing single backslash
+          currentLine += '\\'
+          continue
+        }
+      }
+
+      continue
+    }
+
+    // Normal character
+    currentLine += c
+    i += 1
+  }
+
+  pushCurrentLine()
+  return lines
+}
+
+/**
  * Whether a raw selection would survive normalization as a query.
  *
  * Used by the browser half to decide that `resolve()` should return

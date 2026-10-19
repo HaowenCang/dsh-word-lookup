@@ -370,10 +370,12 @@ describe('DictionarySettingsSection Rendering', () => {
       expect(html).toContain('Linux Web 平台受浏览器系统快捷键限制')
     })
 
-    it('renders Phase 7A.8 notice for custom SQLite dictionaries', () => {
+    it('renders "已支持" badge and updated description for custom SQLite dictionaries', () => {
       const html = renderSection({})
       expect(html).toContain('自定义外部 SQLite 词典')
-      expect(html).toContain('Phase 7A.8 开放')
+      expect(html).toContain('已支持')
+      expect(html).toContain('请在上方“自定义 SQLite 词典管理”区域配置并挂载使用')
+      expect(html).not.toContain('Phase 7A.8')
     })
   })
 

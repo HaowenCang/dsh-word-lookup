@@ -15,6 +15,7 @@ import {
   countCodePoints,
   isEligibleSelectionText,
   normalizeHeadword,
+  splitDefinitionLines,
   splitGlosses,
 } from '../src/shared/text.js'
 
@@ -123,6 +124,108 @@ describe('splitGlosses', () => {
     expect(splitGlosses('  ')).toEqual([])
     expect(splitGlosses('')).toEqual([])
     expect(splitGlosses(null)).toEqual([])
+  })
+})
+
+describe('splitDefinitionLines', () => {
+  it('returns empty array for null, undefined, empty string, and whitespace-only text', () => {
+    expect(splitDefinitionLines(null)).toEqual([])
+    expect(splitDefinitionLines(undefined)).toEqual([])
+    expect(splitDefinitionLines('')).toEqual([])
+    expect(splitDefinitionLines('   ')).toEqual([])
+    expect(splitDefinitionLines('\n\n\r\n')).toEqual([])
+    expect(splitDefinitionLines('\\n\\n')).toEqual([])
+  })
+
+  it('returns a single line unchanged when no line break exists', () => {
+    expect(splitDefinitionLines('single definition line')).toEqual(['single definition line'])
+    expect(splitDefinitionLines('  trimmed definition  ')).toEqual(['trimmed definition'])
+    expect(splitDefinitionLines('波函数；量子态')).toEqual(['波函数；量子态'])
+  })
+
+  it('splits on real LF (\\n)', () => {
+    expect(splitDefinitionLines('first line\nsecond line\nthird line')).toEqual([
+      'first line',
+      'second line',
+      'third line',
+    ])
+  })
+
+  it('splits on real CRLF (\\r\\n) and real CR (\\r)', () => {
+    expect(splitDefinitionLines('line 1\r\nline 2\rline 3')).toEqual(['line 1', 'line 2', 'line 3'])
+  })
+
+  it('splits on literal \\n escape sequence', () => {
+    expect(splitDefinitionLines('first line\\nsecond line\\nthird line')).toEqual([
+      'first line',
+      'second line',
+      'third line',
+    ])
+  })
+
+  it('splits on literal \\r\\n and literal \\r escape sequences', () => {
+    expect(splitDefinitionLines('line 1\\r\\nline 2\\rline 3')).toEqual(['line 1', 'line 2', 'line 3'])
+  })
+
+  it('splits on mixed real and literal line breaks', () => {
+    expect(splitDefinitionLines('line 1\nline 2\\nline 3\r\nline 4\\r\\nline 5')).toEqual([
+      'line 1',
+      'line 2',
+      'line 3',
+      'line 4',
+      'line 5',
+    ])
+  })
+
+  it('preserves double-escaped backslash (\\\\n remains literal \\n and does not split)', () => {
+    expect(splitDefinitionLines('literal\\\\nnot-a-break')).toEqual(['literal\\nnot-a-break'])
+  })
+
+  it('handles triple-escaped backslash (\\\\\\n yields literal backslash and splits)', () => {
+    expect(splitDefinitionLines('escaped-slash\\\\\\nsecond-line')).toEqual([
+      'escaped-slash\\',
+      'second-line',
+    ])
+  })
+
+  it('preserves legitimate backslashes without splitting (e.g. \\lambda, C:\\dir)', () => {
+    expect(splitDefinitionLines('formula: \\lambda + \\mu')).toEqual(['formula: \\lambda + \\mu'])
+    expect(splitDefinitionLines('path: C:\\dir\\file.txt')).toEqual(['path: C:\\dir\\file.txt'])
+    expect(splitDefinitionLines('operator \\ backslash')).toEqual(['operator \\ backslash'])
+  })
+
+  it('handles real tabs by controlled substitution to a space while preserving legitimate text', () => {
+    expect(splitDefinitionLines('col1\tcol2\tcol3')).toEqual(['col1 col2 col3'])
+    expect(splitDefinitionLines('word \\to another')).toEqual(['word \\to another'])
+  })
+
+  it('trims lines and collapses consecutive empty lines without ghost rows', () => {
+    expect(splitDefinitionLines('line 1\n\n\nline 2')).toEqual(['line 1', 'line 2'])
+    expect(splitDefinitionLines('line 1\\n\\nline 2')).toEqual(['line 1', 'line 2'])
+    expect(splitDefinitionLines('line 1\r\n  \r\nline 2')).toEqual(['line 1', 'line 2'])
+  })
+
+  it('strips leading and trailing line breaks', () => {
+    expect(splitDefinitionLines('\n\nline 1\nline 2\n\n')).toEqual(['line 1', 'line 2'])
+    expect(splitDefinitionLines('\\n\\nline 1\\nline 2\\n\\n')).toEqual(['line 1', 'line 2'])
+  })
+
+  it('preserves HTML tags and special characters as raw text without decoding or injection', () => {
+    const raw = '<script>alert(1)</script>\\n<div class="test">content</div>'
+    expect(splitDefinitionLines(raw)).toEqual([
+      '<script>alert(1)</script>',
+      '<div class="test">content</div>',
+    ])
+  })
+
+  it('splits synthetic pass entry with multiple POS segments and Chinese glosses', () => {
+    const passTranslation =
+      'n. 穿过, 通过, 经过, 通行证, 护照, 入场券, 票, 隘口, 关口\\nvt. 通过, 经过, 穿过, 度过, 超越, 传递, 传球, 遗留, 批准\\nvi. 经过, 穿过, 变化, 终止, 传递, 被通过'
+    expect(splitDefinitionLines(passTranslation)).toEqual([
+      'n. 穿过, 通过, 经过, 通行证, 护照, 入场券, 票, 隘口, 关口',
+      'vt. 通过, 经过, 穿过, 度过, 超越, 传递, 传球, 遗留, 批准',
+      'vi. 经过, 穿过, 变化, 终止, 传递, 被通过',
+    ])
   })
 })
 
