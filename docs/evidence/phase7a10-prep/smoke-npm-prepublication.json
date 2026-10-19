@@ -1,0 +1,13 @@
+{
+  "timestamp": "2026-10-19T07:51:11.380Z",
+  "mode": "npm",
+  "verdict": "NOT_EXECUTED_PRE_PUBLICATION",
+  "reason": "NOT_PUBLISHED (E404 confirmed from official registry)",
+  "registry": "https://registry.npmjs.org/",
+  "package": "dsh-word-lookup@0.2.0",
+  "error": {
+    "code": "E404",
+    "summary": "No match found for version 0.2.0",
+    "detail": "The requested resource 'dsh-word-lookup@0.2.0' could not be found or you do not have permission to access it.\n\nNote that you can also install from a\ntarball, folder, http url, or git url."
+  }
+}
