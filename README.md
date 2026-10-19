@@ -6,17 +6,18 @@ nothing leaves your machine and no model is involved.
 
 ## Status
 
-**Current development target: v0.2.0 — unreleased.**
-The latest published release is **v0.1.0**.
+**Current release: v0.2.0 — RELEASED.**
+The latest published release is **v0.2.0** on the official npm registry.
 
-The plugin is local-first and uses SQLite for dictionary lookup. The public package does not redistribute the full ECDICT corpus (manifest status: `REDISTRIBUTION REVIEW REQUIRED`). On startup, the plugin immediately provides a deterministic, zero-dependency built-in fixture dictionary with zero external network requests. Full lexicon coverage is available via one-click user-orchestrated Managed ECDICT installation from the pinned public corpus source with streaming SHA-256 and UTF-8 verification, or via user-provided custom SQLite dictionary imports staged into immutable managed snapshots.
+The plugin is local-first and uses SQLite (`node:sqlite`) for dictionary lookup. The public npm package does not bundle or redistribute the full ECDICT database corpus (manifest status: `REDISTRIBUTION REVIEW REQUIRED`). On startup, the plugin immediately provides a deterministic, zero-dependency built-in fixture dictionary with zero external network requests. Full lexicon coverage is available via one-click user-orchestrated Managed ECDICT installation from the pinned public corpus source with streaming SHA-256 and UTF-8 verification, or via user-provided custom SQLite dictionary imports staged into immutable managed snapshots.
 
 | Area | State |
 | --- | --- |
 | Target client | DSH Web (`0.2.0-rc.2`) |
-| DSH baseline | `0.2.0-rc.2`, Web only — Desktop adapters and earlier DSH versions are unverified / unsupported |
-| Development version | `0.2.0` (unreleased) |
-| Latest published release | `0.1.0` |
+| DSH baseline | `0.2.0-rc.2` (Web Profile) — verified target |
+| DSH 0.2.1-rc.2 status | `NOT_VERIFIED` — candidate target for next independent compatibility adaptation (not declared compatible) |
+| Desktop / other targets | Desktop adapters and earlier DSH versions are unverified / unsupported |
+| Current published release | `0.2.0` |
 | Manual shortcut lookup | works; primary supported path (`Primary+Shift+L` by default, fully customizable) |
 | Settings persistence | works, verified across full restart and reboot |
 | Automatic lookup on double-click | works when `autoDoubleClick` is on (default off), verified in a real browser |
@@ -31,57 +32,74 @@ The plugin is local-first and uses SQLite for dictionary lookup. The public pack
 
 ### Installation
 
-#### Published Release (v0.1.0)
+#### Published Release (v0.2.0)
 
 To install the latest published release in DSH Web:
+
+```powershell
+dsh plugin --profile web add dsh-word-lookup@0.2.0
+dsh --profile web
+```
+
+#### Development & Local Verification
+
+To run runtime verification tests or develop locally against an isolated profile:
+
+```powershell
+npm run iso:check
+npm run test-profile:create
+npm run test:runtime
+npm run test-profile:cleanup -- --evidence-recorded
+```
+
+### Historical Versions
+
+#### Release v0.1.0
+
+The initial release of `dsh-word-lookup` provided basic SQLite fixture lookup and shortcut invocation:
 
 ```powershell
 dsh plugin --profile web add dsh-word-lookup@0.1.0
 dsh --profile web
 ```
 
-#### Development Version (v0.2.0)
+## Compatibility Scope
 
-The v0.2.0 version is an active development branch and is not published to npm. To test or develop locally, link the local checkout to an isolated profile:
+- **Verified Target**: DSH `0.2.0-rc.2` (Web Profile). All end-to-end integration tests, browser interactions, and post-publication smoke verifications have been conducted on this target.
+- **Candidate Target (DSH 0.2.1-rc.2)**: `NOT_VERIFIED`. In the absence of end-to-end empirical testing, DSH `0.2.1-rc.2` is not declared compatible and v0.2.0 package compatibility metadata is unchanged. It is recorded as a candidate target for future independent compatibility validation.
+- **Unsupported Environments**: DSH Desktop profiles, native desktop electron wrappers, and DSH versions prior to `0.2.0-rc.2` are unverified and unsupported.
 
-```powershell
-npm run test-profile:create
-npm run test:runtime
-```
+## Known Limitations & Disclosures
 
-### Known v0.1.0 limitation
+### 1. Automatic Selection Portability (`autoSelection`)
 
-`autoSelection` remains opt-in and defaults to off. Its portability across unmeasured operating systems, display servers, DPI settings, and platform multi-click configurations is not yet established. The manual `Primary+Shift+L` path is unaffected and remains the primary supported interaction.
+`autoSelection` (automatic lookup on mouse drag-selection) remains strictly opt-in and defaults to **OFF**. Automatic lookup on drag-selection has been measured and verified on Windows/Chromium at standard DPI settings. Portability across unmeasured operating systems, display servers (e.g., Wayland/X11), high-DPI scaling, and platform multi-click timing differences is not established and is classified as a known release limitation.
 
-The two automatic switches (`autoDoubleClick`, `autoSelection`) exist in the
-settings UI, default to **off**, and persist. Each one drives exactly the
-gesture it names:
+The manual keyboard shortcut (`Primary+Shift+L`) is unaffected, has zero gesture timing dependencies, and remains the primary, recommended interaction.
+
+The two automatic switches (`autoDoubleClick`, `autoSelection`) exist in the settings UI, default to **OFF**, and persist across restarts. Each switch controls strictly the gesture it names:
 
 ```text
-autoSelection    a completed pointer drag selection   (not a selectionchange)
-autoDoubleClick  a double click the browser recognised
+autoSelection    a completed pointer drag selection (not a selectionchange)
+autoDoubleClick  a double click the browser recognized
 ```
 
-Neither switch affects the manual `Primary+Shift+L` shortcut, which is the only
-path that reaches the dictionary with both switches off.
+- **A double click is never answered by `autoSelection`**: The classifier's 5 px drag threshold and the browser's double-click recognition are distinct rules. The plugin reads platform click multiplicity on `mousedown` and refuses an `auto-selection` lookup unless the press was verifiably a *single* click. An unmeasured press does not produce automatic I/O.
+- **`autoSelection` is not "the selection changed"**: Keyboard selection, programmatic selection, and selections resulting from double-clicks are deliberately excluded. The plugin never triggers a lookup from a DOM `selectionchange` event.
 
-**A double click is never answered by `autoSelection`.** The classifier's 5 px
-drag threshold and the browser's own double-click recognition are different
-rules, so a second press that drifts while selecting a word can satisfy both —
-and the browser still reports the whole thing as `dblclick`. The plugin reads the
-platform's click multiplicity off the `mousedown` that opens each press and
-refuses an `auto-selection` lookup unless the press was verifiably a *single*
-click, so a gesture the platform calls a double click is answered by
-`autoDoubleClick` and nothing else. A press whose multiplicity was never observed
-is refused too: an unmeasured press does not become automatic I/O.
+### 2. Scenario F03 Process Crash Recovery Boundary
 
-**`autoSelection` is not "the selection changed."** A keyboard selection, a
-programmatic one and the selection a double click produces are all deliberately
-outside it, and the plugin never issues a lookup from a `selectionchange` event.
-That is what keeps one double click to one lookup instead of two, and it is
-asserted two ways: a syntax-tree check that the `selectionchange` handler reaches
-no I/O, and a browser measurement that fifty programmatic selections issue zero
-requests with `autoSelection` on.
+In fault-injection testing under Scenario F03 (a process crash occurring during transition from custom dictionary mode to built-in fixture mode, immediately after the durable metadata file `active.json` is unlinked on disk but before the host settings synchronization RPC is acknowledged):
+- **Data Plane Resiliency**: Upon restart, the data plane safely falls back to the built-in deterministic fixture dictionary (`activeMode: fixture`). Vocabulary lookup functionality is 100% operational.
+- **Data Integrity**: User source database files and managed snapshots remain 100% intact without data loss or corruption.
+- **Truthful Status Reporting**: Because the host configuration synchronization RPC was interrupted by the crash, host configuration may still display the prior mode. The runtime truthfully reports `settingsSyncState: 'pending'` to disclose that disk state and host configuration have not yet synchronized.
+- **Recovery Requirement**: This pending state is stable and will not cause runtime errors, but **it will not automatically converge during idle periods**. The user must explicitly click and select the dictionary mode ("内置词典 / Fixture") once in the settings UI to complete host settings synchronization and transition `settingsSyncState` to `'synced'`.
+
+### 3. ECDICT Corpus Redistribution & Network Boundary
+
+- **Package Redistribution**: The full ECDICT database corpus is **NOT** bundled or redistributed in this repository, npm packages, or GitHub Releases (manifest status: `REDISTRIBUTION REVIEW REQUIRED`). Only the deterministic 7-entry test fixture and metadata manifest (`corpus/ecdict.manifest.json`) are included in the package.
+- **Zero Network for Lookups**: Dictionary word lookups run strictly against local SQLite and never make outbound network requests, never contact third-party translation services, and never send queries to AI models or LLM token endpoints.
+- **Explicit Network on Installation**: Outbound network requests occur **only** when the user explicitly triggers the "Install ECDICT" action in the settings UI. The host then streams the corpus directly from the pinned public repository source with streaming SHA-256 integrity and UTF-8 validation before building the local SQLite database in a background worker.
 
 ## How it works
 
@@ -110,7 +128,7 @@ browser (client half)                          host (Node half)
 
 ### Dictionary Storage & Lifecycle
 
-The v0.2.0 architecture routes dictionary lookups through `DictionaryManager`:
+The plugin architecture routes dictionary lookups through `DictionaryManager`:
 
 ```text
 lookup route → DictionaryManager → active Dictionary
@@ -221,14 +239,14 @@ is a standing engineering rule, not incident paperwork.
 - The plugin uses local SQLite (`node:sqlite`) strictly on the host side.
 - Fixture databases are read directly on the local machine in read-only mode.
 - No dictionary corpus, word lookups, or user queries are ever uploaded or written outside local cache/storage.
-- No files outside package-owned data are accessed.
+- No files outside package-owned data and user-designated import files are accessed.
 
 ### Network
 - The browser client only calls the DSH host's same-origin `/api/dsh-word-lookup` HTTP POST route.
-- No remote dictionary services.
-- No third-party translation APIs.
-- No LLM / model provider APIs or token consumption.
-- No external lookup requests or outbound network traffic whatsoever.
+- Zero remote dictionary services or third-party translation APIs.
+- Zero LLM / model provider APIs or token consumption.
+- Zero external network requests during dictionary lookup operations.
+- Outbound network requests occur exclusively during user-initiated Managed ECDICT download from the pinned public corpus repository.
 
 ### Environment & Credentials
 - Zero environment variables are read by the active runtime.
@@ -239,8 +257,7 @@ is a standing engineering rule, not incident paperwork.
 - Full ECDICT redistribution is **NOT included and NOT authorized** in this repository, npm packages, or GitHub Releases.
 - Only the deterministic 7-entry test fixture and metadata manifests (`corpus/ecdict.manifest.json`) are distributed.
 
-### Known Release Blocker: automatic-selection portability
-- **RELEASE BLOCKER — automatic-selection portability: OPEN**.
+### Known Release Limitation: automatic-selection portability
 - Automatic lookup on drag-selection is verified only in measured Windows/Chromium/DPI environments. Cross-platform timing, multi-click behaviors, and display server differences mean `autoSelection` remains an experimental opt-in feature.
 - `autoSelection` defaults to **OFF**.
 - `autoDoubleClick` defaults to **OFF**.
@@ -269,6 +286,8 @@ tests/                  unit tests (vitest)
 
 ## Documentation
 
+- [`docs/evidence/phase7a11-published/release-summary.md`](docs/evidence/phase7a11-published/release-summary.md) — Phase 7A.11 formal publication report
+- [`docs/evidence/phase7a10-prep/release-notes-v0.2.0.md`](docs/evidence/phase7a10-prep/release-notes-v0.2.0.md) — formal v0.2.0 release notes
 - [`docs/RECOVERY_AUDIT.md`](docs/RECOVERY_AUDIT.md) — what was verified and when
 - [`docs/ISOLATION-TEST-PLAN.md`](docs/ISOLATION-TEST-PLAN.md) — mandatory test isolation
 - [`docs/PHASE1_EVIDENCE.md`](docs/PHASE1_EVIDENCE.md) — Phase 1 runtime results
