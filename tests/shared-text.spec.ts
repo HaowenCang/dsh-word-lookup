@@ -245,7 +245,7 @@ describe('R3: Backslash newline parsing and legitimate backslash boundary', () =
     expect(realLfBytes).toEqual(Buffer.from([0x6c, 0x69, 0x6e, 0x65, 0x31, 0x0a, 0x6c, 0x69, 0x6e, 0x65, 0x32]))
     expect(realCrlfBytes).toEqual(Buffer.from([0x6c, 0x69, 0x6e, 0x65, 0x31, 0x0d, 0x0a, 0x6c, 0x69, 0x6e, 0x65, 0x32]))
 
-    // Per ECDICT contract, all three normalize to the same split result
+    // Under plugin parsing rules accommodating ECDICT literal escapes and standard newlines, all three normalize to the same split result
     expect(splitDefinitionLines(literalEscape)).toEqual(['line1', 'line2'])
     expect(splitDefinitionLines(realLf)).toEqual(['line1', 'line2'])
     expect(splitDefinitionLines(realCrlf)).toEqual(['line1', 'line2'])
@@ -261,22 +261,22 @@ describe('R3: Backslash newline parsing and legitimate backslash boundary', () =
 
   it('characterizes ambiguity boundary: unescaped single \\n and \\r vs double-escaped literal backslashes', () => {
     // LaTeX commands: \nu, \rho, \nabla
-    // Unescaped: \n and \r are interpreted as ECDICT line breaks
+    // Unescaped: \n and \r are interpreted as line breaks under plugin parsing rules
     expect(splitDefinitionLines('\\nu')).toEqual(['u'])
     expect(splitDefinitionLines('\\rho')).toEqual(['ho'])
     expect(splitDefinitionLines('\\nabla')).toEqual(['abla'])
 
-    // Escaped contract: double-backslash strictly preserves literal LaTeX commands without splitting
+    // Plugin parsing rule: double-backslash strictly preserves literal LaTeX commands without splitting
     expect(splitDefinitionLines('\\\\nu')).toEqual(['\\nu'])
     expect(splitDefinitionLines('\\\\rho')).toEqual(['\\rho'])
     expect(splitDefinitionLines('\\\\nabla')).toEqual(['\\nabla'])
 
     // Windows paths: C:\new, C:\reports
-    // Unescaped: \n and \r split
+    // Unescaped: \n and \r split under plugin parsing rules
     expect(splitDefinitionLines('C:\\new\\folder')).toEqual(['C:', 'ew\\folder'])
     expect(splitDefinitionLines('C:\\reports\\data')).toEqual(['C:', 'eports\\data'])
 
-    // Escaped contract: double-backslash strictly preserves Windows path without splitting
+    // Plugin parsing rule: double-backslash strictly preserves Windows path without splitting
     expect(splitDefinitionLines('C:\\\\new\\\\folder')).toEqual(['C:\\new\\folder'])
     expect(splitDefinitionLines('C:\\\\reports\\\\data')).toEqual(['C:\\reports\\data'])
   })
@@ -303,6 +303,14 @@ describe('hasExplicitPosPrefix', () => {
     expect(hasExplicitPosPrefix('pl. 复数')).toBe(true)
   })
 
+  it('recognizes Chinese POS prefixes without space per dictionary convention', () => {
+    expect(hasExplicitPosPrefix('n.穿过')).toBe(true)
+    expect(hasExplicitPosPrefix('vt.打倒')).toBe(true)
+    expect(hasExplicitPosPrefix('vi.登广告')).toBe(true)
+    expect(hasExplicitPosPrefix('conj.虽然')).toBe(true)
+    expect(hasExplicitPosPrefix('v.& n.穿过')).toBe(true)
+  })
+
   it('recognizes compound POS prefixes (e.g. v.& n., vt. / vi.)', () => {
     expect(hasExplicitPosPrefix('v.& n. 穿过')).toBe(true)
     expect(hasExplicitPosPrefix('vt. / vi. 通过')).toBe(true)
@@ -317,6 +325,9 @@ describe('hasExplicitPosPrefix', () => {
     expect(hasExplicitPosPrefix('[adj.] 漂亮的')).toBe(true)
     expect(hasExplicitPosPrefix('【动】 穿过')).toBe(true)
     expect(hasExplicitPosPrefix('【名】 关口')).toBe(true)
+    expect(hasExplicitPosPrefix('【名词】 关口')).toBe(true)
+    expect(hasExplicitPosPrefix('〔副〕 快速')).toBe(true)
+    expect(hasExplicitPosPrefix('（代） 他')).toBe(true)
   })
 
   it('rejects ordinary words and sentences (never falsely matches regular text)', () => {
@@ -335,6 +346,24 @@ describe('hasExplicitPosPrefix', () => {
     expect(hasExplicitPosPrefix('etc. and so forth')).toBe(false)
     expect(hasExplicitPosPrefix('C:\\dir\\file.txt')).toBe(false)
     expect(hasExplicitPosPrefix('\\lambda + \\mu')).toBe(false)
+  })
+
+  it('rejects non-POS lexical tokens and false positives (e.g. n.example, v.2026)', () => {
+    expect(hasExplicitPosPrefix('n.example')).toBe(false)
+    expect(hasExplicitPosPrefix('v.2026')).toBe(false)
+    expect(hasExplicitPosPrefix('v.1.0')).toBe(false)
+    expect(hasExplicitPosPrefix('n.foo')).toBe(false)
+    expect(hasExplicitPosPrefix('a.method')).toBe(false)
+  })
+
+  it('rejects empty and non-POS bracketed patterns', () => {
+    expect(hasExplicitPosPrefix('【】')).toBe(false)
+    expect(hasExplicitPosPrefix('【】 穿过')).toBe(false)
+    expect(hasExplicitPosPrefix('〔〕')).toBe(false)
+    expect(hasExplicitPosPrefix('（）')).toBe(false)
+    expect(hasExplicitPosPrefix('【词】')).toBe(false)
+    expect(hasExplicitPosPrefix('【其他】')).toBe(false)
+    expect(hasExplicitPosPrefix('【化学】')).toBe(false)
   })
 
   it('handles empty, null, and whitespace inputs safely', () => {

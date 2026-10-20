@@ -763,5 +763,91 @@ describe('WordLookupCard rendering', () => {
       expect(html).toContain('v.')
       expect(html).toContain('<span style="display:inline-block;padding:1px 5px;margin-right:6px;border-radius:3px;background:var(--wl-tag-bg, rgba(255,255,255,0.08));color:var(--wl-tag-fg, #d0d0dc);font-size:11px;font-weight:600;font-style:italic;vertical-align:baseline">v.</span>')
     })
+
+    it('Scenario 7: renders top-level POS badge on line 1 when line 1 has no POS but subsequent lines do', () => {
+      const store = new LookupCardStore()
+      store.set({
+        status: 'ready',
+        query: 'pass',
+        result: {
+          kind: 'found',
+          body: baseFound({
+            headword: 'pass',
+            meanings: [
+              {
+                partOfSpeech: 'v.',
+                translation: '穿过, 通过, 经过\nvt. 批准, 度过\nvi. 变化, 终止',
+                definition: 'to move past something',
+              },
+            ],
+          }),
+        },
+      })
+      const html = renderCard(store)
+
+      // Top-level badge should be rendered on line 1 since line 1 has no explicit POS
+      expect(html).toContain('<span style="display:inline-block;padding:1px 5px;margin-right:6px;border-radius:3px;background:var(--wl-tag-bg, rgba(255,255,255,0.08));color:var(--wl-tag-fg, #d0d0dc);font-size:11px;font-weight:600;font-style:italic;vertical-align:baseline">v.</span>')
+      expect(countOccurrences(html, 'data-dsh-word-lookup="translation-line"')).toBe(3)
+      expect(html).toContain('穿过')
+      expect(html).toContain('vt. 批准')
+      expect(html).toContain('vi. 变化')
+    })
+
+    it('Scenario 8: suppresses top-level POS badge when line 1 has POS but subsequent lines do not', () => {
+      const store = new LookupCardStore()
+      store.set({
+        status: 'ready',
+        query: 'pass',
+        result: {
+          kind: 'found',
+          body: baseFound({
+            headword: 'pass',
+            meanings: [
+              {
+                partOfSpeech: 'v.',
+                translation: 'n. 关口, 隘口, 护照\n穿过, 通过, 经过',
+                definition: 'a narrow passage or path',
+              },
+            ],
+          }),
+        },
+      })
+      const html = renderCard(store)
+
+      // Top-level badge v. must be suppressed to avoid collision with line 1's "n."
+      expect(html).not.toContain('v.n.')
+      expect(html).not.toContain('v. n.')
+      expect(html).not.toContain('<span style="display:inline-block;padding:1px 5px;margin-right:6px;border-radius:3px;background:var(--wl-tag-bg, rgba(255,255,255,0.08));color:var(--wl-tag-fg, #d0d0dc);font-size:11px;font-weight:600;font-style:italic;vertical-align:baseline">v.</span>')
+      expect(countOccurrences(html, 'data-dsh-word-lookup="translation-line"')).toBe(2)
+      expect(html).toContain('n. 关口')
+      expect(html).toContain('穿过')
+    })
+
+    it('Scenario 9: renders top-level POS badge on line 1 when all translation lines lack POS', () => {
+      const store = new LookupCardStore()
+      store.set({
+        status: 'ready',
+        query: 'derive',
+        result: {
+          kind: 'found',
+          body: baseFound({
+            headword: 'derive',
+            meanings: [
+              {
+                partOfSpeech: 'v.',
+                translation: '得到；源于\n从特定来源获取',
+                definition: 'obtain something from a specified source.',
+              },
+            ],
+          }),
+        },
+      })
+      const html = renderCard(store)
+
+      expect(countOccurrences(html, 'data-dsh-word-lookup="translation-line"')).toBe(2)
+      expect(html).toContain('<span style="display:inline-block;padding:1px 5px;margin-right:6px;border-radius:3px;background:var(--wl-tag-bg, rgba(255,255,255,0.08));color:var(--wl-tag-fg, #d0d0dc);font-size:11px;font-weight:600;font-style:italic;vertical-align:baseline">v.</span>')
+      expect(html).toContain('得到')
+      expect(html).toContain('从特定来源获取')
+    })
   })
 })

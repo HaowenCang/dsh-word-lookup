@@ -92,16 +92,19 @@ export function normalizeHeadword(raw: string): string {
  */
 const POS_TAG_PATTERN =
   '(?:vt|vi|adj|adv|prep|pron|conj|interj|int|num|art|aux|abbr|sing|pref|suff|link-v|cop|pl|a|ad|n|v)'
-const COMPOUND_POS_PATTERN = `${POS_TAG_PATTERN}(?:\\s*(?:&|\\/)\\s*${POS_TAG_PATTERN})*`
+const BARE_POS_PATTERN = `(?:${POS_TAG_PATTERN}\\.?(?:\\s*(?:&|\\/)\\s*))*${POS_TAG_PATTERN}\\.`
 
 /**
- * Matches bare POS tags ending with a period and whitespace/delimiter, e.g.
- * - "n. 穿过"
- * - "vt. 通过"
- * - "v.& n. 穿过"
- * - "a. 好的"
+ * Matches bare POS tags ending with a period and a lexical boundary:
+ * - Followed by one or more whitespace characters, e.g. "n. 穿过", "vt. 通过", "v.& n. 穿过", "a. 好的"
+ * - Followed immediately by a Chinese character without whitespace per dictionary convention, e.g. "n.穿过", "vt.打倒"
+ * - Ending at the boundary/end of the line, e.g. "n."
+ *
+ * Rejects non-POS plain text such as "n.example" or "v.2026".
  */
-const BARE_POS_REGEX = new RegExp(`^${COMPOUND_POS_PATTERN}\\.\\s*`, 'i')
+const BARE_POS_REGEX = new RegExp(`^${BARE_POS_PATTERN}(?:\\s+|$|(?=[\\u4e00-\\u9fa5]))`, 'i')
+
+const BRACKETED_COMPOUND_POS_PATTERN = `(?:${POS_TAG_PATTERN}\\.?(?:\\s*(?:&|\\/)\\s*))*${POS_TAG_PATTERN}\\.?`
 
 /**
  * Matches bracketed POS tags with optional period, e.g.
@@ -110,14 +113,21 @@ const BARE_POS_REGEX = new RegExp(`^${COMPOUND_POS_PATTERN}\\.\\s*`, 'i')
  * - "(vt.) 通过"
  * - "(vi) 经过"
  */
-const BRACKETED_POS_REGEX = new RegExp(`^(?:\\[|\\()${COMPOUND_POS_PATTERN}\\.?(?:\\]|\\))\\s*`, 'i')
+const BRACKETED_POS_REGEX = new RegExp(
+  `^(?:\\[${BRACKETED_COMPOUND_POS_PATTERN}\\]|\\(${BRACKETED_COMPOUND_POS_PATTERN}\\))\\s*`,
+  'i',
+)
 
 /**
- * Matches common Chinese bracketed POS tags, e.g.
+ * Matches non-empty Chinese bracketed POS tags, e.g.
  * - "【动】 穿过"
  * - "【名】 关口"
+ * - "【名词】 关口"
+ *
+ * Disallows empty bracket pairs such as "【】", "〔〕", or "（）".
  */
-const CJK_BRACKETED_POS_REGEX = /^(?:【|〔|（)(?:名|动|形|副|代|介|连|感|叹|数|量|冠|助|缩)?词?(?:】|〕|）)\s*/
+const CJK_BRACKETED_POS_REGEX =
+  /^(?:【(?:名|动|形|副|代|介|连|感|叹|数|量|冠|助|缩)词?】|〔(?:名|动|形|副|代|介|连|感|叹|数|量|冠|助|缩)词?〕|（(?:名|动|形|副|代|介|连|感|叹|数|量|冠|助|缩)词?）)\s*/
 
 /**
  * Determine whether a translation or definition line begins with an explicit part-of-speech prefix.
@@ -169,14 +179,25 @@ export function splitGlosses(translation: string | null): readonly string[] {
  * - Preserves legitimate backslashes (e.g. `\lambda`, `C:\dir`)
  * - Trims individual lines and collapses consecutive empty lines
  *
- * Data Contract & Remaining Ambiguity Boundary:
- * ECDICT database fields use literal two-character sequences `\n` and `\r\n` to
- * encode multiline glosses without embedding raw control characters into CSV records.
- * Syntactically, an unescaped single backslash before `n` or `r` (e.g. in LaTeX `\nu`,
- * `\nabla`, `\rho` or Windows paths `C:\new`, `C:\reports`) matches this newline delimiter.
- * Per the ECDICT data format contract, these single-escaped sequences are parsed as line breaks.
- * To preserve literal backslashes before `n` or `r` without splitting, callers or authoring
- * pipelines must use standard double-escaping (`\\nu`, `\\rho`, `C:\\new`).
+ * Data Contract & Parsing Rules:
+ *
+ * 1. ECDICT Source Data Observation:
+ *    ECDICT database fields have been observed to use literal two-character sequences `\n`
+ *    and `\r\n` to encode multiline glosses without embedding raw control characters into
+ *    CSV records.
+ *
+ * 2. Plugin Parsing Rules:
+ *    To uniformly support both standard control characters (raw LF `\n`, CRLF `\r\n`)
+ *    and ECDICT-style literal escapes, this plugin's parser treats unescaped `\n` and `\r\n`
+ *    sequences as line breaks, while preserving double-escaped `\\n` as literal `\n`.
+ *
+ * 3. Custom SQLite & Upstream Corpora Boundary:
+ *    This parsing behavior is an intentional design choice of this plugin, not a universal
+ *    guarantee provided by all upstream dictionary corpora or user-imported SQLite databases.
+ *    Custom SQLite dictionaries imported by users may contain unescaped backslashes before `n`
+ *    or `r` (e.g. LaTeX `\nu`, `\rho`, or Windows paths `C:\new`, `C:\reports`). Under this
+ *    plugin's parsing rules, these sequences will be treated as line delimiters unless authoring
+ *    pipelines or custom importers double-escape them (`\\nu`, `\\rho`, `C:\\new`).
  *
  * @param text - The raw translation or definition string, or null/undefined.
  * @returns Array of non-empty line strings.

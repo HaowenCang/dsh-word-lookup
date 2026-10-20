@@ -399,8 +399,12 @@ export function WordLookupCard(props: WordLookupCardProps): ReactElement | null 
               const transLines = meaning.translation ? splitDefinitionLines(meaning.translation) : []
               const defLines = meaning.definition ? splitDefinitionLines(meaning.definition) : []
 
-              const hasTranslationPos = transLines.some((l) => hasExplicitPosPrefix(l))
-              const showPosBadge = Boolean(meaning.partOfSpeech && (!transLines.length || !hasTranslationPos))
+              // Multiline POS badge suppression:
+              // Prioritize inspecting the adjacent first valid translation line where the top-level
+              // badge actually renders. If the first line lacks an explicit POS prefix, render the
+              // top-level POS badge on that line even if subsequent lines carry explicit POS markers.
+              const firstLineHasPos = transLines.length > 0 && hasExplicitPosPrefix(transLines[0])
+              const showPosBadge = Boolean(meaning.partOfSpeech && !firstLineHasPos)
 
               const posBadge = showPosBadge ? (
                 <span

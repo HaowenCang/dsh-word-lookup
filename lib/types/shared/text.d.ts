@@ -89,14 +89,25 @@ export declare function splitGlosses(translation: string | null): readonly strin
  * - Preserves legitimate backslashes (e.g. `\lambda`, `C:\dir`)
  * - Trims individual lines and collapses consecutive empty lines
  *
- * Data Contract & Remaining Ambiguity Boundary:
- * ECDICT database fields use literal two-character sequences `\n` and `\r\n` to
- * encode multiline glosses without embedding raw control characters into CSV records.
- * Syntactically, an unescaped single backslash before `n` or `r` (e.g. in LaTeX `\nu`,
- * `\nabla`, `\rho` or Windows paths `C:\new`, `C:\reports`) matches this newline delimiter.
- * Per the ECDICT data format contract, these single-escaped sequences are parsed as line breaks.
- * To preserve literal backslashes before `n` or `r` without splitting, callers or authoring
- * pipelines must use standard double-escaping (`\\nu`, `\\rho`, `C:\\new`).
+ * Data Contract & Parsing Rules:
+ *
+ * 1. ECDICT Source Data Observation:
+ *    ECDICT database fields have been observed to use literal two-character sequences `\n`
+ *    and `\r\n` to encode multiline glosses without embedding raw control characters into
+ *    CSV records.
+ *
+ * 2. Plugin Parsing Rules:
+ *    To uniformly support both standard control characters (raw LF `\n`, CRLF `\r\n`)
+ *    and ECDICT-style literal escapes, this plugin's parser treats unescaped `\n` and `\r\n`
+ *    sequences as line breaks, while preserving double-escaped `\\n` as literal `\n`.
+ *
+ * 3. Custom SQLite & Upstream Corpora Boundary:
+ *    This parsing behavior is an intentional design choice of this plugin, not a universal
+ *    guarantee provided by all upstream dictionary corpora or user-imported SQLite databases.
+ *    Custom SQLite dictionaries imported by users may contain unescaped backslashes before `n`
+ *    or `r` (e.g. LaTeX `\nu`, `\rho`, or Windows paths `C:\new`, `C:\reports`). Under this
+ *    plugin's parsing rules, these sequences will be treated as line delimiters unless authoring
+ *    pipelines or custom importers double-escape them (`\\nu`, `\\rho`, `C:\\new`).
  *
  * @param text - The raw translation or definition string, or null/undefined.
  * @returns Array of non-empty line strings.
