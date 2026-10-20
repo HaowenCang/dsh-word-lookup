@@ -84,6 +84,10 @@ async function findAvailablePort(startPort = 50995) {
 
 function resolveDshInvocation(dshBinOption) {
   if (!dshBinOption || dshBinOption === 'dsh') {
+    const defaultNpmBin = join(process.env.APPDATA || '', 'npm/node_modules/@deepseek-ai/dsh/lib/bin.js')
+    if (existsSync(defaultNpmBin)) {
+      return { cmd: process.execPath, baseArgs: [defaultNpmBin], isNodeScript: true }
+    }
     return { cmd: 'dsh', baseArgs: [], isNodeScript: false }
   }
   if (dshBinOption.endsWith('.js') || dshBinOption.endsWith('.mjs') || dshBinOption.endsWith('.cjs')) {
@@ -92,7 +96,7 @@ function resolveDshInvocation(dshBinOption) {
   return { cmd: dshBinOption, baseArgs: [], isNodeScript: false }
 }
 
-async function bootDsh(verified, port, cwd, dshInvocation, timeoutMs = 60000) {
+async function bootDsh(verified, port, cwd, dshInvocation, timeoutMs = 90000) {
   const env = buildIsolatedEnv(verified, process.env, { PORT: String(port) })
   const args = [...dshInvocation.baseArgs, '--profile', verified.profile, '--no-open', '--port', String(port)]
   const child = spawn(dshInvocation.cmd, args, {
@@ -106,7 +110,8 @@ async function bootDsh(verified, port, cwd, dshInvocation, timeoutMs = 60000) {
   let stderr = ''
 
   const url = await new Promise((resolveUrl, rejectUrl) => {
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
+      await stopDsh(child, port).catch(() => {})
       rejectUrl(new Error(`DSH startup timed out after ${timeoutMs}ms.\nSTDOUT:\n${stdout}\nSTDERR:\n${stderr}`))
     }, timeoutMs)
 

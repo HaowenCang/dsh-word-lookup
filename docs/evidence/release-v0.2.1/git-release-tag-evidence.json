@@ -1,0 +1,14 @@
+{
+  "tag": "v0.2.1",
+  "tagType": "annotated",
+  "tagObjectSha": "96986896f7749b663e2949645e686f03429e67fc",
+  "targetCommitSha": "79c4e16a323df48391dab0dd3799f22f99a6b771",
+  "peeledCommitSha": "79c4e16a323df48391dab0dd3799f22f99a6b771",
+  "releaseSourceSha": "79c4e16a323df48391dab0dd3799f22f99a6b771",
+  "remote": "https://github.com/HaowenCang/dsh-word-lookup.git",
+  "remoteRef": "refs/tags/v0.2.1",
+  "remoteRefSha": "96986896f7749b663e2949645e686f03429e67fc",
+  "tagger": "Evan Williams <54177361+HaowenCang@users.noreply.github.com>",
+  "message": "Release v0.2.1",
+  "verificationStatus": "PASS"
+}

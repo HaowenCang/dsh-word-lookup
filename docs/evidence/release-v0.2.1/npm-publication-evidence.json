@@ -1,0 +1,64 @@
+{
+  "package": "dsh-word-lookup",
+  "version": "0.2.1",
+  "registry": "https://registry.npmjs.org/",
+  "timestamp": "2026-10-20T11:57:05.085Z",
+  "dist": {
+    "tarball": "https://registry.npmjs.org/dsh-word-lookup/-/dsh-word-lookup-0.2.1.tgz",
+    "shasum": "3a8c0a196ff7d7fd95cc79a1bea7d0ea8a3eeae4",
+    "integrity": "sha512-oX3g8czFp8QczjCspl/RfL3fP/V4ZPLC4Vt8Oy0I7V+GQL9vgOyBVmA0W6J6anv9eKS4ObiZveRX8x7bBdxaBg==",
+    "fileCount": 8,
+    "unpackedSize": 588929
+  },
+  "registryDownload": {
+    "url": "https://registry.npmjs.org/dsh-word-lookup/-/dsh-word-lookup-0.2.1.tgz",
+    "length": 139760,
+    "sha256": "597e70b241c298a35c6b36988fc0356129029e51436faa7dc8ec00968d3ad758",
+    "sha1": "3a8c0a196ff7d7fd95cc79a1bea7d0ea8a3eeae4",
+    "sri": "sha512-oX3g8czFp8QczjCspl/RfL3fP/V4ZPLC4Vt8Oy0I7V+GQL9vgOyBVmA0W6J6anv9eKS4ObiZveRX8x7bBdxaBg=="
+  },
+  "peerDependencies": {
+    "react": "^18.2.0",
+    "@deepseek-ai/cordis": "~4.0.4",
+    "@deepseek-ai/schemastery": "~3.18.4"
+  },
+  "dsh": {
+    "pluginType": "feature",
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-client-shortcuts",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-locale"
+      ]
+    },
+    "compatibility": {
+      "dsh": "0.2.0-rc.2",
+      "profiles": [
+        "web"
+      ],
+      "dshReleases": {
+        "0.2.0-rc.1": "unknown",
+        "0.2.0-rc.2": "compatible",
+        "0.2.1-alpha.1": "unknown"
+      },
+      "dshOperations": {
+        "0.2.0-rc.2": {
+          "install": "passed",
+          "start": "passed",
+          "uninstall": "passed",
+          "rollback": "passed"
+        }
+      }
+    }
+  },
+  "distTags": {
+    "latest": "0.2.1"
+  },
+  "verificationStatus": "PASS"
+}

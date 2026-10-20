@@ -1,0 +1,27 @@
+{
+  "tag": "v0.2.1",
+  "title": "dsh-word-lookup v0.2.1",
+  "url": "https://github.com/HaowenCang/dsh-word-lookup/releases/tag/v0.2.1",
+  "draft": false,
+  "prerelease": false,
+  "notesFile": "docs/releases/v0.2.1.md",
+  "assets": [
+    {
+      "name": "dsh-word-lookup-0.2.1.tgz",
+      "size": 139760,
+      "sha256": "597e70b241c298a35c6b36988fc0356129029e51436faa7dc8ec00968d3ad758"
+    },
+    {
+      "name": "SHA256SUMS.txt",
+      "size": 92,
+      "content": "597e70b241c298a35c6b36988fc0356129029e51436faa7dc8ec00968d3ad758  dsh-word-lookup-0.2.1.tgz\n"
+    }
+  ],
+  "tripartiteIdentityVerification": {
+    "localTarballSha256": "597e70b241c298a35c6b36988fc0356129029e51436faa7dc8ec00968d3ad758",
+    "npmTarballSha256": "597e70b241c298a35c6b36988fc0356129029e51436faa7dc8ec00968d3ad758",
+    "githubReleaseTarballSha256": "597e70b241c298a35c6b36988fc0356129029e51436faa7dc8ec00968d3ad758",
+    "tripartiteMatch": true
+  },
+  "verificationStatus": "PASS"
+}

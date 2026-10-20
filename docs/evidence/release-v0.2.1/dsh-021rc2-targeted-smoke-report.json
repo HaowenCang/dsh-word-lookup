@@ -1,0 +1,45 @@
+{
+  "timestamp": "2026-10-20T11:14:08.553Z",
+  "phase": "RELEASE_V021",
+  "mode": "local-tarball",
+  "verdict": "PASS",
+  "durationMs": 36003,
+  "packageIdentity": {
+    "name": "dsh-word-lookup",
+    "version": "0.2.1",
+    "sourceMode": "local-tarball",
+    "tarballSha256": "597e70b241c298a35c6b36988fc0356129029e51436faa7dc8ec00968d3ad758",
+    "installedPath": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-release-smoke-v021-38368d0a\\home\\profiles\\smoke-v021-1984be\\node_modules\\dsh-word-lookup",
+    "isSymlink": false
+  },
+  "isolation": {
+    "testRoot": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-release-smoke-v021-38368d0a",
+    "dshHome": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-release-smoke-v021-38368d0a\\home",
+    "profile": "smoke-v021-1984be",
+    "port": 50995
+  },
+  "verificationEvidence": {
+    "pluginLoaded": "PASS",
+    "settingsNavVisible": "PASS",
+    "settingsSectionVisible": "PASS",
+    "fixtureModeActive": "PASS",
+    "lookupSuccessful": "PASS",
+    "lookupHeadword": "derive",
+    "lookupSource": "sqlite-fixture",
+    "autoDoubleClickDefaultOff": "PASS",
+    "autoSelectionDefaultOff": "PASS",
+    "ecdictNotDownloaded": "PASS",
+    "multilineFormattingVerified": "PASS",
+    "posBadgeDeduplicationVerified": "PASS",
+    "narrowViewportVerified": "PASS",
+    "scrollabilityVerified": "PASS",
+    "settingsUpdatedBadgesVerified": "PASS",
+    "uninstallationClean": "PASS",
+    "screenshots": {
+      "settings": "E:\\Projects\\DSHarness\\dsh-word-lookup\\docs\\evidence\\release-v0.2.1\\screenshots\\04-settings-ui-support-badge.png",
+      "cardNormal": "E:\\Projects\\DSHarness\\dsh-word-lookup\\docs\\evidence\\release-v0.2.1\\screenshots\\01-card-multiline-normal-360px.png",
+      "cardNarrow": "E:\\Projects\\DSHarness\\dsh-word-lookup\\docs\\evidence\\release-v0.2.1\\screenshots\\02-card-multiline-narrow-viewport.png",
+      "cardScroll": "E:\\Projects\\DSHarness\\dsh-word-lookup\\docs\\evidence\\release-v0.2.1\\screenshots\\03-card-multiline-scroll.png"
+    }
+  }
+}
