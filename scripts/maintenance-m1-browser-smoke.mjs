@@ -39,8 +39,9 @@ const PORT = 50996
 const HOME = resolve(join(DEFAULT_TEST_ROOT, 'home'))
 const PROFILE = 'word-lookup-test'
 const PROFILE_DIR = join(HOME, 'profiles', PROFILE)
-const SCREENSHOTS_DIR = join(REPO_ROOT, 'docs', 'evidence', 'maintenance-m1', 'screenshots')
-const EVIDENCE_JSON_PATH = join(REPO_ROOT, 'docs', 'evidence', 'maintenance-m1', 'browser-smoke-evidence.json')
+const EVIDENCE_DIR = join(REPO_ROOT, 'docs', 'evidence', 'maintenance-m1r')
+const SCREENSHOTS_DIR = join(EVIDENCE_DIR, 'screenshots')
+const EVIDENCE_JSON_PATH = join(EVIDENCE_DIR, 'browser-smoke-evidence.json')
 
 mkdirSync(SCREENSHOTS_DIR, { recursive: true })
 
@@ -161,9 +162,19 @@ async function runSmoke() {
   const dshVersion = execSync('dsh --version', { encoding: 'utf-8' }).trim()
   const chromiumVersion = browser.version()
   const evidence = {
+    suite: 'Maintenance M1R Browser Smoke Verification',
+    timestamp: new Date().toISOString(),
+    gitCommit: execSync('git rev-parse HEAD', { cwd: REPO_ROOT, encoding: 'utf-8' }).trim(),
+    classification: {
+      environment: 'REAL_BROWSER',
+      lookupMode: 'CONTROLLED_LOOKUP_RESPONSE',
+      domMeasurement: 'REAL_DOM_GEOMETRY',
+      isolation: 'ISOLATED_DSH_RUNTIME',
+      liveEcdictQuery: 'REAL_ECDICT_QUERY_NOT_EXECUTED',
+    },
     runtime: {
       dshVersion,
-      dsh021Status: 'NOT_EXECUTED / BLOCKED_ENVIRONMENT',
+      dsh021Status: 'NOT_EXECUTED / INDEPENDENT_ACCEPTANCE_NOT_PERFORMED',
       chromiumVersion,
       port: PORT,
       home: HOME,
@@ -178,7 +189,7 @@ async function runSmoke() {
     const context = await browser.newContext({ viewport: { width: 1280, height: 800 } })
     const page = await context.newPage()
 
-    // Route interceptor for synthetic pass word lookup
+    // Route interceptor for controlled synthetic word lookups (R4: CONTROLLED_LOOKUP_RESPONSE)
     await page.route('**/api/dsh-word-lookup**', async (route) => {
       const req = route.request()
       if (req.method() === 'POST') {
@@ -210,6 +221,48 @@ async function runSmoke() {
               examples: [
                 { en: 'Time passes quickly.', zh: '光阴似箭。' },
                 { en: 'The bill passed in parliament.', zh: '该法案在议会获得通过。' },
+              ],
+              source: 'ecdict-local',
+              settings: { autoDoubleClick: false, autoSelection: false },
+            }),
+          })
+        }
+        if (postData.query === 'long-entry') {
+          return route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              ok: true,
+              found: true,
+              query: 'long-entry',
+              headword: 'long-entry',
+              phonetic: '/lɔːŋ ˈɛntri/',
+              meanings: [
+                {
+                  partOfSpeech: 'n.',
+                  translation: Array.from(
+                    { length: 12 },
+                    (_, i) =>
+                      `释义行 ${i + 1}：用于验证长释义卡片垂直滚动的详细中文翻译条目，包含丰富上下文`,
+                  ).join('\\n'),
+                  definition: Array.from(
+                    { length: 12 },
+                    (_, i) =>
+                      `Definition line ${i + 1}: detailed English explanation sense to enforce card scrollHeight exceeding clientHeight constraint`,
+                  ).join('\\n'),
+                },
+              ],
+              forms: [{ form: 'long-entries', kind: 'plural' }],
+              matchedForm: null,
+              examples: [
+                {
+                  en: 'Comprehensive test example to ensure container scrollability is verified.',
+                  zh: '用于确保容器可滚动性得到严格验证的综合测试用例。',
+                },
+                {
+                  en: 'Second example validating maximum height enforcement.',
+                  zh: '验证卡片最大高度限制的第二个示例。',
+                },
               ],
               source: 'ecdict-local',
               settings: { autoDoubleClick: false, autoSelection: false },
@@ -268,6 +321,8 @@ async function runSmoke() {
         transRects,
         defRects,
         hasLiteralEscapeInText: card.textContent.includes('\\n'),
+        firstTransLine: transLines[0]?.textContent.trim() ?? '',
+        hasDuplicatePos: (transLines[0]?.textContent ?? '').includes('v.n.'),
       }
     })
 
@@ -275,6 +330,9 @@ async function runSmoke() {
     console.log(`Translation lines count: ${cardMetrics.transLineCount}`)
     console.log(`Definition lines count: ${cardMetrics.defLineCount}`)
     console.log(`Literal \\n in text: ${cardMetrics.hasLiteralEscapeInText}`)
+
+    const noPosDuplication = !cardMetrics.hasDuplicatePos && cardMetrics.firstTransLine.startsWith('n.')
+    console.log(`R1 POS badge duplication absent ("v.n." check): ${noPosDuplication ? 'PASS' : 'FAIL'}`)
 
     // Verify lines are on separate vertical coordinates
     const transYOrderValid =
@@ -295,8 +353,16 @@ async function runSmoke() {
     evidence.screenshots.cardNormal = cardNormalShot
 
     evidence.observations.push({
-      test: 'FMT-01 Normal Viewport Card Rendering',
-      status: cardMetrics.transLineCount === 3 && cardMetrics.defLineCount === 4 && transYOrderValid && defYOrderValid && !cardMetrics.hasLiteralEscapeInText ? 'PASS' : 'FAIL',
+      test: 'FMT-01 Normal Viewport Card Rendering & POS Dedup (R1)',
+      status:
+        cardMetrics.transLineCount === 3 &&
+        cardMetrics.defLineCount === 4 &&
+        transYOrderValid &&
+        defYOrderValid &&
+        !cardMetrics.hasLiteralEscapeInText &&
+        noPosDuplication
+          ? 'PASS'
+          : 'FAIL',
       cardMetrics,
     })
 
@@ -325,31 +391,74 @@ async function runSmoke() {
     await page.setViewportSize({ width: 1280, height: 800 })
     await page.waitForTimeout(300)
 
-    // Long entry vertical scrollability
-    console.log('--- Step 7: Testing Long Entry Scrollability ---')
-    const scrollInfo = await page.evaluate(() => {
+    // Dismiss normal card before testing scroll on long entry
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(400)
+
+    // Long entry vertical scrollability (R2 Remediation)
+    console.log('--- Step 7: Testing Long Entry Scrollability (R2 Remediation) ---')
+    await page.evaluate(() => {
+      window.__DSH_WORD_LOOKUP__.runLookup('long-entry', 'shortcut')
+    })
+    await page.waitForSelector('[data-dsh-word-lookup="card"]', { timeout: 10_000 })
+    await page.waitForSelector('[data-dsh-word-lookup="translation-line"]', { timeout: 10_000 })
+    await page.waitForTimeout(400)
+
+    const scrollInfo = await page.evaluate(async () => {
       const card = document.querySelector('[data-dsh-word-lookup="card"]')
       const beforeScroll = card.scrollTop
-      card.scrollTop = 80
+      const scrollHeight = card.scrollHeight
+      const clientHeight = card.clientHeight
+      const scrollWidth = card.scrollWidth
+      const clientWidth = card.clientWidth
+
+      // Perform actual vertical scroll
+      card.scrollTop = 120
+      await new Promise((r) => requestAnimationFrame(r))
       const afterScroll = card.scrollTop
+
       return {
-        scrollHeight: card.scrollHeight,
-        clientHeight: card.clientHeight,
-        isScrollable: card.scrollHeight >= card.clientHeight,
+        scrollHeight,
+        clientHeight,
+        scrollWidth,
+        clientWidth,
         beforeScroll,
         afterScroll,
+        isScrollable: scrollHeight > clientHeight,
+        didScroll: afterScroll > beforeScroll,
+        withinMaxHeightLimit: clientHeight <= 440,
+        noHorizontalOverflow: scrollWidth <= clientWidth + 1,
       }
     })
+
     console.log(`Scrollability check: scrollHeight=${scrollInfo.scrollHeight}, clientHeight=${scrollInfo.clientHeight}`)
+    console.log(`Scroll progress: before=${scrollInfo.beforeScroll}, after=${scrollInfo.afterScroll}`)
+    console.log(`Scrollable (scrollHeight > clientHeight): ${scrollInfo.isScrollable ? 'PASS' : 'FAIL'}`)
+    console.log(`Scroll executed (afterScroll > beforeScroll): ${scrollInfo.didScroll ? 'PASS' : 'FAIL'}`)
+    console.log(`Height capped (clientHeight <= 440): ${scrollInfo.withinMaxHeightLimit ? 'PASS' : 'FAIL'}`)
+    console.log(`No horizontal overflow: ${scrollInfo.noHorizontalOverflow ? 'PASS' : 'FAIL'}`)
 
     const cardScrollShot = join(SCREENSHOTS_DIR, '03-card-multiline-scroll.png')
     await page.locator('[data-dsh-word-lookup="card"]').screenshot({ path: cardScrollShot })
     evidence.screenshots.cardScroll = cardScrollShot
 
+    const scrollPassed =
+      scrollInfo.isScrollable &&
+      scrollInfo.didScroll &&
+      scrollInfo.withinMaxHeightLimit &&
+      scrollInfo.noHorizontalOverflow
+
     evidence.observations.push({
-      test: 'FMT-01 Long Entry Scrollability',
-      status: 'PASS',
+      test: 'FMT-01 Long Entry Scrollability (R2 Remediation)',
+      status: scrollPassed ? 'PASS' : 'FAIL',
       scrollInfo,
+      m1Audit: {
+        m1Result: 'FALSE_POSITIVE',
+        m1Reason:
+          'Original M1 test used scrollHeight >= clientHeight assertion with scrollHeight=372, clientHeight=372, beforeScroll=0, afterScroll=0, which produced a false positive without actual scrolling.',
+        m1rRemediation:
+          'M1R synthesized long dictionary response exceeding maxHeight (440px), performed real scroll action (scrollTop=120), asserted scrollHeight > clientHeight, verified afterScroll > beforeScroll, and validated geometry bounds.',
+      },
     })
 
     // Dismiss card
@@ -444,7 +553,7 @@ async function runSmoke() {
       settingsAudit,
     })
 
-    if (!settingsPassed || !transYOrderValid || !defYOrderValid) {
+    if (!settingsPassed || !transYOrderValid || !defYOrderValid || !noPosDuplication || !scrollPassed) {
       evidence.verdict = 'FAIL'
     }
   } finally {

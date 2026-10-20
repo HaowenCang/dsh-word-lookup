@@ -56,6 +56,16 @@ export declare function countCodePoints(value: string): number;
  */
 export declare function normalizeHeadword(raw: string): string;
 /**
+ * Determine whether a translation or definition line begins with an explicit part-of-speech prefix.
+ *
+ * Restricted strictly to line beginnings using a closed set of known POS abbreviations.
+ * Avoids misidentifying ordinary English or Chinese words (e.g. "apple", "a method", "1. item").
+ *
+ * @param line - One line of dictionary translation or definition text.
+ * @returns True if the line starts with an explicit POS marker; false otherwise.
+ */
+export declare function hasExplicitPosPrefix(line: string | null | undefined): boolean;
+/**
  * Split a Chinese translation cell into individual glosses.
  *
  * A dictionary cell carries several glosses separated by a full-width
@@ -78,6 +88,15 @@ export declare function splitGlosses(translation: string | null): readonly strin
  * - Preserves double-escaped backslashes (`\\n` remains literal `\n`)
  * - Preserves legitimate backslashes (e.g. `\lambda`, `C:\dir`)
  * - Trims individual lines and collapses consecutive empty lines
+ *
+ * Data Contract & Remaining Ambiguity Boundary:
+ * ECDICT database fields use literal two-character sequences `\n` and `\r\n` to
+ * encode multiline glosses without embedding raw control characters into CSV records.
+ * Syntactically, an unescaped single backslash before `n` or `r` (e.g. in LaTeX `\nu`,
+ * `\nabla`, `\rho` or Windows paths `C:\new`, `C:\reports`) matches this newline delimiter.
+ * Per the ECDICT data format contract, these single-escaped sequences are parsed as line breaks.
+ * To preserve literal backslashes before `n` or `r` without splitting, callers or authoring
+ * pipelines must use standard double-escaping (`\\nu`, `\\rho`, `C:\\new`).
  *
  * @param text - The raw translation or definition string, or null/undefined.
  * @returns Array of non-empty line strings.

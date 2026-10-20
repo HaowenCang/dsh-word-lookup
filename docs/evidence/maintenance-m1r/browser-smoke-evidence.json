@@ -1,0 +1,118 @@
+{
+  "suite": "Maintenance M1R Browser Smoke Verification",
+  "timestamp": "2026-10-20T08:49:52.044Z",
+  "gitCommit": "e092c98fb2aae7ac288d1f0e495b087406242f15",
+  "classification": {
+    "environment": "REAL_BROWSER",
+    "lookupMode": "CONTROLLED_LOOKUP_RESPONSE",
+    "domMeasurement": "REAL_DOM_GEOMETRY",
+    "isolation": "ISOLATED_DSH_RUNTIME",
+    "liveEcdictQuery": "REAL_ECDICT_QUERY_NOT_EXECUTED"
+  },
+  "runtime": {
+    "dshVersion": "0.2.0-rc.2",
+    "dsh021Status": "NOT_EXECUTED / INDEPENDENT_ACCEPTANCE_NOT_PERFORMED",
+    "chromiumVersion": "153.0.8010.12",
+    "port": 50996,
+    "home": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-word-lookup-test\\home",
+    "profile": "word-lookup-test"
+  },
+  "observations": [
+    {
+      "test": "FMT-01 Normal Viewport Card Rendering & POS Dedup (R1)",
+      "status": "PASS",
+      "cardMetrics": {
+        "cardWidth": 360,
+        "cardHeight": 354.640625,
+        "transLineCount": 3,
+        "defLineCount": 4,
+        "transRects": [
+          {
+            "text": "n. 穿过, 通过, 经过, 通行证, 护照, 入场券, 票, 隘口, 关口",
+            "top": 103.796875,
+            "height": 18.84375
+          },
+          {
+            "text": "vt. 通过, 经过, 穿过, 度过, 超越, 传递, 传球, 遗留, 批准",
+            "top": 125.640625,
+            "height": 18.84375
+          },
+          {
+            "text": "vi. 经过, 穿过, 变化, 终止, 传递, 被通过",
+            "top": 147.484375,
+            "height": 18.84375
+          }
+        ],
+        "defRects": [
+          {
+            "text": "n. (sports) the act of throwing the ball to another member of your team",
+            "top": 170.328125,
+            "height": 33.59375
+          },
+          {
+            "text": "n. a success in a test or exam",
+            "top": 205.921875,
+            "height": 16.796875
+          },
+          {
+            "text": "v. to move past something or someone",
+            "top": 224.71875,
+            "height": 16.796875
+          },
+          {
+            "text": "v. to give something to someone using your hands",
+            "top": 243.515625,
+            "height": 16.796875
+          }
+        ],
+        "hasLiteralEscapeInText": false,
+        "firstTransLine": "n. 穿过, 通过, 经过, 通行证, 护照, 入场券, 票, 隘口, 关口",
+        "hasDuplicatePos": false
+      }
+    },
+    {
+      "test": "FMT-01 Narrow Viewport Responsiveness",
+      "status": "PASS",
+      "narrowCardWidth": 296
+    },
+    {
+      "test": "FMT-01 Long Entry Scrollability (R2 Remediation)",
+      "status": "PASS",
+      "scrollInfo": {
+        "scrollHeight": 1129,
+        "clientHeight": 438,
+        "scrollWidth": 358,
+        "clientWidth": 358,
+        "beforeScroll": 0,
+        "afterScroll": 120,
+        "isScrollable": true,
+        "didScroll": true,
+        "withinMaxHeightLimit": true,
+        "noHorizontalOverflow": true
+      },
+      "m1Audit": {
+        "m1Result": "FALSE_POSITIVE",
+        "m1Reason": "Original M1 test used scrollHeight >= clientHeight assertion with scrollHeight=372, clientHeight=372, beforeScroll=0, afterScroll=0, which produced a false positive without actual scrolling.",
+        "m1rRemediation": "M1R synthesized long dictionary response exceeding maxHeight (440px), performed real scroll action (scrollTop=120), asserted scrollHeight > clientHeight, verified afterScroll > beforeScroll, and validated geometry bounds."
+      }
+    },
+    {
+      "test": "UI-02 Settings Badge and Description Update",
+      "status": "PASS",
+      "settingsAudit": {
+        "hasPhase7A8": false,
+        "hasSupportedBadge": true,
+        "hasCustomSection": true,
+        "hasCustomRow": true,
+        "hasUpdatedDesc": true
+      }
+    }
+  ],
+  "screenshots": {
+    "cardNormal": "E:\\Projects\\DSHarness\\dsh-word-lookup\\docs\\evidence\\maintenance-m1r\\screenshots\\01-card-multiline-normal-360px.png",
+    "cardNarrow": "E:\\Projects\\DSHarness\\dsh-word-lookup\\docs\\evidence\\maintenance-m1r\\screenshots\\02-card-multiline-narrow-viewport.png",
+    "cardScroll": "E:\\Projects\\DSHarness\\dsh-word-lookup\\docs\\evidence\\maintenance-m1r\\screenshots\\03-card-multiline-scroll.png",
+    "settings": "E:\\Projects\\DSHarness\\dsh-word-lookup\\docs\\evidence\\maintenance-m1r\\screenshots\\04-settings-ui-support-badge.png"
+  },
+  "verdict": "PASS"
+}

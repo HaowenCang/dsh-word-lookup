@@ -22,7 +22,7 @@ import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect
 
 import { computeCardPosition, type CardPosition } from './position.js'
-import { splitDefinitionLines, splitGlosses } from '../shared/text.js'
+import { hasExplicitPosPrefix, splitDefinitionLines, splitGlosses } from '../shared/text.js'
 import type { CardState, LookupCardStore } from './store.js'
 
 /** Props the overlay seat supplies plus the store injected at registration. */
@@ -399,7 +399,10 @@ export function WordLookupCard(props: WordLookupCardProps): ReactElement | null 
               const transLines = meaning.translation ? splitDefinitionLines(meaning.translation) : []
               const defLines = meaning.definition ? splitDefinitionLines(meaning.definition) : []
 
-              const posBadge = meaning.partOfSpeech ? (
+              const hasTranslationPos = transLines.some((l) => hasExplicitPosPrefix(l))
+              const showPosBadge = Boolean(meaning.partOfSpeech && (!transLines.length || !hasTranslationPos))
+
+              const posBadge = showPosBadge ? (
                 <span
                   style={{
                     display: 'inline-block',

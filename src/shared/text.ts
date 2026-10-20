@@ -84,6 +84,61 @@ export function normalizeHeadword(raw: string): string {
 }
 
 /**
+ * Known part-of-speech abbreviations commonly found at the beginning of
+ * dictionary translation and definition lines.
+ *
+ * Ordered with compound or multi-letter abbreviations first to ensure
+ * greedy and unambiguous matching before single-letter tags.
+ */
+const POS_TAG_PATTERN =
+  '(?:vt|vi|adj|adv|prep|pron|conj|interj|int|num|art|aux|abbr|sing|pref|suff|link-v|cop|pl|a|ad|n|v)'
+const COMPOUND_POS_PATTERN = `${POS_TAG_PATTERN}(?:\\s*(?:&|\\/)\\s*${POS_TAG_PATTERN})*`
+
+/**
+ * Matches bare POS tags ending with a period and whitespace/delimiter, e.g.
+ * - "n. 穿过"
+ * - "vt. 通过"
+ * - "v.& n. 穿过"
+ * - "a. 好的"
+ */
+const BARE_POS_REGEX = new RegExp(`^${COMPOUND_POS_PATTERN}\\.\\s*`, 'i')
+
+/**
+ * Matches bracketed POS tags with optional period, e.g.
+ * - "[n.] 穿过"
+ * - "[n] 穿过"
+ * - "(vt.) 通过"
+ * - "(vi) 经过"
+ */
+const BRACKETED_POS_REGEX = new RegExp(`^(?:\\[|\\()${COMPOUND_POS_PATTERN}\\.?(?:\\]|\\))\\s*`, 'i')
+
+/**
+ * Matches common Chinese bracketed POS tags, e.g.
+ * - "【动】 穿过"
+ * - "【名】 关口"
+ */
+const CJK_BRACKETED_POS_REGEX = /^(?:【|〔|（)(?:名|动|形|副|代|介|连|感|叹|数|量|冠|助|缩)?词?(?:】|〕|）)\s*/
+
+/**
+ * Determine whether a translation or definition line begins with an explicit part-of-speech prefix.
+ *
+ * Restricted strictly to line beginnings using a closed set of known POS abbreviations.
+ * Avoids misidentifying ordinary English or Chinese words (e.g. "apple", "a method", "1. item").
+ *
+ * @param line - One line of dictionary translation or definition text.
+ * @returns True if the line starts with an explicit POS marker; false otherwise.
+ */
+export function hasExplicitPosPrefix(line: string | null | undefined): boolean {
+  if (!line) return false
+  const trimmed = line.trim()
+  return (
+    BARE_POS_REGEX.test(trimmed) ||
+    BRACKETED_POS_REGEX.test(trimmed) ||
+    CJK_BRACKETED_POS_REGEX.test(trimmed)
+  )
+}
+
+/**
  * Split a Chinese translation cell into individual glosses.
  *
  * A dictionary cell carries several glosses separated by a full-width
@@ -113,6 +168,15 @@ export function splitGlosses(translation: string | null): readonly string[] {
  * - Preserves double-escaped backslashes (`\\n` remains literal `\n`)
  * - Preserves legitimate backslashes (e.g. `\lambda`, `C:\dir`)
  * - Trims individual lines and collapses consecutive empty lines
+ *
+ * Data Contract & Remaining Ambiguity Boundary:
+ * ECDICT database fields use literal two-character sequences `\n` and `\r\n` to
+ * encode multiline glosses without embedding raw control characters into CSV records.
+ * Syntactically, an unescaped single backslash before `n` or `r` (e.g. in LaTeX `\nu`,
+ * `\nabla`, `\rho` or Windows paths `C:\new`, `C:\reports`) matches this newline delimiter.
+ * Per the ECDICT data format contract, these single-escaped sequences are parsed as line breaks.
+ * To preserve literal backslashes before `n` or `r` without splitting, callers or authoring
+ * pipelines must use standard double-escaping (`\\nu`, `\\rho`, `C:\\new`).
  *
  * @param text - The raw translation or definition string, or null/undefined.
  * @returns Array of non-empty line strings.

@@ -27,6 +27,16 @@ function renderCard(store: LookupCardStore): string {
   return renderToStaticMarkup(React.createElement(WordLookupCard, { store }))
 }
 
+function countOccurrences(text: string, search: string): number {
+  let count = 0
+  let pos = text.indexOf(search)
+  while (pos !== -1) {
+    count += 1
+    pos = text.indexOf(search, pos + search.length)
+  }
+  return count
+}
+
 function baseFound(overrides: Partial<LookupFoundResponse> = {}): LookupFoundResponse {
   return {
     ok: true,
@@ -578,6 +588,180 @@ describe('WordLookupCard rendering', () => {
       expect(countOccurrences(htmlDefNull, 'data-dsh-word-lookup="definition-line"')).toBe(0)
       expect(htmlDefNull).toContain('只有翻译')
       expect(htmlDefNull).toContain('n.')
+    })
+  })
+
+  describe('R1: Part-of-speech badge duplication and conflict remediation', () => {
+    it('Scenario 1: suppresses redundant POS badge when translation line 1 already contains POS (e.g. partOfSpeech="v." and line starts with "n.")', () => {
+      const store = new LookupCardStore()
+      store.set({
+        status: 'ready',
+        query: 'pass',
+        result: {
+          kind: 'found',
+          body: baseFound({
+            headword: 'pass',
+            meanings: [
+              {
+                partOfSpeech: 'v.',
+                translation: 'n. 穿过, 通过, 经过, 通行证\\nvt. 通过, 经过, 穿过\\nvi. 经过, 穿过',
+                definition: 'to move past something',
+              },
+            ],
+          }),
+        },
+      })
+      const html = renderCard(store)
+
+      // Must never produce contradictory or duplicated combination "v.n."
+      expect(html).not.toContain('v.n.')
+      expect(html).not.toContain('v. n.')
+      // The translation lines must retain their original POS markers
+      expect(html).toContain('n. 穿过')
+      expect(html).toContain('vt. 通过')
+      expect(html).toContain('vi. 经过')
+      // Pos badge should not be prepended to the translation block
+      expect(html).not.toContain('<span style="display:inline-block;padding:1px 5px;margin-right:6px;border-radius:3px;background:var(--wl-tag-bg, rgba(255,255,255,0.08));color:var(--wl-tag-fg, #d0d0dc);font-size:11px;font-weight:600;font-style:italic;vertical-align:baseline">v.</span>')
+    })
+
+    it('Scenario 2: suppresses duplicate POS badge when partOfSpeech="n." and line 1 starts with "n."', () => {
+      const store = new LookupCardStore()
+      store.set({
+        status: 'ready',
+        query: 'pass',
+        result: {
+          kind: 'found',
+          body: baseFound({
+            headword: 'pass',
+            meanings: [
+              {
+                partOfSpeech: 'n.',
+                translation: 'n. 关口, 隘口, 护照\\nv. 穿过, 通过',
+                definition: 'a narrow passage',
+              },
+            ],
+          }),
+        },
+      })
+      const html = renderCard(store)
+
+      // Must never produce duplicate combination "n.n."
+      expect(html).not.toContain('n.n.')
+      expect(html).not.toContain('n. n.')
+      expect(html).toContain('n. 关口')
+      expect(html).toContain('v. 穿过')
+    })
+
+    it('Scenario 3: preserves POS badge when translation line does NOT contain POS prefix', () => {
+      const store = new LookupCardStore()
+      store.set({
+        status: 'ready',
+        query: 'derive',
+        result: {
+          kind: 'found',
+          body: baseFound({
+            headword: 'derive',
+            meanings: [
+              {
+                partOfSpeech: 'v.',
+                translation: '得到；源于',
+                definition: 'obtain something from a specified source.',
+              },
+            ],
+          }),
+        },
+      })
+      const html = renderCard(store)
+
+      // POS badge must be rendered
+      expect(html).toContain('v.')
+      expect(html).toContain('得到')
+      expect(html).toContain('源于')
+      expect(html).toContain('<span style="display:inline-block;padding:1px 5px;margin-right:6px;border-radius:3px;background:var(--wl-tag-bg, rgba(255,255,255,0.08));color:var(--wl-tag-fg, #d0d0dc);font-size:11px;font-weight:600;font-style:italic;vertical-align:baseline">v.</span>')
+    })
+
+    it('Scenario 4: preserves multiple POS lines when partOfSpeech is null', () => {
+      const store = new LookupCardStore()
+      store.set({
+        status: 'ready',
+        query: 'pass',
+        result: {
+          kind: 'found',
+          body: baseFound({
+            headword: 'pass',
+            meanings: [
+              {
+                partOfSpeech: null,
+                translation: 'n. 关口, 护照\\nvt. 传递, 批准\\nvi. 经过, 穿过',
+                definition: 'to move past',
+              },
+            ],
+          }),
+        },
+      })
+      const html = renderCard(store)
+
+      expect(html).toContain('n. 关口')
+      expect(html).toContain('vt. 传递')
+      expect(html).toContain('vi. 经过')
+      expect(html).not.toContain('null')
+    })
+
+    it('Scenario 5: preserves full content across multiline translations containing n., vt., and vi.', () => {
+      const store = new LookupCardStore()
+      store.set({
+        status: 'ready',
+        query: 'pass',
+        result: {
+          kind: 'found',
+          body: baseFound({
+            headword: 'pass',
+            meanings: [
+              {
+                partOfSpeech: 'v.',
+                translation:
+                  'n. 穿过, 通过, 经过, 关口, 隘口, 护照, 通行证, 入场券\\nvt. 通过, 经过, 穿过, 度过, 超越, 传递, 传球, 遗留, 批准\\nvi. 经过, 穿过, 变化, 终止, 传递, 被通过',
+                definition: 'to move past\\nto give over',
+              },
+            ],
+          }),
+        },
+      })
+      const html = renderCard(store)
+
+      expect(countOccurrences(html, 'data-dsh-word-lookup="translation-line"')).toBe(3)
+      expect(html).toContain('n. 穿过, 通过, 经过, 关口, 隘口, 护照, 通行证, 入场券')
+      expect(html).toContain('vt. 通过, 经过, 穿过, 度过, 超越, 传递, 传球, 遗留, 批准')
+      expect(html).toContain('vi. 经过, 穿过, 变化, 终止, 传递, 被通过')
+      expect(html).not.toContain('v.n.')
+    })
+
+    it('Scenario 6: renders POS badge when translation is null and only English definition exists', () => {
+      const store = new LookupCardStore()
+      store.set({
+        status: 'ready',
+        query: 'derive',
+        result: {
+          kind: 'found',
+          body: baseFound({
+            headword: 'derive',
+            meanings: [
+              {
+                partOfSpeech: 'v.',
+                translation: null,
+                definition: 'obtain something from a specified source.',
+              },
+            ],
+          }),
+        },
+      })
+      const html = renderCard(store)
+
+      expect(countOccurrences(html, 'data-dsh-word-lookup="translation-line"')).toBe(0)
+      expect(countOccurrences(html, 'data-dsh-word-lookup="definition-line"')).toBe(1)
+      expect(html).toContain('obtain something from a specified source.')
+      expect(html).toContain('v.')
+      expect(html).toContain('<span style="display:inline-block;padding:1px 5px;margin-right:6px;border-radius:3px;background:var(--wl-tag-bg, rgba(255,255,255,0.08));color:var(--wl-tag-fg, #d0d0dc);font-size:11px;font-weight:600;font-style:italic;vertical-align:baseline">v.</span>')
     })
   })
 })

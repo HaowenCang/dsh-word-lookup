@@ -13,6 +13,7 @@ import { openSqliteDictionary } from '../src/host/sqlite-dictionary.js'
 import { MAX_QUERY_CODE_POINTS } from '../src/shared/protocol.js'
 import {
   countCodePoints,
+  hasExplicitPosPrefix,
   isEligibleSelectionText,
   normalizeHeadword,
   splitDefinitionLines,
@@ -226,6 +227,121 @@ describe('splitDefinitionLines', () => {
       'vt. 通过, 经过, 穿过, 度过, 超越, 传递, 传球, 遗留, 批准',
       'vi. 经过, 穿过, 变化, 终止, 传递, 被通过',
     ])
+  })
+})
+
+describe('R3: Backslash newline parsing and legitimate backslash boundary', () => {
+  it('verifies character encoding distinction: literal \\n (0x5C 0x6E) vs LF (0x0A) vs CRLF (0x0D 0x0A)', () => {
+    const literalEscape = 'line1\\nline2'
+    const realLf = 'line1\nline2'
+    const realCrlf = 'line1\r\nline2'
+
+    // Verify UTF-8 byte differences
+    const literalBytes = Buffer.from(literalEscape, 'utf8')
+    const realLfBytes = Buffer.from(realLf, 'utf8')
+    const realCrlfBytes = Buffer.from(realCrlf, 'utf8')
+
+    expect(literalBytes).toEqual(Buffer.from([0x6c, 0x69, 0x6e, 0x65, 0x31, 0x5c, 0x6e, 0x6c, 0x69, 0x6e, 0x65, 0x32]))
+    expect(realLfBytes).toEqual(Buffer.from([0x6c, 0x69, 0x6e, 0x65, 0x31, 0x0a, 0x6c, 0x69, 0x6e, 0x65, 0x32]))
+    expect(realCrlfBytes).toEqual(Buffer.from([0x6c, 0x69, 0x6e, 0x65, 0x31, 0x0d, 0x0a, 0x6c, 0x69, 0x6e, 0x65, 0x32]))
+
+    // Per ECDICT contract, all three normalize to the same split result
+    expect(splitDefinitionLines(literalEscape)).toEqual(['line1', 'line2'])
+    expect(splitDefinitionLines(realLf)).toEqual(['line1', 'line2'])
+    expect(splitDefinitionLines(realCrlf)).toEqual(['line1', 'line2'])
+  })
+
+  it('preserves non-newline backslash sequences without double-escaping (e.g. \\lambda, \\alpha, C:\\dir)', () => {
+    expect(splitDefinitionLines('\\lambda + \\mu')).toEqual(['\\lambda + \\mu'])
+    expect(splitDefinitionLines('\\alpha + \\beta = \\gamma')).toEqual(['\\alpha + \\beta = \\gamma'])
+    expect(splitDefinitionLines('word \\to definition')).toEqual(['word \\to definition'])
+    expect(splitDefinitionLines('path: C:\\dir\\file.txt')).toEqual(['path: C:\\dir\\file.txt'])
+    expect(splitDefinitionLines('D:\\tools\\bin\\app.exe')).toEqual(['D:\\tools\\bin\\app.exe'])
+  })
+
+  it('characterizes ambiguity boundary: unescaped single \\n and \\r vs double-escaped literal backslashes', () => {
+    // LaTeX commands: \nu, \rho, \nabla
+    // Unescaped: \n and \r are interpreted as ECDICT line breaks
+    expect(splitDefinitionLines('\\nu')).toEqual(['u'])
+    expect(splitDefinitionLines('\\rho')).toEqual(['ho'])
+    expect(splitDefinitionLines('\\nabla')).toEqual(['abla'])
+
+    // Escaped contract: double-backslash strictly preserves literal LaTeX commands without splitting
+    expect(splitDefinitionLines('\\\\nu')).toEqual(['\\nu'])
+    expect(splitDefinitionLines('\\\\rho')).toEqual(['\\rho'])
+    expect(splitDefinitionLines('\\\\nabla')).toEqual(['\\nabla'])
+
+    // Windows paths: C:\new, C:\reports
+    // Unescaped: \n and \r split
+    expect(splitDefinitionLines('C:\\new\\folder')).toEqual(['C:', 'ew\\folder'])
+    expect(splitDefinitionLines('C:\\reports\\data')).toEqual(['C:', 'eports\\data'])
+
+    // Escaped contract: double-backslash strictly preserves Windows path without splitting
+    expect(splitDefinitionLines('C:\\\\new\\\\folder')).toEqual(['C:\\new\\folder'])
+    expect(splitDefinitionLines('C:\\\\reports\\\\data')).toEqual(['C:\\reports\\data'])
+  })
+})
+
+describe('hasExplicitPosPrefix', () => {
+  it('recognizes standard bare POS prefixes with dot at start of line', () => {
+    expect(hasExplicitPosPrefix('n. 穿过, 通过')).toBe(true)
+    expect(hasExplicitPosPrefix('v. 穿过, 通过')).toBe(true)
+    expect(hasExplicitPosPrefix('vt. 批准')).toBe(true)
+    expect(hasExplicitPosPrefix('vi. 变化, 终止')).toBe(true)
+    expect(hasExplicitPosPrefix('adj. 漂亮的')).toBe(true)
+    expect(hasExplicitPosPrefix('adv. 快速地')).toBe(true)
+    expect(hasExplicitPosPrefix('a. 好的')).toBe(true)
+    expect(hasExplicitPosPrefix('ad. 慢速地')).toBe(true)
+    expect(hasExplicitPosPrefix('prep. 在...上')).toBe(true)
+    expect(hasExplicitPosPrefix('pron. 他')).toBe(true)
+    expect(hasExplicitPosPrefix('conj. 和')).toBe(true)
+    expect(hasExplicitPosPrefix('interj. 哎呀')).toBe(true)
+    expect(hasExplicitPosPrefix('int. 喂')).toBe(true)
+    expect(hasExplicitPosPrefix('num. 第一')).toBe(true)
+    expect(hasExplicitPosPrefix('art. 定冠词')).toBe(true)
+    expect(hasExplicitPosPrefix('abbr. 缩写')).toBe(true)
+    expect(hasExplicitPosPrefix('pl. 复数')).toBe(true)
+  })
+
+  it('recognizes compound POS prefixes (e.g. v.& n., vt. / vi.)', () => {
+    expect(hasExplicitPosPrefix('v.& n. 穿过')).toBe(true)
+    expect(hasExplicitPosPrefix('vt. / vi. 通过')).toBe(true)
+    expect(hasExplicitPosPrefix('adj.& adv. 快速')).toBe(true)
+  })
+
+  it('recognizes bracketed POS prefixes', () => {
+    expect(hasExplicitPosPrefix('[n.] 穿过')).toBe(true)
+    expect(hasExplicitPosPrefix('[n] 穿过')).toBe(true)
+    expect(hasExplicitPosPrefix('(vt.) 通过')).toBe(true)
+    expect(hasExplicitPosPrefix('(vi) 经过')).toBe(true)
+    expect(hasExplicitPosPrefix('[adj.] 漂亮的')).toBe(true)
+    expect(hasExplicitPosPrefix('【动】 穿过')).toBe(true)
+    expect(hasExplicitPosPrefix('【名】 关口')).toBe(true)
+  })
+
+  it('rejects ordinary words and sentences (never falsely matches regular text)', () => {
+    expect(hasExplicitPosPrefix('得到；源于')).toBe(false)
+    expect(hasExplicitPosPrefix('穿过, 通过, 经过')).toBe(false)
+    expect(hasExplicitPosPrefix('波函数')).toBe(false)
+    expect(hasExplicitPosPrefix('apple is a fruit')).toBe(false)
+    expect(hasExplicitPosPrefix('a method of calculating')).toBe(false)
+    expect(hasExplicitPosPrefix('an example of usage')).toBe(false)
+    expect(hasExplicitPosPrefix('variable name')).toBe(false)
+    expect(hasExplicitPosPrefix('nice weather')).toBe(false)
+    expect(hasExplicitPosPrefix('1. first definition')).toBe(false)
+    expect(hasExplicitPosPrefix('2. second definition')).toBe(false)
+    expect(hasExplicitPosPrefix('e.g. for example')).toBe(false)
+    expect(hasExplicitPosPrefix('i.e. that is')).toBe(false)
+    expect(hasExplicitPosPrefix('etc. and so forth')).toBe(false)
+    expect(hasExplicitPosPrefix('C:\\dir\\file.txt')).toBe(false)
+    expect(hasExplicitPosPrefix('\\lambda + \\mu')).toBe(false)
+  })
+
+  it('handles empty, null, and whitespace inputs safely', () => {
+    expect(hasExplicitPosPrefix(null)).toBe(false)
+    expect(hasExplicitPosPrefix(undefined)).toBe(false)
+    expect(hasExplicitPosPrefix('')).toBe(false)
+    expect(hasExplicitPosPrefix('   ')).toBe(false)
   })
 })
 
