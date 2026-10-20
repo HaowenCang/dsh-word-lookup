@@ -6,8 +6,10 @@ nothing leaves your machine and no model is involved.
 
 ## Status
 
-**Current release: v0.2.0 — RELEASED.**
-The latest published release is **v0.2.0** on the official npm registry.
+**Current release: v0.2.1 — RELEASED.**
+The latest published release is **v0.2.1** on the official npm registry.
+
+v0.2.1 is a maintenance patch release addressing dictionary card text formatting, multiline translation/definition rendering, part-of-speech badge deduplication and lexical boundary refinement, and settings UI label updates. See [`docs/releases/v0.2.1.md`](docs/releases/v0.2.1.md) for detailed release notes.
 
 The plugin is local-first and uses SQLite (`node:sqlite`) for dictionary lookup. The public npm package does not bundle or redistribute the full ECDICT database corpus (manifest status: `REDISTRIBUTION REVIEW REQUIRED`). On startup, the plugin immediately provides a deterministic, zero-dependency built-in fixture dictionary with zero external network requests. Full lexicon coverage is available via one-click user-orchestrated Managed ECDICT installation from the pinned public corpus source with streaming SHA-256 and UTF-8 verification, or via user-provided custom SQLite dictionary imports staged into immutable managed snapshots.
 
@@ -15,9 +17,9 @@ The plugin is local-first and uses SQLite (`node:sqlite`) for dictionary lookup.
 | --- | --- |
 | Target client | DSH Web (`0.2.0-rc.2`) |
 | DSH baseline | `0.2.0-rc.2` (Web Profile) — verified target |
-| DSH 0.2.1-rc.2 status | `NOT_VERIFIED` — candidate target for next independent compatibility adaptation (not declared compatible) |
+| DSH 0.2.1-rc.2 status | `NOT_VERIFIED` — targeted verification candidate (see release notes) |
 | Desktop / other targets | Desktop adapters and earlier DSH versions are unverified / unsupported |
-| Current published release | `0.2.0` |
+| Current published release | `0.2.1` |
 | Manual shortcut lookup | works; primary supported path (`Primary+Shift+L` by default, fully customizable) |
 | Settings persistence | works, verified across full restart and reboot |
 | Automatic lookup on double-click | works when `autoDoubleClick` is on (default off), verified in a real browser |
@@ -27,17 +29,17 @@ The plugin is local-first and uses SQLite (`node:sqlite`) for dictionary lookup.
 | Multi-snapshot management | works; settings UI supports importing, switching, and deleting custom snapshots |
 | Snapshot protection | active snapshot is strictly protected against deletion until deactivated |
 | User source safety | custom SQLite import creates an isolated managed snapshot; user source files are never modified, moved, or deleted |
-| Dictionary card UI | headword, phonetic, POS, Chinese meaning, forms and examples |
+| Dictionary card UI | headword, phonetic, POS, multiline Chinese meaning, English definition, forms and examples |
 | Pointer devices | mouse only — automatic lookup is refused for pen, touch and an unidentifiable pointer |
 
 ### Installation
 
-#### Published Release (v0.2.0)
+#### Published Release (v0.2.1)
 
 To install the latest published release in DSH Web:
 
 ```powershell
-dsh plugin --profile web add dsh-word-lookup@0.2.0
+dsh plugin --profile web add dsh-word-lookup@0.2.1
 dsh --profile web
 ```
 
@@ -53,6 +55,15 @@ npm run test-profile:cleanup -- --evidence-recorded
 ```
 
 ### Historical Versions
+
+#### Release v0.2.0
+
+Release v0.2.0 introduced one-click Managed ECDICT on-demand download, custom SQLite immutable snapshot imports, and host configuration management:
+
+```powershell
+dsh plugin --profile web add dsh-word-lookup@0.2.0
+dsh --profile web
+```
 
 #### Release v0.1.0
 
@@ -286,6 +297,7 @@ tests/                  unit tests (vitest)
 
 ## Documentation
 
+- [`docs/releases/v0.2.1.md`](docs/releases/v0.2.1.md) — formal v0.2.1 release notes
 - [`docs/evidence/phase7a11-published/release-summary.md`](docs/evidence/phase7a11-published/release-summary.md) — Phase 7A.11 formal publication report
 - [`docs/evidence/phase7a10-prep/release-notes-v0.2.0.md`](docs/evidence/phase7a10-prep/release-notes-v0.2.0.md) — formal v0.2.0 release notes
 - [`docs/RECOVERY_AUDIT.md`](docs/RECOVERY_AUDIT.md) — what was verified and when
