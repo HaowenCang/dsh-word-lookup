@@ -1,0 +1,94 @@
+{
+  "package": "dsh-word-lookup",
+  "version": "0.2.2",
+  "releaseTag": "v0.2.2",
+  "sourceCommit": "080085b21c15f85bb93a6af8847353e2b1992451",
+  "repository": "https://github.com/HaowenCang/dsh-word-lookup",
+  "builtAt": "2026-10-25T14:23:33.168Z",
+  "tarball": {
+    "file": "dsh-word-lookup-0.2.2.tgz",
+    "bytes": 147304,
+    "sha256": "30b46d3c8dcf356c29b763c62882eb882a363d49ee0afb27201d25e0b2c08b45",
+    "integrity": "sha512-qFiDNy7nFiWVaYVUIwAsV9QhIWmcy+U2ZunhWtyRQP9X3GR5CM5IQsXk4/BjiCrG6o2sMjvPxWEMQdEaYKrRkw=="
+  },
+  "members": [
+    {
+      "path": "LICENSE",
+      "bytes": 1089,
+      "sha256": "99922c2a61954f0eaef1591241bcaaac4d3c8984a9866840180d65f7a1ff8101",
+      "gitBlobSha256": "db7615255bd9016d3347b552cb8aead251f113dba7f9965acdae84b29a34475e",
+      "gitMatch": "CRLF_NORMALIZED"
+    },
+    {
+      "path": "README.md",
+      "bytes": 21012,
+      "sha256": "8ae58fbb9f0f7cbd48bde0706d2da189525c564781666873d06ecc6d63a7a89e",
+      "gitBlobSha256": "8ae58fbb9f0f7cbd48bde0706d2da189525c564781666873d06ecc6d63a7a89e",
+      "gitMatch": "EXACT"
+    },
+    {
+      "path": "cordis.patch.yml",
+      "bytes": 415,
+      "sha256": "df9851e21b59cafc69f91b0839c7cd56cb53104c57644813d9001e1a76c7d868",
+      "gitBlobSha256": "df9851e21b59cafc69f91b0839c7cd56cb53104c57644813d9001e1a76c7d868",
+      "gitMatch": "EXACT"
+    },
+    {
+      "path": "corpus/ecdict.manifest.json",
+      "bytes": 566,
+      "sha256": "03cba27d42cb43551d7b51fa12e4a07a869c5d4b65ac07f4fa3d105d9c944044",
+      "gitBlobSha256": "03cba27d42cb43551d7b51fa12e4a07a869c5d4b65ac07f4fa3d105d9c944044",
+      "gitMatch": "EXACT"
+    },
+    {
+      "path": "lib/client.js",
+      "bytes": 198730,
+      "sha256": "a4becec431e045e589d1164bc8826a9c9722d719369bf5715c4a44f592729c6b",
+      "gitBlobSha256": "a4becec431e045e589d1164bc8826a9c9722d719369bf5715c4a44f592729c6b",
+      "gitMatch": "EXACT"
+    },
+    {
+      "path": "lib/ecdict-integrity-worker.js",
+      "bytes": 29261,
+      "sha256": "91aa9a1e333628a04f497be00aeb996b1571069c5cdc1fd3d228babfdadd27af",
+      "gitBlobSha256": "91aa9a1e333628a04f497be00aeb996b1571069c5cdc1fd3d228babfdadd27af",
+      "gitMatch": "EXACT"
+    },
+    {
+      "path": "lib/index.js",
+      "bytes": 361993,
+      "sha256": "46e61f9d0b9f0e98186087276c8943f6b84a8ce2d93b369c80836e0fc9066d40",
+      "gitBlobSha256": "46e61f9d0b9f0e98186087276c8943f6b84a8ce2d93b369c80836e0fc9066d40",
+      "gitMatch": "EXACT"
+    },
+    {
+      "path": "package.json",
+      "bytes": 5535,
+      "sha256": "5c4ffa86dcf269d14c6a84a3cbfa44a0577812e835a64901fd5cdb808fc6a389",
+      "gitBlobSha256": "5c4ffa86dcf269d14c6a84a3cbfa44a0577812e835a64901fd5cdb808fc6a389",
+      "gitMatch": "EXACT"
+    }
+  ],
+  "validation": {
+    "freshTests": 1739,
+    "testFiles": 70,
+    "legacySuite": "NOT_EXECUTED",
+    "isolatedWebChecks": 22,
+    "baseline": "0.2.1-rc.3",
+    "archiveHashesVerifiedInGit": 233,
+    "archivePolicy": "docs/evidence/release-v0.2.2/.gitattributes preserves evidence bytes and whitespace"
+  },
+  "npmPublication": {
+    "performedByAgent": false,
+    "action": "Owner publishes this exact tarball locally with 2FA"
+  },
+  "publishScript": {
+    "file": "publish-npm.ps1",
+    "sha256": "e073a3226a997bfc0bf40a0709b7ddb34cdba7aaf85080c1d583aeb3c0f835ba"
+  },
+  "limits": [
+    "No formal Desktop/rollback/other-runtime/full-corpus validation",
+    "Upstream DSH live-browser reconnect error reproduced without plugin",
+    "Measured Windows Node 24.13.0 and carrier Node 24.21.0 require complete SQLite paths below 260 characters"
+  ]
+}

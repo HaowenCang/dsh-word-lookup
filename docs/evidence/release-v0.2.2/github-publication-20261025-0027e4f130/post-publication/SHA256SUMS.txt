@@ -1,0 +1,3 @@
+30b46d3c8dcf356c29b763c62882eb882a363d49ee0afb27201d25e0b2c08b45  dsh-word-lookup-0.2.2.tgz
+e073a3226a997bfc0bf40a0709b7ddb34cdba7aaf85080c1d583aeb3c0f835ba  publish-npm.ps1
+674c2c984b12cb448c7a2e5397798db3e2dac7ba833322673b21cc46b385a5c7  release-manifest.json

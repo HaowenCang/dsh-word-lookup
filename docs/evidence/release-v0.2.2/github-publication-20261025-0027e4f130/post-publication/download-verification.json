@@ -1,0 +1,22 @@
+[
+  {
+    "name": "dsh-word-lookup-0.2.2.tgz",
+    "match": true,
+    "sha256": "30b46d3c8dcf356c29b763c62882eb882a363d49ee0afb27201d25e0b2c08b45"
+  },
+  {
+    "name": "publish-npm.ps1",
+    "match": true,
+    "sha256": "e073a3226a997bfc0bf40a0709b7ddb34cdba7aaf85080c1d583aeb3c0f835ba"
+  },
+  {
+    "name": "release-manifest.json",
+    "match": true,
+    "sha256": "674c2c984b12cb448c7a2e5397798db3e2dac7ba833322673b21cc46b385a5c7"
+  },
+  {
+    "name": "SHA256SUMS.txt",
+    "match": true,
+    "sha256": "8ad17ba637fc24747ebb9c1226ea4ff647f8368a4cf89c51e000716738e9b7ad"
+  }
+]
