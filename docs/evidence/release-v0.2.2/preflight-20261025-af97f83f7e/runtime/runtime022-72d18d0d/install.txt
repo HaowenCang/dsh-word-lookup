@@ -1,0 +1,13 @@
+Progress: resolved 0, reused 1, downloaded 0, added 0
+[WARN] Issues with peer dependencies found. Run "pnpm peers check" to list them.
+Packages: +1
++
+Packages are hard linked from the content-addressable store to the virtual store.
+  Content-addressable store is at: C:\Users\20659\AppData\Local\Temp\dsh-022-preflight-af97f83f7e\runtime022-72d18d0d\pnpm-store\v11
+  Virtual store is at:             node_modules/.pnpm
+Progress: resolved 1, reused 1, downloaded 0, added 1, done
+
+dependencies:
++ dsh-word-lookup 0.2.2
+
+Done in 883ms using pnpm v11.28.5

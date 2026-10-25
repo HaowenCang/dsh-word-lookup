@@ -1,6 +1,6 @@
 {
   "name": "dsh-word-lookup",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Local English-Chinese dictionary plugin for DeepSeek Harness (DSH).",
   "type": "module",
   "license": "MIT",
@@ -42,18 +42,25 @@
       ]
     },
     "compatibility": {
-      "dsh": "0.2.0-rc.2",
+      "dsh": "0.2.1-rc.3",
       "dshReleases": {
         "0.2.0-rc.1": "unknown",
-        "0.2.0-rc.2": "compatible",
-        "0.2.1-alpha.1": "unknown"
+        "0.2.0-rc.2": "unknown",
+        "0.2.1-alpha.1": "unknown",
+        "0.2.1-rc.3": "compatible"
       },
       "dshOperations": {
         "0.2.0-rc.2": {
+          "install": "unknown",
+          "start": "unknown",
+          "uninstall": "unknown",
+          "rollback": "unknown"
+        },
+        "0.2.1-rc.3": {
           "install": "passed",
           "start": "passed",
           "uninstall": "passed",
-          "rollback": "passed"
+          "rollback": "unknown"
         }
       },
       "profiles": [

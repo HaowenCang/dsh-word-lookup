@@ -1,0 +1,11 @@
+{
+  "version": "0.2.1-rc.3",
+  "status": 0,
+  "testRoot": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-preflight-af97f83f7e\\profile-probe-5b5d90fa",
+  "home": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-preflight-af97f83f7e\\profile-probe-5b5d90fa\\home",
+  "profile": "release022-rc3-probe",
+  "profileDir": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-preflight-af97f83f7e\\profile-probe-5b5d90fa\\home\\profiles\\release022-rc3-probe",
+  "profileCreated": true,
+  "packageName": "dsh-profile-release022-rc3-probe",
+  "retained": true
+}

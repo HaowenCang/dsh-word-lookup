@@ -6,20 +6,21 @@ nothing leaves your machine and no model is involved.
 
 ## Status
 
-**Current release: v0.2.1 — RELEASED.**
-The latest published release is **v0.2.1** on the official npm registry.
+**Version: v0.2.2 — maintenance fixes and reliability hardening.**
+See [`docs/releases/v0.2.2.md`](docs/releases/v0.2.2.md) for changes and validation limits. Check [GitHub Releases](https://github.com/HaowenCang/dsh-word-lookup/releases) and [npm](https://www.npmjs.com/package/dsh-word-lookup) for publication status.
 
-v0.2.1 is a maintenance patch release addressing dictionary card text formatting, multiline translation/definition rendering, part-of-speech badge deduplication and lexical boundary refinement, and settings UI label updates. See [`docs/releases/v0.2.1.md`](docs/releases/v0.2.1.md) for detailed release notes.
+The previous v0.2.1 release addressed dictionary card text formatting, multiline translation/definition rendering, part-of-speech badge deduplication and lexical boundary refinement, and settings UI label updates. See [`docs/releases/v0.2.1.md`](docs/releases/v0.2.1.md) for detailed release notes.
 
 The plugin is local-first and uses SQLite (`node:sqlite`) for dictionary lookup. The public npm package does not bundle or redistribute the full ECDICT database corpus (manifest status: `REDISTRIBUTION REVIEW REQUIRED`). On startup, the plugin immediately provides a deterministic, zero-dependency built-in fixture dictionary with zero external network requests. Full lexicon coverage is available via one-click user-orchestrated Managed ECDICT installation from the pinned public corpus source with streaming SHA-256 and UTF-8 verification, or via user-provided custom SQLite dictionary imports staged into immutable managed snapshots.
 
 | Area | State |
 | --- | --- |
-| Target client | DSH Web (`0.2.0-rc.2`) |
-| DSH baseline | `0.2.0-rc.2` (Web Profile) — verified target |
+| Target client | DSH Web (`0.2.1-rc.3`) |
+| DSH baseline | `0.2.1-rc.3` — verified with a newly created isolated Web profile |
 | DSH 0.2.1-rc.2 status | `NOT_VERIFIED` — targeted verification candidate (see release notes) |
 | Desktop / other targets | Desktop adapters and earlier DSH versions are unverified / unsupported |
-| Current published release | `0.2.1` |
+| Package version | `0.2.2` |
+| Distribution | GitHub release assets; npm upload is completed separately by the maintainer |
 | Manual shortcut lookup | works; primary supported path (`Primary+Shift+L` by default, fully customizable) |
 | Settings persistence | works, verified across full restart and reboot |
 | Automatic lookup on double-click | works when `autoDoubleClick` is on (default off), verified in a real browser |
@@ -34,12 +35,12 @@ The plugin is local-first and uses SQLite (`node:sqlite`) for dictionary lookup.
 
 ### Installation
 
-#### Published Release (v0.2.1)
+#### Release v0.2.2
 
-To install the latest published release in DSH Web:
+After v0.2.2 is available on npm, install it in DSH Web:
 
 ```powershell
-dsh plugin --profile web add dsh-word-lookup@0.2.1
+dsh plugin --profile web add dsh-word-lookup@0.2.2
 dsh --profile web
 ```
 
@@ -48,10 +49,14 @@ dsh --profile web
 To run runtime verification tests or develop locally against an isolated profile:
 
 ```powershell
-npm run iso:check
-npm run test-profile:create
-npm run test:runtime
-npm run test-profile:cleanup -- --evidence-recorded
+$runRoot = Join-Path $env:TEMP ("dsh-word-lookup-test-" + [guid]::NewGuid())
+npm run iso:check -- --test-root $runRoot
+npm run test-profile:create -- --test-root $runRoot
+# Save the independently printed CLEANUP_TOKEN outside $runRoot.
+$cleanupToken = '<token from create output>'
+npm run test:runtime -- --test-root $runRoot
+# After every owned process/worker has exited and evidence is saved outside $runRoot:
+npm run test-profile:cleanup -- --test-root $runRoot --cleanup-token $cleanupToken --evidence-recorded --processes-exited
 ```
 
 ### Historical Versions
@@ -76,11 +81,17 @@ dsh --profile web
 
 ## Compatibility Scope
 
-- **Verified Target**: DSH `0.2.0-rc.2` (Web Profile). All end-to-end integration tests, browser interactions, and post-publication smoke verifications have been conducted on this target.
-- **Candidate Target (DSH 0.2.1-rc.2)**: `NOT_VERIFIED`. In the absence of end-to-end empirical testing, DSH `0.2.1-rc.2` is not declared compatible and v0.2.0 package compatibility metadata is unchanged. It is recorded as a candidate target for future independent compatibility validation.
+- **Candidate Verified Target**: DSH `0.2.1-rc.3`, the exact version returned by the installed CLI, with a newly created isolated Web profile. Candidate installation, startup, fixture queries, settings, rendering, and uninstallation were verified; this does not declare compatibility for the Desktop profile.
+- **Historical Target**: DSH `0.2.0-rc.2` was verified for v0.2.1. It has not been rerun for v0.2.2 and remains `unknown` in this candidate. Rollback and other runtime versions also remain unverified.
+- **Candidate Target (DSH 0.2.1-rc.2)**: `NOT_VERIFIED`. In the absence of end-to-end empirical testing, DSH `0.2.1-rc.2` is not declared compatible and the v0.2.2 candidate does not claim compatibility for it. It is recorded as a candidate target for future independent compatibility validation.
 - **Unsupported Environments**: DSH Desktop profiles, native desktop electron wrappers, and DSH versions prior to `0.2.0-rc.2` are unverified and unsupported.
 
 ## Known Limitations & Disclosures
+
+### Windows SQLite path length
+
+Keep the complete managed database and temporary candidate paths below 260 characters in the measured Windows runtimes. Synthetic checks on Node 24.13.0 and the DSH carrier Node 24.21.0 opened 259-character paths but rejected paths of 260 characters or more, even when the filesystem could reserve the file. A shorter DSH home and test root avoid this platform boundary.
+
 
 ### 1. Automatic Selection Portability (`autoSelection`)
 
@@ -234,10 +245,13 @@ profile and destroyed it. Runtime tests must run in a fully isolated
 environment, and the only supported entry point is:
 
 ```powershell
-npm run iso:check              # verify the target is isolated and the port is free
-npm run test-profile:create    # build the isolated profile
-npm run test:runtime           # boot it, measure, shut it down
-npm run test-profile:cleanup -- --evidence-recorded
+$runRoot = Join-Path $env:TEMP ("dsh-word-lookup-test-" + [guid]::NewGuid())
+npm run iso:check -- --test-root $runRoot
+npm run test-profile:create -- --test-root $runRoot
+$cleanupToken = '<token from create output>'  # keep outside $runRoot
+npm run test:runtime -- --test-root $runRoot
+# Confirm all owned processes/workers exited and save the evidence before cleanup.
+npm run test-profile:cleanup -- --test-root $runRoot --cleanup-token $cleanupToken --evidence-recorded --processes-exited
 ```
 
 Every runtime entry point asserts isolation first and exits non-zero otherwise.

@@ -1,0 +1,28 @@
+preflight {"home":"C:\\Users\\20659\\AppData\\Local\\Temp\\r22-27c7a5\\user","tmp":"C:\\Users\\20659\\AppData\\Local\\Temp\\r22-27c7a5\\tmp","dsh":[]}
+
+node ../check-final-artifact.mjs package release-artifact.json
+{
+  "version": "0.2.2",
+  "bytes": 147304,
+  "sha256": "30b46d3c8dcf356c29b763c62882eb882a363d49ee0afb27201d25e0b2c08b45",
+  "members": 8,
+  "worker": {
+    "response": {
+      "requestId": "99e0c3f6-f27b-4580-84f3-11a1c5f3c343",
+      "success": true,
+      "integrityResult": "ok",
+      "durationMs": 1
+    },
+    "exitCode": 0,
+    "deleteAfterExit": "PASS"
+  },
+  "lock": "UNCHANGED_EXCEPT_ROOT_VERSION"
+}
+
+(node:38572) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:38572) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+EXIT_CODE=0
+

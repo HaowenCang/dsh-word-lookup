@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Stop and remove the isolated DSH test environment.
+ * Verify stopped processes and remove the owned isolated DSH test environment.
  *
  * Cleanup deletes recursively, so it asserts isolation first and then refuses to
  * delete anything until the caller confirms the evidence has been written into a
@@ -13,14 +13,14 @@
  *
  * Usage:
  *   node scripts/cleanup-test-profile.mjs [--home <dir>] [--profile <name>] [--port <port>] \
- *     --evidence-recorded
+ *     --test-root <new-root-from-create> --cleanup-token <token-from-create> \
+ *     --evidence-recorded --processes-exited
  *
  * @module dsh-word-lookup/scripts/cleanup-test-profile
  */
 
-import { existsSync, rmSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
 
 import {
   assertIsolatedDshEnvironment,
@@ -29,9 +29,7 @@ import {
   ISOLATION_BANNER,
   IsolationError,
 } from './assert-isolated-env.mjs'
-
-/** Repository root, derived from this script's own location. */
-const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url))
+import { reopenOwnedTestRoot, cleanupOwnedHome, cleanupOwnedTestRoot } from './isolated-run-directory.mjs'
 
 /** Default test port, chosen away from every production port. */
 const DEFAULT_PORT = 50991
@@ -93,14 +91,20 @@ if (options['evidence-recorded'] !== 'true') {
   console.error(
     'cleanup-test-profile: refusing to delete the test environment.\n' +
       '  Confirm the run\'s results are written into a project report, then re-run with\n' +
-      '  --evidence-recorded. Stopping the instance above is already done; only the\n' +
-      '  directory is left in place.',
+      '  --evidence-recorded. This script does not stop any process; the directory\n' +
+      '  is left in place.',
   )
   process.exit(4)
 }
 
+if (options['processes-exited'] !== 'true') {
+  console.error('cleanup-test-profile: refusing cleanup until owned processes have exited; confirm with --processes-exited')
+  process.exit(4)
+}
+const owner = await reopenOwnedTestRoot({ requestedRoot: testRoot, token: options['cleanup-token'] })
 const existed = existsSync(verified.home)
-if (existed) rmSync(verified.home, { recursive: true, force: true })
+await cleanupOwnedHome(owner, verified.home)
+await cleanupOwnedTestRoot(owner)
 const removed = existed && !existsSync(verified.home)
 
 console.log(

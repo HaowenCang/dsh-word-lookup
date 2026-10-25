@@ -124,3 +124,34 @@ export declare function describeEndpoint(node: Node | null): SelectionEndpointFa
  * @returns the eligible selection, or `null` when there is nothing to look up.
  */
 export declare function readEligibleSelection(doc: Document): EligibleSelection | null;
+/** Automatic-only target exclusions. Manual shortcut selection rules stay above. */
+export declare const AUTOMATIC_EXCLUDED_SELECTOR = "input, textarea, select, [contenteditable=\"\"], [contenteditable=\"true\"], [role=\"textbox\"], [contenteditable]:not([contenteditable=\"false\"]), button, a, [role=\"button\"], [role=\"link\"], [role=\"dialog\"], [aria-modal=\"true\"], [data-dsh-word-lookup=\"card\"], .dsh-wl-card, .dsh-wl-settings, .snapshot-picker-modal";
+export interface SelectionEndpoints {
+    readonly anchorNode: Node | null;
+    readonly anchorOffset: number;
+    readonly focusNode: Node | null;
+    readonly focusOffset: number;
+}
+/** Value snapshot only: never retain a live Selection or Range across events. */
+export declare function readSelectionEndpoints(doc: Document): SelectionEndpoints | null;
+export interface AutomaticSurface {
+    readonly target: Element;
+    readonly flow: Element;
+}
+/** Resolve through the composed path, then inspect all DOM ancestors. */
+export declare function readAutomaticSurface(doc: Document, event: MouseEvent): AutomaticSurface | null;
+/** Browser-resolved insertion point copied as node/offset values, never a Range. */
+export interface SelectionCaret {
+    readonly node: Node;
+    readonly offset: number;
+}
+export declare function readPointCaret(doc: Document, x: number, y: number): SelectionCaret | null;
+export interface AutomaticGestureContext {
+    readonly surface: AutomaticSurface;
+    readonly before: SelectionEndpoints | null;
+    readonly caret: SelectionCaret | null;
+    readonly x: number;
+    readonly y: number;
+}
+/** Associate this gesture's two targets/points with the newly read live Range. */
+export declare function isSelectionRelatedToGesture(doc: Document, selection: EligibleSelection, context: AutomaticGestureContext | null, event: MouseEvent): boolean;

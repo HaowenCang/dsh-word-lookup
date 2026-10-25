@@ -1,0 +1,145 @@
+PASS  lib contains exactly the approved emitted artifacts
+      client.js, ecdict-integrity-worker.js, index.js
+PASS  no second client chunk was emitted
+      client.js, ecdict-integrity-worker.js, index.js
+PASS  client bundle opens with the module-loader envelope
+PASS  client bundle closes with the module-loader envelope
+PASS  client bundle parses as JavaScript
+PASS  client bundle has no top-level import/export
+PASS  client bundle has no dynamic import
+PASS  client bundle requires only the declared externals
+      react, react/jsx-runtime
+PASS  client bundle requires react
+PASS  React is not bundled into the client
+PASS  client bundle references no SQLite driver module
+      react, react/jsx-runtime
+PASS  client bundle contains no "DatabaseSync"
+PASS  client bundle contains no "StatementSync"
+PASS  client bundle contains no "CREATE TABLE"
+PASS  client bundle contains no "INSERT INTO"
+PASS  client bundle contains no "DELETE FROM"
+PASS  client bundle contains no "PRAGMA"
+PASS  client bundle contains no "dictionary.fixture"
+PASS  client bundle contains no "fixtures/"
+PASS  client bundle contains no "dictionaryPath"
+PASS  client bundle contains no SQL statement
+      no statement shape found
+PASS  client bundle requires no Node built-in module
+      react, react/jsx-runtime
+PASS  client bundle names no filesystem or path API
+PASS  client bundle exports apply
+PASS  client bundle exports inject
+PASS  client bundle carries the shortcut command id
+      "wordLookup.lookupSelection"
+PASS  client bundle carries the overlay slot key
+      "shell.overlay"
+PASS  client bundle carries the card entry id
+      "dsh-word-lookup:card"
+PASS  client bundle carries the document-relative route and never the absolute form
+      client must address api/dsh-word-lookup because the page sets <base href="./">
+PASS  client bundle never fetches an absolute /api path
+PASS  client bundle contains no hard-coded route literal in fetch
+PASS  the client half reaches the network only via dedicated lookup and management transports
+      response = await fetch(url, init); | response = await fetch(LOOKUP_DOCUMENT_PATH, init);
+PASS  the lookup network call site uses the document relative lookup route
+      lookup path must use LOOKUP_DOCUMENT_PATH
+PASS  client bundle subscribes to pointerdown
+PASS  client bundle subscribes to pointermove
+PASS  client bundle subscribes to pointerup
+PASS  client bundle subscribes to pointercancel
+PASS  client bundle subscribes to dblclick
+PASS  client bundle subscribes to selectionchange
+PASS  client bundle declares the three required services
+PASS  client bundle registers the shortcut on five profiles and not web:linux
+PASS  host bundle imports schemastery as an external
+PASS  host bundle exports Config
+PASS  host bundle exports apply
+PASS  host bundle declares the exact route path
+PASS  host bundle registers requestBody buffered
+PASS  host bundle does not use rpc.handle or rpc.intercept
+PASS  host bundle carries no browser global
+PASS  host bundle makes no outbound call of its own
+      the handler answers from local data only; no provider or network call exists on this path
+PASS  host bundle imports no model provider package
+PASS  host bundle worker usage complies with Architecture Exception 1 & 2
+      workerCount: 1
+PASS  host bundle contains no Worker eval
+PASS  host bundle contains no eval() or Function()
+PASS  host bundle contains no dynamic import
+PASS  host bundle contains no child_process
+PASS  host bundle contains no process.env
+PASS  companion worker bundle contains no forbidden capabilities
+      clean companion worker
+PASS  host bundle loads node:sqlite as a built-in
+      the dictionary must be a real local SQLite store on the host side
+PASS  host bundle ships the fixture schema
+PASS  host bundle binds its queries through prepared statements
+      the seed is one transaction
+PASS  host bundle resolves the fixture from its own module URL
+      the database path is derived, never configured and never hard-coded to a machine
+PASS  host bundle reports the fixture as its only provenance
+      the runtime must not still answer as the Phase 1 stub
+PASS  host bundle describes autoSelection as the gesture it answers
+      the settings row must not read as "look up on any selection change"
+PASS  host bundle describes autoDoubleClick as the gesture it answers
+      the settings row must not read as "look up on any selection change"
+PASS  the emitted host code claims no stub as a source
+      provenance must describe the data that is actually there
+PASS  client bundle carries the auto-selection origin
+      "auto-selection"
+PASS  client bundle carries the auto-double-click origin
+      "auto-double-click"
+PASS  client bundle carries the manual origin
+      "shortcut"
+PASS  client bundle carries the duplicate refusal reason
+      "duplicate-gesture"
+PASS  client bundle carries the switched-off refusal reason
+      "switch-off"
+PASS  client bundle carries the unverified-pointer refusal reason
+      "unverified-pointer-kind"
+PASS  client bundle carries the not-a-trigger refusal reason
+      "not-a-trigger-gesture"
+PASS  client bundle carries the multi-click refusal reason
+      "multi-click-sequence"
+PASS  client bundle carries the unverified-multiplicity refusal reason
+      "unverified-click-multiplicity"
+PASS  client bundle carries the platform click-multiplicity values
+      "single"
+PASS  client bundle carries a listener for the event that carries the click counter
+      "mousedown"
+PASS  client bundle classifies pointer kinds, so an unverified one can be refused
+      the automatic paths are gated on the pointer kind the build measured
+PASS  client bundle allocates a gesture identity
+      de-duplication is by identity, never by text or by a time window
+PASS  gesture classification and trigger path contains no timer
+      gesture recognition must rely on platform events and classifier, never timers
+PASS  host bundle carries no gesture concern ("auto-selection")
+PASS  host bundle carries no gesture concern ("auto-double-click")
+PASS  host bundle carries no gesture concern ("gestureId")
+PASS  host bundle carries no gesture concern ("pointerType")
+PASS  host bundle carries no gesture concern ("duplicate-gesture")
+PASS  host bundle carries no gesture concern ("multi-click-sequence")
+PASS  host bundle carries no gesture concern ("clickMultiplicity")
+PASS  host bundle still carries no pointer or selection event name
+      a host that subscribed to a DOM event would be a second, unreviewed trigger path
+PASS  client bundle requests no origin field on the wire
+      origin is client state; the HTTP contract is unchanged by Phase 4
+PASS  package.json name is the plugin id
+PASS  every exports path exists on disk
+      ./lib/index.js, ./lib/client.js
+PASS  the published file list covers the build output
+      lib/index.js, lib/client.js, lib/ecdict-integrity-worker.js, cordis.patch.yml, README.md, LICENSE, corpus/ecdict.manifest.json
+PASS  every published file entry exists on disk
+      lib/index.js, lib/client.js, lib/ecdict-integrity-worker.js, cordis.patch.yml, README.md, LICENSE, corpus/ecdict.manifest.json
+PASS  dsh.bundle.patch exists
+      ./cordis.patch.yml
+PASS  dsh.client.platform is web
+PASS  dsh.client.inject lists the load-order dependencies
+PASS  peer dependencies pin the installed schemastery and cordis lines
+      {"@deepseek-ai/cordis":"~4.0.4","@deepseek-ai/schemastery":"~3.18.4","react":"^18.2.0"}
+PASS  patch inserts the plugin row
+PASS  lib/types/index.d.ts exists
+PASS  lib/types/client/index.d.ts exists
+PASS  lib/types is a directory
+
+check-bundle: 100/100 checks passed

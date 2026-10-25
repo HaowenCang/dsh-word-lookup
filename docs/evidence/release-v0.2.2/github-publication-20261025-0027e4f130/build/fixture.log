@@ -1,0 +1,18 @@
+preflight {"home":"C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-github-release-0027e4f130\\user","tmp":"C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-github-release-0027e4f130\\tmp","dsh":[]}
+
+node scripts/build-fixture-db.mjs --force
+build-fixture-db: built fixtures\dictionary.fixture.db
+  schema_version   1
+  fixture_version  phase3-fixture-1
+  entries          7
+  forms            11
+  examples         12
+  file             45056 bytes  sha256 063fbf6b650afecc6a52f6790fb89956a9a7e07bd6985269324191e399dfd930
+  determinism      logical dump identical: true (bytes identical: true)
+build-fixture-db: PASS
+
+(node:1520) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+EXIT_CODE=0
+

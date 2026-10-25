@@ -1,0 +1,24 @@
+negative controls: {"prematureDeath":"PASS","missingRecord":"PASS"}
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: premature process death must not pass
++ actual - expected
+
++ 'PASS'
+- 'INCOMPLETE'
+
+    at file:///C:/Users/20659/AppData/Local/Temp/dsh-022-preflight-af97f83f7e/network-verdict-selftest.mjs:11:8
+    at ModuleJob.run (node:internal/modules/esm/module_job:413:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:660:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 'PASS',
+  expected: 'INCOMPLETE',
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.13.0

@@ -1,0 +1,94 @@
+preflight {"home":"C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-preflight-af97f83f7e\\user","tmp":"C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-preflight-af97f83f7e\\tmp","dsh":[]}
+
+node node_modules/vitest/vitest.mjs run tests/ecdict-downloader.spec.ts --configLoader runner --no-cache --maxWorkers 1 -t bounds pending cancel
+
+ RUN  v3.2.4 C:/Users/20659/AppData/Local/Temp/dsh-022-preflight-af97f83f7e/repo
+
+ ✓ tests/ecdict-downloader.spec.ts (55 tests | 51 skipped) 27ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed | 51 skipped (55)
+     Errors  4 errors
+   Start at  05:08:27
+   Duration  1.96s (transform 451ms, setup 0ms, collect 974ms, tests 27ms, environment 0ms, prepare 652ms)
+
+
+(node:42052) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+⎯⎯⎯⎯⎯⎯ Unhandled Errors ⎯⎯⎯⎯⎯⎯
+
+Vitest caught 4 unhandled errors during the test run.
+This might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.
+
+⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯
+Error: late cancel rejection
+ ❯ finish tests/ecdict-downloader.spec.ts:139:87
+    137|       const cancelEntered = new Promise<void>(resolve => { entered = r…
+    138|       let finish!: () => void
+    139|       const pending = new Promise<void>((_resolve, reject) => { finish…
+       |                                                                                       ^
+    140|       const body = openBody(Buffer.from([0xff]), () => { entered(); re…
+    141|       let transport: AbortSignal | undefined
+ ❯ tests/ecdict-downloader.spec.ts:173:9
+ ❯ E:/Projects/DSHarness/dsh-word-lookup/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20
+
+This error originated in "tests/ecdict-downloader.spec.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "bounds pending cancel at 1000ms for decode and preserves the original error". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯
+Error: late cancel rejection
+ ❯ finish tests/ecdict-downloader.spec.ts:139:87
+    137|       const cancelEntered = new Promise<void>(resolve => { entered = r…
+    138|       let finish!: () => void
+    139|       const pending = new Promise<void>((_resolve, reject) => { finish…
+       |                                                                                       ^
+    140|       const body = openBody(Buffer.from([0xff]), () => { entered(); re…
+    141|       let transport: AbortSignal | undefined
+ ❯ tests/ecdict-downloader.spec.ts:173:9
+ ❯ E:/Projects/DSHarness/dsh-word-lookup/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20
+
+This error originated in "tests/ecdict-downloader.spec.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "bounds pending cancel at 1000ms for status and preserves the original error". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯
+Error: late cancel rejection
+ ❯ finish tests/ecdict-downloader.spec.ts:139:87
+    137|       const cancelEntered = new Promise<void>(resolve => { entered = r…
+    138|       let finish!: () => void
+    139|       const pending = new Promise<void>((_resolve, reject) => { finish…
+       |                                                                                       ^
+    140|       const body = openBody(Buffer.from([0xff]), () => { entered(); re…
+    141|       let transport: AbortSignal | undefined
+ ❯ tests/ecdict-downloader.spec.ts:173:9
+ ❯ E:/Projects/DSHarness/dsh-word-lookup/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20
+
+This error originated in "tests/ecdict-downloader.spec.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "bounds pending cancel at 1000ms for length and preserves the original error". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+
+⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯
+Error: late cancel rejection
+ ❯ finish tests/ecdict-downloader.spec.ts:139:87
+    137|       const cancelEntered = new Promise<void>(resolve => { entered = r…
+    138|       let finish!: () => void
+    139|       const pending = new Promise<void>((_resolve, reject) => { finish…
+       |                                                                                       ^
+    140|       const body = openBody(Buffer.from([0xff]), () => { entered(); re…
+    141|       let transport: AbortSignal | undefined
+ ❯ tests/ecdict-downloader.spec.ts:173:9
+ ❯ E:/Projects/DSHarness/dsh-word-lookup/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20
+
+This error originated in "tests/ecdict-downloader.spec.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "bounds pending cancel at 1000ms for redirect and preserves the original error". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+
+EXIT_CODE=1
+

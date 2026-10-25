@@ -1,0 +1,67 @@
+ M README.md
+ M docs/ISOLATION-TEST-PLAN.md
+ M lib/client.js
+ M lib/ecdict-integrity-worker.js
+ M lib/index.js
+ M lib/types/client/selection.d.ts
+ M lib/types/host/custom-dictionary-validator.d.ts
+ M lib/types/host/custom-snapshot-manager.d.ts
+ M lib/types/host/ecdict-downloader.d.ts
+ M package-lock.json
+ M package.json
+ M scripts/assert-isolated-env.d.mts
+ M scripts/assert-isolated-env.mjs
+ M scripts/check-bundle.mjs
+ M scripts/cleanup-test-profile.mjs
+ M scripts/create-test-profile.mjs
+ M scripts/maintenance-m1-browser-smoke.mjs
+ M scripts/probes/release-v0.2.1/release-smoke.mjs
+ M scripts/run-integration-test.mjs
+ M src/client/index.tsx
+ M src/client/selection.ts
+ M src/client/settings/dictionary-settings-components.tsx
+ M src/client/settings/dictionary-settings-section.tsx
+ M src/host/custom-dictionary-validator.ts
+ M src/host/custom-dictionary-worker.ts
+ M src/host/custom-snapshot-manager.ts
+ M src/host/dictionary-operations.ts
+ M src/host/ecdict-downloader.ts
+ M src/host/ecdict-integrity-worker.ts
+ M src/host/sqlite-dictionary.ts
+ M tests/client-card-interaction.spec.ts
+ M tests/client-runtime-harness.spec.ts
+ M tests/client-selection.spec.ts
+ M tests/custom-sqlite-snapshot-matrix.spec.ts
+ M tests/ecdict-downloader.spec.ts
+ M tests/ecdict-integrity-worker.spec.ts
+ M tests/host-sqlite-safety.spec.ts
+ M tests/iso-guard.spec.ts
+ M tests/phase7a8-2-native-settings.spec.ts
+?? docs/evidence/release-v0.2.2/
+?? docs/releases/v0.2.2.md
+?? docs/superpowers/
+?? lib/types/client/settings/snapshot-eligibility.d.ts
+?? lib/types/host/schema-version.d.ts
+?? scripts/bundle-check-rules.d.mts
+?? scripts/bundle-check-rules.mjs
+?? scripts/isolated-run-directory.d.mts
+?? scripts/isolated-run-directory.mjs
+?? scripts/maintenance-m1-browser-smoke.d.mts
+?? scripts/probes/release-v0.2.1/release-smoke.d.mts
+?? scripts/smoke-verdict.d.mts
+?? scripts/smoke-verdict.mjs
+?? src/client/settings/snapshot-eligibility.ts
+?? src/host/schema-version.ts
+?? tests/bug002-catalog-recovery.spec.ts
+?? tests/bug007-cleanup.spec.ts
+?? tests/bundle-check-rules.spec.ts
+?? tests/custom-worker-protocol.spec.ts
+?? tests/custom-worker-test-helpers.ts
+?? tests/isolated-run-directory.spec.ts
+?? tests/risk001-custom-termination.spec.ts
+?? tests/schema-version-test-helpers.ts
+?? tests/schema-version.spec.ts
+?? tests/smoke-lifecycle.spec.ts
+?? tests/smoke-verdict.spec.ts
+?? tests/snapshot-eligibility.spec.ts
+?? tests/ux001-modal.spec.ts

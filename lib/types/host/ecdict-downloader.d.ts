@@ -24,6 +24,7 @@
  *
  * @module dsh-word-lookup/host/ecdict-downloader
  */
+import { type FileHandle } from 'node:fs/promises';
 import { type EcdictSourceDescriptor } from './ecdict-source.js';
 import type { ManagedStoragePaths } from './managed-storage.js';
 /** Maximum permitted redirects before failing closed. */
@@ -103,6 +104,10 @@ export interface DownloadPinnedEcdictInternalOptions {
     readonly fetch?: typeof globalThis.fetch;
     /** @internal Test-only seam to override UUID factory. */
     readonly generateId?: () => string;
+    /** @internal Source-only disk failure injection; never forwarded by the production entrypoint. */
+    readonly writeChunk?: (handle: FileHandle, value: Uint8Array, offset: number, length: number) => Promise<{
+        bytesWritten: number;
+    }>;
 }
 /**
  * Detect whether a URL contains embedded userinfo (username, password-only, or username:password).

@@ -9,9 +9,11 @@
  */
 
 import { homedir, tmpdir } from 'node:os'
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, symlinkSync, rmSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import fs from 'node:fs'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import {
   assertIsolatedDshEnvironment,
@@ -20,6 +22,7 @@ import {
   isInsideOrEqual,
   ISOLATION_BANNER,
   productionFacts,
+  normalisePath,
 } from '../scripts/assert-isolated-env.mjs'
 
 /** The production home on this machine, as the gate computes it. */
@@ -61,6 +64,33 @@ function violationsFor(facts: Parameters<typeof assertIsolatedDshEnvironment>[0]
 }
 
 describe('assertIsolatedDshEnvironment', () => {
+  it('rejects a test root containing synthetic production', () => {
+    const root = mkdtempSync(join(tmpdir(), 'guard-ancestor-'))
+    try {
+      const production = join(root, 'production')
+      mkdirSync(production)
+      writeFileSync(join(production, 'sentinel'), 'untouched')
+      const mkdirSpy = vi.spyOn(fs, 'mkdirSync')
+      const deleteSpy = vi.spyOn(fs, 'rmSync')
+      try {
+        expect(() => assertIsolatedDshEnvironment({ ...ISOLATED, testRoot: root, home: join(root, 'scratch'), env: { DSH_HOME: production } })).toThrow(IsolationError)
+        expect(mkdirSpy).not.toHaveBeenCalled()
+        expect(deleteSpy).not.toHaveBeenCalled()
+      } finally { mkdirSpy.mockRestore(); deleteSpy.mockRestore() }
+      expect(readFileSync(join(production, 'sentinel'), 'utf8')).toBe('untouched')
+    } finally { rmSync(root, { recursive: true, force: true }) }
+  })
+
+  it('rejects a missing home through an existing production junction', () => {
+    const root = mkdtempSync(join(tmpdir(), 'guard-junction-'))
+    try {
+      const production = join(root, 'production')
+      const scratch = join(root, 'scratch')
+      mkdirSync(production); mkdirSync(scratch)
+      symlinkSync(production, join(scratch, 'alias'), 'junction')
+      expect(() => assertIsolatedDshEnvironment({ ...ISOLATED, testRoot: scratch, home: join(scratch, 'alias', 'missing-home'), env: { DSH_HOME: production } })).toThrow(IsolationError)
+    } finally { rmSync(root, { recursive: true, force: true }) }
+  })
   it('accepts a scratch home under the test root on a non-production port', () => {
     const verified = assertIsolatedDshEnvironment(ISOLATED)
 
@@ -84,7 +114,7 @@ describe('assertIsolatedDshEnvironment', () => {
   })
 
   it('refuses the daily and damaged profile names', () => {
-    for (const profile of ['web', 'desktop', 'WEB', 'Desktop']) {
+    for (const profile of ['web', 'desktop', 'default', 'WEB', 'Desktop', 'Default']) {
       const violations = violationsFor({ ...ISOLATED, profile })
       expect(violations.join('\n'), profile).toContain('is a production profile name')
     }
@@ -176,6 +206,29 @@ describe('buildIsolatedEnv', () => {
 })
 
 describe('isInsideOrEqual', () => {
+  it('resolves ordinary missing suffixes against the nearest real ancestor', () => {
+    const expected = resolve(TEST_ROOT, 'missing', 'leaf')
+    expect(normalisePath(join(TEST_ROOT, 'missing', 'leaf'))).toBe(process.platform === 'win32' ? expected.toLowerCase() : expected)
+  })
+
+  it.each(['EACCES', 'EPERM', 'EIO'])('fails closed on realpath %s failure', (code) => {
+    const spy = vi.spyOn(fs.realpathSync, 'native').mockImplementationOnce(() => { throw Object.assign(new Error('synthetic denied'), { code }) })
+    try { expect(() => normalisePath(tmpdir())).toThrow(new RegExp(`${code}.*synthetic denied`)) }
+    finally { spy.mockRestore() }
+  })
+
+  it('rejects a missing leaf whose existing ancestor is a file', () => {
+    const root = mkdtempSync(join(tmpdir(), 'guard-file-'))
+    try {
+      writeFileSync(join(root, 'file'), '')
+      expect(() => normalisePath(join(root, 'file', 'missing'))).toThrow(/ENOTDIR/)
+    } finally { rmSync(root, { recursive: true, force: true }) }
+  })
+
+  it('folds mixed case on Windows and allows disjoint sibling roots', () => {
+    if (process.platform === 'win32') expect(isInsideOrEqual(join(TEST_ROOT.toUpperCase(), 'HOME'), TEST_ROOT)).toBe(true)
+    expect(() => assertIsolatedDshEnvironment({ ...ISOLATED, env: { DSH_HOME: `${TEST_ROOT}x` } })).not.toThrow()
+  })
   it('does not treat a sibling with a shared prefix as a descendant', () => {
     expect(isInsideOrEqual(join(TEST_ROOT, 'x'), TEST_ROOT)).toBe(true)
     expect(isInsideOrEqual(`${TEST_ROOT}x`, TEST_ROOT)).toBe(false)

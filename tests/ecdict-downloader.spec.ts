@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createHash, randomUUID } from 'node:crypto'
+import type { FileHandle } from 'node:fs/promises'
 import {
   mkdirSync,
   readFileSync,
@@ -81,6 +82,238 @@ describe('ECDICT secure downloader', () => {
       rmSync(testRoot, { recursive: true, force: true })
     } catch {}
   }
+
+  describe('BUG-003 response ownership', () => {
+    function openBody(bytes: Uint8Array, cancel: () => void | Promise<void> = () => {}) {
+      return new ReadableStream<Uint8Array>({ start(c) { c.enqueue(bytes) }, cancel })
+    }
+
+    it.each(['decode', 'write', 'write-cancel-rejection', 'read', 'limit', 'cancel-rejection'])('releases reader and aborts transport on %s failure', async (failure) => {
+      setupTestPaths()
+      const original = new Error('original disk failure')
+      const caller = new AbortController()
+      const remove = vi.spyOn(caller.signal, 'removeEventListener')
+      let transport: AbortSignal | undefined
+      let cancelled = 0
+      let ownedHandle: FileHandle | undefined
+      const writing = failure.startsWith('write')
+      const body = failure === 'read'
+        ? new ReadableStream<Uint8Array>({ pull(c) { c.error(original) } })
+        : openBody(writing ? Buffer.from('ok') : failure === 'limit' ? Buffer.from('long') : Buffer.from([0xff]), () => {
+          cancelled++
+          if (failure.includes('cancel-rejection')) return Promise.reject(new Error('cancel failed'))
+        })
+      const { descriptor } = createSyntheticDescriptor('ok')
+      try {
+        const outcome = await downloadPinnedEcdictInternal(paths, descriptor, {
+          signal: caller.signal,
+          fetch: (async (_url, init) => { transport = init?.signal as AbortSignal; return new Response(body as any) }) as typeof fetch,
+          ...(writing ? { writeChunk: async (handle: FileHandle) => {
+            ownedHandle = handle
+            const close = handle.close.bind(handle)
+            handle.close = async () => {
+              expect(readdirSync(paths.sourceCacheDirectory).some(name => name.endsWith('.part'))).toBe(true)
+              await close()
+            }
+            throw original
+          } } : {}),
+        } as any).catch(error => error)
+        if (writing || failure === 'read') expect(outcome).toBe(original)
+        else expect(outcome).toBeInstanceOf(Error)
+        if (failure !== 'read') expect(cancelled).toBe(1)
+        expect(body.locked).toBe(false)
+        expect(transport).not.toBe(caller.signal)
+        expect(transport?.aborted).toBe(true)
+        expect(caller.signal.aborted).toBe(false)
+        expect(remove).toHaveBeenCalledWith('abort', expect.any(Function))
+        if (writing) expect(ownedHandle?.fd).toBe(-1)
+        expect(readdirSync(paths.sourceCacheDirectory)).toEqual([])
+      } finally { cleanupTestPaths() }
+    })
+
+    it.each(['decode', 'status', 'length', 'redirect'])('bounds pending cancel at 1000ms for %s and preserves the original error', async (failure) => {
+      setupTestPaths()
+      let entered!: () => void
+      const cancelEntered = new Promise<void>(resolve => { entered = resolve })
+      let finish!: () => void
+      const pending = new Promise<void>((_resolve, reject) => { finish = () => reject(new Error('late cancel rejection')) })
+      let cancelCalls = 0
+      const body = openBody(Buffer.from([0xff]), () => { cancelCalls++; entered(); return pending })
+      let transport: AbortSignal | undefined
+      const { descriptor } = createSyntheticDescriptor('ok')
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+      const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      let settled = false
+      let error: unknown
+      const operation = downloadPinnedEcdictInternal(paths, descriptor, {
+        fetch: (async (_url, init) => {
+          transport = init?.signal as AbortSignal
+          return new Response(body as any, failure === 'status' ? { status: 503 } : failure === 'length' ? { headers: { 'content-length': 'bad' } } : failure === 'redirect' ? { status: 302, headers: { location: 'https://raw.githubusercontent.com/next' } } : {})
+        }) as typeof fetch,
+      }).catch(e => { settled = true; error = e })
+      try {
+        const first = await Promise.race([
+          cancelEntered.then(() => 'cancel-entered'),
+          operation.then(() => 'operation-settled'),
+        ])
+        expect(first).toBe('cancel-entered')
+        expect(cancelCalls).toBe(1)
+        expect(settled).toBe(false)
+        await vi.advanceTimersByTimeAsync(999)
+        expect(settled).toBe(false)
+        await vi.advanceTimersByTimeAsync(1)
+        expect(transport?.aborted).toBe(true)
+        expect(body.locked).toBe(false)
+        expect(warning).toHaveBeenCalledWith(expect.stringContaining('unconfirmed'))
+        await operation // Real disk cleanup follows the already completed bounded stream cleanup.
+        expect(settled).toBe(true)
+        expect(error).toBeInstanceOf(Error)
+        if (failure === 'decode') expect(error).toBeInstanceOf(TypeError)
+        if (failure === 'status') expect((error as Error).message).toContain('non-200 HTTP status 503')
+        if (failure === 'length') expect((error as Error).message).toContain('Invalid Content-Length')
+        expect(readdirSync(paths.sourceCacheDirectory)).toEqual([])
+      } finally {
+        if (cancelCalls > 0) finish()
+        await operation; await new Promise<void>(resolve => setImmediate(resolve)); vi.useRealTimers(); warning.mockRestore(); cleanupTestPaths()
+      }
+    })
+
+    it('forwards abort while read is pending and removes caller listener', async () => {
+      setupTestPaths()
+      const caller = new AbortController()
+      const remove = vi.spyOn(caller.signal, 'removeEventListener')
+      let transport: AbortSignal | undefined
+      let ready!: () => void
+      const fetched = new Promise<void>(resolve => { ready = resolve })
+      let streamController!: ReadableStreamDefaultController<Uint8Array>
+      const body = new ReadableStream<Uint8Array>({ start(c) { streamController = c } })
+      const { descriptor } = createSyntheticDescriptor('ok')
+      const operation = downloadPinnedEcdictInternal(paths, descriptor, {
+        signal: caller.signal,
+        fetch: (async (_url, init) => {
+          transport = init?.signal as AbortSignal
+          // Match fetch's transport contract: abort rejects an outstanding body read.
+          transport.addEventListener('abort', () => streamController.error(new DOMException('aborted', 'AbortError')), { once: true })
+          ready(); return new Response(body as any)
+        }) as typeof fetch,
+      })
+      try {
+        await fetched; await new Promise<void>(resolve => setImmediate(resolve)); caller.abort('caller reason')
+        await expect(operation).rejects.toMatchObject({ name: 'AbortError' })
+        expect(transport).not.toBe(caller.signal)
+        expect(body.locked).toBe(false)
+        expect(remove).toHaveBeenCalledWith('abort', expect.any(Function))
+        expect(readdirSync(paths.sourceCacheDirectory)).toEqual([])
+      } finally { cleanupTestPaths() }
+    })
+
+    it('releases normal EOF without cancel, including hash failure, then succeeds and reuses valid cache', async () => {
+      setupTestPaths()
+      const { descriptor, rawBytes } = createSyntheticDescriptor('ok')
+      const caller = new AbortController()
+      const add = vi.spyOn(caller.signal, 'addEventListener')
+      const remove = vi.spyOn(caller.signal, 'removeEventListener')
+      try {
+        for (const badHash of [true, true, false]) {
+          let cancelled = 0
+          const body = createMockStream([rawBytes], () => { cancelled++ })
+          const promise = downloadPinnedEcdictInternal(paths, badHash ? { ...descriptor, sourceSha256: '0'.repeat(64) } : descriptor, { signal: caller.signal, fetch: (async () => new Response(body)) as typeof fetch })
+          if (badHash) await expect(promise).rejects.toThrow(/SHA-256/)
+          else await expect(promise).resolves.toMatchObject({ reused: false })
+          expect(body.locked).toBe(false)
+          expect(cancelled).toBe(0)
+        }
+        const network = vi.fn(() => { throw new Error('cache reuse must not fetch') })
+        await expect(downloadPinnedEcdictInternal(paths, descriptor, { signal: caller.signal, fetch: network })).resolves.toMatchObject({ reused: true })
+        expect(readFileSync(join(paths.sourceCacheDirectory, 'ecdict.csv'))).toEqual(rawBytes)
+        expect(readdirSync(paths.sourceCacheDirectory)).toEqual(['ecdict.csv'])
+        expect(remove.mock.calls.length).toBe(add.mock.calls.length)
+      } finally { cleanupTestPaths() }
+    })
+
+    it('recovers the same destination after consecutive open-stream failures and a cancelled redirect', async () => {
+      setupTestPaths()
+      const { descriptor, rawBytes } = createSyntheticDescriptor('ok')
+      try {
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const body = openBody(Buffer.from([0xff]), () => attempt === 1 ? Promise.reject(new Error('cancel rejected')) : undefined)
+          await expect(downloadPinnedEcdictInternal(paths, descriptor, { fetch: (async () => new Response(body as any)) as typeof fetch })).rejects.toBeInstanceOf(TypeError)
+          expect(body.locked).toBe(false)
+          expect(readdirSync(paths.sourceCacheDirectory)).toEqual([])
+        }
+        let redirectCancelled = 0
+        const redirectBody = openBody(Buffer.from('redirect'), () => { redirectCancelled++ })
+        const finalBody = createMockStream([rawBytes])
+        const signals: AbortSignal[] = []
+        const responseQueue = [new Response(redirectBody as any, { status: 302, headers: { location: '/next' } }), new Response(finalBody)]
+        const result = await downloadPinnedEcdictInternal(paths, descriptor, {
+          fetch: (async (_url, init) => { signals.push(init?.signal as AbortSignal); return responseQueue.shift()! }) as typeof fetch,
+        })
+        expect(result).toMatchObject({ redirectCount: 1, reused: false })
+        expect(redirectCancelled).toBe(1)
+        expect(redirectBody.locked).toBe(false)
+        expect(finalBody.locked).toBe(false)
+        expect(signals[0]).toBe(signals[1])
+        expect(signals[0]?.aborted).toBe(false)
+        expect(readFileSync(result.path)).toEqual(rawBytes)
+      } finally { cleanupTestPaths() }
+    })
+
+    it('retains its part if closing its handle fails and preserves the original write error', async () => {
+      setupTestPaths()
+      const { descriptor } = createSyntheticDescriptor('ok')
+      const original = new Error('disk write failed')
+      let closeOwned: (() => Promise<void>) | undefined
+      const body = openBody(Buffer.from('ok'))
+      try {
+        await expect(downloadPinnedEcdictInternal(paths, descriptor, {
+          fetch: (async () => new Response(body as any)) as typeof fetch,
+          writeChunk: async handle => {
+            closeOwned = handle.close.bind(handle)
+            handle.close = async () => { throw new Error('close failed') }
+            throw original
+          },
+        })).rejects.toBe(original)
+        expect(body.locked).toBe(false)
+        expect(readdirSync(paths.sourceCacheDirectory).filter(name => name.endsWith('.part'))).toHaveLength(1)
+        expect(existsSync(join(paths.sourceCacheDirectory, 'ecdict.csv'))).toBe(false)
+      } finally { await closeOwned?.(); cleanupTestPaths() }
+    })
+  })
+
+  describe('BUG-003 actual Host artifact', () => {
+    it('keeps the packaged pin and private seams while cancelling invalid open UTF-8 through the public root', async () => {
+      setupTestPaths()
+      const artifact = await import(new URL('../lib/index.js', import.meta.url).href)
+      const caller = new AbortController()
+      const remove = vi.spyOn(caller.signal, 'removeEventListener')
+      let cancelled = 0
+      let transport: AbortSignal | undefined
+      let requested: unknown
+      const body = new ReadableStream<Uint8Array>({ start(c) { c.enqueue(Buffer.from([0xff])) }, cancel() { cancelled++ } })
+      const network = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
+        requested = url; transport = init?.signal as AbortSignal
+        return new Response(body as any)
+      })
+      const foreignSeam = vi.fn(() => { throw new Error('private override reached production') })
+      try {
+        for (const internal of ['downloadPinnedEcdictInternal', 'DownloadPinnedEcdictInternalOptions', 'writeChunk', 'validateEcdictManifest']) expect(internal in artifact).toBe(false)
+        await expect(artifact.downloadPinnedEcdict(paths, {
+          signal: caller.signal, fetch: foreignSeam, writeChunk: foreignSeam,
+          descriptor: createSyntheticDescriptor('foreign').descriptor,
+        })).rejects.toBeInstanceOf(TypeError)
+        expect(requested).toBe('https://raw.githubusercontent.com/skywind3000/ECDICT/bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b/ecdict.csv')
+        expect(foreignSeam).not.toHaveBeenCalled()
+        expect(cancelled).toBe(1)
+        expect(body.locked).toBe(false)
+        expect(transport).not.toBe(caller.signal)
+        expect(transport?.aborted).toBe(true)
+        expect(caller.signal.aborted).toBe(false)
+        expect(remove).toHaveBeenCalledWith('abort', expect.any(Function))
+        expect(readdirSync(paths.sourceCacheDirectory)).toEqual([])
+      } finally { network.mockRestore(); cleanupTestPaths() }
+    })
+  })
 
   it('rejects insecure protocol (non-HTTPS)', async () => {
     setupTestPaths()

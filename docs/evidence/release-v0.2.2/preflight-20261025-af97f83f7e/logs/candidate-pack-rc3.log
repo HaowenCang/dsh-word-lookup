@@ -1,0 +1,63 @@
+preflight {"home":"C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-preflight-af97f83f7e\\user","tmp":"C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-preflight-af97f83f7e\\tmp","dsh":[]}
+
+node D:/softwares/nodejs/node_modules/npm/bin/npm-cli.js pack --json --ignore-scripts --offline --pack-destination ../candidate-rc3
+[
+  {
+    "id": "dsh-word-lookup@0.2.2",
+    "name": "dsh-word-lookup",
+    "version": "0.2.2",
+    "size": 147121,
+    "unpackedSize": 618136,
+    "shasum": "2e42606c661626c515e9371dc2c9fcb123d4d33c",
+    "integrity": "sha512-IShZ22GgzI4KGEuP3jb+qwB053DqAMn7Xsj+Xb+Aq0JBQtjBxqTkwh9aB3wQaj2fhvqF2fkZnC4kfgcc+yeWKA==",
+    "filename": "dsh-word-lookup-0.2.2.tgz",
+    "files": [
+      {
+        "path": "LICENSE",
+        "size": 1089,
+        "mode": 420
+      },
+      {
+        "path": "README.md",
+        "size": 20547,
+        "mode": 420
+      },
+      {
+        "path": "cordis.patch.yml",
+        "size": 415,
+        "mode": 420
+      },
+      {
+        "path": "corpus/ecdict.manifest.json",
+        "size": 566,
+        "mode": 420
+      },
+      {
+        "path": "lib/client.js",
+        "size": 198730,
+        "mode": 420
+      },
+      {
+        "path": "lib/ecdict-integrity-worker.js",
+        "size": 29261,
+        "mode": 420
+      },
+      {
+        "path": "lib/index.js",
+        "size": 361993,
+        "mode": 420
+      },
+      {
+        "path": "package.json",
+        "size": 5535,
+        "mode": 420
+      }
+    ],
+    "entryCount": 8,
+    "bundled": []
+  }
+]
+
+
+EXIT_CODE=0
+

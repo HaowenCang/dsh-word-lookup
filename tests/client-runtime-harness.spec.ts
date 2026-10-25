@@ -23,6 +23,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { Window } from 'happy-dom'
 
 import {
   apply,
@@ -32,8 +33,6 @@ import {
   type WordLookupDiagnostics,
 } from '../src/client/index.js'
 import {
-  CONVERSATION_FLOW_SELECTOR,
-  INTERACTIVE_SURFACE_SELECTOR,
   type SelectionRect,
 } from '../src/client/selection.js'
 
@@ -42,39 +41,27 @@ import {
 /** Which ancestor facts an element reports. */
 type Surface = 'flow' | 'loose' | 'composer'
 
-/** The smallest element that can answer the two `closest()` questions. */
-class FakeElement {
-  readonly nodeType = 1
-  readonly parentElement: FakeElement | null = null
-  readonly #surface: Surface
-
-  /**
-   * @param surface - what this element is inside of.
-   */
-  constructor(surface: Surface) {
-    this.#surface = surface
-  }
-
-  /**
-   * @param selector - one of the two selectors the plugin uses.
-   * @returns this element when it matches, `null` otherwise.
-   */
-  closest(selector: string): FakeElement | null {
-    if (selector === CONVERSATION_FLOW_SELECTOR) return this.#surface === 'flow' ? this : null
-    if (selector === INTERACTIVE_SURFACE_SELECTOR) return this.#surface === 'composer' ? this : null
-    return null
-  }
-}
-
-/** A `Range` stand-in; only the geometry read is used. */
-function fakeRange(rect: SelectionRect): { collapsed: boolean; getBoundingClientRect: () => SelectionRect } {
-  return { collapsed: false, getBoundingClientRect: () => rect }
+const dom = new Window()
+type FakeElement = HTMLElement
+// Explicit virtual one-line layout for wiring tests; native geometry is tested
+// separately. Carets depend on x/y and hit text, never on the old Selection.
+const textLayouts = new WeakMap<Element, SelectionRect>()
+function makeElement(surface: Surface): FakeElement {
+  const element = dom.document.createElement('div')
+  if (surface === 'flow') element.setAttribute('data-chat-flow-kind', 'assistant-step')
+  if (surface === 'composer') element.setAttribute('contenteditable', 'true')
+  element.textContent = 'derive'
+  textLayouts.set(element as unknown as Element, { x: 200, y: 190, width: 40, height: 20 })
+  dom.document.body.append(element)
+  return element as unknown as FakeElement
 }
 
 /** The document's selection, as the plugin reads it. */
 class FakeSelection {
-  anchorNode: FakeElement | null = null
-  focusNode: FakeElement | null = null
+  anchorNode: Node | null = null
+  focusNode: Node | null = null
+  anchorOffset = 0
+  focusOffset = 0
   rangeCount = 0
   isCollapsed = true
   #text = ''
@@ -89,7 +76,11 @@ class FakeSelection {
    * @returns the live range.
    */
   getRangeAt(): unknown {
-    return fakeRange(this.#rect)
+    const range = dom.document.createRange()
+    range.setStart(this.anchorNode as never, this.anchorOffset)
+    range.setEnd(this.focusNode as never, this.focusOffset)
+    Object.assign(range, { getBoundingClientRect: () => this.#rect, getClientRects: () => [textLayouts.get(this.anchorNode!.parentElement!)!] })
+    return range
   }
 
   /**
@@ -100,8 +91,12 @@ class FakeSelection {
    * @param rect - the geometry the live range reports.
    */
   replace(node: FakeElement, text: string, rect?: SelectionRect): void {
-    this.anchorNode = node
-    this.focusNode = node
+    if (node.firstChild?.nodeType === 3) node.firstChild.textContent = text
+    else node.textContent = text
+    this.anchorNode = node.firstChild as unknown as Node
+    this.focusNode = node.firstChild as unknown as Node
+    this.anchorOffset = 0
+    this.focusOffset = text.length
     this.rangeCount = 1
     this.isCollapsed = text === ''
     this.#text = text
@@ -161,6 +156,24 @@ class FakeTarget {
 
 /** The product document. */
 class FakeDocument extends FakeTarget {
+  defaultTarget: FakeElement | null = null
+  defaultView = dom
+  override emit(type: string, event: unknown = {}): void {
+    const data = event as { target?: FakeElement }
+    super.emit(type, { target: this.defaultTarget, ...data, composedPath: () => [data.target ?? this.defaultTarget] })
+  }
+  setLayout(node: FakeElement, rect: SelectionRect): void { textLayouts.set(node, rect) }
+  caretRangeFromPoint(x: number, y: number): unknown {
+    const target = this.defaultTarget
+    if (target === null) return null
+    const layout = textLayouts.get(target), text = target.firstChild
+    if (layout === undefined || text?.nodeType !== 3 || y < layout.y || y > layout.y + layout.height || x < layout.x || x > layout.x + 400) return null
+    const range = dom.document.createRange()
+    const length = text.textContent!.length
+    const offset = Math.min(length, Math.max(0, Math.round((x - layout.x) / layout.width * length)))
+    range.setStart(text as never, offset); range.collapse(true)
+    return range
+  }
   readonly selection = new FakeSelection()
 
   /** @returns the live selection. */
@@ -281,9 +294,10 @@ function createHarness(options: HarnessOptions = {}): Harness {
   const doc = new FakeDocument()
   const win = new FakeTarget()
   const form = new FakeForm()
-  const flow = new FakeElement('flow')
-  const loose = new FakeElement('loose')
-  const composer = new FakeElement('composer')
+  const flow = makeElement('flow')
+  const loose = makeElement('loose')
+  const composer = makeElement('composer')
+  doc.defaultTarget = flow
   const requests: string[] = []
   const effects: (() => void)[] = []
   let command: RegisteredCommand | null = null
@@ -414,6 +428,8 @@ async function drag(
     quiet?: boolean
     multiClick?: boolean
     mouseDown?: boolean
+    retainSelection?: boolean
+    target?: FakeElement
   } = {
     text: 'derive',
   },
@@ -421,10 +437,12 @@ async function drag(
   const node = options.node ?? harness.flow
   const pointerType = options.pointerType ?? 'mouse'
   const distance = options.distance ?? 40
-  harness.doc.selection.clear()
+  harness.doc.setLayout(node, { x: 100, y: 90, width: 40, height: 20 })
+  harness.doc.defaultTarget = options.target ?? node
+  if (!options.retainSelection) harness.doc.selection.clear()
   harness.doc.emit('pointerdown', pointer(100, 100, pointerType))
   if (options.mouseDown !== false) harness.doc.emit('mousedown', { detail: options.multiClick === true ? 2 : 1, button: 0 })
-  harness.select(node, options.text)
+  if (!options.retainSelection) harness.select(node, options.text)
   harness.doc.emit('pointermove', pointer(100 + distance, 100, pointerType))
   harness.doc.emit('pointerup', pointer(100 + distance, 100, pointerType))
   if (options.quiet !== true) await settle()
@@ -446,25 +464,27 @@ async function drag(
  */
 async function doubleClick(
   harness: Harness,
-  options: { text: string; node?: FakeElement; pointerType?: string; quiet?: boolean; drift?: number } = {
+  options: { text: string; node?: FakeElement; pointerType?: string; quiet?: boolean; drift?: number; retainSelection?: boolean; target?: FakeElement } = {
     text: 'derive',
   },
 ): Promise<void> {
   const node = options.node ?? harness.flow
   const pointerType = options.pointerType ?? 'mouse'
   const drift = options.drift ?? 0
-  harness.doc.selection.clear()
+  harness.doc.setLayout(node, { x: 200, y: 190, width: Math.max(40, drift), height: 20 })
+  harness.doc.defaultTarget = options.target ?? node
+  if (!options.retainSelection) harness.doc.selection.clear()
   harness.doc.emit('pointerdown', pointer(200, 200, pointerType))
   harness.doc.emit('mousedown', { detail: 1, button: 0 })
   harness.doc.emit('pointerup', pointer(200, 200, pointerType))
   harness.doc.emit('pointerdown', pointer(200, 200, pointerType))
   harness.doc.emit('mousedown', { detail: 2, button: 0 })
-  harness.select(node, options.text)
+  if (!options.retainSelection) harness.select(node, options.text)
   if (drift > 0) harness.doc.emit('pointermove', pointer(200 + drift, 200, pointerType))
   harness.doc.emit('pointerup', pointer(200 + drift, 200, pointerType))
   harness.doc.emit('dblclick', { clientX: 200, clientY: 200 })
   // The trailing change the browser dispatches after `dblclick`.
-  harness.select(node, options.text)
+  if (!options.retainSelection) harness.select(node, options.text)
   if (options.quiet !== true) await settle()
 }
 
@@ -818,17 +838,15 @@ describe('the overlap: a double click that also travels', () => {
 
 describe('de-duplication', () => {
   it('treats a second platform double click as a second gesture, not as a duplicate event', async () => {
-    // Two `dblclick` events are two gestures: the plugin has no timer and no
-    // other way to tell a synthesised repeat from a reader double-clicking twice,
-    // and collapsing them would swallow the second lookup the brief requires.
+    // Two complete physical sequences over the same retained selection are
+    // distinct gestures; no text, geometry or time comparison may collapse them.
     const harness = createHarness()
     harness.boot()
     await useState(harness, STATES.S01)
 
     await doubleClick(harness, { text: 'derive' })
     const first = view(harness).gestures().last.gestureId
-    harness.doc.emit('dblclick', { clientX: 200, clientY: 200 })
-    await settle()
+    await doubleClick(harness, { text: 'derive', retainSelection: true })
     const second = view(harness).gestures().last.gestureId
 
     expect(first).not.toBe(second)
@@ -1427,4 +1445,80 @@ describe('diagnostics', () => {
     await drag(harness, { text: 'went' })
     expect(view(harness).requestId()).toBe(2)
   })
+})
+
+// BUG-005: completion must associate the live selection with this gesture's targets.
+describe('BUG-005 retained selection and real event targets', () => {
+  for (const kind of ['double-click', 'drag'] as const) {
+    for (const surface of ['outside-button', 'nonselectable', 'link', 'card', 'settings', 'composer', 'other-flow', 'same-flow-sibling']) {
+      it(`${kind} rejects retained derive from ${surface}`, async () => {
+        const h = createHarness(); h.boot(); await useState(h, STATES.S11)
+        const target = makeElement(surface === 'other-flow' ? 'flow' : 'loose')
+        if (surface === 'outside-button') target.setAttribute('role', 'button')
+        if (surface === 'nonselectable') target.style.userSelect = 'none'
+        if (surface === 'link') target.setAttribute('role', 'link')
+        if (surface === 'card') target.setAttribute('data-dsh-word-lookup', 'card')
+        if (surface === 'settings') target.className = 'dsh-wl-settings'
+        if (surface === 'composer') target.contentEditable = 'true'
+        h.select(h.flow, 'derive')
+        if (['nonselectable', 'link', 'same-flow-sibling'].includes(surface)) h.flow.append(target)
+        await (kind === 'drag' ? drag : doubleClick)(h, { text: 'derive', target, retainSelection: true })
+        expect(h.requests).toEqual([])
+      })
+    }
+  }
+  for (const kind of ['drag', 'double-click'] as const) {
+    it(`${kind} accepts repeated retained same word`, async () => {
+      const h = createHarness(); h.boot(); await useState(h, STATES.S11)
+      await (kind === 'drag' ? drag : doubleClick)(h, { text: 'derive' })
+      await (kind === 'drag' ? drag : doubleClick)(h, { text: 'derive', retainSelection: true })
+      expect(h.requests).toEqual(['derive', 'derive'])
+    })
+  }
+  for (const cancel of ['pointercancel', 'blur']) {
+    it(`${cancel} clears context before a later double click`, async () => {
+      const h = createHarness(); h.boot(); await useState(h, STATES.S11); h.select(h.flow, 'derive')
+      h.doc.emit('pointerdown', pointer(100, 100));
+      (cancel === 'blur' ? h.win : h.doc).emit(cancel)
+      h.doc.emit('dblclick', { clientX: 100, clientY: 100 })
+      await settle(); expect(h.requests).toEqual([])
+    })
+  }
+})
+
+describe('BUG-005 review invalidated caret runtime cleanup', () => {
+  for (const mutation of ['shortened-text', 'replaced-node']) {
+    for (const completion of ['pointerup', 'dblclick']) {
+      it(`${mutation} at ${completion} refuses, clears context, and recovers`, async () => {
+        const h = createHarness(); h.boot(); await useState(h, STATES.S11); h.select(h.flow, 'derive')
+        const oldNode = h.flow.firstChild!
+        h.doc.emit('pointerdown', pointer(240, 200)); h.doc.emit('mousedown', { detail: 2, button: 0 })
+        if (mutation === 'replaced-node') h.flow.replaceChildren(dom.document.createTextNode('go') as unknown as Node)
+        h.select(h.flow, 'go')
+        h.doc.emit('pointermove', pointer(200, 200))
+        expect(() => h.doc.emit(completion, pointer(200, 200))).not.toThrow()
+        expect(h.requests).toEqual([])
+        // Revalidate the old node/offset without a new down: cleared context
+        // must stay cleared rather than reviving the abandoned gesture.
+        if (mutation === 'replaced-node') h.flow.replaceChildren(oldNode)
+        h.select(h.flow, 'derive')
+        h.doc.emit('dblclick', pointer(200, 200))
+        await settle(); expect(h.requests).toEqual([])
+        await drag(h, { text: 'derive' }); expect(h.requests).toEqual(['derive'])
+      })
+    }
+  }
+  for (const phase of ['pointerdown', 'pointerup', 'dblclick']) {
+    it(`a DOM caret API exception at ${phase} fails closed and recovers`, async () => {
+      const h = createHarness(); h.boot(); await useState(h, STATES.S11); h.select(h.flow, 'derive')
+      if (phase !== 'pointerdown') { h.doc.emit('pointerdown', pointer(200, 200)); h.doc.emit('mousedown', { detail: 2, button: 0 }) }
+      const resolve = h.doc.caretRangeFromPoint.bind(h.doc)
+      h.doc.caretRangeFromPoint = () => { throw new DOMException('transient DOM read failure', 'InvalidStateError') }
+      expect(() => h.doc.emit(phase, pointer(200, 200))).not.toThrow()
+      h.doc.caretRangeFromPoint = resolve
+      h.doc.emit('pointerup', pointer(240, 200)); h.doc.emit('dblclick', pointer(200, 200))
+      await settle(); expect(h.requests).toEqual([])
+      await drag(h, { text: 'derive' }); expect(h.requests).toEqual(['derive'])
+    })
+  }
 })

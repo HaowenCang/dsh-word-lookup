@@ -1,0 +1,363 @@
+{
+  "testFiles": 70,
+  "total": 1739,
+  "passed": 1739,
+  "failed": 0,
+  "skipped": 0,
+  "success": true,
+  "excluded": [
+    "tests/probes/phase7a8-0/p01-p07-sqlite-safety.spec.ts"
+  ],
+  "files": [
+    {
+      "name": "tests/bug002-catalog-recovery.spec.ts",
+      "status": "passed",
+      "passed": 36
+    },
+    {
+      "name": "tests/bug007-cleanup.spec.ts",
+      "status": "passed",
+      "passed": 52
+    },
+    {
+      "name": "tests/bundle-check-rules.spec.ts",
+      "status": "passed",
+      "passed": 31
+    },
+    {
+      "name": "tests/client-card-interaction.spec.ts",
+      "status": "passed",
+      "passed": 3
+    },
+    {
+      "name": "tests/client-card-render.spec.ts",
+      "status": "passed",
+      "passed": 30
+    },
+    {
+      "name": "tests/client-dismiss-race.spec.ts",
+      "status": "passed",
+      "passed": 6
+    },
+    {
+      "name": "tests/client-gesture-identity.spec.ts",
+      "status": "passed",
+      "passed": 17
+    },
+    {
+      "name": "tests/client-gesture.spec.ts",
+      "status": "passed",
+      "passed": 40
+    },
+    {
+      "name": "tests/client-io-boundary.spec.ts",
+      "status": "passed",
+      "passed": 12
+    },
+    {
+      "name": "tests/client-lookup.spec.ts",
+      "status": "passed",
+      "passed": 19
+    },
+    {
+      "name": "tests/client-management-store.spec.ts",
+      "status": "passed",
+      "passed": 16
+    },
+    {
+      "name": "tests/client-management-transport.spec.ts",
+      "status": "passed",
+      "passed": 17
+    },
+    {
+      "name": "tests/client-position.spec.ts",
+      "status": "passed",
+      "passed": 11
+    },
+    {
+      "name": "tests/client-runtime-harness.spec.ts",
+      "status": "passed",
+      "passed": 78
+    },
+    {
+      "name": "tests/client-runtime.spec.ts",
+      "status": "passed",
+      "passed": 15
+    },
+    {
+      "name": "tests/client-selection.spec.ts",
+      "status": "passed",
+      "passed": 29
+    },
+    {
+      "name": "tests/client-settings-registration.spec.ts",
+      "status": "passed",
+      "passed": 2
+    },
+    {
+      "name": "tests/client-settings-ui.spec.ts",
+      "status": "passed",
+      "passed": 32
+    },
+    {
+      "name": "tests/client-trigger.spec.ts",
+      "status": "passed",
+      "passed": 40
+    },
+    {
+      "name": "tests/cordis-lifecycle-management.spec.ts",
+      "status": "passed",
+      "passed": 14
+    },
+    {
+      "name": "tests/corpus-builder-safety.spec.ts",
+      "status": "passed",
+      "passed": 12
+    },
+    {
+      "name": "tests/corpus-production.spec.ts",
+      "status": "passed",
+      "passed": 15
+    },
+    {
+      "name": "tests/corpus-verify.spec.ts",
+      "status": "passed",
+      "passed": 6
+    },
+    {
+      "name": "tests/csv-parser.spec.ts",
+      "status": "passed",
+      "passed": 13
+    },
+    {
+      "name": "tests/custom-sqlite-snapshot-matrix.spec.ts",
+      "status": "passed",
+      "passed": 105
+    },
+    {
+      "name": "tests/custom-worker-protocol.spec.ts",
+      "status": "passed",
+      "passed": 30
+    },
+    {
+      "name": "tests/dictionary-activation.spec.ts",
+      "status": "passed",
+      "passed": 29
+    },
+    {
+      "name": "tests/dictionary-management-route.spec.ts",
+      "status": "passed",
+      "passed": 33
+    },
+    {
+      "name": "tests/dictionary-manager.spec.ts",
+      "status": "passed",
+      "passed": 24
+    },
+    {
+      "name": "tests/dictionary-operations.spec.ts",
+      "status": "passed",
+      "passed": 56
+    },
+    {
+      "name": "tests/ecdict-concurrency-quarantine.spec.ts",
+      "status": "passed",
+      "passed": 6
+    },
+    {
+      "name": "tests/ecdict-downloader.spec.ts",
+      "status": "passed",
+      "passed": 55
+    },
+    {
+      "name": "tests/ecdict-importer.spec.ts",
+      "status": "passed",
+      "passed": 32
+    },
+    {
+      "name": "tests/ecdict-integrity-worker.spec.ts",
+      "status": "passed",
+      "passed": 16
+    },
+    {
+      "name": "tests/ecdict-source.spec.ts",
+      "status": "passed",
+      "passed": 13
+    },
+    {
+      "name": "tests/environment-removal.spec.ts",
+      "status": "passed",
+      "passed": 6
+    },
+    {
+      "name": "tests/exchange-parser.spec.ts",
+      "status": "passed",
+      "passed": 4
+    },
+    {
+      "name": "tests/fault-state-and-supervisor-lifecycle.spec.ts",
+      "status": "passed",
+      "passed": 13
+    },
+    {
+      "name": "tests/host-config.spec.ts",
+      "status": "passed",
+      "passed": 15
+    },
+    {
+      "name": "tests/host-dictionary.spec.ts",
+      "status": "passed",
+      "passed": 34
+    },
+    {
+      "name": "tests/host-fixture-db.spec.ts",
+      "status": "passed",
+      "passed": 23
+    },
+    {
+      "name": "tests/host-lookup.spec.ts",
+      "status": "passed",
+      "passed": 24
+    },
+    {
+      "name": "tests/host-route.spec.ts",
+      "status": "passed",
+      "passed": 12
+    },
+    {
+      "name": "tests/host-sqlite-safety.spec.ts",
+      "status": "passed",
+      "passed": 35
+    },
+    {
+      "name": "tests/iso-guard.spec.ts",
+      "status": "passed",
+      "passed": 22
+    },
+    {
+      "name": "tests/isolated-run-directory.spec.ts",
+      "status": "passed",
+      "passed": 31
+    },
+    {
+      "name": "tests/managed-storage.spec.ts",
+      "status": "passed",
+      "passed": 32
+    },
+    {
+      "name": "tests/npm-tarball-worker-verification.spec.ts",
+      "status": "passed",
+      "passed": 1
+    },
+    {
+      "name": "tests/phase421-probe-logic.spec.ts",
+      "status": "passed",
+      "passed": 14
+    },
+    {
+      "name": "tests/phase7a8-1ar-scenarios.spec.ts",
+      "status": "passed",
+      "passed": 23
+    },
+    {
+      "name": "tests/phase7a8-1ar2-scenarios.spec.ts",
+      "status": "passed",
+      "passed": 12
+    },
+    {
+      "name": "tests/phase7a8-1b-activation-matrix.spec.ts",
+      "status": "passed",
+      "passed": 29
+    },
+    {
+      "name": "tests/phase7a8-1br-activation-recovery.spec.ts",
+      "status": "passed",
+      "passed": 28
+    },
+    {
+      "name": "tests/phase7a8-1br2-scenarios.spec.ts",
+      "status": "passed",
+      "passed": 20
+    },
+    {
+      "name": "tests/phase7a8-2-native-settings.spec.ts",
+      "status": "passed",
+      "passed": 80
+    },
+    {
+      "name": "tests/quarantine-recovery-proof.spec.ts",
+      "status": "passed",
+      "passed": 12
+    },
+    {
+      "name": "tests/redact.spec.ts",
+      "status": "passed",
+      "passed": 12
+    },
+    {
+      "name": "tests/risk001-custom-termination.spec.ts",
+      "status": "passed",
+      "passed": 60
+    },
+    {
+      "name": "tests/schema-version.spec.ts",
+      "status": "passed",
+      "passed": 26
+    },
+    {
+      "name": "tests/shared-text.spec.ts",
+      "status": "passed",
+      "passed": 57
+    },
+    {
+      "name": "tests/smoke-lifecycle.spec.ts",
+      "status": "passed",
+      "passed": 21
+    },
+    {
+      "name": "tests/smoke-verdict.spec.ts",
+      "status": "passed",
+      "passed": 93
+    },
+    {
+      "name": "tests/snapshot-eligibility.spec.ts",
+      "status": "passed",
+      "passed": 12
+    },
+    {
+      "name": "tests/store-worker-audit.spec.ts",
+      "status": "passed",
+      "passed": 18
+    },
+    {
+      "name": "tests/ux001-modal.spec.ts",
+      "status": "passed",
+      "passed": 2
+    },
+    {
+      "name": "tests/worker-exit-provenance-safety.spec.ts",
+      "status": "passed",
+      "passed": 8
+    },
+    {
+      "name": "tests/worker-lifecycle-safety.spec.ts",
+      "status": "passed",
+      "passed": 12
+    },
+    {
+      "name": "tests/probes/phase7a8-0/p08-p09-event-loop-worker.spec.ts",
+      "status": "passed",
+      "passed": 1
+    },
+    {
+      "name": "tests/probes/phase7a8-0/p10-p13-activation-lifecycle.spec.ts",
+      "status": "passed",
+      "passed": 1
+    },
+    {
+      "name": "tests/probes/phase7a8-0/p14-p20-shortcuts.spec.ts",
+      "status": "passed",
+      "passed": 1
+    }
+  ]
+}

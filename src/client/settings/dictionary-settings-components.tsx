@@ -12,6 +12,7 @@
 
 import React, { type CSSProperties, type ReactNode } from 'react'
 import type { CustomSnapshotSummary } from '../../shared/dictionary-management-protocol.js'
+import { isSnapshotActivatable } from './snapshot-eligibility.js'
 
 /** CSS styles injected for settings UI components. */
 export const SETTINGS_THEME_STYLES = `
@@ -525,6 +526,11 @@ export function ModalConfirm({
 }: ModalConfirmProps) {
   const dialogRef = React.useRef<HTMLDivElement>(null)
   const previousActiveElementRef = React.useRef<HTMLElement | null>(null)
+  const onCancelRef = React.useRef(onCancel)
+
+  React.useEffect(() => {
+    onCancelRef.current = onCancel
+  }, [onCancel])
 
   React.useEffect(() => {
     if (typeof document !== 'undefined') {
@@ -548,7 +554,7 @@ export function ModalConfirm({
       if (e.key === 'Escape') {
         e.preventDefault()
         e.stopPropagation()
-        onCancel()
+        onCancelRef.current()
         return
       }
 
@@ -596,7 +602,7 @@ export function ModalConfirm({
         }
       }
     }
-  }, [onCancel])
+  }, [])
 
   const backdropStyle: CSSProperties = {
     position: 'fixed',
@@ -1326,7 +1332,7 @@ export function SnapshotPickerModal({
   const handleSelectSnapshot = (snapshotId: string) => {
     if (isActing || submittingId !== null) return
     const target = snapshots.find((s) => s.snapshotId === snapshotId)
-    if (!target || target.corrupt) return
+    if (!target || !isSnapshotActivatable(target) || target.isActive || target.snapshotId === activeSnapshotId) return
     setSubmittingId(snapshotId)
     onSelectRef.current(snapshotId)
     onCloseRef.current()
@@ -1382,8 +1388,9 @@ export function SnapshotPickerModal({
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '280px', overflowY: 'auto' }}>
           {snapshots.map((snap) => {
-            const isActive = snap.snapshotId === activeSnapshotId
+            const isActive = snap.snapshotId === activeSnapshotId || snap.isActive
             const isCorrupt = snap.corrupt === true
+            const isActivatable = isSnapshotActivatable(snap)
             return (
               <div
                 key={snap.snapshotId}
@@ -1406,7 +1413,8 @@ export function SnapshotPickerModal({
                       {snap.identity}
                     </span>
                     {isActive && <StatusBadge variant="success" label="当前激活" />}
-                    {isCorrupt && <StatusBadge variant="error" label="快照损坏" />}
+                    {isCorrupt ? <StatusBadge variant="error" label="快照损坏" /> :
+                      !isActivatable && <StatusBadge variant="warning" label="快照不可用" />}
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--wl-set-text-muted, #6c6c7a)', fontFamily: 'monospace' }}>
                     ID: {snap.snapshotId.slice(0, 8)}... | {snap.entryCount?.toLocaleString?.() ?? snap.entryCount} 词条 | {snap.formCount?.toLocaleString?.() ?? snap.formCount} 形态
@@ -1417,10 +1425,11 @@ export function SnapshotPickerModal({
                   data-testid={`snapshot-picker-select-${snap.snapshotId}`}
                   size="small"
                   variant={isActive ? 'ghost' : 'primary'}
-                  disabled={isActive || isCorrupt || isActing || submittingId !== null}
+                  disabled={isActive || !isActivatable || isActing || submittingId !== null}
+                  title={isCorrupt ? '快照文件已损坏，不可激活' : !isActivatable ? '快照不可用，请重新导入或校验' : undefined}
                   onClick={() => handleSelectSnapshot(snap.snapshotId)}
                 >
-                  {isActive ? '已激活' : isCorrupt ? '快照损坏' : '启用'}
+                  {isActive ? '已激活' : isCorrupt ? '快照损坏' : !isActivatable ? '快照不可用' : '启用'}
                 </ActionButton>
               </div>
             )

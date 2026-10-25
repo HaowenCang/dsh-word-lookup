@@ -1,0 +1,1391 @@
+{
+  "note": "Text copies are redacted; raw evidence is retained outside the repository. Earlier failures remain historical evidence.",
+  "files": [
+    {
+      "path": "logs/minor-old-mutation.log",
+      "source": "minor-old-mutation.log",
+      "rawSha256": "994f7225639c817e250918c65efc3bb9787577f52e73e961db26a67826157e7d",
+      "archivedSha256": "994f7225639c817e250918c65efc3bb9787577f52e73e961db26a67826157e7d",
+      "redacted": false
+    },
+    {
+      "path": "logs/minor-hardened-mutation.log",
+      "source": "minor-hardened-mutation.log",
+      "rawSha256": "0af8c9416b908756edf9034ab259531a34ced206d2bfc412172a59807e5477d6",
+      "archivedSha256": "0af8c9416b908756edf9034ab259531a34ced206d2bfc412172a59807e5477d6",
+      "redacted": false
+    },
+    {
+      "path": "logs/minor-green.log",
+      "source": "minor-green.log",
+      "rawSha256": "477902644493df1f2eb24733ba4156725efc89cb96e1f0da24b872a6f124b6b4",
+      "archivedSha256": "477902644493df1f2eb24733ba4156725efc89cb96e1f0da24b872a6f124b6b4",
+      "redacted": false
+    },
+    {
+      "path": "logs/fixture.log",
+      "source": "fixture.log",
+      "rawSha256": "5dfb2cd0526234f02552615b02da2b69bdc9382caa23600d6cd9f1baa27848ec",
+      "archivedSha256": "5dfb2cd0526234f02552615b02da2b69bdc9382caa23600d6cd9f1baa27848ec",
+      "redacted": false
+    },
+    {
+      "path": "logs/build.log",
+      "source": "build.log",
+      "rawSha256": "9521dc21ff5d82ef450262b6957f7f0a698d3d03a36867de7fd821500b8aa8b4",
+      "archivedSha256": "9521dc21ff5d82ef450262b6957f7f0a698d3d03a36867de7fd821500b8aa8b4",
+      "redacted": false
+    },
+    {
+      "path": "logs/declarations.log",
+      "source": "declarations.log",
+      "rawSha256": "65366f1e0f26c53f5453fa0c130babfcfcb75785d41b0dbabc65c2b841a33277",
+      "archivedSha256": "65366f1e0f26c53f5453fa0c130babfcfcb75785d41b0dbabc65c2b841a33277",
+      "redacted": false
+    },
+    {
+      "path": "logs/typecheck.log",
+      "source": "typecheck.log",
+      "rawSha256": "5774490bfc4dc8052652f53740f2af33959beb1aae2d813cf18113e455550395",
+      "archivedSha256": "5774490bfc4dc8052652f53740f2af33959beb1aae2d813cf18113e455550395",
+      "redacted": false
+    },
+    {
+      "path": "logs/integrated.log",
+      "source": "integrated.log",
+      "rawSha256": "37fedc74fefe17f52a9404ce15d6a6e6a084ced7c41602260c564145a1af5e1c",
+      "archivedSha256": "37fedc74fefe17f52a9404ce15d6a6e6a084ced7c41602260c564145a1af5e1c",
+      "redacted": false
+    },
+    {
+      "path": "logs/bundle-rc3.log",
+      "source": "bundle-rc3.log",
+      "rawSha256": "a497135ea035008ea7dca9783f65522a3cc5ee6749f0c41157189bcab2665497",
+      "archivedSha256": "a497135ea035008ea7dca9783f65522a3cc5ee6749f0c41157189bcab2665497",
+      "redacted": false
+    },
+    {
+      "path": "logs/candidate-pack-rc3.log",
+      "source": "candidate-pack-rc3.log",
+      "rawSha256": "28f03bbd1bf01054bcf70f564d4086c375b70045dbf10238ff80e9e229933075",
+      "archivedSha256": "28f03bbd1bf01054bcf70f564d4086c375b70045dbf10238ff80e9e229933075",
+      "redacted": false
+    },
+    {
+      "path": "logs/artifact-rc3.log",
+      "source": "artifact-rc3.log",
+      "rawSha256": "66faab1c7a6ea10060053ec37816fe9b6f3635138ce2c4c3f99dd0732e03cb5f",
+      "archivedSha256": "66faab1c7a6ea10060053ec37816fe9b6f3635138ce2c4c3f99dd0732e03cb5f",
+      "redacted": false
+    },
+    {
+      "path": "logs/network-verdict-red.log",
+      "source": "network-verdict-red.log",
+      "rawSha256": "71ce731a85430958531b24750fef39805d43ad27cb7d4b1fe85ea84da2582238",
+      "archivedSha256": "71ce731a85430958531b24750fef39805d43ad27cb7d4b1fe85ea84da2582238",
+      "redacted": false
+    },
+    {
+      "path": "logs/network-verdict-green.log",
+      "source": "network-verdict-green.log",
+      "rawSha256": "b9f75070feb6ae89545ccf28b81610986046812bfd0d322db17e57b721501e52",
+      "archivedSha256": "b9f75070feb6ae89545ccf28b81610986046812bfd0d322db17e57b721501e52",
+      "redacted": false
+    },
+    {
+      "path": "logs/runtime022-first.log",
+      "source": "runtime022-first.log",
+      "rawSha256": "83eda434786f976e9982bfc0fb71c16f88905f0663208b4e9bd73785e94711e8",
+      "archivedSha256": "83eda434786f976e9982bfc0fb71c16f88905f0663208b4e9bd73785e94711e8",
+      "redacted": false
+    },
+    {
+      "path": "logs/runtime022-second.log",
+      "source": "runtime022-second.log",
+      "rawSha256": "780f33c51d7505e9908404f6b8c3506f1105fcfcd0a1c5cef6af33d8fe7bd0de",
+      "archivedSha256": "780f33c51d7505e9908404f6b8c3506f1105fcfcd0a1c5cef6af33d8fe7bd0de",
+      "redacted": false
+    },
+    {
+      "path": "logs/runtime022-third.log",
+      "source": "runtime022-third.log",
+      "rawSha256": "e1139d2c758e5c8d0ac596ac5f201ed46161901ada8bfd18ad82a098a4fba457",
+      "archivedSha256": "e1139d2c758e5c8d0ac596ac5f201ed46161901ada8bfd18ad82a098a4fba457",
+      "redacted": false
+    },
+    {
+      "path": "logs/runtime022-fourth.log",
+      "source": "runtime022-fourth.log",
+      "rawSha256": "b0fdadf5aa332e0b4c7bb241d461c0c917fde44af8268b2f786381fed43b7083",
+      "archivedSha256": "b0fdadf5aa332e0b4c7bb241d461c0c917fde44af8268b2f786381fed43b7083",
+      "redacted": false
+    },
+    {
+      "path": "logs/runtime022-fifth.log",
+      "source": "runtime022-fifth.log",
+      "rawSha256": "f217937f718d670965bd6de90044481f1e5de1436dffd5996bec9ee58a3bdf9a",
+      "archivedSha256": "f217937f718d670965bd6de90044481f1e5de1436dffd5996bec9ee58a3bdf9a",
+      "redacted": false
+    },
+    {
+      "path": "logs/runtime022-sixth.log",
+      "source": "runtime022-sixth.log",
+      "rawSha256": "a9b3912e4878952081a7ddc89d7b4026af8e25274c0ea98208737871bc05027d",
+      "archivedSha256": "a9b3912e4878952081a7ddc89d7b4026af8e25274c0ea98208737871bc05027d",
+      "redacted": false
+    },
+    {
+      "path": "logs/runtime022-final.log",
+      "source": "runtime022-final.log",
+      "rawSha256": "f49e9a2043bb1e20107056de5a9343cc714af3fb7e2c826e2c7f3fbac7dfec5d",
+      "archivedSha256": "f49e9a2043bb1e20107056de5a9343cc714af3fb7e2c826e2c7f3fbac7dfec5d",
+      "redacted": false
+    },
+    {
+      "path": "logs/runtime022-final-r2.log",
+      "source": "runtime022-final-r2.log",
+      "rawSha256": "8c9ec10c708ea18f17f1d1a060be9861becf4e6e5011018eb2ac9418de519ca7",
+      "archivedSha256": "8c9ec10c708ea18f17f1d1a060be9861becf4e6e5011018eb2ac9418de519ca7",
+      "redacted": false
+    },
+    {
+      "path": "logs/sensor-final.log",
+      "source": "sensor-final.log",
+      "rawSha256": "6873292f47b722682b2d05f97a3ca2b6180ffac5cd7f2ad1f59172c877bb9a04",
+      "archivedSha256": "6873292f47b722682b2d05f97a3ca2b6180ffac5cd7f2ad1f59172c877bb9a04",
+      "redacted": false
+    },
+    {
+      "path": "logs/reconnect-baseline-control.log",
+      "source": "reconnect-baseline-control.log",
+      "rawSha256": "87f717ed29e7e88cda1bf49221189d4b5edd9ab4d439a2f1c888f49d788c6325",
+      "archivedSha256": "87f717ed29e7e88cda1bf49221189d4b5edd9ab4d439a2f1c888f49d788c6325",
+      "redacted": false
+    },
+    {
+      "path": "logs/candidate-credential-scan.log",
+      "source": "candidate-credential-scan.log",
+      "rawSha256": "efdb725e20135e58bbc6bab7eca5f13f61ab50e1c2e6a97e25fb8dc94cbf3555",
+      "archivedSha256": "efdb725e20135e58bbc6bab7eca5f13f61ab50e1c2e6a97e25fb8dc94cbf3555",
+      "redacted": false
+    },
+    {
+      "path": "reviews/review-022-preflight.md",
+      "source": "review-022-preflight.md",
+      "rawSha256": "831076aaa9a3cd710b0998d3f5cecbadd0c1653a3c7ab27caa9b0f863b4f3146",
+      "archivedSha256": "831076aaa9a3cd710b0998d3f5cecbadd0c1653a3c7ab27caa9b0f863b4f3146",
+      "redacted": false
+    },
+    {
+      "path": "reviews/review-022-runtime-addendum.md",
+      "source": "review-022-runtime-addendum.md",
+      "rawSha256": "eee4895dcbbe73d157d404f32e10a0a50a09503e3891d48cad67c05787c9ec79",
+      "archivedSha256": "eee4895dcbbe73d157d404f32e10a0a50a09503e3891d48cad67c05787c9ec79",
+      "redacted": false
+    },
+    {
+      "path": "reviews/carrier-inspection.json",
+      "source": "carrier-inspection.json",
+      "rawSha256": "8a7995cb4387df804e6f3ac89efc0abd24f1c0102201a522d5c4709064ce80b5",
+      "archivedSha256": "8a7995cb4387df804e6f3ac89efc0abd24f1c0102201a522d5c4709064ce80b5",
+      "redacted": false
+    },
+    {
+      "path": "reproduction/runtime022-smoke.mjs",
+      "source": "runtime022-smoke.mjs",
+      "rawSha256": "15b9af739998ccb1872e6ce5b5ab2ad581f22634a4f01cfbc582c4feb8cdb9e7",
+      "archivedSha256": "15b9af739998ccb1872e6ce5b5ab2ad581f22634a4f01cfbc582c4feb8cdb9e7",
+      "redacted": false
+    },
+    {
+      "path": "reproduction/network-observer.cjs",
+      "source": "network-observer.cjs",
+      "rawSha256": "21d78f26d5cae9082f758ee5230e9565e0d106771c4c0ea87e702223131f66a9",
+      "archivedSha256": "21d78f26d5cae9082f758ee5230e9565e0d106771c4c0ea87e702223131f66a9",
+      "redacted": false
+    },
+    {
+      "path": "reproduction/network-verdict.mjs",
+      "source": "network-verdict.mjs",
+      "rawSha256": "5c915409d8cd5c4932efca91dd75a8c07a4434f71ffee073f0bcb8751438848b",
+      "archivedSha256": "5c915409d8cd5c4932efca91dd75a8c07a4434f71ffee073f0bcb8751438848b",
+      "redacted": false
+    },
+    {
+      "path": "reproduction/network-verdict-selftest.mjs",
+      "source": "network-verdict-selftest.mjs",
+      "rawSha256": "79fe7b95e2222a11c74b9e85eda9498c2de368d9a0e46caad975993761ef6988",
+      "archivedSha256": "79fe7b95e2222a11c74b9e85eda9498c2de368d9a0e46caad975993761ef6988",
+      "redacted": false
+    },
+    {
+      "path": "reproduction/network-observer-selftest.mjs",
+      "source": "network-observer-selftest.mjs",
+      "rawSha256": "1fe3670378fc7fd3d19f8e6df6984c8161635314f13d59ed03fcb6ae0145dab9",
+      "archivedSha256": "1fe3670378fc7fd3d19f8e6df6984c8161635314f13d59ed03fcb6ae0145dab9",
+      "redacted": false
+    },
+    {
+      "path": "reproduction/carrier-sensor-selftest.mjs",
+      "source": "carrier-sensor-selftest.mjs",
+      "rawSha256": "d0b8d2c828ef10a18029c2b49394ccc0f1ce052738c249696484c218447de4d7",
+      "archivedSha256": "d0b8d2c828ef10a18029c2b49394ccc0f1ce052738c249696484c218447de4d7",
+      "redacted": false
+    },
+    {
+      "path": "reproduction/reconnect-control.mjs",
+      "source": "reconnect-control.mjs",
+      "rawSha256": "73833d456fe80bc0586b244caca3152b6bb9f89655c0a3d444ca1c56641e7b9e",
+      "archivedSha256": "73833d456fe80bc0586b244caca3152b6bb9f89655c0a3d444ca1c56641e7b9e",
+      "redacted": false
+    },
+    {
+      "path": "reproduction/run-isolated.mjs",
+      "source": "run-isolated.mjs",
+      "rawSha256": "8a619bd07d89829181dd6b8814d04859a762a1e4c6e10b23df3e9fc938520e8c",
+      "archivedSha256": "8a619bd07d89829181dd6b8814d04859a762a1e4c6e10b23df3e9fc938520e8c",
+      "redacted": false
+    },
+    {
+      "path": "reproduction/check-final-artifact.mjs",
+      "source": "check-final-artifact.mjs",
+      "rawSha256": "718464e0a2fc5feda967ca50387cedb060bcb0c464557b4207090b08b1ba5844",
+      "archivedSha256": "718464e0a2fc5feda967ca50387cedb060bcb0c464557b4207090b08b1ba5844",
+      "redacted": false
+    },
+    {
+      "path": "checks/carrier-control-af3c9056.txt",
+      "source": "evidence/carrier-control-af3c9056.txt",
+      "rawSha256": "e643e2450c62cb3bc874ff0a8339ee97f693518474a9ed30a6be8b37a3378f70",
+      "archivedSha256": "e643e2450c62cb3bc874ff0a8339ee97f693518474a9ed30a6be8b37a3378f70",
+      "redacted": false
+    },
+    {
+      "path": "checks/carrier-version.json",
+      "source": "evidence/carrier-version.json",
+      "rawSha256": "94d70e56e95b46ba8c2d084dcef960b643bdfb81e9ee44fd9bdbfd0b43520580",
+      "archivedSha256": "94d70e56e95b46ba8c2d084dcef960b643bdfb81e9ee44fd9bdbfd0b43520580",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\control-f62a6c52\\control-report.json",
+      "source": "evidence/control-f62a6c52/control-report.json",
+      "rawSha256": "a1c4af429867fb7c987b85de703ab9fcf27089140cdcf30147aed0a2fa48f266",
+      "archivedSha256": "a1c4af429867fb7c987b85de703ab9fcf27089140cdcf30147aed0a2fa48f266",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\control-f62a6c52\\network\\network-control-f62a6c52-30896-0.jsonl",
+      "source": "evidence/control-f62a6c52/network/network-control-f62a6c52-30896-0.jsonl",
+      "rawSha256": "ac941301379deef3860b9154a47787e1edbe87256a4d725c50f664c12821cedd",
+      "archivedSha256": "ac941301379deef3860b9154a47787e1edbe87256a4d725c50f664c12821cedd",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\control-f62a6c52\\network\\network-control-f62a6c52-34884-0.jsonl",
+      "source": "evidence/control-f62a6c52/network/network-control-f62a6c52-34884-0.jsonl",
+      "rawSha256": "871126ab490fe207d84517c7ed2663b3d922df1117330e749c50a1fe4462b13b",
+      "archivedSha256": "871126ab490fe207d84517c7ed2663b3d922df1117330e749c50a1fe4462b13b",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\control-f62a6c52\\network\\network-control-f62a6c52-52020-0.jsonl",
+      "source": "evidence/control-f62a6c52/network/network-control-f62a6c52-52020-0.jsonl",
+      "rawSha256": "5f90bf3dbfd5c5dbd2c957db5c7133bb79f2335feb3a7e4d8b5a09bc0ca41ba0",
+      "archivedSha256": "5f90bf3dbfd5c5dbd2c957db5c7133bb79f2335feb3a7e4d8b5a09bc0ca41ba0",
+      "redacted": false
+    },
+    {
+      "path": "checks/credential-scan.log",
+      "source": "evidence/credential-scan.log",
+      "rawSha256": "87baa6e85a83057e810dc3fa81a799e706f31827878f6c1f0e3e37c08e1a90e7",
+      "archivedSha256": "87baa6e85a83057e810dc3fa81a799e706f31827878f6c1f0e3e37c08e1a90e7",
+      "redacted": false
+    },
+    {
+      "path": "checks/final-artifact-rc3.json",
+      "source": "evidence/final-artifact-rc3.json",
+      "rawSha256": "969f71f6a345f04263dd9bbff0fa59314246fb971cabd1ea71af019b43408144",
+      "archivedSha256": "969f71f6a345f04263dd9bbff0fa59314246fb971cabd1ea71af019b43408144",
+      "redacted": false
+    },
+    {
+      "path": "checks/profile-install-offline.json",
+      "source": "evidence/profile-install-offline.json",
+      "rawSha256": "81f6d629578d10df400815a3bfffe6f92e2983e7c408b7b05daa4ccd8143df55",
+      "archivedSha256": "81f6d629578d10df400815a3bfffe6f92e2983e7c408b7b05daa4ccd8143df55",
+      "redacted": false
+    },
+    {
+      "path": "checks/profile-install-offline.txt",
+      "source": "evidence/profile-install-offline.txt",
+      "rawSha256": "de00a6df71851a8500c304c36c3aa8f35f260b60583c02de6ec5310ba9520aa9",
+      "archivedSha256": "de00a6df71851a8500c304c36c3aa8f35f260b60583c02de6ec5310ba9520aa9",
+      "redacted": false
+    },
+    {
+      "path": "checks/profile-probe.json",
+      "source": "evidence/profile-probe.json",
+      "rawSha256": "334b67dd1383904e678a54fb9179ab8040a2259769e745d32c0d5efbc9ce20f5",
+      "archivedSha256": "334b67dd1383904e678a54fb9179ab8040a2259769e745d32c0d5efbc9ce20f5",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-177eb310\\01-startup.png",
+      "source": "evidence/runtime022-177eb310/01-startup.png",
+      "rawSha256": "98302f6ce8d6837ed1da66089019876f0609ebc9bcaae62f063cfcf7404599e2",
+      "archivedSha256": "98302f6ce8d6837ed1da66089019876f0609ebc9bcaae62f063cfcf7404599e2",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-177eb310\\boot-15116.txt",
+      "source": "evidence/runtime022-177eb310/boot-15116.txt",
+      "rawSha256": "ab1b907feb06efc2a4da559d887796f48de9ce5a1e6128c29bb1cead5dbaad44",
+      "archivedSha256": "ab1b907feb06efc2a4da559d887796f48de9ce5a1e6128c29bb1cead5dbaad44",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-177eb310\\install.txt",
+      "source": "evidence/runtime022-177eb310/install.txt",
+      "rawSha256": "620c1ed5add41bad3ee17f1033ab4c36e2dee6cfe62b04aa5efd19c90b33f231",
+      "archivedSha256": "620c1ed5add41bad3ee17f1033ab4c36e2dee6cfe62b04aa5efd19c90b33f231",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-177eb310\\network\\network-177eb310-15116-0.jsonl",
+      "source": "evidence/runtime022-177eb310/network/network-177eb310-15116-0.jsonl",
+      "rawSha256": "35df95bf8eeea66b7d980088e62a171de3c9cf52c0494b852a07d7180d07ac6b",
+      "archivedSha256": "35df95bf8eeea66b7d980088e62a171de3c9cf52c0494b852a07d7180d07ac6b",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-177eb310\\profile-create.txt",
+      "source": "evidence/runtime022-177eb310/profile-create.txt",
+      "rawSha256": "c5286c542ddc14f85e18ddbfcde891956d1136c7928579df4daae097e558a356",
+      "archivedSha256": "c5286c542ddc14f85e18ddbfcde891956d1136c7928579df4daae097e558a356",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-177eb310\\runtime-report.json",
+      "source": "evidence/runtime022-177eb310/runtime-report.json",
+      "rawSha256": "80def37d7f9f1362a3b360ccac5cd15296c49ee9c90de9d771e3706584da5fb2",
+      "archivedSha256": "80def37d7f9f1362a3b360ccac5cd15296c49ee9c90de9d771e3706584da5fb2",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-177eb310\\version.txt",
+      "source": "evidence/runtime022-177eb310/version.txt",
+      "rawSha256": "96bad88b8a312b7297de5c9c1d57cd158d8b2964dab42a39463bd743d94fbd7a",
+      "archivedSha256": "96bad88b8a312b7297de5c9c1d57cd158d8b2964dab42a39463bd743d94fbd7a",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-38ad90b2\\01-startup.png",
+      "source": "evidence/runtime022-38ad90b2/01-startup.png",
+      "rawSha256": "79ead254093f5e0d05b230a54a41a1659e76b59193ed104876f50c2ed97b27fe",
+      "archivedSha256": "79ead254093f5e0d05b230a54a41a1659e76b59193ed104876f50c2ed97b27fe",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-38ad90b2\\02-settings.png",
+      "source": "evidence/runtime022-38ad90b2/02-settings.png",
+      "rawSha256": "9bcb4d830862d08482f90bd3c22331ea8766548e7962da48130b5ddaa598cb95",
+      "archivedSha256": "9bcb4d830862d08482f90bd3c22331ea8766548e7962da48130b5ddaa598cb95",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-38ad90b2\\03-card.png",
+      "source": "evidence/runtime022-38ad90b2/03-card.png",
+      "rawSha256": "16314be6a80e34075a63cb655562417e2df56f4d0e7d37b9c2fc8000e99d6e8d",
+      "archivedSha256": "16314be6a80e34075a63cb655562417e2df56f4d0e7d37b9c2fc8000e99d6e8d",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-38ad90b2\\04-narrow.png",
+      "source": "evidence/runtime022-38ad90b2/04-narrow.png",
+      "rawSha256": "b0920117db5a5163337723deeb0b9e18a5e725977af06ba65cf28614d2d58a2e",
+      "archivedSha256": "b0920117db5a5163337723deeb0b9e18a5e725977af06ba65cf28614d2d58a2e",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-38ad90b2\\05-scroll.png",
+      "source": "evidence/runtime022-38ad90b2/05-scroll.png",
+      "rawSha256": "46a9fee44da0ed926600f7c6cc620f11a78aeda07e1ac0498e6b6c44bd4fcafb",
+      "archivedSha256": "46a9fee44da0ed926600f7c6cc620f11a78aeda07e1ac0498e6b6c44bd4fcafb",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-38ad90b2\\06-uninstalled.png",
+      "source": "evidence/runtime022-38ad90b2/06-uninstalled.png",
+      "rawSha256": "54966b00797fe99a1b788d7e47acdab560a0f0ca8281b39f46f03ee81f4433f5",
+      "archivedSha256": "54966b00797fe99a1b788d7e47acdab560a0f0ca8281b39f46f03ee81f4433f5",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-38ad90b2\\boot-36796.txt",
+      "source": "evidence/runtime022-38ad90b2/boot-36796.txt",
+      "rawSha256": "ab1b907feb06efc2a4da559d887796f48de9ce5a1e6128c29bb1cead5dbaad44",
+      "archivedSha256": "ab1b907feb06efc2a4da559d887796f48de9ce5a1e6128c29bb1cead5dbaad44",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-38ad90b2\\boot-51052.txt",
+      "source": "evidence/runtime022-38ad90b2/boot-51052.txt",
+      "rawSha256": "ab1b907feb06efc2a4da559d887796f48de9ce5a1e6128c29bb1cead5dbaad44",
+      "archivedSha256": "ab1b907feb06efc2a4da559d887796f48de9ce5a1e6128c29bb1cead5dbaad44",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-38ad90b2\\install.txt",
+      "source": "evidence/runtime022-38ad90b2/install.txt",
+      "rawSha256": "9e3d39b3ad192bb8a5ab1b34a49d8d766ca21f382d0f7a09be9ab7c8049fddf5",
+      "archivedSha256": "9e3d39b3ad192bb8a5ab1b34a49d8d766ca21f382d0f7a09be9ab7c8049fddf5",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-38ad90b2\\network\\network-38ad90b2-36796-0.jsonl",
+      "source": "evidence/runtime022-38ad90b2/network/network-38ad90b2-36796-0.jsonl",
+      "rawSha256": "47027d985ef9c5cb3301b4303cd264a48386dac199e27d261649787a78cd8ede",
+      "archivedSha256": "47027d985ef9c5cb3301b4303cd264a48386dac199e27d261649787a78cd8ede",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-38ad90b2\\network\\network-38ad90b2-51052-0.jsonl",
+      "source": "evidence/runtime022-38ad90b2/network/network-38ad90b2-51052-0.jsonl",
+      "rawSha256": "a42b8c146a4212f471a466c8ad30a5754a48a6fee6a94e0c1508369b7f6dd42c",
+      "archivedSha256": "a42b8c146a4212f471a466c8ad30a5754a48a6fee6a94e0c1508369b7f6dd42c",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-38ad90b2\\network-observer.cjs",
+      "source": "evidence/runtime022-38ad90b2/network-observer.cjs",
+      "rawSha256": "33c6e4cbfa5364681ebf5feb2dd41e700c8393233d11a5340ed84f04ef70ad8e",
+      "archivedSha256": "33c6e4cbfa5364681ebf5feb2dd41e700c8393233d11a5340ed84f04ef70ad8e",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-38ad90b2\\network-verdict.mjs",
+      "source": "evidence/runtime022-38ad90b2/network-verdict.mjs",
+      "rawSha256": "b93bd7f982035e7a476e0e704191417de8035c027efae0165014d2d4ce1908fb",
+      "archivedSha256": "b93bd7f982035e7a476e0e704191417de8035c027efae0165014d2d4ce1908fb",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-38ad90b2\\profile-create.txt",
+      "source": "evidence/runtime022-38ad90b2/profile-create.txt",
+      "rawSha256": "c5286c542ddc14f85e18ddbfcde891956d1136c7928579df4daae097e558a356",
+      "archivedSha256": "c5286c542ddc14f85e18ddbfcde891956d1136c7928579df4daae097e558a356",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-38ad90b2\\runtime-harness.mjs",
+      "source": "evidence/runtime022-38ad90b2/runtime-harness.mjs",
+      "rawSha256": "2d61f0778807985fe79bc26edfd3f335564dfdc84bd4f1ee480b645a1d0d4e5f",
+      "archivedSha256": "2d61f0778807985fe79bc26edfd3f335564dfdc84bd4f1ee480b645a1d0d4e5f",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-38ad90b2\\runtime-report.json",
+      "source": "evidence/runtime022-38ad90b2/runtime-report.json",
+      "rawSha256": "b6c4dcdf9f124d899302c77a151ca6336a8de51488b26b2b0ca23b577b319841",
+      "archivedSha256": "b6c4dcdf9f124d899302c77a151ca6336a8de51488b26b2b0ca23b577b319841",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-38ad90b2\\uninstall.txt",
+      "source": "evidence/runtime022-38ad90b2/uninstall.txt",
+      "rawSha256": "85b0c748648a36b436987565451e29ee5157e4fe4577f281f23c5cd7866a59c1",
+      "archivedSha256": "85b0c748648a36b436987565451e29ee5157e4fe4577f281f23c5cd7866a59c1",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-38ad90b2\\version.txt",
+      "source": "evidence/runtime022-38ad90b2/version.txt",
+      "rawSha256": "96bad88b8a312b7297de5c9c1d57cd158d8b2964dab42a39463bd743d94fbd7a",
+      "archivedSha256": "96bad88b8a312b7297de5c9c1d57cd158d8b2964dab42a39463bd743d94fbd7a",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-5c351489\\01-startup.png",
+      "source": "evidence/runtime022-5c351489/01-startup.png",
+      "rawSha256": "79ead254093f5e0d05b230a54a41a1659e76b59193ed104876f50c2ed97b27fe",
+      "archivedSha256": "79ead254093f5e0d05b230a54a41a1659e76b59193ed104876f50c2ed97b27fe",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-5c351489\\02-settings.png",
+      "source": "evidence/runtime022-5c351489/02-settings.png",
+      "rawSha256": "9bcb4d830862d08482f90bd3c22331ea8766548e7962da48130b5ddaa598cb95",
+      "archivedSha256": "9bcb4d830862d08482f90bd3c22331ea8766548e7962da48130b5ddaa598cb95",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-5c351489\\03-card.png",
+      "source": "evidence/runtime022-5c351489/03-card.png",
+      "rawSha256": "16314be6a80e34075a63cb655562417e2df56f4d0e7d37b9c2fc8000e99d6e8d",
+      "archivedSha256": "16314be6a80e34075a63cb655562417e2df56f4d0e7d37b9c2fc8000e99d6e8d",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-5c351489\\04-narrow.png",
+      "source": "evidence/runtime022-5c351489/04-narrow.png",
+      "rawSha256": "701b19449b896878271a1b49db11b9ee1bd467c8fe5ee69ff8b39c4ba1e6ef51",
+      "archivedSha256": "701b19449b896878271a1b49db11b9ee1bd467c8fe5ee69ff8b39c4ba1e6ef51",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-5c351489\\05-scroll.png",
+      "source": "evidence/runtime022-5c351489/05-scroll.png",
+      "rawSha256": "46a9fee44da0ed926600f7c6cc620f11a78aeda07e1ac0498e6b6c44bd4fcafb",
+      "archivedSha256": "46a9fee44da0ed926600f7c6cc620f11a78aeda07e1ac0498e6b6c44bd4fcafb",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-5c351489\\boot-57968.txt",
+      "source": "evidence/runtime022-5c351489/boot-57968.txt",
+      "rawSha256": "ab1b907feb06efc2a4da559d887796f48de9ce5a1e6128c29bb1cead5dbaad44",
+      "archivedSha256": "ab1b907feb06efc2a4da559d887796f48de9ce5a1e6128c29bb1cead5dbaad44",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-5c351489\\failure.png",
+      "source": "evidence/runtime022-5c351489/failure.png",
+      "rawSha256": "20abd5ec4413227924a30de9801aa4e84bb326697f65e4705a3b0beab1b80d9c",
+      "archivedSha256": "20abd5ec4413227924a30de9801aa4e84bb326697f65e4705a3b0beab1b80d9c",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-5c351489\\install.txt",
+      "source": "evidence/runtime022-5c351489/install.txt",
+      "rawSha256": "60af2515f6f31f9fef5a66d4dd1597d89712d54c0082b014ac5c03be7a6d5efc",
+      "archivedSha256": "60af2515f6f31f9fef5a66d4dd1597d89712d54c0082b014ac5c03be7a6d5efc",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-5c351489\\network\\network-5c351489-57968-0.jsonl",
+      "source": "evidence/runtime022-5c351489/network/network-5c351489-57968-0.jsonl",
+      "rawSha256": "6dc4e682b64bc6d5261d5acc0bb59c1399bc7de6675325a62971010f198ff015",
+      "archivedSha256": "6dc4e682b64bc6d5261d5acc0bb59c1399bc7de6675325a62971010f198ff015",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-5c351489\\network-observer.cjs",
+      "source": "evidence/runtime022-5c351489/network-observer.cjs",
+      "rawSha256": "33c6e4cbfa5364681ebf5feb2dd41e700c8393233d11a5340ed84f04ef70ad8e",
+      "archivedSha256": "33c6e4cbfa5364681ebf5feb2dd41e700c8393233d11a5340ed84f04ef70ad8e",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-5c351489\\network-verdict.mjs",
+      "source": "evidence/runtime022-5c351489/network-verdict.mjs",
+      "rawSha256": "b93bd7f982035e7a476e0e704191417de8035c027efae0165014d2d4ce1908fb",
+      "archivedSha256": "b93bd7f982035e7a476e0e704191417de8035c027efae0165014d2d4ce1908fb",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-5c351489\\profile-create.txt",
+      "source": "evidence/runtime022-5c351489/profile-create.txt",
+      "rawSha256": "c5286c542ddc14f85e18ddbfcde891956d1136c7928579df4daae097e558a356",
+      "archivedSha256": "c5286c542ddc14f85e18ddbfcde891956d1136c7928579df4daae097e558a356",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-5c351489\\runtime-harness.mjs",
+      "source": "evidence/runtime022-5c351489/runtime-harness.mjs",
+      "rawSha256": "af6ddd5f0107487cac967c2c76542c0b6079989cb59af82078047abf905f540b",
+      "archivedSha256": "af6ddd5f0107487cac967c2c76542c0b6079989cb59af82078047abf905f540b",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-5c351489\\runtime-report.json",
+      "source": "evidence/runtime022-5c351489/runtime-report.json",
+      "rawSha256": "52b97760761bab221039c00ebedd7801cf1c51bd1739c376795ae03121a1b893",
+      "archivedSha256": "52b97760761bab221039c00ebedd7801cf1c51bd1739c376795ae03121a1b893",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-5c351489\\uninstall.txt",
+      "source": "evidence/runtime022-5c351489/uninstall.txt",
+      "rawSha256": "a7ed341c50ddc63eeb4747746b3bd78899b586b62794e1017005fc6c10bee639",
+      "archivedSha256": "a7ed341c50ddc63eeb4747746b3bd78899b586b62794e1017005fc6c10bee639",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-5c351489\\version.txt",
+      "source": "evidence/runtime022-5c351489/version.txt",
+      "rawSha256": "96bad88b8a312b7297de5c9c1d57cd158d8b2964dab42a39463bd743d94fbd7a",
+      "archivedSha256": "96bad88b8a312b7297de5c9c1d57cd158d8b2964dab42a39463bd743d94fbd7a",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-6e377aeb\\01-startup.png",
+      "source": "evidence/runtime022-6e377aeb/01-startup.png",
+      "rawSha256": "79ead254093f5e0d05b230a54a41a1659e76b59193ed104876f50c2ed97b27fe",
+      "archivedSha256": "79ead254093f5e0d05b230a54a41a1659e76b59193ed104876f50c2ed97b27fe",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-6e377aeb\\02-settings.png",
+      "source": "evidence/runtime022-6e377aeb/02-settings.png",
+      "rawSha256": "9bcb4d830862d08482f90bd3c22331ea8766548e7962da48130b5ddaa598cb95",
+      "archivedSha256": "9bcb4d830862d08482f90bd3c22331ea8766548e7962da48130b5ddaa598cb95",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-6e377aeb\\03-card.png",
+      "source": "evidence/runtime022-6e377aeb/03-card.png",
+      "rawSha256": "16314be6a80e34075a63cb655562417e2df56f4d0e7d37b9c2fc8000e99d6e8d",
+      "archivedSha256": "16314be6a80e34075a63cb655562417e2df56f4d0e7d37b9c2fc8000e99d6e8d",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-6e377aeb\\04-narrow.png",
+      "source": "evidence/runtime022-6e377aeb/04-narrow.png",
+      "rawSha256": "ad955290d4a4d65fff942fdc83d2a6c39f4e49f883982595f21c82b161b3b236",
+      "archivedSha256": "ad955290d4a4d65fff942fdc83d2a6c39f4e49f883982595f21c82b161b3b236",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-6e377aeb\\05-scroll.png",
+      "source": "evidence/runtime022-6e377aeb/05-scroll.png",
+      "rawSha256": "46a9fee44da0ed926600f7c6cc620f11a78aeda07e1ac0498e6b6c44bd4fcafb",
+      "archivedSha256": "46a9fee44da0ed926600f7c6cc620f11a78aeda07e1ac0498e6b6c44bd4fcafb",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-6e377aeb\\06-uninstalled.png",
+      "source": "evidence/runtime022-6e377aeb/06-uninstalled.png",
+      "rawSha256": "d4226dc94823c35df6a60db52376ab0b6435bdb852c9b77b4e7edb4d4a907e14",
+      "archivedSha256": "d4226dc94823c35df6a60db52376ab0b6435bdb852c9b77b4e7edb4d4a907e14",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-6e377aeb\\boot-2428.txt",
+      "source": "evidence/runtime022-6e377aeb/boot-2428.txt",
+      "rawSha256": "ab1b907feb06efc2a4da559d887796f48de9ce5a1e6128c29bb1cead5dbaad44",
+      "archivedSha256": "ab1b907feb06efc2a4da559d887796f48de9ce5a1e6128c29bb1cead5dbaad44",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-6e377aeb\\boot-54020.txt",
+      "source": "evidence/runtime022-6e377aeb/boot-54020.txt",
+      "rawSha256": "ab1b907feb06efc2a4da559d887796f48de9ce5a1e6128c29bb1cead5dbaad44",
+      "archivedSha256": "ab1b907feb06efc2a4da559d887796f48de9ce5a1e6128c29bb1cead5dbaad44",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-6e377aeb\\install.txt",
+      "source": "evidence/runtime022-6e377aeb/install.txt",
+      "rawSha256": "581dae331ead8db47f5f6a683473d98565c3e219aaea48b0f61e97679ad608ed",
+      "archivedSha256": "581dae331ead8db47f5f6a683473d98565c3e219aaea48b0f61e97679ad608ed",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-6e377aeb\\network\\network-6e377aeb-2428-0.jsonl",
+      "source": "evidence/runtime022-6e377aeb/network/network-6e377aeb-2428-0.jsonl",
+      "rawSha256": "901b7b7c7bf8593005abd3248af5b10c244e031459ba36bfa3014a7abf9b1a87",
+      "archivedSha256": "901b7b7c7bf8593005abd3248af5b10c244e031459ba36bfa3014a7abf9b1a87",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-6e377aeb\\network\\network-6e377aeb-54020-0.jsonl",
+      "source": "evidence/runtime022-6e377aeb/network/network-6e377aeb-54020-0.jsonl",
+      "rawSha256": "a77c3a89466e818ffb14a77ae30da70b710bc9b77de1616d5b77c0eae0909506",
+      "archivedSha256": "a77c3a89466e818ffb14a77ae30da70b710bc9b77de1616d5b77c0eae0909506",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-6e377aeb\\network-observer.cjs",
+      "source": "evidence/runtime022-6e377aeb/network-observer.cjs",
+      "rawSha256": "21d78f26d5cae9082f758ee5230e9565e0d106771c4c0ea87e702223131f66a9",
+      "archivedSha256": "21d78f26d5cae9082f758ee5230e9565e0d106771c4c0ea87e702223131f66a9",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-6e377aeb\\network-verdict.mjs",
+      "source": "evidence/runtime022-6e377aeb/network-verdict.mjs",
+      "rawSha256": "5c915409d8cd5c4932efca91dd75a8c07a4434f71ffee073f0bcb8751438848b",
+      "archivedSha256": "5c915409d8cd5c4932efca91dd75a8c07a4434f71ffee073f0bcb8751438848b",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-6e377aeb\\profile-create.txt",
+      "source": "evidence/runtime022-6e377aeb/profile-create.txt",
+      "rawSha256": "c5286c542ddc14f85e18ddbfcde891956d1136c7928579df4daae097e558a356",
+      "archivedSha256": "c5286c542ddc14f85e18ddbfcde891956d1136c7928579df4daae097e558a356",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-6e377aeb\\runtime-harness.mjs",
+      "source": "evidence/runtime022-6e377aeb/runtime-harness.mjs",
+      "rawSha256": "2d61f0778807985fe79bc26edfd3f335564dfdc84bd4f1ee480b645a1d0d4e5f",
+      "archivedSha256": "2d61f0778807985fe79bc26edfd3f335564dfdc84bd4f1ee480b645a1d0d4e5f",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-6e377aeb\\runtime-report.json",
+      "source": "evidence/runtime022-6e377aeb/runtime-report.json",
+      "rawSha256": "afb36666ac57cc0b31dd334b9fd59a0d5677c11305b9d7ad859201529d3bd7e5",
+      "archivedSha256": "afb36666ac57cc0b31dd334b9fd59a0d5677c11305b9d7ad859201529d3bd7e5",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-6e377aeb\\uninstall.txt",
+      "source": "evidence/runtime022-6e377aeb/uninstall.txt",
+      "rawSha256": "4abdd408c3deb8ff4885228dd026613bb0c227207d1eeb8ed0c04b24c8e13a46",
+      "archivedSha256": "4abdd408c3deb8ff4885228dd026613bb0c227207d1eeb8ed0c04b24c8e13a46",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-6e377aeb\\version.txt",
+      "source": "evidence/runtime022-6e377aeb/version.txt",
+      "rawSha256": "96bad88b8a312b7297de5c9c1d57cd158d8b2964dab42a39463bd743d94fbd7a",
+      "archivedSha256": "96bad88b8a312b7297de5c9c1d57cd158d8b2964dab42a39463bd743d94fbd7a",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-72d18d0d\\01-startup.png",
+      "source": "evidence/runtime022-72d18d0d/01-startup.png",
+      "rawSha256": "79ead254093f5e0d05b230a54a41a1659e76b59193ed104876f50c2ed97b27fe",
+      "archivedSha256": "79ead254093f5e0d05b230a54a41a1659e76b59193ed104876f50c2ed97b27fe",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-72d18d0d\\02-settings.png",
+      "source": "evidence/runtime022-72d18d0d/02-settings.png",
+      "rawSha256": "9bcb4d830862d08482f90bd3c22331ea8766548e7962da48130b5ddaa598cb95",
+      "archivedSha256": "9bcb4d830862d08482f90bd3c22331ea8766548e7962da48130b5ddaa598cb95",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-72d18d0d\\03-card.png",
+      "source": "evidence/runtime022-72d18d0d/03-card.png",
+      "rawSha256": "16314be6a80e34075a63cb655562417e2df56f4d0e7d37b9c2fc8000e99d6e8d",
+      "archivedSha256": "16314be6a80e34075a63cb655562417e2df56f4d0e7d37b9c2fc8000e99d6e8d",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-72d18d0d\\04-narrow.png",
+      "source": "evidence/runtime022-72d18d0d/04-narrow.png",
+      "rawSha256": "701b19449b896878271a1b49db11b9ee1bd467c8fe5ee69ff8b39c4ba1e6ef51",
+      "archivedSha256": "701b19449b896878271a1b49db11b9ee1bd467c8fe5ee69ff8b39c4ba1e6ef51",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-72d18d0d\\05-scroll.png",
+      "source": "evidence/runtime022-72d18d0d/05-scroll.png",
+      "rawSha256": "46a9fee44da0ed926600f7c6cc620f11a78aeda07e1ac0498e6b6c44bd4fcafb",
+      "archivedSha256": "46a9fee44da0ed926600f7c6cc620f11a78aeda07e1ac0498e6b6c44bd4fcafb",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-72d18d0d\\06-uninstalled.png",
+      "source": "evidence/runtime022-72d18d0d/06-uninstalled.png",
+      "rawSha256": "5fce32258bc6eecea15bef3e3c2d23dca9653860bfd0a36e155d4e1035b8a5dd",
+      "archivedSha256": "5fce32258bc6eecea15bef3e3c2d23dca9653860bfd0a36e155d4e1035b8a5dd",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-72d18d0d\\boot-58108.txt",
+      "source": "evidence/runtime022-72d18d0d/boot-58108.txt",
+      "rawSha256": "ab1b907feb06efc2a4da559d887796f48de9ce5a1e6128c29bb1cead5dbaad44",
+      "archivedSha256": "ab1b907feb06efc2a4da559d887796f48de9ce5a1e6128c29bb1cead5dbaad44",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-72d18d0d\\boot-58364.txt",
+      "source": "evidence/runtime022-72d18d0d/boot-58364.txt",
+      "rawSha256": "ab1b907feb06efc2a4da559d887796f48de9ce5a1e6128c29bb1cead5dbaad44",
+      "archivedSha256": "ab1b907feb06efc2a4da559d887796f48de9ce5a1e6128c29bb1cead5dbaad44",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-72d18d0d\\install.txt",
+      "source": "evidence/runtime022-72d18d0d/install.txt",
+      "rawSha256": "0b3b15db6bce84aa0efaf50bfa8007796c1f63edef5b2062dd7e0d04b18e946f",
+      "archivedSha256": "0b3b15db6bce84aa0efaf50bfa8007796c1f63edef5b2062dd7e0d04b18e946f",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-72d18d0d\\network\\network-72d18d0d-58108-0.jsonl",
+      "source": "evidence/runtime022-72d18d0d/network/network-72d18d0d-58108-0.jsonl",
+      "rawSha256": "98552bb2e115e39413354c7e04549036e4a31f4c4d8e76100637e8f9629c6bcf",
+      "archivedSha256": "98552bb2e115e39413354c7e04549036e4a31f4c4d8e76100637e8f9629c6bcf",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-72d18d0d\\network\\network-72d18d0d-58364-0.jsonl",
+      "source": "evidence/runtime022-72d18d0d/network/network-72d18d0d-58364-0.jsonl",
+      "rawSha256": "c7a16ac9a10e02abb31f6e37c943004c45afe540fda5339cb448a772dd488432",
+      "archivedSha256": "c7a16ac9a10e02abb31f6e37c943004c45afe540fda5339cb448a772dd488432",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-72d18d0d\\network-observer.cjs",
+      "source": "evidence/runtime022-72d18d0d/network-observer.cjs",
+      "rawSha256": "21d78f26d5cae9082f758ee5230e9565e0d106771c4c0ea87e702223131f66a9",
+      "archivedSha256": "21d78f26d5cae9082f758ee5230e9565e0d106771c4c0ea87e702223131f66a9",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-72d18d0d\\network-verdict.mjs",
+      "source": "evidence/runtime022-72d18d0d/network-verdict.mjs",
+      "rawSha256": "5c915409d8cd5c4932efca91dd75a8c07a4434f71ffee073f0bcb8751438848b",
+      "archivedSha256": "5c915409d8cd5c4932efca91dd75a8c07a4434f71ffee073f0bcb8751438848b",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-72d18d0d\\profile-create.txt",
+      "source": "evidence/runtime022-72d18d0d/profile-create.txt",
+      "rawSha256": "c5286c542ddc14f85e18ddbfcde891956d1136c7928579df4daae097e558a356",
+      "archivedSha256": "c5286c542ddc14f85e18ddbfcde891956d1136c7928579df4daae097e558a356",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-72d18d0d\\runtime-harness.mjs",
+      "source": "evidence/runtime022-72d18d0d/runtime-harness.mjs",
+      "rawSha256": "15b9af739998ccb1872e6ce5b5ab2ad581f22634a4f01cfbc582c4feb8cdb9e7",
+      "archivedSha256": "15b9af739998ccb1872e6ce5b5ab2ad581f22634a4f01cfbc582c4feb8cdb9e7",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-72d18d0d\\runtime-report.json",
+      "source": "evidence/runtime022-72d18d0d/runtime-report.json",
+      "rawSha256": "4354234866c3da0eb80b83d326df93ca1bf15b0bb72c545cc4ce01454fbc7a1d",
+      "archivedSha256": "4354234866c3da0eb80b83d326df93ca1bf15b0bb72c545cc4ce01454fbc7a1d",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-72d18d0d\\uninstall.txt",
+      "source": "evidence/runtime022-72d18d0d/uninstall.txt",
+      "rawSha256": "631f045598856823647bd8e785196dcff990d6ab5f9330f4f57bbefd81eebf7f",
+      "archivedSha256": "631f045598856823647bd8e785196dcff990d6ab5f9330f4f57bbefd81eebf7f",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-72d18d0d\\version.txt",
+      "source": "evidence/runtime022-72d18d0d/version.txt",
+      "rawSha256": "96bad88b8a312b7297de5c9c1d57cd158d8b2964dab42a39463bd743d94fbd7a",
+      "archivedSha256": "96bad88b8a312b7297de5c9c1d57cd158d8b2964dab42a39463bd743d94fbd7a",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-a6ab9ca6\\01-startup.png",
+      "source": "evidence/runtime022-a6ab9ca6/01-startup.png",
+      "rawSha256": "3b0961f4c271a4237beb23ef03e72946686b8fd9a783e71f2ee495bd81e1f58c",
+      "archivedSha256": "3b0961f4c271a4237beb23ef03e72946686b8fd9a783e71f2ee495bd81e1f58c",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-a6ab9ca6\\boot-53608.txt",
+      "source": "evidence/runtime022-a6ab9ca6/boot-53608.txt",
+      "rawSha256": "ab1b907feb06efc2a4da559d887796f48de9ce5a1e6128c29bb1cead5dbaad44",
+      "archivedSha256": "ab1b907feb06efc2a4da559d887796f48de9ce5a1e6128c29bb1cead5dbaad44",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-a6ab9ca6\\failure.png",
+      "source": "evidence/runtime022-a6ab9ca6/failure.png",
+      "rawSha256": "0514b581eb96c2ac1a6df338e94a8e3829b7c2b2bd520f56c2c558781963323c",
+      "archivedSha256": "0514b581eb96c2ac1a6df338e94a8e3829b7c2b2bd520f56c2c558781963323c",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-a6ab9ca6\\install.txt",
+      "source": "evidence/runtime022-a6ab9ca6/install.txt",
+      "rawSha256": "676ef08b61d9f33d488bf317fd62327b1210533b9678dec6da4c85b46673e51e",
+      "archivedSha256": "676ef08b61d9f33d488bf317fd62327b1210533b9678dec6da4c85b46673e51e",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-a6ab9ca6\\network\\network-a6ab9ca6-53608-0.jsonl",
+      "source": "evidence/runtime022-a6ab9ca6/network/network-a6ab9ca6-53608-0.jsonl",
+      "rawSha256": "a83bd917671d1de6f7f8c9219c384b2a4596c7d293c22a87c5dcf4225928602d",
+      "archivedSha256": "a83bd917671d1de6f7f8c9219c384b2a4596c7d293c22a87c5dcf4225928602d",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-a6ab9ca6\\network-observer.cjs",
+      "source": "evidence/runtime022-a6ab9ca6/network-observer.cjs",
+      "rawSha256": "33c6e4cbfa5364681ebf5feb2dd41e700c8393233d11a5340ed84f04ef70ad8e",
+      "archivedSha256": "33c6e4cbfa5364681ebf5feb2dd41e700c8393233d11a5340ed84f04ef70ad8e",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-a6ab9ca6\\network-verdict.mjs",
+      "source": "evidence/runtime022-a6ab9ca6/network-verdict.mjs",
+      "rawSha256": "b93bd7f982035e7a476e0e704191417de8035c027efae0165014d2d4ce1908fb",
+      "archivedSha256": "b93bd7f982035e7a476e0e704191417de8035c027efae0165014d2d4ce1908fb",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-a6ab9ca6\\profile-create.txt",
+      "source": "evidence/runtime022-a6ab9ca6/profile-create.txt",
+      "rawSha256": "c5286c542ddc14f85e18ddbfcde891956d1136c7928579df4daae097e558a356",
+      "archivedSha256": "c5286c542ddc14f85e18ddbfcde891956d1136c7928579df4daae097e558a356",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-a6ab9ca6\\runtime-harness.mjs",
+      "source": "evidence/runtime022-a6ab9ca6/runtime-harness.mjs",
+      "rawSha256": "b3f5372fb5944900be6ff09af66e193a61f82c69ec733802b20a716d711405ea",
+      "archivedSha256": "b3f5372fb5944900be6ff09af66e193a61f82c69ec733802b20a716d711405ea",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-a6ab9ca6\\runtime-report.json",
+      "source": "evidence/runtime022-a6ab9ca6/runtime-report.json",
+      "rawSha256": "b1e102db3259710844a127503d993ca5847f884b020bab02e80d230a6babe810",
+      "archivedSha256": "b1e102db3259710844a127503d993ca5847f884b020bab02e80d230a6babe810",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-a6ab9ca6\\version.txt",
+      "source": "evidence/runtime022-a6ab9ca6/version.txt",
+      "rawSha256": "96bad88b8a312b7297de5c9c1d57cd158d8b2964dab42a39463bd743d94fbd7a",
+      "archivedSha256": "96bad88b8a312b7297de5c9c1d57cd158d8b2964dab42a39463bd743d94fbd7a",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-be3a2725\\01-startup.png",
+      "source": "evidence/runtime022-be3a2725/01-startup.png",
+      "rawSha256": "79ead254093f5e0d05b230a54a41a1659e76b59193ed104876f50c2ed97b27fe",
+      "archivedSha256": "79ead254093f5e0d05b230a54a41a1659e76b59193ed104876f50c2ed97b27fe",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-be3a2725\\02-settings.png",
+      "source": "evidence/runtime022-be3a2725/02-settings.png",
+      "rawSha256": "9bcb4d830862d08482f90bd3c22331ea8766548e7962da48130b5ddaa598cb95",
+      "archivedSha256": "9bcb4d830862d08482f90bd3c22331ea8766548e7962da48130b5ddaa598cb95",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-be3a2725\\03-card.png",
+      "source": "evidence/runtime022-be3a2725/03-card.png",
+      "rawSha256": "16314be6a80e34075a63cb655562417e2df56f4d0e7d37b9c2fc8000e99d6e8d",
+      "archivedSha256": "16314be6a80e34075a63cb655562417e2df56f4d0e7d37b9c2fc8000e99d6e8d",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-be3a2725\\04-narrow.png",
+      "source": "evidence/runtime022-be3a2725/04-narrow.png",
+      "rawSha256": "b0920117db5a5163337723deeb0b9e18a5e725977af06ba65cf28614d2d58a2e",
+      "archivedSha256": "b0920117db5a5163337723deeb0b9e18a5e725977af06ba65cf28614d2d58a2e",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-be3a2725\\05-scroll.png",
+      "source": "evidence/runtime022-be3a2725/05-scroll.png",
+      "rawSha256": "46a9fee44da0ed926600f7c6cc620f11a78aeda07e1ac0498e6b6c44bd4fcafb",
+      "archivedSha256": "46a9fee44da0ed926600f7c6cc620f11a78aeda07e1ac0498e6b6c44bd4fcafb",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-be3a2725\\boot-46240.txt",
+      "source": "evidence/runtime022-be3a2725/boot-46240.txt",
+      "rawSha256": "ab1b907feb06efc2a4da559d887796f48de9ce5a1e6128c29bb1cead5dbaad44",
+      "archivedSha256": "ab1b907feb06efc2a4da559d887796f48de9ce5a1e6128c29bb1cead5dbaad44",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-be3a2725\\failure.png",
+      "source": "evidence/runtime022-be3a2725/failure.png",
+      "rawSha256": "81db3a6e29da9e7ea881f13d41a1a45af2c2cfe157e912a91b22ea68868b79cb",
+      "archivedSha256": "81db3a6e29da9e7ea881f13d41a1a45af2c2cfe157e912a91b22ea68868b79cb",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-be3a2725\\install.txt",
+      "source": "evidence/runtime022-be3a2725/install.txt",
+      "rawSha256": "7f4f6dd60bbfb596cec111ec952c958dcc5354fb3e3d1fd02af15f70090f0fa0",
+      "archivedSha256": "7f4f6dd60bbfb596cec111ec952c958dcc5354fb3e3d1fd02af15f70090f0fa0",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-be3a2725\\network\\network-be3a2725-46240-0.jsonl",
+      "source": "evidence/runtime022-be3a2725/network/network-be3a2725-46240-0.jsonl",
+      "rawSha256": "f454b27914f7538177ee3fe621419a22b6b261e5e6c20a9c5cd3a2e44580990f",
+      "archivedSha256": "f454b27914f7538177ee3fe621419a22b6b261e5e6c20a9c5cd3a2e44580990f",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-be3a2725\\network-observer.cjs",
+      "source": "evidence/runtime022-be3a2725/network-observer.cjs",
+      "rawSha256": "33c6e4cbfa5364681ebf5feb2dd41e700c8393233d11a5340ed84f04ef70ad8e",
+      "archivedSha256": "33c6e4cbfa5364681ebf5feb2dd41e700c8393233d11a5340ed84f04ef70ad8e",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-be3a2725\\network-verdict.mjs",
+      "source": "evidence/runtime022-be3a2725/network-verdict.mjs",
+      "rawSha256": "b93bd7f982035e7a476e0e704191417de8035c027efae0165014d2d4ce1908fb",
+      "archivedSha256": "b93bd7f982035e7a476e0e704191417de8035c027efae0165014d2d4ce1908fb",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-be3a2725\\profile-create.txt",
+      "source": "evidence/runtime022-be3a2725/profile-create.txt",
+      "rawSha256": "c5286c542ddc14f85e18ddbfcde891956d1136c7928579df4daae097e558a356",
+      "archivedSha256": "c5286c542ddc14f85e18ddbfcde891956d1136c7928579df4daae097e558a356",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-be3a2725\\runtime-harness.mjs",
+      "source": "evidence/runtime022-be3a2725/runtime-harness.mjs",
+      "rawSha256": "82dd5a399d3b81c5e1c1cdda656087b33958eb1598bb8694cf78ef73d733c141",
+      "archivedSha256": "82dd5a399d3b81c5e1c1cdda656087b33958eb1598bb8694cf78ef73d733c141",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-be3a2725\\runtime-report.json",
+      "source": "evidence/runtime022-be3a2725/runtime-report.json",
+      "rawSha256": "7bf38ea50633c23f31ffe365cdff42fde850fc95066f2b3a2edbabd0e1949dce",
+      "archivedSha256": "7bf38ea50633c23f31ffe365cdff42fde850fc95066f2b3a2edbabd0e1949dce",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-be3a2725\\uninstall.txt",
+      "source": "evidence/runtime022-be3a2725/uninstall.txt",
+      "rawSha256": "bbe7d6723d1ff6551b0ba7bd77a91f0f1baa696ac2f4fb43e8b7c3649b18471d",
+      "archivedSha256": "bbe7d6723d1ff6551b0ba7bd77a91f0f1baa696ac2f4fb43e8b7c3649b18471d",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-be3a2725\\version.txt",
+      "source": "evidence/runtime022-be3a2725/version.txt",
+      "rawSha256": "96bad88b8a312b7297de5c9c1d57cd158d8b2964dab42a39463bd743d94fbd7a",
+      "archivedSha256": "96bad88b8a312b7297de5c9c1d57cd158d8b2964dab42a39463bd743d94fbd7a",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-c688da55\\01-startup.png",
+      "source": "evidence/runtime022-c688da55/01-startup.png",
+      "rawSha256": "c6e067c09d1bac99120f7c38e20607ca9d20d342e6d89131ea76c5e1bbf11722",
+      "archivedSha256": "c6e067c09d1bac99120f7c38e20607ca9d20d342e6d89131ea76c5e1bbf11722",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-c688da55\\boot-700.txt",
+      "source": "evidence/runtime022-c688da55/boot-700.txt",
+      "rawSha256": "ab1b907feb06efc2a4da559d887796f48de9ce5a1e6128c29bb1cead5dbaad44",
+      "archivedSha256": "ab1b907feb06efc2a4da559d887796f48de9ce5a1e6128c29bb1cead5dbaad44",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-c688da55\\install.txt",
+      "source": "evidence/runtime022-c688da55/install.txt",
+      "rawSha256": "a5e1f03641b4cec77bf90cbf66710198291d6b7fed8fa82c7a54ecc1d27f22eb",
+      "archivedSha256": "a5e1f03641b4cec77bf90cbf66710198291d6b7fed8fa82c7a54ecc1d27f22eb",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-c688da55\\network\\network-c688da55-700-0.jsonl",
+      "source": "evidence/runtime022-c688da55/network/network-c688da55-700-0.jsonl",
+      "rawSha256": "473359348a88bf3343ec0860678265ef6a02a2ac29781dc90389713819ad9f53",
+      "archivedSha256": "473359348a88bf3343ec0860678265ef6a02a2ac29781dc90389713819ad9f53",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-c688da55\\profile-create.txt",
+      "source": "evidence/runtime022-c688da55/profile-create.txt",
+      "rawSha256": "c5286c542ddc14f85e18ddbfcde891956d1136c7928579df4daae097e558a356",
+      "archivedSha256": "c5286c542ddc14f85e18ddbfcde891956d1136c7928579df4daae097e558a356",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-c688da55\\runtime-report.json",
+      "source": "evidence/runtime022-c688da55/runtime-report.json",
+      "rawSha256": "530b9aa8a94162ab4ec0113e08c89c8c66c2d9ddc9a353ce04c4a747f0f659bb",
+      "archivedSha256": "530b9aa8a94162ab4ec0113e08c89c8c66c2d9ddc9a353ce04c4a747f0f659bb",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-c688da55\\version.txt",
+      "source": "evidence/runtime022-c688da55/version.txt",
+      "rawSha256": "96bad88b8a312b7297de5c9c1d57cd158d8b2964dab42a39463bd743d94fbd7a",
+      "archivedSha256": "96bad88b8a312b7297de5c9c1d57cd158d8b2964dab42a39463bd743d94fbd7a",
+      "redacted": false
+    },
+    {
+      "path": "checks/supplemental-secret-scan.json",
+      "source": "evidence/supplemental-secret-scan.json",
+      "rawSha256": "e6b95f9fd98bd0b8a9c4a070a9a4df91fbd221264c561269c57ef7a88b9f8b14",
+      "archivedSha256": "e6b95f9fd98bd0b8a9c4a070a9a4df91fbd221264c561269c57ef7a88b9f8b14",
+      "redacted": false
+    },
+    {
+      "path": "controls\\network\\network-carrier-control-53416-0.jsonl",
+      "source": "network-control/network-carrier-control-53416-0.jsonl",
+      "rawSha256": "1a6698cf0d2ede4398e7f59e7b553ab551bdc8faac154f87e200407260f5e03b",
+      "archivedSha256": "1a6698cf0d2ede4398e7f59e7b553ab551bdc8faac154f87e200407260f5e03b",
+      "redacted": false
+    },
+    {
+      "path": "controls\\network\\network-carrier-control-af3c9056-53744-0.jsonl",
+      "source": "network-control/network-carrier-control-af3c9056-53744-0.jsonl",
+      "rawSha256": "1d1d2b6393be8ac990f5b119f5c561496b4770a9dd008cb622b969e11988dbd2",
+      "archivedSha256": "1d1d2b6393be8ac990f5b119f5c561496b4770a9dd008cb622b969e11988dbd2",
+      "redacted": false
+    },
+    {
+      "path": "controls\\network\\network-positive-control-2488-0.jsonl",
+      "source": "network-control/network-positive-control-2488-0.jsonl",
+      "rawSha256": "e795787af9931f798856c742409862595fa80732a92bc1fcb4f2369c653564d8",
+      "archivedSha256": "e795787af9931f798856c742409862595fa80732a92bc1fcb4f2369c653564d8",
+      "redacted": false
+    },
+    {
+      "path": "controls\\network\\network-positive-control-r2-56488-0.jsonl",
+      "source": "network-control/network-positive-control-r2-56488-0.jsonl",
+      "rawSha256": "16657727c9fb08af6cf6d42a5f34f219352f2130cda9ed3ba01813e68c4fe146",
+      "archivedSha256": "16657727c9fb08af6cf6d42a5f34f219352f2130cda9ed3ba01813e68c4fe146",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-325bd19b\\01-startup.png",
+      "source": "evidence/runtime022-325bd19b/01-startup.png",
+      "rawSha256": "79ead254093f5e0d05b230a54a41a1659e76b59193ed104876f50c2ed97b27fe",
+      "archivedSha256": "79ead254093f5e0d05b230a54a41a1659e76b59193ed104876f50c2ed97b27fe",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-325bd19b\\boot-2964.txt",
+      "source": "evidence/runtime022-325bd19b/boot-2964.txt",
+      "rawSha256": "ab1b907feb06efc2a4da559d887796f48de9ce5a1e6128c29bb1cead5dbaad44",
+      "archivedSha256": "ab1b907feb06efc2a4da559d887796f48de9ce5a1e6128c29bb1cead5dbaad44",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-325bd19b\\failure.png",
+      "source": "evidence/runtime022-325bd19b/failure.png",
+      "rawSha256": "97457fbb1269de4aa64a60ca216a391cde6502141a734a2ccc582c50d16b6c41",
+      "archivedSha256": "97457fbb1269de4aa64a60ca216a391cde6502141a734a2ccc582c50d16b6c41",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-325bd19b\\install.txt",
+      "source": "evidence/runtime022-325bd19b/install.txt",
+      "rawSha256": "c4f4afb4cc5f9d8cacbbe005e21dd73b48035981bc1dec398d0479a95a0b6d5b",
+      "archivedSha256": "c4f4afb4cc5f9d8cacbbe005e21dd73b48035981bc1dec398d0479a95a0b6d5b",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-325bd19b\\network\\network-325bd19b-2964-0.jsonl",
+      "source": "evidence/runtime022-325bd19b/network/network-325bd19b-2964-0.jsonl",
+      "rawSha256": "dc10aff7c545778fe03ee302021fbc0c86377f3f873bf938140e1de947d2e657",
+      "archivedSha256": "dc10aff7c545778fe03ee302021fbc0c86377f3f873bf938140e1de947d2e657",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-325bd19b\\network-observer.cjs",
+      "source": "evidence/runtime022-325bd19b/network-observer.cjs",
+      "rawSha256": "21d78f26d5cae9082f758ee5230e9565e0d106771c4c0ea87e702223131f66a9",
+      "archivedSha256": "21d78f26d5cae9082f758ee5230e9565e0d106771c4c0ea87e702223131f66a9",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-325bd19b\\network-verdict.mjs",
+      "source": "evidence/runtime022-325bd19b/network-verdict.mjs",
+      "rawSha256": "5c915409d8cd5c4932efca91dd75a8c07a4434f71ffee073f0bcb8751438848b",
+      "archivedSha256": "5c915409d8cd5c4932efca91dd75a8c07a4434f71ffee073f0bcb8751438848b",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-325bd19b\\profile-create.txt",
+      "source": "evidence/runtime022-325bd19b/profile-create.txt",
+      "rawSha256": "c5286c542ddc14f85e18ddbfcde891956d1136c7928579df4daae097e558a356",
+      "archivedSha256": "c5286c542ddc14f85e18ddbfcde891956d1136c7928579df4daae097e558a356",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-325bd19b\\runtime-harness.mjs",
+      "source": "evidence/runtime022-325bd19b/runtime-harness.mjs",
+      "rawSha256": "a360b3bf02a2127df10e6f0879cfadbabcf9a620a5574d1acd5cd95fc1510222",
+      "archivedSha256": "a360b3bf02a2127df10e6f0879cfadbabcf9a620a5574d1acd5cd95fc1510222",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-325bd19b\\runtime-report.json",
+      "source": "evidence/runtime022-325bd19b/runtime-report.json",
+      "rawSha256": "98d8dc2b9a18db95089fa77b1e12922b534e76ecd131426679f9369d3c6fae9b",
+      "archivedSha256": "98d8dc2b9a18db95089fa77b1e12922b534e76ecd131426679f9369d3c6fae9b",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-325bd19b\\version.txt",
+      "source": "evidence/runtime022-325bd19b/version.txt",
+      "rawSha256": "96bad88b8a312b7297de5c9c1d57cd158d8b2964dab42a39463bd743d94fbd7a",
+      "archivedSha256": "96bad88b8a312b7297de5c9c1d57cd158d8b2964dab42a39463bd743d94fbd7a",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-5e06c194\\01-startup.png",
+      "source": "evidence/runtime022-5e06c194/01-startup.png",
+      "rawSha256": "79ead254093f5e0d05b230a54a41a1659e76b59193ed104876f50c2ed97b27fe",
+      "archivedSha256": "79ead254093f5e0d05b230a54a41a1659e76b59193ed104876f50c2ed97b27fe",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-5e06c194\\02-settings.png",
+      "source": "evidence/runtime022-5e06c194/02-settings.png",
+      "rawSha256": "9bcb4d830862d08482f90bd3c22331ea8766548e7962da48130b5ddaa598cb95",
+      "archivedSha256": "9bcb4d830862d08482f90bd3c22331ea8766548e7962da48130b5ddaa598cb95",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-5e06c194\\03-card.png",
+      "source": "evidence/runtime022-5e06c194/03-card.png",
+      "rawSha256": "16314be6a80e34075a63cb655562417e2df56f4d0e7d37b9c2fc8000e99d6e8d",
+      "archivedSha256": "16314be6a80e34075a63cb655562417e2df56f4d0e7d37b9c2fc8000e99d6e8d",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-5e06c194\\04-narrow.png",
+      "source": "evidence/runtime022-5e06c194/04-narrow.png",
+      "rawSha256": "b0920117db5a5163337723deeb0b9e18a5e725977af06ba65cf28614d2d58a2e",
+      "archivedSha256": "b0920117db5a5163337723deeb0b9e18a5e725977af06ba65cf28614d2d58a2e",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-5e06c194\\05-scroll.png",
+      "source": "evidence/runtime022-5e06c194/05-scroll.png",
+      "rawSha256": "46a9fee44da0ed926600f7c6cc620f11a78aeda07e1ac0498e6b6c44bd4fcafb",
+      "archivedSha256": "46a9fee44da0ed926600f7c6cc620f11a78aeda07e1ac0498e6b6c44bd4fcafb",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-5e06c194\\06-uninstalled.png",
+      "source": "evidence/runtime022-5e06c194/06-uninstalled.png",
+      "rawSha256": "bd9f3298e163c233effb14ca6da93c15aa1df36bca2c4a5e8fa3d82968a6bccd",
+      "archivedSha256": "bd9f3298e163c233effb14ca6da93c15aa1df36bca2c4a5e8fa3d82968a6bccd",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-5e06c194\\07-native-shortcut.png",
+      "source": "evidence/runtime022-5e06c194/07-native-shortcut.png",
+      "rawSha256": "4f232f923969909ee5fe3dc8ca19a6aba7a42df4ca091052332c53b859006104",
+      "archivedSha256": "4f232f923969909ee5fe3dc8ca19a6aba7a42df4ca091052332c53b859006104",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-5e06c194\\boot-25492.txt",
+      "source": "evidence/runtime022-5e06c194/boot-25492.txt",
+      "rawSha256": "ab1b907feb06efc2a4da559d887796f48de9ce5a1e6128c29bb1cead5dbaad44",
+      "archivedSha256": "ab1b907feb06efc2a4da559d887796f48de9ce5a1e6128c29bb1cead5dbaad44",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-5e06c194\\boot-48124.txt",
+      "source": "evidence/runtime022-5e06c194/boot-48124.txt",
+      "rawSha256": "ab1b907feb06efc2a4da559d887796f48de9ce5a1e6128c29bb1cead5dbaad44",
+      "archivedSha256": "ab1b907feb06efc2a4da559d887796f48de9ce5a1e6128c29bb1cead5dbaad44",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-5e06c194\\install.txt",
+      "source": "evidence/runtime022-5e06c194/install.txt",
+      "rawSha256": "7ad059014dc98c75cd52787302e18904447942115b1405fd9b4cff0cf153521a",
+      "archivedSha256": "7ad059014dc98c75cd52787302e18904447942115b1405fd9b4cff0cf153521a",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-5e06c194\\network\\network-5e06c194-25492-0.jsonl",
+      "source": "evidence/runtime022-5e06c194/network/network-5e06c194-25492-0.jsonl",
+      "rawSha256": "0da4b25d427511bf7e3bb16c912f88b4aa95fcc939bb1710f7fba425124ec113",
+      "archivedSha256": "0da4b25d427511bf7e3bb16c912f88b4aa95fcc939bb1710f7fba425124ec113",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-5e06c194\\network\\network-5e06c194-48124-0.jsonl",
+      "source": "evidence/runtime022-5e06c194/network/network-5e06c194-48124-0.jsonl",
+      "rawSha256": "b9819f9fd1f49c9274760a8118ef92767d59e33443960ea421471dbfda6a3b00",
+      "archivedSha256": "b9819f9fd1f49c9274760a8118ef92767d59e33443960ea421471dbfda6a3b00",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-5e06c194\\network-observer.cjs",
+      "source": "evidence/runtime022-5e06c194/network-observer.cjs",
+      "rawSha256": "21d78f26d5cae9082f758ee5230e9565e0d106771c4c0ea87e702223131f66a9",
+      "archivedSha256": "21d78f26d5cae9082f758ee5230e9565e0d106771c4c0ea87e702223131f66a9",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-5e06c194\\network-verdict.mjs",
+      "source": "evidence/runtime022-5e06c194/network-verdict.mjs",
+      "rawSha256": "5c915409d8cd5c4932efca91dd75a8c07a4434f71ffee073f0bcb8751438848b",
+      "archivedSha256": "5c915409d8cd5c4932efca91dd75a8c07a4434f71ffee073f0bcb8751438848b",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-5e06c194\\profile-create.txt",
+      "source": "evidence/runtime022-5e06c194/profile-create.txt",
+      "rawSha256": "c5286c542ddc14f85e18ddbfcde891956d1136c7928579df4daae097e558a356",
+      "archivedSha256": "c5286c542ddc14f85e18ddbfcde891956d1136c7928579df4daae097e558a356",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-5e06c194\\runtime-harness.mjs",
+      "source": "evidence/runtime022-5e06c194/runtime-harness.mjs",
+      "rawSha256": "432a424899c97cafe400186ada2bddf7e1da933d732496d5e0ca5a625d952281",
+      "archivedSha256": "432a424899c97cafe400186ada2bddf7e1da933d732496d5e0ca5a625d952281",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-5e06c194\\runtime-report.json",
+      "source": "evidence/runtime022-5e06c194/runtime-report.json",
+      "rawSha256": "cb705b716a5cbca1735c08bf842e430cd58eb6b61b95f6f24f3abb15cc372573",
+      "archivedSha256": "cb705b716a5cbca1735c08bf842e430cd58eb6b61b95f6f24f3abb15cc372573",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-5e06c194\\uninstall.txt",
+      "source": "evidence/runtime022-5e06c194/uninstall.txt",
+      "rawSha256": "1ba845df1337a2efabbdc039f2b1150155edd2206bf6d94e49c3b1ba66555ca8",
+      "archivedSha256": "1ba845df1337a2efabbdc039f2b1150155edd2206bf6d94e49c3b1ba66555ca8",
+      "redacted": false
+    },
+    {
+      "path": "runtime\\runtime022-5e06c194\\version.txt",
+      "source": "evidence/runtime022-5e06c194/version.txt",
+      "rawSha256": "96bad88b8a312b7297de5c9c1d57cd158d8b2964dab42a39463bd743d94fbd7a",
+      "archivedSha256": "96bad88b8a312b7297de5c9c1d57cd158d8b2964dab42a39463bd743d94fbd7a",
+      "redacted": false
+    },
+    {
+      "path": "logs/runtime022-native-final.log",
+      "source": "runtime022-native-final.log",
+      "rawSha256": "3b50546ad0af36ac1f1dc6ded66d7dd9d9488618882861aedd0314bdf9e8340f",
+      "archivedSha256": "3b50546ad0af36ac1f1dc6ded66d7dd9d9488618882861aedd0314bdf9e8340f",
+      "redacted": false
+    },
+    {
+      "path": "logs/runtime022-native-final-r2.log",
+      "source": "runtime022-native-final-r2.log",
+      "rawSha256": "2f41046dfacff6b169ad51c4a591fcfc5323ea9ac857a114986698c1707e1bfd",
+      "archivedSha256": "2f41046dfacff6b169ad51c4a591fcfc5323ea9ac857a114986698c1707e1bfd",
+      "redacted": false
+    },
+    {
+      "path": "reproduction/runtime022-native-final.mjs",
+      "source": "runtime022-smoke.mjs",
+      "rawSha256": "432a424899c97cafe400186ada2bddf7e1da933d732496d5e0ca5a625d952281",
+      "archivedSha256": "432a424899c97cafe400186ada2bddf7e1da933d732496d5e0ca5a625d952281",
+      "redacted": false
+    },
+    {
+      "path": "reviews/review-022-native-addendum.md",
+      "source": "review-022-native-addendum.md",
+      "rawSha256": "c777152d412bf63ffb4a037232f7aa3612d65d795510f7ddf6694da3ead494be",
+      "archivedSha256": "c777152d412bf63ffb4a037232f7aa3612d65d795510f7ddf6694da3ead494be",
+      "redacted": false
+    },
+    {
+      "path": "logs/final-source-credential-scan.log",
+      "source": "final-source-credential-scan.log",
+      "rawSha256": "049e39a7efc5848c2587de34e8818033200d92fee7e5e8681c9db567307eb0e9",
+      "archivedSha256": "049e39a7efc5848c2587de34e8818033200d92fee7e5e8681c9db567307eb0e9",
+      "redacted": false
+    }
+  ]
+}

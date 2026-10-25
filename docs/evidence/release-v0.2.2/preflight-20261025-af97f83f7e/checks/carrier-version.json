@@ -1,0 +1,13 @@
+{
+  "cmd": "E:/Laptop/softwares/DSH/DeepSeek Harness.exe",
+  "args": [
+    "--expose-internals",
+    "E:/Laptop/softwares/DSH/resources/app.asar/dsh/node_modules/@deepseek-ai/dsh-desktop-host/lib/cli.js",
+    "--version"
+  ],
+  "home": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-preflight-af97f83f7e\\runtime-probe\\home",
+  "profile": "pre022-carrier-probe",
+  "status": 0,
+  "stdout": "0.2.1-rc.3\n",
+  "stderr": ""
+}

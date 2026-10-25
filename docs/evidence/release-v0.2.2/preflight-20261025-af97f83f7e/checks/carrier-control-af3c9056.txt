@@ -1,0 +1,3 @@
+{"status":"PASS","records":7,"positiveControls":["fetch","http","socket","undici"],"externalControl":"blocked before transport"}
+
+EXIT_CODE=0

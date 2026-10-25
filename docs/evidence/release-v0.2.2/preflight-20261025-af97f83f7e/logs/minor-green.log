@@ -1,0 +1,34 @@
+preflight {"home":"C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-preflight-af97f83f7e\\user","tmp":"C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-preflight-af97f83f7e\\tmp","dsh":[]}
+
+node node_modules/vitest/vitest.mjs run tests/ecdict-downloader.spec.ts --configLoader runner --no-cache --maxWorkers 1
+
+ RUN  v3.2.4 C:/Users/20659/AppData/Local/Temp/dsh-022-preflight-af97f83f7e/repo
+
+ ✓ tests/ecdict-downloader.spec.ts (55 tests) 591ms
+
+ Test Files  1 passed (1)
+      Tests  55 passed (55)
+   Start at  05:09:05
+   Duration  1.79s (transform 318ms, setup 0ms, collect 908ms, tests 591ms, environment 0ms, prepare 121ms)
+
+
+(node:46812) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+stderr | tests/ecdict-downloader.spec.ts > ECDICT secure downloader > BUG-003 response ownership > releases reader and aborts transport on write-cancel-rejection failure
+ECDICT response cleanup unconfirmed; transfer aborted
+
+stderr | tests/ecdict-downloader.spec.ts > ECDICT secure downloader > BUG-003 response ownership > releases reader and aborts transport on read failure
+ECDICT response cleanup unconfirmed; transfer aborted
+
+stderr | tests/ecdict-downloader.spec.ts > ECDICT secure downloader > BUG-003 response ownership > releases reader and aborts transport on cancel-rejection failure
+ECDICT response cleanup unconfirmed; transfer aborted
+
+stderr | tests/ecdict-downloader.spec.ts > ECDICT secure downloader > BUG-003 response ownership > forwards abort while read is pending and removes caller listener
+ECDICT response cleanup unconfirmed; transfer aborted
+
+stderr | tests/ecdict-downloader.spec.ts > ECDICT secure downloader > BUG-003 response ownership > recovers the same destination after consecutive open-stream failures and a cancelled redirect
+ECDICT response cleanup unconfirmed; transfer aborted
+
+
+EXIT_CODE=0
+

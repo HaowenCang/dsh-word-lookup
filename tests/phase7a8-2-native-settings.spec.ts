@@ -14,8 +14,8 @@
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
-import { existsSync, unlinkSync, statSync, readFileSync, rmSync, mkdirSync } from 'node:fs'
+import { describe, expect, it, vi, beforeEach, afterEach, beforeAll, afterAll } from 'vitest'
+import { existsSync, unlinkSync, statSync, readFileSync, rmSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createHash } from 'node:crypto'
@@ -2083,5 +2083,167 @@ describe('Phase 7A.8.2 Native Settings Acceptance Matrix (U01–U32)', () => {
       })
       container.remove()
     })
+  })
+})
+
+// BUG-006 write scope: only mkdtemp(os.tmpdir()); tiny synthetic source is never
+// mutated. Host publishes snapshots, then only inactive published copies change.
+describe('BUG006 truthful Host snapshot eligibility', () => {
+  let directory: string
+  let snapshots: CustomSnapshotSummary[]
+  const managers: CustomSnapshotManager[] = []
+  let original: Buffer
+  let source: string
+
+  beforeAll(async () => {
+    directory = mkdtempSync(join(tmpdir(), 'bug006-host-'))
+    source = join(directory, 'synthetic-source.sqlite3')
+    const db = new DatabaseSync(source)
+    try {
+      db.exec(`CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+        INSERT INTO meta VALUES ('schema_version','1'),('corpus_name','BUG006_SYNTHETIC');
+        CREATE TABLE entries (word TEXT PRIMARY KEY, phonetic TEXT, definition_en TEXT, translation_zh TEXT, pos TEXT, exchange TEXT, frequency INTEGER);
+        CREATE TABLE forms (form TEXT PRIMARY KEY, headword TEXT NOT NULL, kind TEXT);
+        CREATE TABLE examples (id INTEGER PRIMARY KEY, headword TEXT NOT NULL, english TEXT NOT NULL, chinese TEXT, source TEXT, source_id TEXT, score REAL);
+        CREATE INDEX idx_forms_headword ON forms(headword);
+        CREATE INDEX idx_examples_headword ON examples(headword);
+        INSERT INTO entries VALUES ('wave','','wave','波','n',NULL,1);`)
+    } finally { db.close() }
+    original = readFileSync(source)
+    const paths = resolveManagedStoragePaths({ home: join(directory, 'home') })
+    const publisher = new CustomSnapshotManager({ paths })
+    managers.push(publisher)
+    for (const identity of ['missing', 'empty', 'sizeMismatch', 'validA', 'validB']) {
+      const record = await publisher.createAndPublishSnapshot(source, { identity })
+      expect(record.state).toBe('PUBLISHED_INACTIVE')
+      if (identity === 'missing') unlinkSync(record.publishedPath!)
+      if (identity === 'empty') writeFileSync(record.publishedPath!, '')
+      if (identity === 'sizeMismatch') writeFileSync(record.publishedPath!, Buffer.concat([readFileSync(record.publishedPath!), Buffer.from('x')]))
+    }
+    const fresh = new CustomSnapshotManager({ paths })
+    managers.push(fresh)
+    await fresh.loadCatalog()
+    snapshots = [...fresh.listCustomSnapshots()]
+    for (const identity of ['missing', 'empty', 'sizeMismatch']) {
+      const summary = snapshots.find((s) => s.identity === identity)!
+      expect(summary).toMatchObject({ status: 'REJECTED', isValid: false })
+      expect(Object.hasOwn(summary, 'corrupt')).toBe(false)
+    }
+    writeFileSync(join(tmpdir(), 'bug006-host-summaries.json'), JSON.stringify(snapshots, null, 2))
+  })
+  afterAll(async () => {
+    for (const manager of managers) await manager.dispose()
+    expect(readFileSync(source)).toEqual(original)
+    expect(statSync(source).size).toBe(original.length)
+    rmSync(directory, { recursive: true, force: true })
+  })
+  afterEach(() => vi.restoreAllMocks())
+
+  function directHandler(button: HTMLButtonElement) {
+    const key = Object.keys(button).find((key) => key.startsWith('__reactProps$'))!
+    return (button as unknown as Record<string, { onClick: () => void }>)[key]!.onClick
+  }
+  function listEnable(container: HTMLElement, id: string) {
+    return container.querySelector(`[data-testid="custom-snapshot-row-${id}"] button`) as HTMLButtonElement
+  }
+  async function picker(summaries: CustomSnapshotSummary[], extra: { activeSnapshotId?: string; isActing?: boolean } = {}) {
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    const onSelect = vi.fn()
+    await act(async () => root.render(React.createElement(SnapshotPickerModal, { snapshots: summaries, onSelect, onClose: () => {}, ...extra })))
+    return { container, onSelect, unmount: async () => { await act(async () => root.unmount()); container.remove() } }
+  }
+  function invalid(identity: string): CustomSnapshotSummary {
+    const base = snapshots.find((s) => s.identity === 'validA')!
+    if (identity === 'missing-isValid') { const { isValid: _, ...rest } = base; return { ...rest, snapshotId: identity } as CustomSnapshotSummary }
+    if (identity === 'unknown-isValid') return { ...base, snapshotId: identity, isValid: 'unknown' } as unknown as CustomSnapshotSummary
+    if (identity === 'corrupt') return { ...base, snapshotId: identity, corrupt: true }
+    return snapshots.find((s) => s.identity === identity)!
+  }
+  for (const identity of ['missing', 'empty', 'sizeMismatch', 'missing-isValid', 'unknown-isValid', 'corrupt']) {
+    it(`${identity}: list and picker disabled with truthful explanation`, async () => {
+      const snapshot = invalid(identity)
+      const ui = mount({ storeState: { customSnapshots: [snapshot] } })
+      const modal = await picker([snapshot])
+      try {
+        await ui.render()
+        expect(listEnable(ui.container, snapshot.snapshotId).disabled).toBe(true)
+        const select = modal.container.querySelector(`[data-testid="snapshot-picker-select-${snapshot.snapshotId}"]`) as HTMLButtonElement
+        expect(select.disabled).toBe(true)
+        const label = identity === 'corrupt' ? '快照损坏' : '快照不可用'
+        expect(ui.container.textContent).toContain(label)
+        expect(modal.container.textContent).toContain(label)
+        if (identity !== 'corrupt') {
+          expect(ui.container.textContent).not.toContain('快照损坏')
+          expect(modal.container.textContent).not.toContain('快照损坏')
+        }
+        expect((ui.container.querySelector('[data-testid="btn-mode-custom"]') as HTMLButtonElement).disabled).toBe(true)
+      } finally { await modal.unmount(); await ui.unmount() }
+    })
+    it(`${identity}: direct React handlers cannot bypass list/picker/top refusal`, async () => {
+      const snapshot = invalid(identity)
+      const fetchSpy = vi.fn()
+      globalThis.fetch = fetchSpy
+      const ui = mount({ storeState: { customSnapshots: [snapshot] } })
+      const selectMode = vi.spyOn(ui.store, 'selectMode').mockResolvedValue(false)
+      const modal = await picker([snapshot])
+      try {
+        await ui.render()
+        await act(async () => {
+          directHandler(listEnable(ui.container, snapshot.snapshotId))()
+          directHandler(ui.container.querySelector('[data-testid="btn-mode-custom"]') as HTMLButtonElement)()
+          directHandler(modal.container.querySelector(`[data-testid="snapshot-picker-select-${snapshot.snapshotId}"]`) as HTMLButtonElement)()
+        })
+        expect(selectMode).not.toHaveBeenCalled()
+        expect(modal.onSelect).not.toHaveBeenCalled()
+        expect(fetchSpy).not.toHaveBeenCalled()
+      } finally { await modal.unmount(); await ui.unmount() }
+    })
+  }
+
+  it.each(['active-id', 'active-flag', 'busy', 'canSwitchMode', 'running'] as const)('%s: caller guards also reject direct list and picker handlers', async (guard) => {
+    const base = snapshots.find((s) => s.identity === 'validA')!
+    const target = guard === 'active-flag' ? { ...base, isActive: true } : base
+    const ui = mount({ storeState: {
+      customSnapshots: [target, snapshots.find((s) => s.identity === 'validB')!],
+      ...(guard === 'active-id' ? { activeSnapshotId: target.snapshotId, activeMode: 'custom' as const } : {}),
+    } })
+    const selectMode = vi.spyOn(ui.store, 'selectMode').mockResolvedValue(false)
+    const initial = ui.store.getSnapshot()
+    try {
+      await ui.render()
+      // Open first, then capability changes while the modal remains mounted.
+      await act(async () => (ui.container.querySelector('[data-testid="btn-mode-custom"]') as HTMLButtonElement).click())
+      const blocked = { ...initial, isActing: guard === 'busy', status: { ...initial.status!,
+        canSwitchMode: guard !== 'canSwitchMode',
+        ...(guard === 'running' ? { currentOperation: { status: 'running', phase: 'building', progress: { percent: 10, message: 'building' } } as DictionaryStatusResponse['currentOperation'] } : {}),
+      } }
+      vi.mocked(ui.store.getSnapshot).mockReturnValue(blocked)
+      await ui.render()
+      const select = ui.container.querySelector(`[data-testid="snapshot-picker-select-${target.snapshotId}"]`) as HTMLButtonElement
+      expect(listEnable(ui.container, target.snapshotId).disabled).toBe(true)
+      expect(select.disabled).toBe(true)
+      await act(async () => { directHandler(listEnable(ui.container, target.snapshotId))(); directHandler(select)() })
+      expect(selectMode).not.toHaveBeenCalled()
+    } finally { await ui.unmount() }
+  })
+
+  it.each(['list', 'top-single', 'picker'] as const)('%s: valid Host summaries without corrupt pass exact explicit snapshot payload through real store fetch', async (path) => {
+    const valid = snapshots.filter((s) => s.isValid)
+    const requests: { url: string; body: unknown }[] = []
+    globalThis.fetch = vi.fn(async (url: string | URL | Request, options?: RequestInit) => {
+      if (options?.method === 'POST') requests.push({ url: String(url), body: JSON.parse(String(options.body)) })
+      return new Response(JSON.stringify(createStatus({ customSnapshots: valid })), { status: 200 })
+    }) as typeof fetch
+    const ui = mount({ storeState: { customSnapshots: path === 'top-single' ? [valid[1]!] : valid } })
+    try {
+      await ui.render()
+      if (path === 'picker') await act(async () => (ui.container.querySelector('[data-testid="btn-mode-custom"]') as HTMLButtonElement).click())
+      const button = (path === 'list' ? listEnable(ui.container, valid[1]!.snapshotId) : path === 'top-single' ? ui.container.querySelector('[data-testid="btn-mode-custom"]') : ui.container.querySelector(`[data-testid="snapshot-picker-select-${valid[1]!.snapshotId}"]`)) as HTMLButtonElement
+      expect(button.disabled).toBe(false)
+      await act(async () => button.click())
+      expect(requests).toEqual([{ url: 'api/dsh-word-lookup/dictionary/select-mode', body: { mode: 'custom', snapshotId: valid[1]!.snapshotId } }])
+    } finally { await ui.unmount() }
   })
 })

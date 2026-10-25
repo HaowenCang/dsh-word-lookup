@@ -32,9 +32,9 @@
  * @module dsh-word-lookup/scripts/assert-isolated-env
  */
 
-import { existsSync, realpathSync } from 'node:fs'
+import { lstatSync, realpathSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
-import { join, resolve, sep } from 'node:path'
+import { basename, dirname, join, resolve, sep } from 'node:path'
 
 /** Printed exactly once, only after every assertion holds. */
 export const ISOLATION_BANNER = 'ISOLATION CHECK: PASS'
@@ -52,7 +52,7 @@ export const DEFAULT_TEST_ROOT = resolve(join(tmpdir(), 'dsh-word-lookup-test'))
 export const PRODUCTION_PORTS = Object.freeze([19387, 50001])
 
 /** Profiles that carry real conversation data and are therefore off limits. */
-export const FORBIDDEN_PROFILES = Object.freeze(['web', 'desktop'])
+export const FORBIDDEN_PROFILES = Object.freeze(['web', 'desktop', 'default'])
 
 /** Thrown when a target is not provably isolated. */
 export class IsolationError extends Error {
@@ -69,24 +69,52 @@ export class IsolationError extends Error {
 /**
  * Resolve a path to a comparable absolute form.
  *
- * Windows path comparison is case-insensitive and junctions make two different
- * spellings name one directory, so the resolved form is realpath'd when it
- * exists and lower-cased on Windows. Without this, `C:\Users\x\.dsh` and
+ * Resolve the nearest existing ancestor with realpath and append only genuinely
+ * missing suffixes. All permission, broken-link and parsing errors fail closed.
+ * Windows comparison is case-insensitive. Without this, `C:\Users\x\.dsh` and
  * `c:\users\x\.dsh\profiles\..` would compare as different environments.
  *
  * @param path - the path to normalise.
  * @returns the comparable absolute form.
  */
 export function normalisePath(path) {
-  let out = resolve(path)
-  try {
-    if (existsSync(out)) out = realpathSync.native(out)
-  } catch {
-    // A path that cannot be realpath'd (missing, locked) is still compared in
-    // its resolved form; the shell-level assertions below do not depend on the
-    // directory existing yet.
+  const original = resolve(path)
+  let ancestor = original
+  const suffix = []
+  for (;;) {
+    let stat
+    try { stat = lstatSync(ancestor) }
+    catch (error) {
+      if (error.code !== 'ENOENT' || dirname(ancestor) === ancestor) {
+        throw new IsolationError([`cannot resolve path ${original}: ${error.code ?? 'UNKNOWN'} ${error.message}`])
+      }
+      suffix.unshift(basename(ancestor))
+      ancestor = dirname(ancestor)
+      continue
+    }
+    try {
+      const real = realpathSync.native(ancestor)
+      // A missing suffix under an ordinary file is not a missing directory.
+      if (suffix.length && !stat.isDirectory() && !stat.isSymbolicLink()) {
+        throw Object.assign(new Error(`ancestor is not a directory: ${ancestor}`), { code: 'ENOTDIR' })
+      }
+      const out = resolve(real, ...suffix)
+      return process.platform === 'win32' ? out.toLowerCase() : out
+    } catch (error) {
+      throw new IsolationError([`cannot resolve path ${original}: ${error.code ?? 'UNKNOWN'} ${error.message}`])
+    }
   }
-  return process.platform === 'win32' ? out.toLowerCase() : out
+}
+
+/** Reject both descendants and ancestors of every protected home. Pure/read-only. */
+export function assertDisjointProductionPaths(paths, env = process.env) {
+  for (const candidate of paths) {
+    for (const production of productionFacts(env).homes) {
+      if (isInsideOrEqual(candidate, production) || isInsideOrEqual(production, candidate)) {
+        throw new IsolationError([`path overlaps production DSH_HOME (${candidate} <-> ${production})`])
+      }
+    }
+  }
 }
 
 /**
@@ -174,6 +202,8 @@ export function assertIsolatedDshEnvironment(facts) {
       violations.push(`DSH_HOME is the production DSH_HOME (${forbidden})`)
     } else if (isInsideOrEqual(home, forbidden)) {
       violations.push(`DSH_HOME resolves inside the production DSH_HOME (${home} under ${forbidden})`)
+    } else if (isInsideOrEqual(forbidden, home)) {
+      violations.push(`DSH_HOME contains the production DSH_HOME (${forbidden} under ${home})`)
     }
   }
 
@@ -186,6 +216,8 @@ export function assertIsolatedDshEnvironment(facts) {
   for (const forbidden of production.homes) {
     if (isInsideOrEqual(testRoot, forbidden)) {
       violations.push(`the test root resolves into the production DSH_HOME (${testRoot} under ${forbidden})`)
+    } else if (isInsideOrEqual(forbidden, testRoot)) {
+      violations.push(`the test root contains the production DSH_HOME (${forbidden} under ${testRoot})`)
     }
   }
 
@@ -211,6 +243,8 @@ export function assertIsolatedDshEnvironment(facts) {
   for (const forbidden of production.homes) {
     if (isInsideOrEqual(profileDir, forbidden)) {
       violations.push(`the profile directory resolves into the production DSH_HOME (${profileDir})`)
+    } else if (isInsideOrEqual(forbidden, profileDir)) {
+      violations.push(`the profile directory contains the production DSH_HOME (${profileDir})`)
     }
   }
 

@@ -70,7 +70,7 @@ import {
 } from './gesture.js'
 import { Disposer } from './lifecycle.js'
 import { LookupController, LOOKUP_ORIGINS, type LookupCounts } from './lookup.js'
-import { readEligibleSelection, type SelectionRect } from './selection.js'
+import { readEligibleSelection, readAutomaticSurface, readSelectionEndpoints, readPointCaret, isSelectionRelatedToGesture, type AutomaticGestureContext, type SelectionRect } from './selection.js'
 import { LookupCardStore, type CardState } from './store.js'
 import {
   EMPTY_LEDGER,
@@ -566,18 +566,28 @@ function createRuntime(ctx: ClientContext): () => void {
     // the gesture, so the verdict describes what was selected at that moment —
     // Phase 0 §7.4 measured that a drag's selection can be collapsed again within
     // ~250 ms of `pointerup`, so a late read is not equivalent to this one. It
-    // projects the live `Range` onto plain data immediately: no `Range`, `Node`
-    // or `Selection` object survives the handler.
+    // projects the live `Range` onto plain data immediately: no `Range` or
+    // `Selection` object survives the handler; the pointer context holds only
+    // endpoint node/offset values and the current gesture target until completion.
     //
     // Only the two classification handlers consult the gate. That is the whole
     // I/O boundary of this file, and two tests assert it rather than this
     // comment: an AST check that the `selectionchange` body reaches no I/O, and a
     // browser measurement that a storm of programmatic selection changes issues
     // zero requests with `autoSelection` on.
-    const captureSelection = (): TriggerSelection => {
-      const selection = readEligibleSelection(document)
-      if (selection === null) return EMPTY_SELECTION
-      return { eligible: true, text: selection.text, rect: selection.rect }
+    let automaticContext: AutomaticGestureContext | null = null
+    const captureSelection = (event: MouseEvent): TriggerSelection => {
+      try {
+        const selection = readEligibleSelection(document)
+        if (selection !== null && isSelectionRelatedToGesture(document, selection, automaticContext, event)) {
+          return { eligible: true, text: selection.text, rect: selection.rect }
+        }
+      } catch {
+        // DOM Range/caret reads can fail while a renderer invalidates nodes.
+        // Refuse this completion and let the classifier close it normally.
+      }
+      automaticContext = null
+      return EMPTY_SELECTION
     }
 
     /**
@@ -600,6 +610,18 @@ function createRuntime(ctx: ClientContext): () => void {
     }
 
     const onPointerDown = (event: PointerEvent): void => {
+      if (event.button === 0) {
+        automaticContext = null
+        try {
+          const surface = readAutomaticSurface(document, event)
+          automaticContext = surface === null ? null : {
+            surface, before: readSelectionEndpoints(document), caret: readPointCaret(document, event.clientX, event.clientY), x: event.clientX, y: event.clientY,
+          }
+        } catch {
+          // No context may survive an unsuccessful DOM/caret capture.
+          automaticContext = null
+        }
+      }
       gesture = observePointerDown(
         gesture,
         { x: event.clientX, y: event.clientY, at: Date.now() },
@@ -623,7 +645,7 @@ function createRuntime(ctx: ClientContext): () => void {
     }
 
     const onPointerUp = (event: PointerEvent): void => {
-      const selection = captureSelection()
+      const selection = captureSelection(event)
       const previous = gesture.state
       gesture = observePointerUp(gesture, { x: event.clientX, y: event.clientY, at: Date.now() }, selection.eligible)
       // Only a release that actually closed a gesture offers a classification.
@@ -633,17 +655,21 @@ function createRuntime(ctx: ClientContext): () => void {
       // reducers return the same state object when they change nothing, which is
       // the contract this relies on.
       if (gesture.state !== previous) considerAutomatic(selection)
+      // Only a multi-click release can still be promoted by its dblclick.
+      if (gesture.state.clickMultiplicity !== 'multi') automaticContext = null
     }
 
     const onDoubleClick = (event: MouseEvent): void => {
-      const selection = captureSelection()
+      const selection = captureSelection(event)
       // `dblclick` *is* the platform's completed gesture, so this fold always
       // produces a classification and is always offered.
       gesture = observeDoubleClick(gesture, { x: event.clientX, y: event.clientY, at: Date.now() }, selection.eligible)
       considerAutomatic(selection)
+      automaticContext = null
     }
 
     const onCancelGesture = (): void => {
+      automaticContext = null
       gesture = observeCancel(gesture)
     }
 
@@ -666,6 +692,7 @@ function createRuntime(ctx: ClientContext): () => void {
       document.removeEventListener('pointercancel', onCancelGesture, GESTURE_OPTIONS)
       document.removeEventListener('dblclick', onDoubleClick, GESTURE_OPTIONS)
       window.removeEventListener('blur', onCancelGesture)
+      automaticContext = null
       gesture = observeCancel(gesture)
     })
 

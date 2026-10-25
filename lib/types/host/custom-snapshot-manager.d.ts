@@ -264,6 +264,8 @@ export declare class CustomSnapshotManager {
      * Rejects deletion if active dictionary references exist or if the snapshot is in RETIRING state.
      * Handles Windows file locks explicitly.
      */
+    /** Shared capability and execution eligibility; cleanup still revalidates disk identity. */
+    canCleanupSnapshot(snapshotId: string, activeSnapshotId?: string | null): boolean;
     cleanupSnapshot(snapshotId: string): Promise<boolean>;
     /**
      * Scan customSnapshotDirectory and safely remove orphaned staging files.

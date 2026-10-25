@@ -27,7 +27,7 @@
 
 import { createHash, randomUUID } from 'node:crypto'
 import { createReadStream } from 'node:fs'
-import { mkdir, open, rename, stat, unlink } from 'node:fs/promises'
+import { mkdir, open, rename, stat, unlink, type FileHandle } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 
 import {
@@ -55,6 +55,9 @@ const ALLOWED_HOSTNAMES = new Set([ALLOWED_DOWNLOAD_HOSTNAME])
 
 /** Minimum interval between throttled progress updates in milliseconds (10 updates/sec). */
 const PROGRESS_THROTTLE_INTERVAL_MS = 100
+
+/** Cleanup deadline only; not a timeout for the download itself. */
+const STREAM_CLEANUP_TIMEOUT_MS = 1000
 
 /**
  * Error thrown when a concurrent download for the same destination is already in flight in the current process.
@@ -140,10 +143,44 @@ export interface DownloadPinnedEcdictInternalOptions {
   readonly fetch?: typeof globalThis.fetch
   /** @internal Test-only seam to override UUID factory. */
   readonly generateId?: () => string
+  /** @internal Source-only disk failure injection; never forwarded by the production entrypoint. */
+  readonly writeChunk?: (handle: FileHandle, value: Uint8Array, offset: number, length: number) => Promise<{ bytesWritten: number }>
 }
 
 /** Set of normalized destination file paths currently being downloaded in this process. */
 const activeDownloads = new Set<string>()
+
+/** The reader owner always releases its lock, even if cancellation cannot be confirmed. */
+async function cleanupReader(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  reachedEof: boolean,
+  transport: AbortController,
+): Promise<void> {
+  try {
+    if (!reachedEof) {
+      let timer: ReturnType<typeof setTimeout> | undefined
+      let confirmed = false
+      try {
+        // Attach rejection handling immediately, including after the deadline wins the race.
+        confirmed = await Promise.race([
+          Promise.resolve().then(() => reader.cancel()).then(() => true, () => false),
+          new Promise<false>(resolve => { timer = setTimeout(() => resolve(false), STREAM_CLEANUP_TIMEOUT_MS) }),
+        ])
+      } finally {
+        if (timer !== undefined) clearTimeout(timer)
+      }
+      if (!confirmed) {
+        transport.abort(new Error('ECDICT response cleanup unconfirmed'))
+        console.warn('ECDICT response cleanup unconfirmed; transfer aborted')
+      }
+    }
+  } catch {
+    // Cleanup and diagnostics must never replace the original download error.
+    transport.abort()
+  } finally {
+    try { reader.releaseLock() } catch { /* Preserve the original error. */ }
+  }
+}
 
 /**
  * Helper to construct an Error with `AbortError` name and standard DOMException behavior.
@@ -371,8 +408,9 @@ export async function verifyCachedEcdictSource(
 async function fetchWithRedirectPolicy(
   initialUrl: string,
   fetchImpl: typeof globalThis.fetch,
-  signal?: AbortSignal,
+  transport: AbortController,
 ): Promise<{ response: Response; redirectCount: number }> {
+  const signal = transport.signal
   let currentUrl = initialUrl
   let redirectCount = 0
 
@@ -393,23 +431,25 @@ async function fetchWithRedirectPolicy(
     })
 
     if (REDIRECT_STATUS_CODES.has(response.status)) {
-      redirectCount++
-      if (redirectCount > MAX_REDIRECTS) {
-        await response.body?.cancel().catch(() => {})
-        throw new Error(`Exceeded maximum redirect limit of ${MAX_REDIRECTS}`)
+      const reader = response.body?.getReader()
+      try {
+        redirectCount++
+        if (redirectCount > MAX_REDIRECTS) {
+          throw new Error(`Exceeded maximum redirect limit of ${MAX_REDIRECTS}`)
+        }
+        const location = response.headers.get('location')
+        if (!location) {
+          throw new Error(`HTTP ${response.status} redirect missing Location header from ${currentUrl}`)
+        }
+        const resolvedUrl = new URL(location, currentUrl).href
+        validateTargetUrl(resolvedUrl)
+        currentUrl = resolvedUrl
+      } catch (error) {
+        transport.abort(error)
+        throw error
+      } finally {
+        if (reader) await cleanupReader(reader, false, transport)
       }
-
-      const location = response.headers.get('location')
-      if (!location) {
-        await response.body?.cancel().catch(() => {})
-        throw new Error(`HTTP ${response.status} redirect missing Location header from ${currentUrl}`)
-      }
-
-      // Best-effort response body cancellation before following next hop
-      await response.body?.cancel().catch(() => {})
-
-      const resolvedUrl = new URL(location, currentUrl).href
-      currentUrl = resolvedUrl
       continue
     }
 
@@ -472,9 +512,9 @@ export async function downloadPinnedEcdictInternal(
   descriptor: EcdictSourceDescriptor,
   options?: DownloadPinnedEcdictInternalOptions,
 ): Promise<EcdictDownloadResult> {
-  const signal = options?.signal
-  if (signal?.aborted) {
-    throw createAbortError(signal.reason)
+  const callerSignal = options?.signal
+  if (callerSignal?.aborted) {
+    throw createAbortError(callerSignal.reason)
   }
 
   if (
@@ -499,6 +539,11 @@ export async function downloadPinnedEcdictInternal(
     throw new EcdictDownloadInProgressError(finalCachePath)
   }
   activeDownloads.add(finalCachePath)
+
+  const transport = new AbortController()
+  const signal = transport.signal
+  const forwardAbort = () => transport.abort(callerSignal?.reason)
+  callerSignal?.addEventListener('abort', forwardAbort, { once: true })
 
   try {
     // 2. Ensure cache directory exists
@@ -552,216 +597,212 @@ export async function downloadPinnedEcdictInternal(
       const { response, redirectCount } = await fetchWithRedirectPolicy(
         descriptor.canonicalDownloadUrl,
         fetchImpl,
-        signal,
+        transport,
       )
 
-      if (response.status !== 200) {
-        await response.body?.cancel().catch(() => {})
-        throw new Error(`Downloader received non-200 HTTP status ${response.status} from ${descriptor.canonicalDownloadUrl}`)
-      }
-
-      if (!response.body) {
-        throw new Error('Downloader received null response body')
-      }
-
-      // Early Content-Length check if present
-      const clHeader = response.headers.get('content-length')
-      if (clHeader !== null) {
-        let declaredLength: number | null
-        try {
-          declaredLength = parseContentLengthHeader(clHeader)
-        } catch (error) {
-          await response.body.cancel().catch(() => {})
-          throw error
+      const reader = response.body?.getReader()
+      let reachedEof = false
+      try {
+        if (response.status !== 200) {
+          throw new Error(`Downloader received non-200 HTTP status ${response.status} from ${descriptor.canonicalDownloadUrl}`)
         }
-        if (declaredLength !== null) {
-          if (declaredLength > MAX_STREAMED_SOURCE_BYTES) {
-            await response.body.cancel().catch(() => {})
-            throw new Error(
-              `Content-Length ${declaredLength} exceeds maximum allowed ceiling of ${MAX_STREAMED_SOURCE_BYTES} bytes (80 MiB)`,
-            )
-          }
-          if (declaredLength > descriptor.sourceByteSize) {
-            await response.body.cancel().catch(() => {})
-            throw new Error(
-              `Content-Length ${declaredLength} exceeds authoritative corpus size ${descriptor.sourceByteSize}`,
-            )
+
+        if (!reader) {
+          throw new Error('Downloader received null response body')
+        }
+
+        // Early Content-Length check if present
+        const clHeader = response.headers.get('content-length')
+        if (clHeader !== null) {
+          const declaredLength = parseContentLengthHeader(clHeader)
+          if (declaredLength !== null) {
+            if (declaredLength > MAX_STREAMED_SOURCE_BYTES) {
+              throw new Error(
+                `Content-Length ${declaredLength} exceeds maximum allowed ceiling of ${MAX_STREAMED_SOURCE_BYTES} bytes (80 MiB)`,
+              )
+            }
+            if (declaredLength > descriptor.sourceByteSize) {
+              throw new Error(
+                `Content-Length ${declaredLength} exceeds authoritative corpus size ${descriptor.sourceByteSize}`,
+              )
+            }
           }
         }
-      }
 
-      // 6. Streaming verification and disk write
-      const reader = response.body.getReader()
-      const hash = createHash('sha256')
-      const utf8Decoder = new TextDecoder('utf-8', { fatal: true })
-      let bytesReceived = 0
-      let lastProgressTime = 0
+        // 6. Streaming verification and disk write
+        const hash = createHash('sha256')
+        const utf8Decoder = new TextDecoder('utf-8', { fatal: true })
+        let bytesReceived = 0
+        let lastProgressTime = 0
 
-      notifyProgress(options?.onProgress, {
-        phase: 'downloading',
-        bytesProcessed: 0,
-        totalBytes: descriptor.sourceByteSize,
-      })
+        notifyProgress(options?.onProgress, {
+          phase: 'downloading',
+          bytesProcessed: 0,
+          totalBytes: descriptor.sourceByteSize,
+        })
 
-      while (true) {
+        while (true) {
+          if (signal?.aborted) {
+            throw createAbortError(signal.reason)
+          }
+
+          const { done, value } = await reader.read()
+          if (done) { reachedEof = true; break }
+
+          if (!value || value.byteLength === 0) continue
+
+          bytesReceived += value.byteLength
+
+          // 1. Independent hard security ceiling check
+          if (bytesReceived > MAX_STREAMED_SOURCE_BYTES) {
+            throw new Error(
+              `Streamed bytes ${bytesReceived} exceeded absolute security ceiling of ${MAX_STREAMED_SOURCE_BYTES} bytes (80 MiB)`,
+            )
+          }
+
+          // 2. Exact expected byte integrity check
+          if (bytesReceived > descriptor.sourceByteSize) {
+            throw new Error(
+              `Streamed bytes ${bytesReceived} exceeded authoritative corpus size ${descriptor.sourceByteSize}`,
+            )
+          }
+
+          // Handle partial writes safely
+          let writeOffset = 0
+          while (writeOffset < value.byteLength) {
+            const { bytesWritten } = options?.writeChunk
+              ? await options.writeChunk(fileHandle, value, writeOffset, value.byteLength - writeOffset)
+              : await fileHandle.write(value, writeOffset, value.byteLength - writeOffset)
+            writeOffset += bytesWritten
+          }
+
+          hash.update(value)
+          utf8Decoder.decode(value, { stream: true })
+
+          const now = Date.now()
+          if (now - lastProgressTime >= PROGRESS_THROTTLE_INTERVAL_MS) {
+            lastProgressTime = now
+            notifyProgress(options?.onProgress, {
+              phase: 'downloading',
+              bytesProcessed: bytesReceived,
+              totalBytes: descriptor.sourceByteSize,
+            })
+          }
+        }
+
+        // Publication Gate 1: After EOF (stream fully read)
         if (signal?.aborted) {
-          await reader.cancel().catch(() => {})
           throw createAbortError(signal.reason)
         }
 
-        const { done, value } = await reader.read()
-        if (done) break
-
-        if (!value || value.byteLength === 0) continue
-
-        bytesReceived += value.byteLength
-
-        // 1. Independent hard security ceiling check
-        if (bytesReceived > MAX_STREAMED_SOURCE_BYTES) {
-          await reader.cancel().catch(() => {})
+        if (bytesReceived !== descriptor.sourceByteSize) {
           throw new Error(
-            `Streamed bytes ${bytesReceived} exceeded absolute security ceiling of ${MAX_STREAMED_SOURCE_BYTES} bytes (80 MiB)`,
+            `Truncated download: expected exactly ${descriptor.sourceByteSize} bytes, received ${bytesReceived}`,
           )
         }
 
-        // 2. Exact expected byte integrity check
-        if (bytesReceived > descriptor.sourceByteSize) {
-          await reader.cancel().catch(() => {})
+        notifyProgress(options?.onProgress, {
+          phase: 'verifying',
+          bytesProcessed: bytesReceived,
+          totalBytes: descriptor.sourceByteSize,
+        })
+
+        // Publication Gate 2: Immediately after notifying 'verifying' phase
+        if (signal?.aborted) {
+          throw createAbortError(signal.reason)
+        }
+
+        // Fatal UTF-8 final sequence flush
+        utf8Decoder.decode()
+
+        // SHA-256 digest verification
+        const digest = hash.digest('hex').toLowerCase()
+        if (digest !== descriptor.sourceSha256) {
           throw new Error(
-            `Streamed bytes ${bytesReceived} exceeded authoritative corpus size ${descriptor.sourceByteSize}`,
+            `SHA-256 integrity verification failed: expected ${descriptor.sourceSha256}, calculated ${digest}`,
           )
         }
 
-        // Handle partial writes safely
-        let writeOffset = 0
-        while (writeOffset < value.byteLength) {
-          const { bytesWritten } = await fileHandle.write(
-            value,
-            writeOffset,
-            value.byteLength - writeOffset,
+        // Publication Gate 3: After verification stage / before sync
+        if (signal?.aborted) {
+          throw createAbortError(signal.reason)
+        }
+
+        // Explicit flush and close before rename publish
+        await fileHandle.sync()
+
+        // Publication Gate 4: After sync / before close
+        if (signal?.aborted) {
+          throw createAbortError(signal.reason)
+        }
+
+        await fileHandle.close()
+        fileHandleClosed = true
+
+        // Publication Gate 5: After sync+close / immediately before rename publication
+        if (signal?.aborted) {
+          throw createAbortError(signal.reason)
+        }
+
+        // 7. Atomic publication via same-directory rename commit
+        try {
+          await rename(partPath, finalCachePath)
+          downloadCompletedSuccessfully = true
+        } catch (renameError) {
+          // Concurrency race: check if another concurrent attempt published the valid source
+          const converged = await verifyCachedEcdictSource(
+            finalCachePath,
+            { byteSize: descriptor.sourceByteSize, sha256: descriptor.sourceSha256 },
           )
-          writeOffset += bytesWritten
+          if (converged) {
+            notifyProgress(options?.onProgress, {
+              phase: 'complete',
+              bytesProcessed: descriptor.sourceByteSize,
+              totalBytes: descriptor.sourceByteSize,
+            })
+            return Object.freeze({
+              path: finalCachePath,
+              sourceCommit: descriptor.sourceCommit,
+              sha256: descriptor.sourceSha256,
+              byteSize: descriptor.sourceByteSize,
+              reused: true,
+              redirectCount,
+            })
+          }
+          throw renameError
         }
 
-        hash.update(value)
-        utf8Decoder.decode(value, { stream: true })
+        notifyProgress(options?.onProgress, {
+          phase: 'complete',
+          bytesProcessed: descriptor.sourceByteSize,
+          totalBytes: descriptor.sourceByteSize,
+        })
 
-        const now = Date.now()
-        if (now - lastProgressTime >= PROGRESS_THROTTLE_INTERVAL_MS) {
-          lastProgressTime = now
-          notifyProgress(options?.onProgress, {
-            phase: 'downloading',
-            bytesProcessed: bytesReceived,
-            totalBytes: descriptor.sourceByteSize,
-          })
-        }
+        return Object.freeze({
+          path: finalCachePath,
+          sourceCommit: descriptor.sourceCommit,
+          sha256: descriptor.sourceSha256,
+          byteSize: descriptor.sourceByteSize,
+          reused: false,
+          redirectCount,
+        })
+      } catch (error) {
+        // Abort before awaiting any potentially unresponsive cancellation algorithm.
+        transport.abort(error)
+        throw error
+      } finally {
+        if (reader) await cleanupReader(reader, reachedEof, transport)
       }
-
-      // Publication Gate 1: After EOF (stream fully read)
-      if (signal?.aborted) {
-        throw createAbortError(signal.reason)
-      }
-
-      if (bytesReceived !== descriptor.sourceByteSize) {
-        throw new Error(
-          `Truncated download: expected exactly ${descriptor.sourceByteSize} bytes, received ${bytesReceived}`,
-        )
-      }
-
-      notifyProgress(options?.onProgress, {
-        phase: 'verifying',
-        bytesProcessed: bytesReceived,
-        totalBytes: descriptor.sourceByteSize,
-      })
-
-      // Publication Gate 2: Immediately after notifying 'verifying' phase
-      if (signal?.aborted) {
-        throw createAbortError(signal.reason)
-      }
-
-      // Fatal UTF-8 final sequence flush
-      utf8Decoder.decode()
-
-      // SHA-256 digest verification
-      const digest = hash.digest('hex').toLowerCase()
-      if (digest !== descriptor.sourceSha256) {
-        throw new Error(
-          `SHA-256 integrity verification failed: expected ${descriptor.sourceSha256}, calculated ${digest}`,
-        )
-      }
-
-      // Publication Gate 3: After verification stage / before sync
-      if (signal?.aborted) {
-        throw createAbortError(signal.reason)
-      }
-
-      // Explicit flush and close before rename publish
-      await fileHandle.sync()
-
-      // Publication Gate 4: After sync / before close
-      if (signal?.aborted) {
-        throw createAbortError(signal.reason)
-      }
-
-      await fileHandle.close()
-      fileHandleClosed = true
-
-      // Publication Gate 5: After sync+close / immediately before rename publication
-      if (signal?.aborted) {
-        throw createAbortError(signal.reason)
-      }
-
-      // 7. Atomic publication via same-directory rename commit
-      try {
-        await rename(partPath, finalCachePath)
-        downloadCompletedSuccessfully = true
-      } catch (renameError) {
-        // Concurrency race: check if another concurrent attempt published the valid source
-        const converged = await verifyCachedEcdictSource(
-          finalCachePath,
-          { byteSize: descriptor.sourceByteSize, sha256: descriptor.sourceSha256 },
-        )
-        if (converged) {
-          notifyProgress(options?.onProgress, {
-            phase: 'complete',
-            bytesProcessed: descriptor.sourceByteSize,
-            totalBytes: descriptor.sourceByteSize,
-          })
-          return Object.freeze({
-            path: finalCachePath,
-            sourceCommit: descriptor.sourceCommit,
-            sha256: descriptor.sourceSha256,
-            byteSize: descriptor.sourceByteSize,
-            reused: true,
-            redirectCount,
-          })
-        }
-        throw renameError
-      }
-
-      notifyProgress(options?.onProgress, {
-        phase: 'complete',
-        bytesProcessed: descriptor.sourceByteSize,
-        totalBytes: descriptor.sourceByteSize,
-      })
-
-      return Object.freeze({
-        path: finalCachePath,
-        sourceCommit: descriptor.sourceCommit,
-        sha256: descriptor.sourceSha256,
-        byteSize: descriptor.sourceByteSize,
-        reused: false,
-        redirectCount,
-      })
     } finally {
       if (!fileHandleClosed) {
         try {
           await fileHandle.close()
+          fileHandleClosed = true
         } catch {
           // ignore handle close error
         }
       }
-      if (!downloadCompletedSuccessfully) {
+      if (!downloadCompletedSuccessfully && fileHandleClosed) {
         try {
           await unlink(partPath)
         } catch {
@@ -769,7 +810,11 @@ export async function downloadPinnedEcdictInternal(
         }
       }
     }
+  } catch (error) {
+    transport.abort(error)
+    throw error
   } finally {
+    callerSignal?.removeEventListener('abort', forwardAbort)
     activeDownloads.delete(finalCachePath)
   }
 }

@@ -1,0 +1,57 @@
+preflight {"home":"C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-preflight-af97f83f7e\\user","tmp":"C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-preflight-af97f83f7e\\tmp","dsh":[]}
+
+node ../runtime022-smoke.mjs
+{
+  "status": "FAIL",
+  "baseline": "0.2.1-rc.3",
+  "report": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-preflight-af97f83f7e\\evidence\\runtime022-c688da55\\runtime-report.json",
+  "observations": [
+    {
+      "id": "actual-version",
+      "status": "PASS"
+    },
+    {
+      "id": "new-profile-created",
+      "status": "PASS"
+    },
+    {
+      "id": "installed-package-isolation",
+      "status": "PASS"
+    },
+    {
+      "id": "installed-payload-exact",
+      "status": "PASS"
+    },
+    {
+      "id": "plugin-loaded",
+      "status": "PASS"
+    },
+    {
+      "id": "fixture-active",
+      "status": "PASS"
+    },
+    {
+      "id": "real-fixture-lookup",
+      "status": "PASS"
+    }
+  ],
+  "error": {
+    "name": "TimeoutError",
+    "message": "locator.waitFor: Timeout 10000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('nav button').filter({ hasText: /词典|Dictionary/i }).first() to be visible\u001b[22m\n"
+  },
+  "cleanup": {
+    "status": "PASS",
+    "testRoot": "RETAINED",
+    "portFree": true
+  }
+}
+
+locator.waitFor: Timeout 10000ms exceeded.
+Call log:
+[2m  - waiting for locator('nav button').filter({ hasText: /词典|Dictionary/i }).first() to be visible[22m
+
+(node:13620) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+EXIT_CODE=1
+

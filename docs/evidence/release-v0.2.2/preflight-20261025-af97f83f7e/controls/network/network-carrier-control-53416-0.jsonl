@@ -1,0 +1,8 @@
+{"runId":"carrier-control","pid":53416,"threadId":0,"sequence":1,"time":1792932631843,"kind":"observer-ready","node":"v24.21.0","isMainThread":true,"hooks":["fetch","http","https","socket","tls","undici","worker","child"],"mode":"record-and-block-external","observerSha256":"33c6e4cbfa5364681ebf5feb2dd41e700c8393233d11a5340ed84f04ef70ad8e","connectionSha256":"0ebcca7583e082716f79b0b55bc1749d48269cc8db2989b043b321b57abd3684"}
+{"runId":"carrier-control","pid":53416,"threadId":0,"sequence":2,"time":1792932631907,"kind":"fetch","protocol":"http:","host":"127.0.0.1","port":"5444","path":"/owned-control","external":false,"blocked":false}
+{"runId":"carrier-control","pid":53416,"threadId":0,"sequence":3,"time":1792932631911,"kind":"undici-request","protocol":"http:","host":"127.0.0.1","port":"5444","path":"/owned-control"}
+{"runId":"carrier-control","pid":53416,"threadId":0,"sequence":4,"time":1792932631912,"kind":"socket-connect","host":"127.0.0.1","port":"5444","external":false,"blocked":false}
+{"runId":"carrier-control","pid":53416,"threadId":0,"sequence":5,"time":1792932631943,"kind":"http-get","protocol":"http:","host":"127.0.0.1","port":"5444","path":"/http-control","external":false,"blocked":false}
+{"runId":"carrier-control","pid":53416,"threadId":0,"sequence":6,"time":1792932631945,"kind":"socket-connect","host":"127.0.0.1","port":"5444","external":false,"blocked":false}
+{"runId":"carrier-control","pid":53416,"threadId":0,"sequence":7,"time":1792932631948,"kind":"fetch","protocol":"https:","host":"audit-network-block-control.invalid","port":"","path":"/","external":true,"blocked":true}
+{"runId":"carrier-control","pid":53416,"threadId":0,"sequence":8,"time":1792932631970,"kind":"observer-exit","code":0}

@@ -1,0 +1,109 @@
+preflight {"home":"C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-preflight-af97f83f7e\\user","tmp":"C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-preflight-af97f83f7e\\tmp","dsh":[]}
+
+node ../runtime022-smoke.mjs ../candidate-rc3/dsh-word-lookup-0.2.2.tgz
+{
+  "status": "PASS",
+  "baseline": "0.2.1-rc.3",
+  "report": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-preflight-af97f83f7e\\evidence\\runtime022-5e06c194\\runtime-report.json",
+  "observations": [
+    {
+      "id": "actual-version",
+      "status": "PASS"
+    },
+    {
+      "id": "new-profile-created",
+      "status": "PASS"
+    },
+    {
+      "id": "installed-package-isolation",
+      "status": "PASS"
+    },
+    {
+      "id": "installed-payload-exact",
+      "status": "PASS"
+    },
+    {
+      "id": "plugin-loaded",
+      "status": "PASS"
+    },
+    {
+      "id": "fixture-active",
+      "status": "PASS"
+    },
+    {
+      "id": "real-fixture-lookup",
+      "status": "PASS"
+    },
+    {
+      "id": "native-default-shortcut",
+      "status": "PASS"
+    },
+    {
+      "id": "settings-visible",
+      "status": "PASS"
+    },
+    {
+      "id": "auto-gestures-default-off",
+      "status": "PASS"
+    },
+    {
+      "id": "literal-escaping",
+      "status": "PASS"
+    },
+    {
+      "id": "line-count",
+      "status": "PASS"
+    },
+    {
+      "id": "vertical-layout",
+      "status": "PASS"
+    },
+    {
+      "id": "pos",
+      "status": "PASS"
+    },
+    {
+      "id": "formatting-measured",
+      "status": "PASS"
+    },
+    {
+      "id": "narrow-viewport",
+      "status": "PASS"
+    },
+    {
+      "id": "scrollability",
+      "status": "PASS"
+    },
+    {
+      "id": "scroll-measured",
+      "status": "PASS"
+    },
+    {
+      "id": "uninstall-service-healthy-and-plugin-absent",
+      "status": "PASS"
+    },
+    {
+      "id": "network-full-window-coverage",
+      "status": "PASS"
+    },
+    {
+      "id": "zero-auto-download",
+      "status": "PASS"
+    },
+    {
+      "id": "no-browser-pageerror",
+      "status": "PASS"
+    }
+  ],
+  "cleanup": {
+    "status": "PASS",
+    "testRoot": "RETAINED",
+    "portFree": true
+  }
+}
+
+(node:50592) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+EXIT_CODE=0
+

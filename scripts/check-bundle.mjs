@@ -18,6 +18,7 @@ import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { auditHostWorkerUsage, auditCompanionWorker } from './store-worker-audit.mjs'
+import { checkClientBundle } from './bundle-check-rules.mjs'
 
 /** Repository root, derived from this script's own location. */
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
@@ -95,43 +96,8 @@ check(
 const client = read(CLIENT)
 const host = read(HOST)
 
-// --- the loader envelope -----------------------------------------------------
-const envelopeHead = [
-  'window.__ModuleLoader__.load({',
-  `\tid: ${JSON.stringify(PLUGIN_ID)},`,
-  '\tfactory: (require) => {',
-  '\t\tvar module = { exports: {} };',
-  '\t\tvar exports = module.exports;',
-].join('\n')
-const envelopeTail = ['\t\treturn module.exports;', '\t}', '});'].join('\n')
-
-check('client bundle opens with the module-loader envelope', client.startsWith(envelopeHead))
-check('client bundle closes with the module-loader envelope', client.trimEnd().endsWith(envelopeTail))
-
-// --- no surviving module syntax ---------------------------------------------
-const topLevelModuleSyntax = client
-  .split('\n')
-  .map((line, index) => ({ line: line.trim(), number: index + 1 }))
-  .filter(({ line }) => /^(import|export)\s|^import\{|^export\{/.test(line))
-check(
-  'client bundle has no top-level import/export',
-  topLevelModuleSyntax.length === 0,
-  topLevelModuleSyntax.map((hit) => `line ${hit.number}: ${hit.line.slice(0, 60)}`).join(' | '),
-)
-check('client bundle has no dynamic import', !/\bimport\s*\(/.test(client))
-
-// --- externals arrive through require ---------------------------------------
-const requires = [...client.matchAll(/\brequire\(\s*["']([^"']+)["']\s*\)/g)].map((match) => match[1])
-const externalRequires = [...new Set(requires)].sort()
-check(
-  'client bundle requires only the declared externals',
-  externalRequires.every((specifier) =>
-    ['react', 'react/jsx-runtime', 'react-dom', 'react-dom/client'].includes(specifier),
-  ),
-  externalRequires.join(', ') || '(none)',
-)
-check('client bundle requires react', externalRequires.includes('react'))
-check('React is not bundled into the client', !/function\s+createElement\s*\(/.test(client) || externalRequires.includes('react'))
+// Pure rules run on emitted bytes; only the envelope formatting copy normalizes CRLF.
+results.push(...checkClientBundle(client, PLUGIN_ID))
 
 // --- the plugin's own exported face -----------------------------------------
 check('client bundle exports apply', /^exports\.apply = apply;$/m.test(client))
@@ -229,55 +195,6 @@ check(
 // unreachable from the browser half. These checks read the emitted bytes, so a
 // bundler configuration that quietly hoisted a `node:` import into the client
 // would fail here rather than at runtime in a reader's browser.
-const CLIENT_FORBIDDEN = [
-  'node:sqlite',
-  'DatabaseSync',
-  'StatementSync',
-  'better-sqlite3',
-  'sqlite3',
-  'CREATE TABLE',
-  'INSERT INTO',
-  'DELETE FROM',
-  'PRAGMA',
-  'dictionary.fixture',
-  'fixtures/',
-  'dictionaryPath',
-]
-for (const token of CLIENT_FORBIDDEN) {
-  check(`client bundle contains no "${token}"`, !client.includes(token))
-}
-// Statement *shapes* rather than bare keywords: the client half legitimately
-// contains the word `select` inside the composer-exclusion CSS selector, so a
-// keyword search would report a false positive and, worse, teach the next reader
-// to ignore this check.
-const SQL_STATEMENT_SHAPES = [
-  /SELECT\s+[\w*][\w*,\s().]*\s+FROM\s+\w/i,
-  /INSERT\s+INTO\s+\w/i,
-  /DELETE\s+FROM\s+\w/i,
-  /UPDATE\s+\w+\s+SET\s+\w/i,
-  /CREATE\s+(TABLE|INDEX)\s/i,
-  /PRAGMA\s+\w/i,
-  /BEGIN\s+(IMMEDIATE|DEFERRED|EXCLUSIVE|TRANSACTION)/i,
-  /ORDER\s+BY\s+\w+\s+(ASC|DESC)/i,
-]
-const sqlHit = SQL_STATEMENT_SHAPES.find((shape) => shape.test(client))
-check(
-  'client bundle contains no SQL statement',
-  sqlHit === undefined,
-  sqlHit === undefined
-    ? 'no statement shape found'
-    : `matched ${String(sqlHit)}: a dictionary query in the browser half would mean the dictionary shipped to the page`,
-)
-check(
-  'client bundle requires no Node built-in module',
-  !externalRequires.some((specifier) => specifier.startsWith('node:')),
-  externalRequires.join(', ') || '(none)',
-)
-check(
-  'client bundle names no filesystem or path API',
-  !/\b(readFileSync|writeFileSync|existsSync|mkdirSync|fileURLToPath)\b/.test(client),
-)
-
 const hostCode = stripComments(host)
 check(
   'host bundle loads node:sqlite as a built-in',

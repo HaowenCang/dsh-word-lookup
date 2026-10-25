@@ -39,7 +39,7 @@ import {
   type EcdictImportProgress,
   type ManagedEcdictBuildResult,
 } from './ecdict-importer.js'
-import { workerSupervisor } from './ecdict-integrity-verifier.js'
+import { isTerminationUnconfirmed, workerSupervisor } from './ecdict-integrity-verifier.js'
 import type { ActivationCoordinator } from './dictionary-activation.js'
 
 /** Minimum interval between throttled progress emissions in milliseconds (10 Hz). */
@@ -217,6 +217,7 @@ export class DictionaryOperationManager {
   #lastOp: DictionaryOperationSnapshot | null = null
   #activeRemove: ActiveRemoveContext | null = null
   #drainSummary: OperationDrainSummary | null = null
+  #customDisposalBase: OperationDrainSummary | null = null
   #disposed = false
   #lastEmitTime = 0
   readonly #listeners = new Set<(snapshot: DictionaryOperationSnapshot) => void>()
@@ -312,10 +313,7 @@ export class DictionaryOperationManager {
     if (!cleanId || this.#activationCoordinator.activeSnapshotId === cleanId) return false
     const snapshotMgr = this.#activationCoordinator.customSnapshotManager
     if (!snapshotMgr) return false
-    const rec = snapshotMgr.getSnapshot(cleanId)
-    if (!rec) return false
-    if (rec.state === 'ACTIVE' || rec.activeLeases > 0) return false
-    return rec.state === 'PUBLISHED_INACTIVE' || rec.state === 'PUBLISHED'
+    return snapshotMgr.canCleanupSnapshot(cleanId, this.#activationCoordinator.activeSnapshotId)
   }
 
   /**
@@ -667,6 +665,12 @@ export class DictionaryOperationManager {
       throw err
     }
 
+    if (!snapshotMgr.canCleanupSnapshot(cleanId, this.#activationCoordinator.activeSnapshotId) && record.state !== 'DELETED') {
+      const err = new Error(`Snapshot state ${record.state} is not eligible for removal`)
+      ;(err as unknown as { code: string }).code = 'REMOVE_CUSTOM_FAILED'
+      throw err
+    }
+
     const operationId = `remove-custom-${Date.now()}-${randomUUID().slice(0, 8)}`
     const abortController = new AbortController()
     let resolveSettled!: (val: DictionaryRemoveCustomResponse) => void
@@ -835,7 +839,7 @@ export class DictionaryOperationManager {
         message: 'Custom dictionary activated successfully',
       }
     } catch (error) {
-      if (!ctx.nonCancellable && (signal.aborted || this.#isAbortError(error))) {
+      if (!isTerminationUnconfirmed(error) && !ctx.nonCancellable && (signal.aborted || this.#isAbortError(error))) {
         this.#settleOperation(ctx, 'cancelled', 'cancelled', {
           phase: 'cancelled',
           unit: 'steps',
@@ -959,7 +963,7 @@ export class DictionaryOperationManager {
         message: `Successfully switched to "${result.activeMode}" dictionary mode`,
       }
     } catch (error) {
-      if (!ctx.nonCancellable && (signal.aborted || this.#isAbortError(error))) {
+      if (!isTerminationUnconfirmed(error) && !ctx.nonCancellable && (signal.aborted || this.#isAbortError(error))) {
         this.#settleOperation(ctx, 'cancelled', 'cancelled', {
           phase: 'cancelled',
           unit: 'steps',
@@ -991,6 +995,7 @@ export class DictionaryOperationManager {
    */
   async dispose(timeoutMs = 5000): Promise<void> {
     if (this.#disposed) {
+      await this.#disposeActivationCoordinator()
       if (this.isBusy() || (this.#drainSummary && !this.#drainSummary.workflowSettled)) {
         if (this.isBusy()) {
           let retryTimer: NodeJS.Timeout | undefined
@@ -1144,11 +1149,27 @@ export class DictionaryOperationManager {
       }
     } finally {
       if (timer) clearTimeout(timer)
-      try {
-        await this.#activationCoordinator.dispose?.()
-      } catch {
-        // non-fatal
+      await this.#disposeActivationCoordinator()
+    }
+  }
+
+  async #disposeActivationCoordinator(): Promise<void> {
+    try {
+      await this.#activationCoordinator.dispose?.()
+      if (this.#customDisposalBase) {
+        this.#drainSummary = this.#customDisposalBase
+        this.#customDisposalBase = null
       }
+    } catch (error) {
+      this.#customDisposalBase ??= this.#drainSummary ?? {
+        requestedCancel: true, workflowSettled: false, workerExited: false,
+        timedOut: false, statusUnknown: false, quarantined: false, operationKind: 'none',
+      }
+      this.#drainSummary = {
+        ...this.#customDisposalBase, workerExited: false, statusUnknown: true,
+        error: `Custom snapshot disposal incomplete: ${error instanceof Error ? error.message : String(error)}`,
+      }
+      throw error
     }
   }
 

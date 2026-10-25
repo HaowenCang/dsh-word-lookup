@@ -1,0 +1,60 @@
+{
+  "version": "0.2.2",
+  "tarball": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-preflight-af97f83f7e\\candidate-rc3\\dsh-word-lookup-0.2.2.tgz",
+  "bytes": 147121,
+  "sha256": "5311ac80bfa6140d0c843654ce2031641343a43026576bed08f0f85acace1131",
+  "integrity": "sha512-IShZ22GgzI4KGEuP3jb+qwB053DqAMn7Xsj+Xb+Aq0JBQtjBxqTkwh9aB3wQaj2fhvqF2fkZnC4kfgcc+yeWKA==",
+  "members": [
+    {
+      "path": "LICENSE",
+      "bytes": 1089,
+      "sha256": "99922c2a61954f0eaef1591241bcaaac4d3c8984a9866840180d65f7a1ff8101"
+    },
+    {
+      "path": "README.md",
+      "bytes": 20547,
+      "sha256": "8268c3a27e627ef112bbf2a8f378a9ee02dd5130449010b502bb8e53da6379d7"
+    },
+    {
+      "path": "cordis.patch.yml",
+      "bytes": 415,
+      "sha256": "df9851e21b59cafc69f91b0839c7cd56cb53104c57644813d9001e1a76c7d868"
+    },
+    {
+      "path": "corpus/ecdict.manifest.json",
+      "bytes": 566,
+      "sha256": "03cba27d42cb43551d7b51fa12e4a07a869c5d4b65ac07f4fa3d105d9c944044"
+    },
+    {
+      "path": "lib/client.js",
+      "bytes": 198730,
+      "sha256": "a4becec431e045e589d1164bc8826a9c9722d719369bf5715c4a44f592729c6b"
+    },
+    {
+      "path": "lib/ecdict-integrity-worker.js",
+      "bytes": 29261,
+      "sha256": "91aa9a1e333628a04f497be00aeb996b1571069c5cdc1fd3d228babfdadd27af"
+    },
+    {
+      "path": "lib/index.js",
+      "bytes": 361993,
+      "sha256": "46e61f9d0b9f0e98186087276c8943f6b84a8ce2d93b369c80836e0fc9066d40"
+    },
+    {
+      "path": "package.json",
+      "bytes": 5535,
+      "sha256": "5c4ffa86dcf269d14c6a84a3cbfa44a0577812e835a64901fd5cdb808fc6a389"
+    }
+  ],
+  "dependencyLock": "UNCHANGED_EXCEPT_ROOT_VERSION",
+  "worker": {
+    "response": {
+      "requestId": "aa438584-d6c8-48e0-bb44-957a1377c661",
+      "success": true,
+      "integrityResult": "ok",
+      "durationMs": 1
+    },
+    "exitCode": 0,
+    "deleteAfterExit": "PASS"
+  }
+}

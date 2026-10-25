@@ -14,17 +14,19 @@
  *    - Normal viewport (~360px panel width)
  *    - Narrow responsive viewport (320px width)
  *    - Long entry vertical scrollability
- * 4. High-resolution screenshots saved to docs/evidence/maintenance-m1/screenshots/
- * 5. Structured evidence written to docs/evidence/maintenance-m1/browser-smoke-evidence.json
+ * 4. Screenshots and reports use an exclusive run ID under docs/evidence/maintenance-m1r/.
+ * 5. Any required failed or missing observation makes the CLI exit nonzero.
  *
  * @module dsh-word-lookup/scripts/maintenance-m1-browser-smoke
  */
 
 import { execSync, spawn } from 'node:child_process'
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { createHash, randomUUID } from 'node:crypto'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
+import { runObservedSmoke, formattingObservations, scrollObservation, waitForSmokeStartup } from './smoke-verdict.mjs'
 
 import {
   assertIsolatedDshEnvironment,
@@ -39,78 +41,23 @@ const PORT = 50996
 const HOME = resolve(join(DEFAULT_TEST_ROOT, 'home'))
 const PROFILE = 'word-lookup-test'
 const PROFILE_DIR = join(HOME, 'profiles', PROFILE)
-const EVIDENCE_DIR = join(REPO_ROOT, 'docs', 'evidence', 'maintenance-m1r')
-const SCREENSHOTS_DIR = join(EVIDENCE_DIR, 'screenshots')
-const EVIDENCE_JSON_PATH = join(EVIDENCE_DIR, 'browser-smoke-evidence.json')
-
-mkdirSync(SCREENSHOTS_DIR, { recursive: true })
-
-// 1. Enforce strict isolation
-console.log('--- Step 1: Isolation Gate Preflight ---')
 let verified
-try {
-  verified = assertIsolatedDshEnvironment({
-    home: HOME,
-    profile: PROFILE,
-    port: PORT,
-    profileDir: PROFILE_DIR,
-    testRoot: DEFAULT_TEST_ROOT,
-  })
-} catch (error) {
-  if (error instanceof IsolationError) {
-    console.error(error.message)
-    console.error('\nRefusing to run browser smoke test: target is not an isolated test environment')
-    process.exit(2)
-  }
-  throw error
-}
-console.log(ISOLATION_BANNER)
-
-// 2. Prepare isolated profile
-console.log('--- Step 2: Preparing isolated profile ---')
-execSync(`node scripts/create-test-profile.mjs --port ${PORT}`, {
-  cwd: REPO_ROOT,
-  stdio: 'inherit',
-})
 
 // 3. Helper to start DSH
-const ANSI = /\u001b\[[0-9;]*m/g
-
-function startDsh() {
-  const env = buildIsolatedEnv(verified)
-  const child = spawn('dsh', ['--profile', PROFILE, '--no-open', '--port', String(PORT)], {
+export function startMaintenanceDsh(dependencies = {}) {
+  const env = dependencies.env ?? buildIsolatedEnv(verified)
+  const child = (dependencies.spawnChild ?? spawn)('dsh', ['--profile', PROFILE, '--no-open', '--port', String(PORT)], {
     cwd: REPO_ROOT,
     env,
     shell: process.platform === 'win32',
     stdio: ['ignore', 'pipe', 'pipe'],
   })
 
-  let stdout = ''
-  let stderr = ''
-
-  return new Promise((resolvePromise, rejectPromise) => {
-    const timer = setTimeout(() => {
-      stopDsh(child)
-      rejectPromise(new Error(`dsh timed out after 90s\n${stdout}\n${stderr}`))
-    }, 90_000)
-
-    const consume = (chunk, isStderr) => {
-      const text = chunk.toString().replace(ANSI, '')
-      if (isStderr) stderr += text
-      else stdout += text
-      const match = /https?:\/\/[^\s"']*\/\?token=[A-Za-z0-9._~-]+/.exec(stdout)
-      if (match) {
-        clearTimeout(timer)
-        resolvePromise({ child, url: match[0] })
-      }
-    }
-
-    child.stdout.on('data', (c) => consume(c, false))
-    child.stderr.on('data', (c) => consume(c, true))
-    child.on('exit', (code) => {
-      clearTimeout(timer)
-      rejectPromise(new Error(`dsh exited early with code ${code}\n${stdout}\n${stderr}`))
-    })
+  return waitForSmokeStartup(child, {
+    label: 'dsh', timeoutMs: 90_000,
+    stopChild: dependencies.stopChild ?? stopDsh,
+    setTimer: dependencies.setTimer, clearTimer: dependencies.clearTimer,
+    onChildError: dependencies.onChildError,
   })
 }
 
@@ -153,39 +100,71 @@ async function dismissDialogs(page) {
   }
 }
 
-async function runSmoke() {
-  console.log('--- Step 3: Booting isolated DSH Web ---')
-  const { child, url } = await startDsh()
-  console.log(`DSH booted successfully at ${url.replace(/token=.*/, 'token=REDACTED')}`)
+export const MAINTENANCE_REQUIRED_IDS = Object.freeze(['literal-escaping', 'line-count', 'vertical-layout', 'pos', 'narrow-width', 'scroll', 'settings-label'])
 
-  const browser = await chromium.launch({ headless: true })
-  const dshVersion = execSync('dsh --version', { encoding: 'utf-8' }).trim()
-  const chromiumVersion = browser.version()
+/** Injectable collector/report seams exercise the same aggregation as the CLI. */
+export async function runMaintenanceSmoke(options = {}) {
+  const runId = randomUUID()
+  const evidenceDir = join(REPO_ROOT, 'docs', 'evidence', 'maintenance-m1r', 'run-' + runId)
   const evidence = {
-    suite: 'Maintenance M1R Browser Smoke Verification',
-    timestamp: new Date().toISOString(),
-    gitCommit: execSync('git rev-parse HEAD', { cwd: REPO_ROOT, encoding: 'utf-8' }).trim(),
-    classification: {
-      environment: 'REAL_BROWSER',
-      lookupMode: 'CONTROLLED_LOOKUP_RESPONSE',
-      domMeasurement: 'REAL_DOM_GEOMETRY',
-      isolation: 'ISOLATED_DSH_RUNTIME',
-      liveEcdictQuery: 'REAL_ECDICT_QUERY_NOT_EXECUTED',
-    },
-    runtime: {
-      dshVersion,
-      dsh021Status: 'NOT_EXECUTED / INDEPENDENT_ACCEPTANCE_NOT_PERFORMED',
-      chromiumVersion,
-      port: PORT,
+    suite: 'Maintenance M1R Browser Smoke Verification', runId,
+    timestamp: new Date().toISOString(), observations: [], screenshots: {},
+    classification: { lookupMode: 'CONTROLLED_LOOKUP_RESPONSE', liveEcdictQuery: 'NOT_EXECUTED', zeroAutoDownload: 'NOT_VERIFIED', collector: options.execute ? 'SYNTHETIC' : 'RUNTIME' },
+    runtime: { nodeVersion: process.version, invocation: { cmd: 'dsh', args: ['--profile', PROFILE, '--no-open', '--port', String(PORT)] }, dshVersion: 'UNKNOWN / NOT_EXECUTED', execution: 'NOT_EXECUTED', port: PORT, home: HOME, profile: PROFILE },
+    evidenceDir,
+  }
+  return runObservedSmoke({ evidence, requiredIds: MAINTENANCE_REQUIRED_IDS,
+    execute: options.execute ?? collectMaintenanceObservations,
+    writeReport: options.writeReport ?? ((report) => {
+      mkdirSync(evidenceDir, { recursive: true })
+      writeFileSync(join(evidenceDir, 'browser-smoke-evidence.json'), JSON.stringify(report, null, 2), { encoding: 'utf8', flag: 'wx' })
+    }), log: options.log,
+  })
+}
+
+async function collectMaintenanceObservations(evidence) {
+  const SCREENSHOTS_DIR = join(evidence.evidenceDir, 'screenshots')
+  // 1. Enforce strict isolation
+  console.log('--- Step 1: Isolation Gate Preflight ---')
+  try {
+    verified = assertIsolatedDshEnvironment({
       home: HOME,
       profile: PROFILE,
-    },
-    observations: [],
-    screenshots: {},
-    verdict: 'PASS',
+      port: PORT,
+      profileDir: PROFILE_DIR,
+      testRoot: DEFAULT_TEST_ROOT,
+    })
+  } catch (error) {
+    if (error instanceof IsolationError) {
+      console.error(error.message)
+      console.error('\nRefusing to run browser smoke test: target is not an isolated test environment')
+      throw error
+    }
+    throw error
   }
+  console.log(ISOLATION_BANNER)
 
+  // 2. Prepare isolated profile
+  console.log('--- Step 2: Preparing isolated profile ---')
+  execSync(`node scripts/create-test-profile.mjs --port ${PORT}`, {
+    cwd: REPO_ROOT,
+    stdio: 'inherit',
+  })
+
+  mkdirSync(SCREENSHOTS_DIR, { recursive: true })
+  evidence.pluginBundle = { source: 'REPOSITORY_CANDIDATE', sha256: createHash('sha256').update(readFileSync(join(REPO_ROOT, 'lib/client.js'))).digest('hex') }
+  let child
+  let browser
   try {
+    console.log('--- Step 3: Booting isolated DSH Web ---')
+    evidence.runtime.execution = 'ATTEMPTED'
+    const started = await startMaintenanceDsh({ onChildError: (error) => evidence.observations.push({ id: 'runtime-child-error', status: 'FAIL', message: String(error.message).replace(/([?&]token=)[^\s&]+/g, '$1REDACTED') }) })
+    evidence.runtime.execution = 'EXECUTED'
+    child = started.child
+    const url = started.url
+    console.log('DSH booted successfully at ' + url.replace(/token=.*/, 'token=REDACTED'))
+    browser = await chromium.launch({ headless: true })
+    evidence.runtime.chromiumVersion = browser.version()
     const context = await browser.newContext({ viewport: { width: 1280, height: 800 } })
     const page = await context.newPage()
 
@@ -331,40 +310,14 @@ async function runSmoke() {
     console.log(`Definition lines count: ${cardMetrics.defLineCount}`)
     console.log(`Literal \\n in text: ${cardMetrics.hasLiteralEscapeInText}`)
 
-    const noPosDuplication = !cardMetrics.hasDuplicatePos && cardMetrics.firstTransLine.startsWith('n.')
-    console.log(`R1 POS badge duplication absent ("v.n." check): ${noPosDuplication ? 'PASS' : 'FAIL'}`)
-
-    // Verify lines are on separate vertical coordinates
-    const transYOrderValid =
-      cardMetrics.transRects.length === 3 &&
-      cardMetrics.transRects[1].top > cardMetrics.transRects[0].top &&
-      cardMetrics.transRects[2].top > cardMetrics.transRects[1].top
-    const defYOrderValid =
-      cardMetrics.defRects.length === 4 &&
-      cardMetrics.defRects[1].top > cardMetrics.defRects[0].top &&
-      cardMetrics.defRects[2].top > cardMetrics.defRects[1].top &&
-      cardMetrics.defRects[3].top > cardMetrics.defRects[2].top
-
-    console.log(`Translation lines vertical separation: ${transYOrderValid ? 'PASS' : 'FAIL'}`)
-    console.log(`Definition lines vertical separation: ${defYOrderValid ? 'PASS' : 'FAIL'}`)
+    const formatRows = formattingObservations(cardMetrics)
+    evidence.observations.push(...formatRows)
+    for (const row of formatRows) console.log(row.id + ': ' + row.status)
 
     const cardNormalShot = join(SCREENSHOTS_DIR, '01-card-multiline-normal-360px.png')
     await page.locator('[data-dsh-word-lookup="card"]').screenshot({ path: cardNormalShot })
     evidence.screenshots.cardNormal = cardNormalShot
 
-    evidence.observations.push({
-      test: 'FMT-01 Normal Viewport Card Rendering & POS Dedup (R1)',
-      status:
-        cardMetrics.transLineCount === 3 &&
-        cardMetrics.defLineCount === 4 &&
-        transYOrderValid &&
-        defYOrderValid &&
-        !cardMetrics.hasLiteralEscapeInText &&
-        noPosDuplication
-          ? 'PASS'
-          : 'FAIL',
-      cardMetrics,
-    })
 
     // Narrow Viewport test (320px)
     console.log('--- Step 6: Testing Narrow Viewport Responsiveness ---')
@@ -382,8 +335,9 @@ async function runSmoke() {
     evidence.screenshots.cardNarrow = cardNarrowShot
 
     evidence.observations.push({
+      id: 'narrow-width',
       test: 'FMT-01 Narrow Viewport Responsiveness',
-      status: narrowCardWidth <= 320 ? 'PASS' : 'FAIL',
+      status: Number.isFinite(narrowCardWidth) && narrowCardWidth > 0 && narrowCardWidth <= 320 ? 'PASS' : 'FAIL',
       narrowCardWidth,
     })
 
@@ -442,15 +396,11 @@ async function runSmoke() {
     await page.locator('[data-dsh-word-lookup="card"]').screenshot({ path: cardScrollShot })
     evidence.screenshots.cardScroll = cardScrollShot
 
-    const scrollPassed =
-      scrollInfo.isScrollable &&
-      scrollInfo.didScroll &&
-      scrollInfo.withinMaxHeightLimit &&
-      scrollInfo.noHorizontalOverflow
+    const scrollResult = scrollObservation(scrollInfo)
 
     evidence.observations.push({
+      ...scrollResult,
       test: 'FMT-01 Long Entry Scrollability (R2 Remediation)',
-      status: scrollPassed ? 'PASS' : 'FAIL',
       scrollInfo,
       m1Audit: {
         m1Result: 'FALSE_POSITIVE',
@@ -546,32 +496,28 @@ async function runSmoke() {
     }
     evidence.screenshots.settings = settingsShot
 
-    const settingsPassed = !settingsAudit.hasPhase7A8 && settingsAudit.hasSupportedBadge && settingsAudit.hasUpdatedDesc
+    const settingsPassed = !settingsAudit.hasPhase7A8 && settingsAudit.hasSupportedBadge && settingsAudit.hasUpdatedDesc && settingsAudit.hasCustomRow && settingsAudit.hasCustomSection
     evidence.observations.push({
+      id: 'settings-label',
       test: 'UI-02 Settings Badge and Description Update',
       status: settingsPassed ? 'PASS' : 'FAIL',
       settingsAudit,
     })
 
-    if (!settingsPassed || !transYOrderValid || !defYOrderValid || !noPosDuplication || !scrollPassed) {
-      evidence.verdict = 'FAIL'
-    }
   } finally {
-    await browser.close().catch(() => {})
-    console.log('--- Step 9: Stopping DSH process ---')
-    await stopDsh(child).catch(() => {})
+    try {
+      if (browser) await browser.close()
+    } finally {
+      console.log('--- Step 9: Stopping DSH process ---')
+      if (child) await stopDsh(child)
+    }
   }
 
-  writeFileSync(EVIDENCE_JSON_PATH, JSON.stringify(evidence, null, 2), 'utf-8')
-  console.log(`Evidence written to ${EVIDENCE_JSON_PATH}`)
-  console.log(`Overall smoke test verdict: ${evidence.verdict}`)
-
-  if (evidence.verdict !== 'PASS') {
-    process.exit(1)
-  }
 }
 
-runSmoke().catch((err) => {
-  console.error('Smoke test execution error:', err)
-  process.exit(1)
-})
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  runMaintenanceSmoke().then(({ exitCode }) => { process.exitCode = exitCode }).catch((error) => {
+    console.error('Smoke report could not be saved:', error.message)
+    process.exitCode = 1
+  })
+}

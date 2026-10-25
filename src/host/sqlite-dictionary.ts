@@ -30,6 +30,7 @@
 import { DatabaseSync } from 'node:sqlite'
 import { existsSync, mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
+import { parseDictionarySchemaVersion } from './schema-version.js'
 
 import {
   DictionaryUnavailableError,
@@ -384,7 +385,7 @@ export function openSqliteDictionary(options: SqliteDictionaryOptions): SqliteDi
     // authored, so rebuilding it can destroy nothing.
     const setup = readOnly ? { created: false, seeded: false } : initialize(db)
 
-    const schemaVersion = Number(readMeta(db, 'schema_version'))
+    const schemaVersion = parseDictionarySchemaVersion(readMeta(db, 'schema_version'))
     if (schemaVersion !== SCHEMA_VERSION) {
       throw new DictionaryUnavailableError(
         `the fixture database at ${options.path} is schema ${String(schemaVersion)}, expected ${String(SCHEMA_VERSION)}`,

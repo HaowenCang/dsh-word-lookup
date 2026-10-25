@@ -122,6 +122,13 @@ function runIntegrityWorker(): void {
       parentPort.postMessage(res)
       return
     }
+    parentPort.postMessage({
+      requestId: String((workerData as Record<string, unknown>).requestId ?? 'unknown'),
+      success: false,
+      errorCode: 'INVALID_REQUEST_PAYLOAD',
+      message: 'Worker received unsupported action',
+    } satisfies IntegrityFailureResponse)
+    return
   }
 
   if (!isValidIntegrityRequest(workerData)) {

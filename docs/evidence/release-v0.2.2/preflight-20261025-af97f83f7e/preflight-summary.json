@@ -1,0 +1,141 @@
+{
+  "status": "PRE_PUBLICATION_VALIDATION_PASS_WITH_RECORDED_LIMITS",
+  "version": "0.2.2",
+  "baseHead": "62e18f8b6ceff318370ef59caa8d66d261f50f23",
+  "baseline": "0.2.1-rc.3",
+  "regression": {
+    "testFiles": 70,
+    "passed": 1739,
+    "failed": 0,
+    "skipped": 0,
+    "legacySuite": "NOT_EXECUTED"
+  },
+  "runtime": {
+    "run": "runtime022-5e06c194",
+    "passed": 22,
+    "failed": 0,
+    "networkRecords": 12,
+    "profile": "release022-rc3-5e06c194",
+    "home": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-preflight-af97f83f7e\\runtime022-5e06c194\\home",
+    "boots": [
+      {
+        "pid": 48124,
+        "startedAt": 1792934510236,
+        "origin": "http://127.0.0.1:54510",
+        "wasRunningAtShutdown": true,
+        "terminationReason": "OWNED_TEST_SHUTDOWN",
+        "exitedAt": 1792934527865,
+        "exitCode": 1,
+        "signalCode": null,
+        "portFree": true
+      },
+      {
+        "pid": 25492,
+        "startedAt": 1792934532612,
+        "origin": "http://127.0.0.1:54510",
+        "wasRunningAtShutdown": true,
+        "terminationReason": "OWNED_TEST_SHUTDOWN",
+        "exitedAt": 1792934546449,
+        "exitCode": 1,
+        "signalCode": null,
+        "portFree": true
+      }
+    ],
+    "zeroExternalAttempts": true,
+    "pageErrors": [],
+    "scope": "Node instrumented APIs and browser page HTTP(S); not packet-level or arbitrary native networking",
+    "nativeDefaultShortcut": {
+      "status": "PASS",
+      "before": 0,
+      "after": 1,
+      "source": "sqlite-fixture",
+      "input": "Controlled conversation DOM; real DSH keyboard dispatch and real Host SQLite"
+    }
+  },
+  "upstreamObservation": {
+    "status": "UPSTREAM_REPRODUCED_WITHOUT_PLUGIN",
+    "run": "control-f62a6c52",
+    "pluginInstalled": false,
+    "reproductions": 2,
+    "releaseRecoveryClaim": false
+  },
+  "artifact": {
+    "version": "0.2.2",
+    "tarball": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-preflight-af97f83f7e\\candidate-rc3\\dsh-word-lookup-0.2.2.tgz",
+    "bytes": 147121,
+    "sha256": "5311ac80bfa6140d0c843654ce2031641343a43026576bed08f0f85acace1131",
+    "integrity": "sha512-IShZ22GgzI4KGEuP3jb+qwB053DqAMn7Xsj+Xb+Aq0JBQtjBxqTkwh9aB3wQaj2fhvqF2fkZnC4kfgcc+yeWKA==",
+    "members": [
+      {
+        "path": "LICENSE",
+        "bytes": 1089,
+        "sha256": "99922c2a61954f0eaef1591241bcaaac4d3c8984a9866840180d65f7a1ff8101"
+      },
+      {
+        "path": "README.md",
+        "bytes": 20547,
+        "sha256": "8268c3a27e627ef112bbf2a8f378a9ee02dd5130449010b502bb8e53da6379d7"
+      },
+      {
+        "path": "cordis.patch.yml",
+        "bytes": 415,
+        "sha256": "df9851e21b59cafc69f91b0839c7cd56cb53104c57644813d9001e1a76c7d868"
+      },
+      {
+        "path": "corpus/ecdict.manifest.json",
+        "bytes": 566,
+        "sha256": "03cba27d42cb43551d7b51fa12e4a07a869c5d4b65ac07f4fa3d105d9c944044"
+      },
+      {
+        "path": "lib/client.js",
+        "bytes": 198730,
+        "sha256": "a4becec431e045e589d1164bc8826a9c9722d719369bf5715c4a44f592729c6b"
+      },
+      {
+        "path": "lib/ecdict-integrity-worker.js",
+        "bytes": 29261,
+        "sha256": "91aa9a1e333628a04f497be00aeb996b1571069c5cdc1fd3d228babfdadd27af"
+      },
+      {
+        "path": "lib/index.js",
+        "bytes": 361993,
+        "sha256": "46e61f9d0b9f0e98186087276c8943f6b84a8ce2d93b369c80836e0fc9066d40"
+      },
+      {
+        "path": "package.json",
+        "bytes": 5535,
+        "sha256": "5c4ffa86dcf269d14c6a84a3cbfa44a0577812e835a64901fd5cdb808fc6a389"
+      }
+    ],
+    "dependencyLock": "UNCHANGED_EXCEPT_ROOT_VERSION",
+    "worker": {
+      "response": {
+        "requestId": "aa438584-d6c8-48e0-bb44-957a1377c661",
+        "success": true,
+        "integrityResult": "ok",
+        "durationMs": 1
+      },
+      "exitCode": 0,
+      "deleteAfterExit": "PASS"
+    }
+  },
+  "independentReview": {
+    "model": "GPT-6.1-SOL / High",
+    "spec": "PASS_WITH_SCOPE",
+    "quality": "PASS_WITH_SCOPE",
+    "critical": 0,
+    "important": 0,
+    "minor": 0,
+    "reranTests": false,
+    "reports": 3,
+    "nativeShortcut": "PASS_WITH_SCOPE"
+  },
+  "publication": {
+    "published": false,
+    "commit": false,
+    "tag": false,
+    "push": false,
+    "latestNpm": "0.2.1"
+  },
+  "application": "SEE_APPLICATION_RECORD_JSON"
+}

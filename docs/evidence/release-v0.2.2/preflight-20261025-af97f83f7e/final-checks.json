@@ -1,0 +1,52 @@
+{
+  "status": "PRE_PUBLICATION_VALIDATION_PASS_WITH_RECORDED_LIMITS",
+  "version": "0.2.2",
+  "branch": "master",
+  "head": "62e18f8b6ceff318370ef59caa8d66d261f50f23",
+  "appliedChecks": {
+    "typecheck": 0,
+    "bundle": 0,
+    "credentials": 0,
+    "diffCheck": 0
+  },
+  "credentialScan": {
+    "files": 1001,
+    "result": "PASS",
+    "scope": "Launch-token scanner over tracked files and all evidence directories"
+  },
+  "testedInputCount": 256,
+  "testedInputManifestSha256": "3cb8be1f0a1d0c679f9013b2d8d8a3a83a1d3378ef5f1e6fc65dfeac63647eff",
+  "packageMembersExact": true,
+  "tarball": {
+    "path": "E:\\Projects\\DSHarness\\dsh-word-lookup\\build\\rc-v0.2.2\\dsh-word-lookup-0.2.2.tgz",
+    "bytes": 147121,
+    "sha256": "5311ac80bfa6140d0c843654ce2031641343a43026576bed08f0f85acace1131"
+  },
+  "lockDependenciesUnchanged": true,
+  "gitDirtyExpected": true,
+  "gitCommit": false,
+  "tag": false,
+  "push": false,
+  "publication": false,
+  "publicRegistryCheck": {
+    "checkedAt": "2026-10-25T13:28:57.9195383Z",
+    "latest": "0.2.1",
+    "candidatePublished": false,
+    "remoteMaster": "62e18f8b6ceff318370ef59caa8d66d261f50f23\trefs/heads/master",
+    "candidateTag": []
+  },
+  "runtime": {
+    "run": "runtime022-5e06c194",
+    "baseline": "0.2.1-rc.3",
+    "passed": 22,
+    "failed": 0,
+    "desktop": "NOT_EXECUTED",
+    "scope": "Isolated Web profile; controlled DOM for native keyboard selection; real fixture HTTP/SQLite; controlled formatting responses"
+  },
+  "remainingLimits": [
+    "Upstream DSH reconnect error reproduced without plugin; live-browser recovery excluded",
+    "Rollback/old runtimes/Desktop/full corpus and performance not executed",
+    "Original native RISK-001 trigger remains unreproduced"
+  ],
+  "evidenceDirectory": "E:\\Projects\\DSHarness\\dsh-word-lookup\\docs\\evidence\\release-v0.2.2\\preflight-20261025-af97f83f7e"
+}

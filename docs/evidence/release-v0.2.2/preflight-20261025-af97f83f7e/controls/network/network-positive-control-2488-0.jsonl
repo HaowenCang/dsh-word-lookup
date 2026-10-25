@@ -1,0 +1,8 @@
+{"runId":"positive-control","pid":2488,"threadId":0,"sequence":1,"time":1792931844175,"kind":"observer-ready","node":"v24.13.0","isMainThread":true,"hooks":["fetch","http","https","socket","tls","undici","worker","child"],"mode":"record-and-block-external"}
+{"runId":"positive-control","pid":2488,"threadId":0,"sequence":2,"time":1792931844280,"kind":"fetch","protocol":"http:","host":"127.0.0.1","port":"9939","path":"/owned-control","external":false,"blocked":false}
+{"runId":"positive-control","pid":2488,"threadId":0,"sequence":3,"time":1792931844288,"kind":"undici-request","protocol":"http:","host":"127.0.0.1","port":"9939","path":"/owned-control"}
+{"runId":"positive-control","pid":2488,"threadId":0,"sequence":4,"time":1792931844289,"kind":"socket-connect","host":"127.0.0.1","port":"9939","external":false,"blocked":false}
+{"runId":"positive-control","pid":2488,"threadId":0,"sequence":5,"time":1792931844337,"kind":"http-get","protocol":"http:","host":"127.0.0.1","port":"9939","path":"/http-control","external":false,"blocked":false}
+{"runId":"positive-control","pid":2488,"threadId":0,"sequence":6,"time":1792931844339,"kind":"socket-connect","host":"127.0.0.1","port":"9939","external":false,"blocked":false}
+{"runId":"positive-control","pid":2488,"threadId":0,"sequence":7,"time":1792931844344,"kind":"fetch","protocol":"https:","host":"audit-network-block-control.invalid","port":"","path":"/","external":true,"blocked":true}
+{"runId":"positive-control","pid":2488,"threadId":0,"sequence":8,"time":1792931844367,"kind":"observer-exit","code":0}

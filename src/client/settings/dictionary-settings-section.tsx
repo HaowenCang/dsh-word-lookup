@@ -39,6 +39,7 @@ import {
   type DictionaryManagementStoreState,
 } from './dictionary-management-store.js'
 import type { CustomSnapshotSummary } from '../../shared/dictionary-management-protocol.js'
+import { isSnapshotActivatable } from './snapshot-eligibility.js'
 
 /** Host settings schema for automatic triggers. */
 export interface DictionaryHostSettings {
@@ -465,11 +466,16 @@ export function DictionarySettingsSection({
 
   // Custom snapshot calculation & mode switch capability
   const customSnapshots = status?.customSnapshots ?? []
-  const validCustomSnapshots = customSnapshots.filter(
-    (s) => s.corrupt !== true && s.isValid !== false,
-  )
+  const validCustomSnapshots = customSnapshots.filter(isSnapshotActivatable)
 
   const canSwitchMode = status?.canSwitchMode !== false && !isActing && !isOperationRunning
+
+  const handleSelectCustomSnapshot = (snapshotId: string) => {
+    const target = customSnapshots.find((snapshot) => snapshot.snapshotId === snapshotId)
+    if (!canSwitchMode || !target || !isSnapshotActivatable(target) ||
+      target.isActive || target.snapshotId === status?.activeSnapshotId) return
+    void store.selectMode('custom', snapshotId)
+  }
 
   const handleCustomTopButtonClick = () => {
     if (!canSwitchMode || customSnapshots.length === 0 || validCustomSnapshots.length === 0) return
@@ -481,7 +487,7 @@ export function DictionarySettingsSection({
       if (status?.activeMode === 'custom' && status?.activeSnapshotId === single.snapshotId) {
         return
       }
-      void store.selectMode('custom', single.snapshotId)
+      handleSelectCustomSnapshot(single.snapshotId)
     } else {
       // CASE C: Multiple valid snapshots -> open SnapshotPickerModal
       setShowSnapshotPicker(true)
@@ -1139,6 +1145,7 @@ export function DictionarySettingsSection({
             <div data-testid="custom-snapshots-list" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {status.customSnapshots.map((snap) => {
                 const isCurrentActive = snap.snapshotId === status.activeSnapshotId || snap.isActive
+                const isActivatable = isSnapshotActivatable(snap)
                 const leases =
                   status.customSnapshotStatus?.snapshotId === snap.snapshotId
                     ? status.customSnapshotStatus.activeLeases
@@ -1168,7 +1175,8 @@ export function DictionarySettingsSection({
                         </span>
                         {isCurrentActive && <StatusBadge variant="success" label="当前激活" />}
                         {isLeased && <StatusBadge variant="warning" label={`查询中 (${leases})`} />}
-                        {snap.corrupt && <StatusBadge variant="error" label="快照损坏" />}
+                        {snap.corrupt === true ? <StatusBadge variant="error" label="快照损坏" /> :
+                          !isActivatable && <StatusBadge variant="warning" label="快照不可用" />}
                       </div>
                       <div style={{ fontSize: '11.5px', color: 'var(--wl-set-text-muted, #6c6c7a)', fontFamily: 'monospace' }}>
                         ID: {snap.snapshotId.slice(0, 8)}... | {snap.entryCount?.toLocaleString?.() ?? snap.entryCount} 词条 | {snap.formCount?.toLocaleString?.() ?? snap.formCount} 形态
@@ -1179,9 +1187,9 @@ export function DictionarySettingsSection({
                       <ActionButton
                         size="small"
                         variant="secondary"
-                        disabled={isCurrentActive || isActing || !canSwitchMode || snap.corrupt === true}
-                        title={snap.corrupt ? '快照文件已损坏，不可激活' : undefined}
-                        onClick={() => void store.selectMode('custom', snap.snapshotId)}
+                        disabled={isCurrentActive || !canSwitchMode || !isActivatable}
+                        title={snap.corrupt === true ? '快照文件已损坏，不可激活' : !isActivatable ? '快照不可用，请重新导入或校验' : undefined}
+                        onClick={() => handleSelectCustomSnapshot(snap.snapshotId)}
                       >
                         启用
                       </ActionButton>
@@ -1454,11 +1462,9 @@ export function DictionarySettingsSection({
         <SnapshotPickerModal
           snapshots={customSnapshots}
           activeSnapshotId={status?.activeSnapshotId}
-          isActing={isActing}
+          isActing={!canSwitchMode}
           onClose={() => setShowSnapshotPicker(false)}
-          onSelect={(snapshotId) => {
-            void store.selectMode('custom', snapshotId)
-          }}
+          onSelect={handleSelectCustomSnapshot}
         />
       )}
     </div>

@@ -1,0 +1,9 @@
+preflight {"home":"C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-preflight-af97f83f7e\\user","tmp":"C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-preflight-af97f83f7e\\tmp","dsh":[]}
+
+node ../carrier-sensor-selftest.mjs
+{"status":"PASS","records":7,"positiveControls":["fetch","http","socket","undici"],"externalControl":"blocked before transport"}
+
+
+
+EXIT_CODE=0
+

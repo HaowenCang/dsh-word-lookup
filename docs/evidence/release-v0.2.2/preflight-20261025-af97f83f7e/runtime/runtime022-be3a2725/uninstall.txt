@@ -1,0 +1,11 @@
+[ERR_PNPM_UNEXPECTED_STORE] Unexpected store location
+
+The dependencies at "C:\Users\20659\AppData\Local\Temp\dsh-022-preflight-af97f83f7e\runtime022-be3a2725\home\profiles\release022-rc3-be3a2725\node_modules" are currently linked from the store at "C:\Users\20659\AppData\Local\Temp\dsh-022-preflight-af97f83f7e\runtime022-be3a2725\pnpm-store\v11".
+
+pnpm now wants to use the store at "C:\Users\20659\AppData\Local\Temp\dsh-022-preflight-af97f83f7e\localappdata\pnpm\store\v11" to link dependencies.
+
+If you want to use the new store location, reinstall your dependencies with "pnpm install".
+
+You may change the global store location by running "pnpm config set store-dir <dir> --global".
+(This error may happen if the node_modules was installed with a different major version of pnpm)
+dsh: plugin command failed; diagnostics: C:\Users\20659\AppData\Local\Temp\dsh-022-preflight-af97f83f7e\runtime022-be3a2725\home\profiles\release022-rc3-be3a2725\.plugin-manager\logs\operation-pskdqe\pnpm.log

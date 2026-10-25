@@ -24,6 +24,7 @@ import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { Worker } from 'node:worker_threads'
+import { runPublishedCustomWorker } from './custom-worker-test-helpers.js'
 
 import {
   verifyCandidateDatabaseWithWorker,
@@ -71,6 +72,20 @@ function createValidCandidateSqlite(dbPath: string): void {
 }
 
 describe('Static Worker Integrity Verification & Fault Injection Suite', () => {
+  it('BUG-001: unknown action fails once without falling through to integrity', async () => {
+    const tempDir = createTempTestDir()
+    const candidatePath = join(tempDir, 'candidate.sqlite3')
+    createValidCandidateSqlite(candidatePath)
+    try {
+      const result = await runPublishedCustomWorker({ requestId: 'unknown-action', action: 'UNKNOWN_ACTION', candidatePath })
+      expect(result.exitCode).toBe(0)
+      expect(result.messages).toHaveLength(1)
+      expect(result.messages[0]).toMatchObject({ requestId: 'unknown-action', success: false, errorCode: 'INVALID_REQUEST_PAYLOAD' })
+      expect(result.messages[0]).not.toHaveProperty('integrityResult')
+      await unlink(candidatePath)
+    } finally { rmSync(tempDir, { recursive: true, force: true }) }
+  })
+
   it('Scenario 1: Normal Worker verification returns ok and releases candidate lock', async () => {
     const tempDir = createTempTestDir()
     try {

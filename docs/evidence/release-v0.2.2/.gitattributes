@@ -1,0 +1,3 @@
+# Preserve verification bytes and the SHA-256 manifests across Git checkouts.
+# Archived logs retain their original whitespace, including historical failures.
+** -text -whitespace

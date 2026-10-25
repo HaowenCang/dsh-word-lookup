@@ -1,0 +1,3 @@
+[ERROR] Unknown options: 'offline', 'ignore-scripts'
+For help, run: pnpm help remove
+dsh: plugin command failed; diagnostics: C:\Users\20659\AppData\Local\Temp\dsh-022-preflight-af97f83f7e\runtime022-5c351489\home\profiles\release022-rc3-5c351489\.plugin-manager\logs\operation-N89Pds\pnpm.log

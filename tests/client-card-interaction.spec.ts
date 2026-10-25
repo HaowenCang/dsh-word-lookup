@@ -11,6 +11,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { Window } from 'happy-dom'
 
 import {
   apply,
@@ -18,54 +19,75 @@ import {
   type WordLookupDiagnostics,
 } from '../src/client/index.js'
 import {
-  CONVERSATION_FLOW_SELECTOR,
-  INTERACTIVE_SURFACE_SELECTOR,
   type SelectionRect,
 } from '../src/client/selection.js'
 
 type Surface = 'flow' | 'loose' | 'composer' | 'card'
 
-class FakeElement {
-  readonly nodeType = 1
-  readonly parentElement: FakeElement | null = null
-  readonly #surface: Surface
-
-  constructor(surface: Surface) {
-    this.#surface = surface
-  }
-
-  closest(selector: string): FakeElement | null {
-    if (selector === CONVERSATION_FLOW_SELECTOR) return this.#surface === 'flow' ? this : null
-    if (selector === INTERACTIVE_SURFACE_SELECTOR) return this.#surface === 'composer' ? this : null
-    return null
-  }
+const dom = new Window()
+type FakeElement = HTMLElement
+// Explicit virtual one-line layout for wiring tests; native geometry is tested
+// separately. Carets depend on x/y and hit text, never on the old Selection.
+const textLayouts = new WeakMap<Element, SelectionRect>()
+function makeElement(surface: Surface): FakeElement {
+  const element = dom.document.createElement('div')
+  if (surface === 'flow') element.setAttribute('data-chat-flow-kind', 'assistant-step')
+  if (surface === 'card') element.setAttribute('data-dsh-word-lookup', 'card')
+  if (surface === 'composer') element.setAttribute('contenteditable', 'true')
+  element.textContent = 'derive'
+  textLayouts.set(element as unknown as Element, { x: 100, y: 90, width: 40, height: 20 })
+  dom.document.body.append(element)
+  return element as unknown as FakeElement
 }
 
+/** The document's selection, as the plugin reads it. */
 class FakeSelection {
-  anchorNode: FakeElement | null = null
-  focusNode: FakeElement | null = null
+  anchorNode: Node | null = null
+  focusNode: Node | null = null
+  anchorOffset = 0
+  focusOffset = 0
   rangeCount = 0
   isCollapsed = true
   #text = ''
-  #rect: SelectionRect = { x: 100, y: 200, width: 50, height: 20 }
+  #rect: SelectionRect = { x: 120, y: 240, width: 44, height: 17 }
 
+  /** @returns the selected text. */
   toString(): string {
     return this.#text
   }
 
+  /**
+   * @returns the live range.
+   */
   getRangeAt(): unknown {
-    return { collapsed: false, getBoundingClientRect: () => this.#rect }
+    const range = dom.document.createRange()
+    range.setStart(this.anchorNode as never, this.anchorOffset)
+    range.setEnd(this.focusNode as never, this.focusOffset)
+    Object.assign(range, { getBoundingClientRect: () => this.#rect, getClientRects: () => [textLayouts.get(this.anchorNode!.parentElement!)!] })
+    return range
   }
 
+  /**
+   * Replace the selection.
+   *
+   * @param node - the endpoint node.
+   * @param text - the selected text.
+   * @param rect - the geometry the live range reports.
+   */
   replace(node: FakeElement, text: string, rect?: SelectionRect): void {
-    this.anchorNode = node
-    this.focusNode = node
+    if (node.firstChild?.nodeType === 3) node.firstChild.textContent = text
+    else node.textContent = text
+    this.anchorNode = node.firstChild as unknown as Node
+    this.focusNode = node.firstChild as unknown as Node
+    this.anchorOffset = 0
+    this.focusOffset = text.length
     this.rangeCount = 1
     this.isCollapsed = text === ''
     this.#text = text
     if (rect !== undefined) this.#rect = rect
   }
 
+  /** Drop the selection. */
   clear(): void {
     this.anchorNode = null
     this.focusNode = null
@@ -96,8 +118,27 @@ class FakeTarget {
 }
 
 class FakeDocument extends FakeTarget {
+  defaultTarget: FakeElement | null = null
+  defaultView = dom
+  override emit(type: string, event: unknown = {}): void {
+    const data = event as { target?: FakeElement }
+    super.emit(type, { target: this.defaultTarget, ...data, composedPath: () => [data.target ?? this.defaultTarget] })
+  }
+  setLayout(node: FakeElement, rect: SelectionRect): void { textLayouts.set(node, rect) }
+  caretRangeFromPoint(x: number, y: number): unknown {
+    const target = this.defaultTarget
+    if (target === null) return null
+    const layout = textLayouts.get(target), text = target.firstChild
+    if (layout === undefined || text?.nodeType !== 3 || y < layout.y || y > layout.y + layout.height || x < layout.x || x > layout.x + 400) return null
+    const range = dom.document.createRange()
+    const length = text.textContent!.length
+    const offset = Math.min(length, Math.max(0, Math.round((x - layout.x) / layout.width * length)))
+    range.setStart(text as never, offset); range.collapse(true)
+    return range
+  }
   readonly selection = new FakeSelection()
 
+  /** @returns the live selection. */
   getSelection(): FakeSelection {
     return this.selection
   }
@@ -148,8 +189,8 @@ function createHarness(): Harness {
   const doc = new FakeDocument()
   const win = new FakeTarget()
   const form = new FakeForm()
-  const flow = new FakeElement('flow')
-  const cardElement = new FakeElement('card')
+  const flow = makeElement('flow')
+  const cardElement = makeElement('card')
   const requests: string[] = []
 
   let cleanup: (() => void) | null = null
@@ -217,6 +258,8 @@ function createHarness(): Harness {
     },
     diagnostics: () => Reflect.get(globalThis, '__DSH_WORD_LOOKUP__'),
     select: (node, text, rect) => {
+      doc.defaultTarget = node
+      if (rect !== undefined) doc.setLayout(node, rect)
       doc.selection.replace(node, text, rect)
       doc.emit('selectionchange')
     },
@@ -330,6 +373,7 @@ describe('Card interaction and dismissal races', () => {
     // 2. Outside pointerdown dismisses A, followed by drag-selecting B ('went')
     diag.dismiss?.()
     harness.select(harness.flow, 'went')
+    harness.doc.setLayout(harness.flow, { x: 200, y: 90, width: 40, height: 20 })
     harness.doc.emit('pointerdown', { clientX: 200, clientY: 100, button: 0, pointerType: 'mouse' })
     harness.doc.emit('mousedown', { detail: 1, button: 0 })
     harness.doc.emit('pointermove', { clientX: 240, clientY: 100 })

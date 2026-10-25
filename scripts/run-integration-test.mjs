@@ -99,6 +99,8 @@ if (!(await isPortFree(verified.port))) {
 // --- run -------------------------------------------------------------------
 const args = [
   'scripts/phase1-verify.mjs',
+  '--test-root',
+  verified.testRoot,
   '--home',
   verified.home,
   '--profile',

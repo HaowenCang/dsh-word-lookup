@@ -19,18 +19,60 @@
  */
 
 import { DatabaseSync } from 'node:sqlite'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, statSync, unlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 
 import { openSqliteDictionary } from '../src/host/sqlite-dictionary.js'
+import { DictionaryUnavailableError } from '../src/host/dictionary.js'
+import { computeFileSha256, executeCustomSnapshotValidate } from '../src/host/custom-dictionary-worker.js'
+import { runPublishedCustomWorker } from './custom-worker-test-helpers.js'
+import { buildSchemaVersionDatabase, schemaVersionCases } from './schema-version-test-helpers.js'
 
 /** Scratch directory for the persistence half of the probe. */
 const scratch = mkdtempSync(join(tmpdir(), 'dsh-word-lookup-sqlite-'))
 
 afterAll(() => {
   rmSync(scratch, { recursive: true, force: true })
+})
+
+describe('BUG-004: Worker validation agrees with actual read-only Dictionary opening', () => {
+  it.each(schemaVersionCases)('$label', async ({ label, value, accepted }) => {
+    const path = join(scratch, `schema-${label}.db`)
+    buildSchemaVersionDatabase(path, value)
+    const metadata = new DatabaseSync(path, { readOnly: true })
+    try {
+      // Prove the real driver value: no TEXT affinity hides numeric/blob/null
+      // boundaries, and a missing key remains distinct from a NULL value.
+      const row = metadata.prepare("SELECT value FROM meta WHERE key = 'schema_version'").get()
+      expect(row?.value).toEqual(value)
+      expect(row === undefined).toBe(value === undefined)
+    } finally { metadata.close() }
+    const before = { hash: computeFileSha256(path), size: statSync(path).size }
+    const request = { action: 'CUSTOM_SNAPSHOT_VALIDATE' as const, requestId: label, snapshotPath: path }
+    const sourceResponse = executeCustomSnapshotValidate(request)
+    const emitted = await runPublishedCustomWorker(request)
+    expect(emitted.exitCode).toBe(0)
+    expect(emitted.messages).toHaveLength(1)
+    for (const response of [sourceResponse, emitted.messages[0]]) {
+      expect.soft(response.success).toBe(accepted)
+      if (!accepted) expect.soft(response.errorCode).toBe('INVALID_SCHEMA_VERSION')
+      else expect.soft(response.schemaVersion).toBe(1)
+    }
+    if (accepted) {
+      const dict = openSqliteDictionary({ path, readOnly: true, source: 'custom-local' })
+      try {
+        expect(dict.initialization).toMatchObject({ schemaVersion: 1, created: false, seeded: false })
+        expect(dict.lookup('derive').found).toBe(true)
+      } finally { dict.close() }
+    } else {
+      expect(() => openSqliteDictionary({ path, readOnly: true })).toThrow(DictionaryUnavailableError)
+    }
+    expect(computeFileSha256(path)).toBe(before.hash)
+    expect(statSync(path).size).toBe(before.size)
+    expect(() => unlinkSync(path)).not.toThrow()
+  })
 })
 
 /**

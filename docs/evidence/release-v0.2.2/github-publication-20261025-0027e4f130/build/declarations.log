@@ -1,0 +1,7 @@
+preflight {"home":"C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-github-release-0027e4f130\\user","tmp":"C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-github-release-0027e4f130\\tmp","dsh":[]}
+
+node node_modules/typescript/bin/tsc -p tsconfig.build.json --incremental false
+
+
+EXIT_CODE=0
+

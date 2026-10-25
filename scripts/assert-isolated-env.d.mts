@@ -72,6 +72,9 @@ export declare class IsolationError extends Error {
 /** Resolve a path to a comparable absolute form. */
 export declare function normalisePath(path: string): string
 
+/** Refuse ancestors and descendants of every protected production home. */
+export declare function assertDisjointProductionPaths(paths: string[], env?: Record<string, string | undefined>): void
+
 /** Whether one path is the other or lives underneath it. */
 export declare function isInsideOrEqual(child: string, parent: string): boolean
 

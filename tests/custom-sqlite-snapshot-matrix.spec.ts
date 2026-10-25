@@ -11,6 +11,7 @@ import {
   mkdirSync,
   openSync,
   readFileSync,
+  readdirSync,
   rmSync,
   statSync,
   unlinkSync,
@@ -39,6 +40,111 @@ import {
 import { DictionaryManager } from '../src/host/dictionary-manager.js'
 import { computeFileSha256 } from '../src/host/custom-dictionary-worker.js'
 import { spawnIntegrityWorker } from '../src/host/ecdict-integrity-verifier.js'
+import { runPublishedCustomWorker } from './custom-worker-test-helpers.js'
+import { buildSchemaVersionDatabase, schemaVersionCases } from './schema-version-test-helpers.js'
+
+describe.each(['source', 'emitted'] as const)('BUG-004: %s snapshot publication and activation', (runtime) => {
+  it.each(schemaVersionCases)('$label actual read-only open releases or rolls back its lease', async ({ label, value, accepted }) => {
+    const bundleUrl = new URL('../lib/index.js', import.meta.url).href
+    const api = runtime === 'source'
+      ? { CustomSnapshotManager }
+      : await import(/* @vite-ignore */ bundleUrl) as typeof import('../src/index.js')
+    const tmp = createTempDir('bug004-open-')
+    const paths = resolveManagedStoragePaths({ home: join(tmp, 'home') })
+    mkdirSync(paths.customSnapshotDirectory, { recursive: true })
+    const id = randomUUID()
+    // A synthetic pre-existing snapshot reaches the actual opener even when a
+    // new import would be rejected by validation before publication.
+    const path = join(paths.customSnapshotDirectory, `custom-${id}.sqlite3`)
+    buildSchemaVersionDatabase(path, value)
+    const before = { hash: computeFileSha256(path), size: statSync(path).size }
+    const snapshots = new api.CustomSnapshotManager({ paths })
+    try {
+      await snapshots.adoptPublishedSnapshot(id, {
+        identity: label.replaceAll(' ', '-'), publishedPath: path,
+        sha256: before.hash, byteSize: before.size,
+      })
+      if (accepted) {
+        const dict = snapshots.openSnapshotDictionary(id)
+        try {
+          expect(snapshots.getActiveLeases(id)).toBe(1)
+          expect(dict.lookup('derive').found).toBe(true)
+        } finally { dict.close(); dict.close() }
+      } else {
+        expect(() => snapshots.openSnapshotDictionary(id)).toThrow(expect.objectContaining({ code: 'dictionary-unavailable' }))
+      }
+      expect(snapshots.getSnapshot(id)).toMatchObject({ state: 'PUBLISHED_INACTIVE', activeLeases: 0 })
+      expect(computeFileSha256(path)).toBe(before.hash)
+      expect(statSync(path).size).toBe(before.size)
+      expect(() => unlinkSync(path)).not.toThrow()
+    } finally {
+      await snapshots.dispose()
+      rmSync(tmp, { recursive: true, force: true })
+    }
+  })
+
+  it.each(schemaVersionCases)('$label preserves publication, activation and lease invariants', async ({ label, value, accepted }) => {
+    const identity = label.replaceAll(' ', '-')
+    const bundleUrl = new URL('../lib/index.js', import.meta.url).href
+    const api = runtime === 'source'
+      ? { CustomSnapshotManager, CustomDictionaryValidator, DictionaryManager }
+      : await import(/* @vite-ignore */ bundleUrl) as typeof import('../src/index.js')
+    const tmp = createTempDir('bug004-publish-')
+    const paths = resolveManagedStoragePaths({ home: join(tmp, 'home') })
+    const source = join(tmp, 'candidate.sqlite3')
+    const valid = join(tmp, 'valid.sqlite3')
+    buildValidTestDatabase(valid)
+    buildSchemaVersionDatabase(source, value)
+    const beforeSource = { hash: computeFileSha256(source), size: statSync(source).size }
+    const validator = new api.CustomDictionaryValidator()
+    const snapshots = new api.CustomSnapshotManager({ paths, validator })
+    let active: DictionaryManager | undefined
+    try {
+      const initial = await snapshots.createAndPublishSnapshot(valid, { identity: 'old-active' })
+      active = new api.DictionaryManager({ mode: 'custom', identity: 'old-active', dictionary: snapshots.openSnapshotDictionary(initial.id) })
+      const oldActive = active.snapshot()
+      const publishedBefore = readdirSync(paths.customSnapshotDirectory).sort()
+      const catalogBefore = readFileSync(paths.customSnapshotCatalogPath, 'utf8')
+      const activeHash = computeFileSha256(initial.publishedPath!)
+      if (accepted) {
+        const candidate = await snapshots.createAndPublishSnapshot(source, { identity })
+        expect(candidate.state).toBe('PUBLISHED_INACTIVE')
+        active.activate({ mode: 'custom', identity, dictionary: snapshots.openSnapshotDictionary(candidate.id) })
+        expect(active.snapshot()).toMatchObject({ identity, generation: oldActive.generation + 1 })
+        expect(active.lookup('derive').found).toBe(true)
+        expect(snapshots.getActiveLeases(initial.id)).toBe(0)
+        expect(snapshots.getActiveLeases(candidate.id)).toBe(1)
+      } else {
+        const error = await snapshots.createAndPublishSnapshot(source, { identity }).then(() => null, (error: unknown) => error)
+        expect.soft(error).toMatchObject({ code: 'INVALID_SCHEMA_VERSION' })
+        const failed = snapshots.getSnapshotByIdentity(identity)!
+        expect.soft(failed).toMatchObject({ state: 'CLEANUP_PENDING', verifiedAt: null, publishedAt: null, publishedPath: null, activeLeases: 0 })
+        expect.soft(existsSync(failed.stagingPath)).toBe(false)
+        expect.soft(existsSync(`${failed.stagingPath}.owner`)).toBe(false)
+        expect.soft(readdirSync(paths.customSnapshotDirectory).sort()).toEqual(publishedBefore)
+        expect.soft(readFileSync(paths.customSnapshotCatalogPath, 'utf8')).toBe(catalogBefore)
+        expect(active.snapshot()).toEqual(oldActive)
+        expect(active.lookup('apple').found).toBe(true)
+        expect(snapshots.getActiveLeases(initial.id)).toBe(1)
+        expect(computeFileSha256(initial.publishedPath!)).toBe(activeHash)
+      }
+      expect(validator.runningCount).toBe(0)
+      expect(computeFileSha256(source)).toBe(beforeSource.hash)
+      expect(statSync(source).size).toBe(beforeSource.size)
+      expect(() => unlinkSync(source)).not.toThrow()
+      active.close()
+      expect(snapshots.listSnapshots().every((record) => record.activeLeases === 0)).toBe(true)
+      for (const record of snapshots.listSnapshots()) {
+        if (record.publishedPath) expect(() => unlinkSync(record.publishedPath!)).not.toThrow()
+      }
+    } finally {
+      active?.close()
+      await snapshots.dispose()
+      await validator.dispose()
+      rmSync(tmp, { recursive: true, force: true })
+    }
+  })
+})
 
 function createTempDir(prefix = 'dsh-custom-test-'): string {
   const dir = join(tmpdir(), `${prefix}${randomUUID()}`)
@@ -164,6 +270,45 @@ function buildValidTestDatabase(
 }
 
 describe('Phase 7A.8.1A: Custom SQLite Secure Snapshot & Validation Matrix (C01–C24)', () => {
+  it('BUG-001: published companion executes CREATE, VALIDATE and PRE_PUBLISH once each', async () => {
+    const tmp = createTempDir('bug001-actions-')
+    const sourcePath = join(tmp, 'source.sqlite3')
+    const stagingPath = join(tmp, 'staging.sqlite3')
+    buildValidTestDatabase(sourcePath)
+    const sourceHash = computeFileSha256(sourcePath)
+    const sourceSize = statSync(sourcePath).size
+    try {
+      const create = await runPublishedCustomWorker({ action: 'CUSTOM_SNAPSHOT_CREATE', requestId: 'create-once', sourcePath, stagingPath })
+      console.log('BUG-001 CREATE', JSON.stringify(create))
+      expect(create.exitCode).toBe(0)
+      expect(create.messages).toHaveLength(1)
+      expect(create.messages[0]).toMatchObject({ action: 'CUSTOM_SNAPSHOT_CREATE', requestId: 'create-once', success: true })
+      expect(create.calls).toEqual({ vacuum: 1, validation: 0, hashOpen: 1, unlink: 0 })
+      const snapshotHash = computeFileSha256(stagingPath)
+      const snapshotSize = statSync(stagingPath).size
+
+      const validate = await runPublishedCustomWorker({ action: 'CUSTOM_SNAPSHOT_VALIDATE', requestId: 'validate-once', snapshotPath: stagingPath })
+      console.log('BUG-001 VALIDATE', JSON.stringify(validate))
+      expect(validate.exitCode).toBe(0)
+      expect(validate.messages).toHaveLength(1)
+      expect(validate.messages[0]).toMatchObject({ action: 'CUSTOM_SNAPSHOT_VALIDATE', requestId: 'validate-once', success: true, entryCount: 2, formCount: 2, exampleCount: 1 })
+      expect(validate.calls).toEqual({ vacuum: 0, validation: 1, hashOpen: 1, unlink: 0 })
+
+      const prePublish = await runPublishedCustomWorker({ action: 'CUSTOM_SNAPSHOT_PRE_PUBLISH_CHECK', requestId: 'publish-once', stagingPath, expectedSha256: snapshotHash, expectedByteSize: snapshotSize })
+      console.log('BUG-001 PRE_PUBLISH', JSON.stringify(prePublish))
+      expect(prePublish.exitCode).toBe(0)
+      expect(prePublish.messages).toHaveLength(1)
+      expect(prePublish.messages[0]).toMatchObject({ action: 'CUSTOM_SNAPSHOT_PRE_PUBLISH_CHECK', requestId: 'publish-once', success: true, matches: true })
+      expect(prePublish.calls).toEqual({ vacuum: 0, validation: 0, hashOpen: 1, unlink: 0 })
+      expect(computeFileSha256(stagingPath)).toBe(snapshotHash)
+      expect(statSync(stagingPath).size).toBe(snapshotSize)
+      expect(() => unlinkSync(stagingPath)).not.toThrow()
+      expect(computeFileSha256(sourcePath)).toBe(sourceHash)
+      expect(statSync(sourcePath).size).toBe(sourceSize)
+      expect(() => unlinkSync(sourcePath)).not.toThrow()
+    } finally { rmSync(tmp, { recursive: true, force: true }) }
+  })
+
   // C01: 合法 SQLite 创建快照
   it('C01: creates a valid SQLite snapshot from legitimate source database', async () => {
     const tmp = createTempDir('c01-')
@@ -580,12 +725,25 @@ describe('Phase 7A.8.1A: Custom SQLite Secure Snapshot & Validation Matrix (C01�
     const stagingDb = join(tmp, 'staging.sqlite3')
     buildValidTestDatabase(srcDb)
 
-    // Configure 1ms timeout to trigger timeout deterministically
-    const validator = new CustomDictionaryValidator({ defaultTimeoutMs: 1 })
+    const sourceHash = computeFileSha256(srcDb)
+    const sourceSize = statSync(srcDb).size
+    let exited = false
+    // Configure 1ms timeout and observe the actual worker exit before rejection.
+    const validator = new CustomDictionaryValidator({ workerAdapter: (request) => {
+      const worker = spawnIntegrityWorker(request)
+      worker.on('exit', () => { exited = true })
+      return worker
+    } })
     try {
       await expect(
         validator.createSnapshot(srcDb, stagingDb, { timeoutMs: 1 }),
       ).rejects.toThrowError(ValidatorTimeoutError)
+      expect(exited).toBe(true)
+      expect(validator.runningCount).toBe(0)
+      expect(computeFileSha256(srcDb)).toBe(sourceHash)
+      expect(statSync(srcDb).size).toBe(sourceSize)
+      expect(() => unlinkSync(srcDb)).not.toThrow()
+      if (existsSync(stagingDb)) expect(() => unlinkSync(stagingDb)).not.toThrow()
     } finally {
       await validator.dispose()
       rmSync(tmp, { recursive: true, force: true })
@@ -600,14 +758,26 @@ describe('Phase 7A.8.1A: Custom SQLite Secure Snapshot & Validation Matrix (C01�
     buildValidTestDatabase(srcDb)
 
     const controller = new AbortController()
-    const validator = new CustomDictionaryValidator()
+    const sourceHash = computeFileSha256(srcDb)
+    const sourceSize = statSync(srcDb).size
+    let exited = false
+    const validator = new CustomDictionaryValidator({ workerAdapter: (request) => {
+      const worker = spawnIntegrityWorker(request)
+      worker.on('exit', () => { exited = true })
+      worker.once('online', () => controller.abort())
+      return worker
+    } })
 
     try {
-      // Abort immediately before/during execution
-      controller.abort()
       await expect(
         validator.createSnapshot(srcDb, stagingDb, { signal: controller.signal }),
       ).rejects.toThrowError(ValidatorCancelledError)
+      expect(exited).toBe(true)
+      expect(validator.runningCount).toBe(0)
+      expect(computeFileSha256(srcDb)).toBe(sourceHash)
+      expect(statSync(srcDb).size).toBe(sourceSize)
+      expect(() => unlinkSync(srcDb)).not.toThrow()
+      if (existsSync(stagingDb)) expect(() => unlinkSync(stagingDb)).not.toThrow()
     } finally {
       await validator.dispose()
       rmSync(tmp, { recursive: true, force: true })

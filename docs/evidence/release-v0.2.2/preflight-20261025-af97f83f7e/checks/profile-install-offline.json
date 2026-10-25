@@ -1,0 +1,18 @@
+{
+  "status": 0,
+  "args": [
+    "--expose-internals",
+    "E:/Laptop/softwares/DSH/resources/app.asar/dsh/node_modules/@deepseek-ai/dsh-desktop-host/lib/cli.js",
+    "plugin",
+    "--profile",
+    "release022-rc3-probe",
+    "add",
+    "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-preflight-af97f83f7e\\candidate-final\\dsh-word-lookup-0.2.2.tgz",
+    "--offline",
+    "--ignore-scripts",
+    "--store-dir",
+    "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-preflight-af97f83f7e\\profile-probe-5b5d90fa\\pnpm-store"
+  ],
+  "profile": "release022-rc3-probe",
+  "home": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-preflight-af97f83f7e\\profile-probe-5b5d90fa\\home"
+}

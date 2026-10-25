@@ -5,14 +5,14 @@
  * - Worker supervisor with unique request ID tracking.
  * - Strict worker lifecycle management: timeout, AbortSignal cancellation, crash handling.
  * - Bounded concurrency constraint (default 1 concurrent worker, configurable).
- * - Guaranteed worker termination and Windows file handle release proof.
+ * - Bounded caller settlement, with physical exit tracking retained until an exit event.
  * - Fail-closed error classification (TIMEOUT, CANCELLED, INVALID_SQLITE_FILE, INVALID_DATABASE_SCHEMA, MISSING_REQUIRED_INDEX, etc.).
  * - Graceful host disposal without unhandled rejections or dangling worker threads.
  *
  * @module dsh-word-lookup/host/custom-dictionary-validator
  */
 import type { URL } from 'node:url';
-import { type WorkerLike } from './ecdict-integrity-verifier.js';
+import { WorkerTerminationError, type WorkerLike } from './ecdict-integrity-verifier.js';
 import type { CompanionWorkerRequest, CustomSnapshotCreateSuccessResponse, CustomSnapshotValidateSuccessResponse, CustomSnapshotPrePublishCheckSuccessResponse } from './ecdict-integrity-worker.js';
 /** Error thrown when TOCTOU tampering or file modification is detected during verification or publishing. */
 export declare class SnapshotTamperingError extends Error {
@@ -47,12 +47,22 @@ export declare class ValidatorExecutionError extends Error {
     readonly durationMs?: number;
     constructor(message: string, code: string, durationMs?: number);
 }
+/** Comparison key only: retain original spellings for I/O and existing containment checks. */
+export declare function customWorkerPathIdentity(path: string): string;
+/** Caller failure is distinct from physical exit; compatible with managed uncertainty consumers. */
+export declare class CustomWorkerTerminationError extends WorkerTerminationError {
+    readonly code = "TERMINATION_UNCONFIRMED";
+    readonly terminationError: unknown;
+    constructor(primary: unknown, terminationError: unknown);
+}
 /** Options for configuring the CustomDictionaryValidator. */
 export interface CustomDictionaryValidatorOptions {
     /** Maximum concurrent worker tasks. Defaults to 1 (serial isolation). */
     readonly maxConcurrency?: number;
     /** Default timeout in milliseconds for operations. Defaults to 30,000 ms. */
     readonly defaultTimeoutMs?: number;
+    /** Exit-confirmation deadline after cancellation/failure. Defaults to 5000ms, like the managed verifier. */
+    readonly terminationTimeoutMs?: number;
     /** Optional Worker adapter factory (for testing). */
     readonly workerAdapter?: (request: CompanionWorkerRequest) => WorkerLike;
     /** Optional worker URL override. */
@@ -97,4 +107,7 @@ export declare class CustomDictionaryValidator {
      * Dispose supervisor, aborting in-flight workers and rejecting queued tasks.
      */
     dispose(): Promise<void>;
+    /** Paths stay protected after caller failure and disposal until physical exit is observed. */
+    isPathInUse(path: string): boolean;
+    get hasUnconfirmedWorkers(): boolean;
 }

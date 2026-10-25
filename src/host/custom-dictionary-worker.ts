@@ -16,7 +16,8 @@
 import { closeSync, existsSync, openSync, readSync, statSync, unlinkSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { DatabaseSync } from 'node:sqlite'
-import { parentPort, workerData } from 'node:worker_threads'
+import { SCHEMA_VERSION } from './fixture.js'
+import { parseDictionarySchemaVersion } from './schema-version.js'
 
 /** Request payload for snapshot creation. */
 export interface CustomSnapshotCreateRequest {
@@ -432,24 +433,26 @@ export function executeCustomSnapshotValidate(
     }
 
     const metaRow = db.prepare("SELECT value FROM meta WHERE key = 'schema_version'").get() as { value?: unknown } | undefined
-    if (!metaRow || typeof metaRow.value !== 'string') {
+    let schemaVersion: number
+    try {
+      schemaVersion = parseDictionarySchemaVersion(metaRow?.value)
+    } catch (error: unknown) {
       return {
         action: 'CUSTOM_SNAPSHOT_VALIDATE',
         requestId,
         success: false,
         errorCode: 'INVALID_SCHEMA_VERSION',
-        message: 'Table "meta" is missing valid "schema_version" entry',
+        message: error instanceof Error ? error.message : 'Invalid schema_version',
       }
     }
 
-    const schemaVersion = Number.parseInt(metaRow.value, 10)
-    if (Number.isNaN(schemaVersion) || schemaVersion !== 1) {
+    if (schemaVersion !== SCHEMA_VERSION) {
       return {
         action: 'CUSTOM_SNAPSHOT_VALIDATE',
         requestId,
         success: false,
         errorCode: 'INVALID_SCHEMA_VERSION',
-        message: `Database schema_version is ${metaRow.value}, expected 1`,
+        message: `Database schema_version is ${metaRow?.value}, expected ${SCHEMA_VERSION}`,
       }
     }
 
@@ -675,24 +678,6 @@ export function executeCustomSnapshotValidate(
         // Suppress secondary close error
       }
     }
-  }
-}
-
-// Standalone execution if started directly as workerData
-if (parentPort && workerData && typeof workerData === 'object' && 'action' in workerData) {
-  const req = workerData as
-    | CustomSnapshotCreateRequest
-    | CustomSnapshotValidateRequest
-    | CustomSnapshotPrePublishCheckRequest
-  if (req.action === 'CUSTOM_SNAPSHOT_CREATE') {
-    const res = executeCustomSnapshotCreate(req)
-    parentPort.postMessage(res)
-  } else if (req.action === 'CUSTOM_SNAPSHOT_VALIDATE') {
-    const res = executeCustomSnapshotValidate(req)
-    parentPort.postMessage(res)
-  } else if (req.action === 'CUSTOM_SNAPSHOT_PRE_PUBLISH_CHECK') {
-    const res = executeCustomSnapshotPrePublishCheck(req)
-    parentPort.postMessage(res)
   }
 }
 

@@ -1,0 +1,41 @@
+{
+  "node": "v24.21.0",
+  "electron": "44.7.0",
+  "packages": {
+    "dsh": {
+      "version": "0.2.1-rc.3"
+    },
+    "dsh-desktop-host": {
+      "version": "0.2.1-rc.3"
+    },
+    "dsh-client-connection": {
+      "version": "0.2.1-rc.3"
+    }
+  },
+  "files": {
+    "cli": {
+      "sha256": "ed8bd3ca840d67599bde74f940cdb1714f7b7a98cecd166705a42a661e5cd1b7",
+      "bytes": 5607
+    },
+    "bin": {
+      "sha256": "80112efe368efb1a39720c7ada0af00442e5131fb2744edaaff8a3e8bb499e6f",
+      "bytes": 11772
+    },
+    "connection": {
+      "sha256": "0ebcca7583e082716f79b0b55bc1749d48269cc8db2989b043b321b57abd3684",
+      "bytes": 44434
+    },
+    "home-paths": {
+      "sha256": "9877a6117c5def69b61fae12f70a7a7400894a9dc4a9f7069ce4cc58aeb66e9d",
+      "bytes": 8228
+    },
+    "dump-config": {
+      "sha256": "f587b1725a0b5cd1ca3d9c7f04bf7192fb076f1ca88fb7b79591157003e5efa3",
+      "bytes": 90
+    },
+    "plugin": {
+      "sha256": "90ecf1a560df0795198a572266fd6644c8ddf1a87f65990110d6caf5223c5b75",
+      "bytes": 5928
+    }
+  }
+}

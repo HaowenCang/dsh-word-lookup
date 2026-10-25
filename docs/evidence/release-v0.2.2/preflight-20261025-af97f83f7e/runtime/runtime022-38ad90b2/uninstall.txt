@@ -1,0 +1,7 @@
+✓ Lockfile passes supply-chain policies (verified 19s ago)
+Already up to date
+
+dependencies:
+- dsh-word-lookup 0.2.2
+
+Done in 455ms using pnpm v11.28.5

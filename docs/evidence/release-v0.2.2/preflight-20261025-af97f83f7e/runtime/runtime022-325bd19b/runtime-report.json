@@ -1,0 +1,697 @@
+{
+  "runId": "325bd19b",
+  "requestedBaseline": "Current installed DSH (user described RC 1.3)",
+  "actualBaseline": "0.2.1-rc.3",
+  "status": "FAIL",
+  "startedAt": "2026-10-25T13:18:11.002Z",
+  "isolation": {
+    "testRoot": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-preflight-af97f83f7e\\runtime022-325bd19b",
+    "home": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-preflight-af97f83f7e\\runtime022-325bd19b\\home",
+    "profile": "release022-rc3-325bd19b",
+    "port": 54510
+  },
+  "candidate": {
+    "path": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-preflight-af97f83f7e\\candidate-rc3\\dsh-word-lookup-0.2.2.tgz",
+    "sha256": "5311ac80bfa6140d0c843654ce2031641343a43026576bed08f0f85acace1131"
+  },
+  "observations": [
+    {
+      "id": "actual-version",
+      "status": "PASS",
+      "details": {
+        "version": "0.2.1-rc.3",
+        "nodeCarrier": "24.21.0",
+        "invocation": {
+          "cmd": "E:/Laptop/softwares/DSH/DeepSeek Harness.exe",
+          "baseArgs": [
+            "--expose-internals",
+            "E:/Laptop/softwares/DSH/resources/app.asar/dsh/node_modules/@deepseek-ai/dsh-desktop-host/lib/cli.js"
+          ]
+        }
+      }
+    },
+    {
+      "id": "new-profile-created",
+      "status": "PASS"
+    },
+    {
+      "id": "installed-package-isolation",
+      "status": "PASS",
+      "details": {
+        "canonical": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-preflight-af97f83f7e\\runtime022-325bd19b\\home\\profiles\\release022-rc3-325bd19b\\node_modules\\dsh-word-lookup"
+      }
+    },
+    {
+      "id": "installed-payload-exact",
+      "status": "PASS"
+    },
+    {
+      "id": "plugin-loaded",
+      "status": "PASS"
+    },
+    {
+      "id": "fixture-active",
+      "status": "PASS"
+    },
+    {
+      "id": "real-fixture-lookup",
+      "status": "PASS"
+    }
+  ],
+  "boots": [
+    {
+      "pid": 2964,
+      "startedAt": 1792934297704,
+      "origin": "http://127.0.0.1:54510",
+      "wasRunningAtShutdown": true,
+      "terminationReason": "OWNED_TEST_SHUTDOWN",
+      "exitedAt": 1792934323217,
+      "exitCode": 1,
+      "signalCode": null,
+      "portFree": true
+    }
+  ],
+  "classification": {
+    "fixture": "REAL_HOST_SQLITE",
+    "formatting": "CONTROLLED_RESPONSE",
+    "realEcdict": "NOT_EXECUTED",
+    "desktop": "NOT_EXECUTED"
+  },
+  "network": {
+    "mode": "Observe and block every non-loopback attempt through instrumented Node APIs and browser",
+    "status": "NOT_VERIFIED"
+  },
+  "cleanup": {
+    "status": "PASS",
+    "testRoot": "RETAINED",
+    "portFree": true
+  },
+  "harnessSha256": "a360b3bf02a2127df10e6f0879cfadbabcf9a620a5574d1acd5cd95fc1510222",
+  "observerSha256": "21d78f26d5cae9082f758ee5230e9565e0d106771c4c0ea87e702223131f66a9",
+  "pageErrorDetails": [],
+  "installedMembers": [
+    {
+      "path": "LICENSE",
+      "sha256": "99922c2a61954f0eaef1591241bcaaac4d3c8984a9866840180d65f7a1ff8101"
+    },
+    {
+      "path": "README.md",
+      "sha256": "8268c3a27e627ef112bbf2a8f378a9ee02dd5130449010b502bb8e53da6379d7"
+    },
+    {
+      "path": "cordis.patch.yml",
+      "sha256": "df9851e21b59cafc69f91b0839c7cd56cb53104c57644813d9001e1a76c7d868"
+    },
+    {
+      "path": "corpus/ecdict.manifest.json",
+      "sha256": "03cba27d42cb43551d7b51fa12e4a07a869c5d4b65ac07f4fa3d105d9c944044"
+    },
+    {
+      "path": "lib/client.js",
+      "sha256": "a4becec431e045e589d1164bc8826a9c9722d719369bf5715c4a44f592729c6b"
+    },
+    {
+      "path": "lib/ecdict-integrity-worker.js",
+      "sha256": "91aa9a1e333628a04f497be00aeb996b1571069c5cdc1fd3d228babfdadd27af"
+    },
+    {
+      "path": "lib/index.js",
+      "sha256": "46e61f9d0b9f0e98186087276c8943f6b84a8ce2d93b369c80836e0fc9066d40"
+    },
+    {
+      "path": "package.json",
+      "sha256": "5c4ffa86dcf269d14c6a84a3cbfa44a0577812e835a64901fd5cdb808fc6a389"
+    }
+  ],
+  "fixture": {
+    "status": {
+      "ok": true,
+      "activeMode": "fixture",
+      "configuredMode": "fixture",
+      "activeSource": "sqlite-fixture",
+      "activeIdentity": "fixture",
+      "activeSnapshotId": null,
+      "customSnapshotStatus": null,
+      "customSnapshots": [],
+      "installed": false,
+      "installedCorpus": null,
+      "fixtureStats": {
+        "entryCount": 7,
+        "formCount": 11,
+        "version": "phase3-fixture-1"
+      },
+      "currentOperation": null,
+      "lastOperation": null,
+      "canInstall": true,
+      "canCancel": false,
+      "canRemove": false,
+      "canActivateCustom": true,
+      "canSwitchMode": true,
+      "quarantined": false,
+      "quarantineReason": null,
+      "recoveryError": null,
+      "settingsSyncState": "pending",
+      "settingsSyncError": null,
+      "lastRollbackError": null,
+      "lastRetirementError": null,
+      "generation": 1
+    },
+    "word": {
+      "ok": true,
+      "found": true,
+      "query": "derive",
+      "headword": "derive",
+      "phonetic": "/dɪˈraɪv/",
+      "meanings": [
+        {
+          "partOfSpeech": "verb",
+          "definition": "obtain something from a specified source; originate in",
+          "translation": "导出；派生；源自"
+        }
+      ],
+      "forms": [
+        {
+          "form": "derived",
+          "kind": "past"
+        },
+        {
+          "form": "derives",
+          "kind": "third-person singular"
+        },
+        {
+          "form": "deriving",
+          "kind": "present participle"
+        }
+      ],
+      "matchedForm": null,
+      "examples": [
+        {
+          "en": "The result must derive from the boundary conditions alone.",
+          "zh": "该结果只能由边界条件导出。"
+        },
+        {
+          "en": "This identity derives from Gauss’s law.",
+          "zh": "这一恒等式源自高斯定律。"
+        }
+      ],
+      "source": "sqlite-fixture",
+      "settings": {
+        "autoDoubleClick": false,
+        "autoSelection": false
+      }
+    }
+  },
+  "error": {
+    "name": "TimeoutError",
+    "message": "page.waitForResponse: Timeout 10000ms exceeded while waiting for event \"response\""
+  },
+  "visibleUi": {
+    "buttons": [
+      {
+        "text": "",
+        "label": "New session"
+      },
+      {
+        "text": "",
+        "label": "Collapse sidebar"
+      },
+      {
+        "text": "New Session\nCtrl\n+\nAlt\n+\nN",
+        "label": "New session"
+      },
+      {
+        "text": "Plugins",
+        "label": "Plugins"
+      },
+      {
+        "text": "Automation tasks",
+        "label": "Automation tasks"
+      },
+      {
+        "text": "More",
+        "label": "More"
+      },
+      {
+        "text": "",
+        "label": "Search sessions"
+      },
+      {
+        "text": "",
+        "label": "View options"
+      },
+      {
+        "text": "",
+        "label": "Add workspace"
+      },
+      {
+        "text": "",
+        "label": "Workspace actions for Default workspace"
+      },
+      {
+        "text": "",
+        "label": "New session in Default workspace"
+      },
+      {
+        "text": "More",
+        "label": "Account menu"
+      },
+      {
+        "text": "",
+        "label": "Open right sidebar"
+      },
+      {
+        "text": "Default workspace",
+        "label": "Choose workspace"
+      },
+      {
+        "text": "Standard mode",
+        "label": null
+      },
+      {
+        "text": "",
+        "label": "Add files or run commands"
+      },
+      {
+        "text": "Workspace Write",
+        "label": "Access mode, current: Workspace Write"
+      },
+      {
+        "text": "Select model",
+        "label": "Select model"
+      },
+      {
+        "text": "",
+        "label": "Send message"
+      },
+      {
+        "text": "",
+        "label": "New tab"
+      },
+      {
+        "text": "",
+        "label": "Split"
+      },
+      {
+        "text": "",
+        "label": "Fullscreen"
+      },
+      {
+        "text": "",
+        "label": "Collapse right sidebar"
+      }
+    ],
+    "navs": [
+      "Plugins\nAutomation tasks\nMore"
+    ],
+    "dialogs": []
+  },
+  "endedAt": "2026-10-25T13:18:43.220Z",
+  "browserRequests": [
+    {
+      "time": 1792934299390,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/",
+      "method": "GET"
+    },
+    {
+      "time": 1792934299452,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/plugins/",
+      "method": "GET"
+    },
+    {
+      "time": 1792934299453,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/plugins/",
+      "method": "GET"
+    },
+    {
+      "time": 1792934299454,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/plugins/",
+      "method": "GET"
+    },
+    {
+      "time": 1792934299456,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/assets/index-BXV-oxvX.js",
+      "method": "GET"
+    },
+    {
+      "time": 1792934299456,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/assets/vendor-DcuzkuQH.js",
+      "method": "GET"
+    },
+    {
+      "time": 1792934299457,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/assets/vendor-DV2921Zo.css",
+      "method": "GET"
+    },
+    {
+      "time": 1792934299457,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/assets/index-BNyAYEM7.css",
+      "method": "GET"
+    },
+    {
+      "time": 1792934299550,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/manifest.webmanifest",
+      "method": "GET"
+    },
+    {
+      "time": 1792934300333,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/settings/describe",
+      "method": "POST"
+    },
+    {
+      "time": 1792934300334,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/dsh-word-lookup/dictionary/status",
+      "method": "GET"
+    },
+    {
+      "time": 1792934300336,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/dynamicCordisRunner/syncInspectManifest",
+      "method": "POST"
+    },
+    {
+      "time": 1792934300338,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/credentials/describe",
+      "method": "POST"
+    },
+    {
+      "time": 1792934300338,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/dynamicCordisRunner/inventory",
+      "method": "POST"
+    },
+    {
+      "time": 1792934300339,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/open-in-app/apps",
+      "method": "GET"
+    },
+    {
+      "time": 1792934300339,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/session/modelCatalog",
+      "method": "POST"
+    },
+    {
+      "time": 1792934300341,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/plugins/events",
+      "method": "GET"
+    },
+    {
+      "time": 1792934300410,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/agentPresets/list",
+      "method": "POST"
+    },
+    {
+      "time": 1792934300426,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/favicon.svg",
+      "method": "GET"
+    },
+    {
+      "time": 1792934300430,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/favicon.svg",
+      "method": "GET"
+    },
+    {
+      "time": 1792934300437,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/credentials/describe",
+      "method": "POST"
+    },
+    {
+      "time": 1792934300439,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/credentials/describe",
+      "method": "POST"
+    },
+    {
+      "time": 1792934300439,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/credentials/describe",
+      "method": "POST"
+    },
+    {
+      "time": 1792934300452,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/session/list",
+      "method": "POST"
+    },
+    {
+      "time": 1792934300454,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/permissionPresets/catalog",
+      "method": "POST"
+    },
+    {
+      "time": 1792934300455,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/dynamicCordisRunner/inventory",
+      "method": "POST"
+    },
+    {
+      "time": 1792934300456,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/agentPresets/list",
+      "method": "POST"
+    },
+    {
+      "time": 1792934300456,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/agentPresets/list",
+      "method": "POST"
+    },
+    {
+      "time": 1792934300456,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/session/modelCatalog",
+      "method": "POST"
+    },
+    {
+      "time": 1792934300456,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/settings/describe",
+      "method": "POST"
+    },
+    {
+      "time": 1792934300458,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/dynamicCordisRunner/syncInspectManifest",
+      "method": "POST"
+    },
+    {
+      "time": 1792934300482,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/workspace/initializeDefault",
+      "method": "POST"
+    },
+    {
+      "time": 1792934300495,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/credentials/describe",
+      "method": "POST"
+    },
+    {
+      "time": 1792934300496,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/credentials/describe",
+      "method": "POST"
+    },
+    {
+      "time": 1792934300497,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/credentials/describe",
+      "method": "POST"
+    },
+    {
+      "time": 1792934300593,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/session/create",
+      "method": "POST"
+    },
+    {
+      "time": 1792934300726,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/agentPresets/list",
+      "method": "POST"
+    },
+    {
+      "time": 1792934300738,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/commands/list",
+      "method": "POST"
+    },
+    {
+      "time": 1792934300740,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/skills/list",
+      "method": "POST"
+    },
+    {
+      "time": 1792934309738,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/settings/mutate",
+      "method": "POST"
+    },
+    {
+      "time": 1792934309911,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/session/modelCatalog",
+      "method": "POST"
+    },
+    {
+      "time": 1792934309912,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/settings/describe",
+      "method": "POST"
+    },
+    {
+      "time": 1792934309959,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/llm/listProviders",
+      "method": "POST"
+    },
+    {
+      "time": 1792934309959,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/llm/listConfigurableProviders",
+      "method": "POST"
+    },
+    {
+      "time": 1792934309973,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/settings/describe",
+      "method": "POST"
+    },
+    {
+      "time": 1792934309999,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/credentials/describe",
+      "method": "POST"
+    },
+    {
+      "time": 1792934310000,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/credentials/describe",
+      "method": "POST"
+    },
+    {
+      "time": 1792934310002,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/credentials/describe",
+      "method": "POST"
+    },
+    {
+      "time": 1792934310002,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/session/modelCatalog",
+      "method": "POST"
+    },
+    {
+      "time": 1792934310008,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/credentials/describe",
+      "method": "POST"
+    },
+    {
+      "time": 1792934310015,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/credentials/describe",
+      "method": "POST"
+    },
+    {
+      "time": 1792934310448,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/dsh-word-lookup/dictionary/status",
+      "method": "GET"
+    },
+    {
+      "time": 1792934311018,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/dsh-word-lookup/dictionary/status",
+      "method": "GET"
+    },
+    {
+      "time": 1792934311022,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/dsh-word-lookup",
+      "method": "POST"
+    },
+    {
+      "time": 1792934320468,
+      "phase": "installed",
+      "origin": "http://127.0.0.1:54510",
+      "path": "/api/dsh-word-lookup/dictionary/status",
+      "method": "GET"
+    }
+  ],
+  "pageErrors": []
+}

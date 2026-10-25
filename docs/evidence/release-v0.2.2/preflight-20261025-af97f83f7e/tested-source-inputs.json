@@ -1,0 +1,1285 @@
+{
+  "algorithm": "SHA-256 over raw bytes; aggregate over compact JSON array; docs/evidence excluded to avoid self-reference",
+  "inputs": [
+    {
+      "path": "LICENSE",
+      "bytes": 1089,
+      "sha256": "99922c2a61954f0eaef1591241bcaaac4d3c8984a9866840180d65f7a1ff8101"
+    },
+    {
+      "path": "README.md",
+      "bytes": 20547,
+      "sha256": "8268c3a27e627ef112bbf2a8f378a9ee02dd5130449010b502bb8e53da6379d7"
+    },
+    {
+      "path": "cordis.patch.yml",
+      "bytes": 415,
+      "sha256": "df9851e21b59cafc69f91b0839c7cd56cb53104c57644813d9001e1a76c7d868"
+    },
+    {
+      "path": "corpus/ecdict.manifest.json",
+      "bytes": 566,
+      "sha256": "03cba27d42cb43551d7b51fa12e4a07a869c5d4b65ac07f4fa3d105d9c944044"
+    },
+    {
+      "path": "lib/client.js",
+      "bytes": 198730,
+      "sha256": "a4becec431e045e589d1164bc8826a9c9722d719369bf5715c4a44f592729c6b"
+    },
+    {
+      "path": "lib/ecdict-integrity-worker.js",
+      "bytes": 29261,
+      "sha256": "91aa9a1e333628a04f497be00aeb996b1571069c5cdc1fd3d228babfdadd27af"
+    },
+    {
+      "path": "lib/index.js",
+      "bytes": 361993,
+      "sha256": "46e61f9d0b9f0e98186087276c8943f6b84a8ce2d93b369c80836e0fc9066d40"
+    },
+    {
+      "path": "lib/types/client/card.d.ts",
+      "bytes": 1809,
+      "sha256": "40178af832e40ab852aec1410b4d1e7e4273fe759cae49a3803a08475b191b56"
+    },
+    {
+      "path": "lib/types/client/contracts.d.ts",
+      "bytes": 1565,
+      "sha256": "177343c38d1da5f239a641aa4dfced619fc66a752c5039db4705c201b30d10be"
+    },
+    {
+      "path": "lib/types/client/gesture.d.ts",
+      "bytes": 24246,
+      "sha256": "828fdc20270829e1a31833212e4cd2314594d44d910ac4101d12702043e0fe9f"
+    },
+    {
+      "path": "lib/types/client/index.d.ts",
+      "bytes": 13410,
+      "sha256": "47eea258aeb987806bbc85aca0337729e87ae09d1fcf871f5547d9e93edce6c5"
+    },
+    {
+      "path": "lib/types/client/lifecycle.d.ts",
+      "bytes": 1232,
+      "sha256": "4b59a8c330e4d72db76edea92e4df1960d927452dc55bed26fa9be9e3983392a"
+    },
+    {
+      "path": "lib/types/client/lookup.d.ts",
+      "bytes": 6089,
+      "sha256": "aafb5acf0ce02ecacdf9b63aa7d9f90097ced20fb4870c02be2c68da5b03be81"
+    },
+    {
+      "path": "lib/types/client/position.d.ts",
+      "bytes": 2252,
+      "sha256": "5224980bbe185a94f99c375e71d754d4c8aef907c719e9453d5e14ef00abf23b"
+    },
+    {
+      "path": "lib/types/client/selection.d.ts",
+      "bytes": 7468,
+      "sha256": "91401763dd76a45869a5fb6938df9966715da80548503f6979354758048f8f71"
+    },
+    {
+      "path": "lib/types/client/settings/dictionary-management-store.d.ts",
+      "bytes": 3830,
+      "sha256": "f9d908fc87a3e8542d2fa23e01a93739b68455e5b0a560fed20e4340e82034e3"
+    },
+    {
+      "path": "lib/types/client/settings/dictionary-management-transport.d.ts",
+      "bytes": 3658,
+      "sha256": "90b17671978cd5fb2bfa5b05432a01013a4c5d514dd63c72c97f18d2e9f6ad5d"
+    },
+    {
+      "path": "lib/types/client/settings/dictionary-settings-components.d.ts",
+      "bytes": 9208,
+      "sha256": "bf7099af0c3a598fda1ec3afc433a650ac555cc9a8d25122b6e7ad67b564eeee"
+    },
+    {
+      "path": "lib/types/client/settings/dictionary-settings-section.d.ts",
+      "bytes": 2489,
+      "sha256": "f37d564ebdc3cdfa26693df6c7fded03044fc0a066330dd6fa9cc9842622779e"
+    },
+    {
+      "path": "lib/types/client/settings/snapshot-eligibility.d.ts",
+      "bytes": 264,
+      "sha256": "70ac6f3483e28a762fd27d5d7ad52e9f7c15f535efb4869eb46e80c82dbd9203"
+    },
+    {
+      "path": "lib/types/client/store.d.ts",
+      "bytes": 3235,
+      "sha256": "12081d84c03ee8768a6e228848c069e362451d90ea16c363f1e52c77666d1df7"
+    },
+    {
+      "path": "lib/types/client/transport.d.ts",
+      "bytes": 2176,
+      "sha256": "49623ed9c8c2d298cc756c17e23890815685e9d99d03dd7178cb9b2ef017875e"
+    },
+    {
+      "path": "lib/types/client/trigger.d.ts",
+      "bytes": 10021,
+      "sha256": "a646f6ab56b0f3359b695dbcc30044b45e302104fd8068aad43eda425c4e238d"
+    },
+    {
+      "path": "lib/types/host/config.d.ts",
+      "bytes": 7016,
+      "sha256": "65a8d97973f5e85ff388fba30b929013d42b8a8356019ede3e8b87c663c665e8"
+    },
+    {
+      "path": "lib/types/host/corpus-db.d.ts",
+      "bytes": 3304,
+      "sha256": "1b4befc254a1bb9a39614964021e53d1c9da5ad3baa8ef0f578fdd6ea966320b"
+    },
+    {
+      "path": "lib/types/host/csv-parser.d.ts",
+      "bytes": 1385,
+      "sha256": "71d63986022989671e7b81030c1717403884118e1a96a7e2225dfb734882fc2f"
+    },
+    {
+      "path": "lib/types/host/custom-dictionary-validator.d.ts",
+      "bytes": 5530,
+      "sha256": "41d921f1f5f09b5c99385ca2692dc48ec4a4ed1bbe598a242d7abcab69132e75"
+    },
+    {
+      "path": "lib/types/host/custom-dictionary-worker.d.ts",
+      "bytes": 4899,
+      "sha256": "725fc901c91141d802908b06582aaa586746d9678f9aff1b03ef7ef51bb1ca55"
+    },
+    {
+      "path": "lib/types/host/custom-snapshot-manager.d.ts",
+      "bytes": 14258,
+      "sha256": "8adb9e1af2b83a173b09a15cded6f470ec210f1bc1346e45fb9373290d0658ff"
+    },
+    {
+      "path": "lib/types/host/dictionary-activation.d.ts",
+      "bytes": 12839,
+      "sha256": "b5e75a5d90f9fbd9e3d2b4d4f35fbb3be5c3d2a1d5b4ceddfea8475bc6436d7d"
+    },
+    {
+      "path": "lib/types/host/dictionary-management-route.d.ts",
+      "bytes": 3583,
+      "sha256": "4e99211fc12279c9d6f6bc1d4b2ee719a60e97006ef103c48d0b7915c748bb96"
+    },
+    {
+      "path": "lib/types/host/dictionary-manager.d.ts",
+      "bytes": 6820,
+      "sha256": "a59a9e37640af16d322f21a9e711028d593015d4f068f993d4876d4854c89232"
+    },
+    {
+      "path": "lib/types/host/dictionary-operations.d.ts",
+      "bytes": 9957,
+      "sha256": "5abbc11dd16ab4f1cdab0344c6cdf314477467a8903d2dd2dc6cd9ddeb316b26"
+    },
+    {
+      "path": "lib/types/host/dictionary.d.ts",
+      "bytes": 5865,
+      "sha256": "4a457958225389c8c41912990a1139ea7050e7c1e0f073f19ce0640fc022ace6"
+    },
+    {
+      "path": "lib/types/host/ecdict-downloader.d.ts",
+      "bytes": 10004,
+      "sha256": "a795f9c83e86a54b79cae7f7dc190c926d469e2b70b0b098b823f3860b812d52"
+    },
+    {
+      "path": "lib/types/host/ecdict-importer.d.ts",
+      "bytes": 15372,
+      "sha256": "0831c4564868e314dab85e6d27b8d7d0a9d8bfdd42cf86fac50c2a3f8dd49c86"
+    },
+    {
+      "path": "lib/types/host/ecdict-integrity-verifier.d.ts",
+      "bytes": 11363,
+      "sha256": "5a24909de4c96e0fb71c3d8171c6eb3fdcd2759defe1a349afc962547c045a1f"
+    },
+    {
+      "path": "lib/types/host/ecdict-integrity-worker.d.ts",
+      "bytes": 2580,
+      "sha256": "be14f7ccf7fe7f81655ace160aaf84fe2518009797b2678ca4be7c2914a4f6d2"
+    },
+    {
+      "path": "lib/types/host/ecdict-source.d.ts",
+      "bytes": 5448,
+      "sha256": "196bc32aaefa68c78c575a796fcc79d0c910de6d4cd5339bf7e55f9fe5d75e3c"
+    },
+    {
+      "path": "lib/types/host/exchange-parser.d.ts",
+      "bytes": 2020,
+      "sha256": "45ceae315c4565d55cfbd27c130ed160b5e63306bdad90884cbb427a3b0e63e0"
+    },
+    {
+      "path": "lib/types/host/fixture-db.d.ts",
+      "bytes": 3398,
+      "sha256": "af45f1d2322bc2c8aa315ca8d72ae2e52af82c77159673a6335b69947eec94c9"
+    },
+    {
+      "path": "lib/types/host/fixture.d.ts",
+      "bytes": 10097,
+      "sha256": "f2d6ceaf8699033e325be225ad9b9e37b06398becfcf6a612cba28c3889fd60b"
+    },
+    {
+      "path": "lib/types/host/lookup.d.ts",
+      "bytes": 2376,
+      "sha256": "ee42c9f3cc46f91470250436ae1d064d16f4c96eb1716ef71b926a9052793559"
+    },
+    {
+      "path": "lib/types/host/managed-storage.d.ts",
+      "bytes": 18722,
+      "sha256": "e4908efad4c407a29acfc2d27f7c0a202aeca5ac801d87dc1fd21639eb3f174b"
+    },
+    {
+      "path": "lib/types/host/route.d.ts",
+      "bytes": 2023,
+      "sha256": "b3f7a8c682d3f3cfdd75bbd81c41dfe7cf2b4504a3798d59f701c9840571fa53"
+    },
+    {
+      "path": "lib/types/host/schema-version.d.ts",
+      "bytes": 234,
+      "sha256": "2f3f91734c2d67f023e4a665298aca91b9ce649ab0a9b518e644a917b2093821"
+    },
+    {
+      "path": "lib/types/host/sqlite-dictionary.d.ts",
+      "bytes": 4946,
+      "sha256": "ed3f2f7c74cfee55d1c92aa83aa26874656109ae70ed86f69a2016e848539718"
+    },
+    {
+      "path": "lib/types/index.d.ts",
+      "bytes": 11005,
+      "sha256": "951ed9762d4a17ca58e44b6694de7430c15a95560f5c40b8787cc16865224f16"
+    },
+    {
+      "path": "lib/types/shared/dictionary-management-protocol.d.ts",
+      "bytes": 15614,
+      "sha256": "2892073d01190bdffccd3f35a3e76e3fc80b4c032691e4aa002665cc5a580298"
+    },
+    {
+      "path": "lib/types/shared/protocol.d.ts",
+      "bytes": 5956,
+      "sha256": "24ce222ab7486e4cdafd1dea94f7ccd2a4716f670f4c8e3a72dc1f51eaa2126c"
+    },
+    {
+      "path": "lib/types/shared/text.d.ts",
+      "bytes": 6454,
+      "sha256": "97431a4ed0961aa72df16cb6f2e450e8b0ecc083b486147f5764da9b1212b819"
+    },
+    {
+      "path": "package-lock.json",
+      "bytes": 107332,
+      "sha256": "d72e734b5bb75b8cc2e4ad7cea17ed0e38e973ea28180bd981ef872647c3544a"
+    },
+    {
+      "path": "package.json",
+      "bytes": 5535,
+      "sha256": "5c4ffa86dcf269d14c6a84a3cbfa44a0577812e835a64901fd5cdb808fc6a389"
+    },
+    {
+      "path": "scripts/assert-isolated-env.d.mts",
+      "bytes": 3584,
+      "sha256": "ee2e8dcd7120ee0dd00a20fb1f95a6a33773688861f582ece31511a1cefafa1c"
+    },
+    {
+      "path": "scripts/assert-isolated-env.mjs",
+      "bytes": 14527,
+      "sha256": "8afba708337b355e4bb1f847697d0d72a472176caba7dba9bd7acdfe7a115952"
+    },
+    {
+      "path": "scripts/benchmark-corpus.mjs",
+      "bytes": 7866,
+      "sha256": "4d10fe92e350ce5c40049667e474ecb39a62fff59bed655bb3066511adbb4f9f"
+    },
+    {
+      "path": "scripts/build-fixture-db.mjs",
+      "bytes": 10757,
+      "sha256": "52a3b7fdbf4bfa2e0c51ff4b4755599e35bdb4fa64fdf57386a96d56aa81914f"
+    },
+    {
+      "path": "scripts/build-production-db.d.mts",
+      "bytes": 786,
+      "sha256": "fc2d31bc0b376ac7bd5d097437d834f1e1f05970c2979a4673bdd320c6f3e6eb"
+    },
+    {
+      "path": "scripts/build-production-db.mjs",
+      "bytes": 26803,
+      "sha256": "78becd9e082b55e2429e5f1e57a0c32ee9dc43764d82c2035c0c89b0f5096895"
+    },
+    {
+      "path": "scripts/bundle-check-rules.d.mts",
+      "bytes": 131,
+      "sha256": "fb79e3b15d49d687bb765af7c29efa0e0221c1e7b8972e2f17eee6fcca472132"
+    },
+    {
+      "path": "scripts/bundle-check-rules.mjs",
+      "bytes": 4700,
+      "sha256": "a84bc1fe8b8409db0f9ead6ef23e892db198e6e04364cbe4efca5ddcae51d7c5"
+    },
+    {
+      "path": "scripts/check-bundle.mjs",
+      "bytes": 17069,
+      "sha256": "ce5283d8056fd244d21d9585ab5287eaeb55137c536bae7e8b22f06c5e0450b0"
+    },
+    {
+      "path": "scripts/cleanup-test-profile.mjs",
+      "bytes": 4389,
+      "sha256": "dda2598812eba8fb0bc63bd37f1cee81994c6c434a156dfa737fd5d46db5f78b"
+    },
+    {
+      "path": "scripts/create-test-profile.mjs",
+      "bytes": 7565,
+      "sha256": "696a07baf5b23aecb2cf73a5bd40840a1bbdbb3ff7ea01b74f2399b8d3b78b3f"
+    },
+    {
+      "path": "scripts/fetch-corpus.mjs",
+      "bytes": 3325,
+      "sha256": "ac1fb2c8a9acd031839998c7d317a1150b21b716f01801c46bdc06c92adea26b"
+    },
+    {
+      "path": "scripts/iso-profile.mjs",
+      "bytes": 5813,
+      "sha256": "07eac5c7909507ff20a016420c880abff8f747ca0901a492589992f46211e4f4"
+    },
+    {
+      "path": "scripts/isolated-run-directory.d.mts",
+      "bytes": 838,
+      "sha256": "b7cb3c1e824251cbb12b7f4bef0639fab9db19c44d11c94beff04907dce25051"
+    },
+    {
+      "path": "scripts/isolated-run-directory.mjs",
+      "bytes": 7070,
+      "sha256": "9f7e3eedffe2895bb500c3e2223eeb733af4e78d8be1bdd9d649da8674abdd78"
+    },
+    {
+      "path": "scripts/lib/corpus-source.d.mts",
+      "bytes": 1040,
+      "sha256": "a26e7ce61310fd921554a6f2ea50b3606f959ca42127bee451dfab8f9db39fec"
+    },
+    {
+      "path": "scripts/lib/corpus-source.mjs",
+      "bytes": 7387,
+      "sha256": "b345a3dd6d924b5c25b123c0e3d9f5dd9f156b8a59fb31b6561cd93e96440386"
+    },
+    {
+      "path": "scripts/maintenance-m1-browser-smoke.d.mts",
+      "bytes": 427,
+      "sha256": "3ee777656192fabdfd475057fbeb9d26d07b195163cd9db0b6b84b9d52dbaa21"
+    },
+    {
+      "path": "scripts/maintenance-m1-browser-smoke.mjs",
+      "bytes": 22667,
+      "sha256": "b07f5b9092ed5b0d777c78c639b99db103aeff22b8a3bbf713c7c6c55176ccfa"
+    },
+    {
+      "path": "scripts/phase1-verify.mjs",
+      "bytes": 145648,
+      "sha256": "a5bd8ed99426438fc2df3f3211e254b202caedb588dfc16c691d7bd852856689"
+    },
+    {
+      "path": "scripts/phase42-probe.mjs",
+      "bytes": 32319,
+      "sha256": "cec5d4947220f52b137a5618736d55b2da22a725aaa889f7cb49b90a154c54f2"
+    },
+    {
+      "path": "scripts/phase421-instrument-logic.d.mts",
+      "bytes": 2002,
+      "sha256": "541cf710c8345e99864a089bbebdf3eb76df68d252d76c116ce486be07450801"
+    },
+    {
+      "path": "scripts/phase421-instrument-logic.mjs",
+      "bytes": 14460,
+      "sha256": "c2a5cd7f6f2f7a7d8dfc419131122b5b669f95d81cbda6f401fd3b18a2ad27dc"
+    },
+    {
+      "path": "scripts/phase421-native-input-probe.mjs",
+      "bytes": 76232,
+      "sha256": "8bc5b0632424fdf2e19ea45e87de007f32cf8e1035edd5d36b6295a5ab470652"
+    },
+    {
+      "path": "scripts/phase5-browser-acceptance.mjs",
+      "bytes": 70555,
+      "sha256": "9bc2a2a0334e1688c0b023c1dc35236a3fb250d77c42c5d6a269c4a764681a42"
+    },
+    {
+      "path": "scripts/phase612-final-verify.mjs",
+      "bytes": 24727,
+      "sha256": "c43c05ccc14eed350768975138d79d07fe68661bf7d1d1380e00cc1130f613b9"
+    },
+    {
+      "path": "scripts/phase7a6-management-runtime.mjs",
+      "bytes": 14601,
+      "sha256": "6021ea19f96f64b56d14ccd24e23450902eede31effc9877433688395fddae34"
+    },
+    {
+      "path": "scripts/phase7a7-settings-e2e.mjs",
+      "bytes": 81729,
+      "sha256": "00fefd26c55816ed439d86a5dddb67b0972b0f2061e0ef6a3e0bfd5e61ed45df"
+    },
+    {
+      "path": "scripts/probe-phase7a0.mjs",
+      "bytes": 26309,
+      "sha256": "ad045b5ae436bfc1cd233505d4fb5d9b06bdfb8c0ba62c6044bf11a5e89c340b"
+    },
+    {
+      "path": "scripts/probes/phase7a10/release-smoke.mjs",
+      "bytes": 32141,
+      "sha256": "0ea0abd55df8a1e5585529796af77448a646eb4bd1902d7342e01851a50225ba"
+    },
+    {
+      "path": "scripts/probes/phase7a8-0/p01-p07-sqlite-safety.d.mts",
+      "bytes": 642,
+      "sha256": "6b2399131047beebd5df06fe1e99166916814883f95d6544504fcf1e3aec0875"
+    },
+    {
+      "path": "scripts/probes/phase7a8-0/p01-p07-sqlite-safety.mjs",
+      "bytes": 26028,
+      "sha256": "50fe92f0b7d3e75853d8b49987e929485ff461a2b9cfa82e9ab07b2f3983df3b"
+    },
+    {
+      "path": "scripts/probes/phase7a8-0/p08-p09-event-loop-worker.d.mts",
+      "bytes": 142,
+      "sha256": "8cf6b87745d4920406af013c5ecf8b5ba0c4cf372975304dcd2666ede4add7d1"
+    },
+    {
+      "path": "scripts/probes/phase7a8-0/p08-p09-event-loop-worker.mjs",
+      "bytes": 17552,
+      "sha256": "c73d9e696f202e10de1a46c772e7e45d331fb44a34b500db0b9b20dbfcc0f741"
+    },
+    {
+      "path": "scripts/probes/phase7a8-0/p10-p13-activation-lifecycle.d.mts",
+      "bytes": 143,
+      "sha256": "23ba6dd704054fd8bb13efa661a93cb7a3fc3277335676902def1c1e1ce86224"
+    },
+    {
+      "path": "scripts/probes/phase7a8-0/p10-p13-activation-lifecycle.mjs",
+      "bytes": 42431,
+      "sha256": "0e6d91d388ba33136051b130e04eb455934bee3497982b02ff96d934c6bd0b6e"
+    },
+    {
+      "path": "scripts/probes/phase7a8-0/p14-p20-shortcuts.d.mts",
+      "bytes": 133,
+      "sha256": "2e9a0383038cef279e863611304bd4682779e67be575779215ae74242ccedeb8"
+    },
+    {
+      "path": "scripts/probes/phase7a8-0/p14-p20-shortcuts.mjs",
+      "bytes": 21027,
+      "sha256": "c49bf88098e7437d7b813dfce138b0f50218b947ede04c5422fa45ea8e406088"
+    },
+    {
+      "path": "scripts/probes/phase7a8-0/probes.d.mts",
+      "bytes": 603,
+      "sha256": "4d4c657fab34f03745122cf89f62dd72e6d2d214a720e235005deba50d78d033"
+    },
+    {
+      "path": "scripts/probes/phase7a8-0/run-all-probes.mjs",
+      "bytes": 4595,
+      "sha256": "1ffc9a7d18835d9633f60af75cdd71b2f244280722157831994ce79a44ef4779"
+    },
+    {
+      "path": "scripts/probes/phase7a8-1a/c01-c24-snapshot-matrix.mjs",
+      "bytes": 40000,
+      "sha256": "7c7e52acd38fb30371114a95ecbf8bcb92b1b2bf0e996ae796cbe0b2f5c02176"
+    },
+    {
+      "path": "scripts/probes/phase7a8-1ar/r01-r22-acceptance-matrix.mjs",
+      "bytes": 51484,
+      "sha256": "a4987b91e7d213e0308b44e63bc65ecd640746d4c161df0cbc74be1d6ca54f53"
+    },
+    {
+      "path": "scripts/probes/phase7a8-1ar2/l01-l12-acceptance-matrix.mjs",
+      "bytes": 32982,
+      "sha256": "30198be8cb1cf848d465c988b279d27333145b74575080d874d4099876d81ab8"
+    },
+    {
+      "path": "scripts/probes/phase7a8-1br2/r01-r20-acceptance-matrix.mjs",
+      "bytes": 58088,
+      "sha256": "e8b107450db08ada4196357dfaa27a7fb0747280dc9679e6cce3d7de58dbf97e"
+    },
+    {
+      "path": "scripts/probes/phase7a8-2/capability-probes.d.mts",
+      "bytes": 523,
+      "sha256": "b7b7572f1ae285a6261e75f3734377dac2eb103d31ce686d88305bdb6da6169b"
+    },
+    {
+      "path": "scripts/probes/phase7a8-2/capability-probes.mjs",
+      "bytes": 13515,
+      "sha256": "6f36f0b0464dcadb5c2c369b28c9b9fb3b4a7ec026a8117165d9de2948dfdf13"
+    },
+    {
+      "path": "scripts/probes/phase7a9/rc-a-large-database-benchmark.mjs",
+      "bytes": 33151,
+      "sha256": "68a0ae6b98a940a203a0afcac2d9e4e7bff7569932c999fce243e4bb82e28a59"
+    },
+    {
+      "path": "scripts/probes/phase7a9/rc-b-process-crash-injection.mjs",
+      "bytes": 46761,
+      "sha256": "e6243d0ef485687dbbc535ad8de676249c83ac36e0d1d9d963554430c074327b"
+    },
+    {
+      "path": "scripts/probes/phase7a9/rc-c-multi-snapshot-ui.mjs",
+      "bytes": 46471,
+      "sha256": "051f89661985a8e370e0ea589d4d0577734504dfa00ed381e308a999ddc63de0"
+    },
+    {
+      "path": "scripts/probes/phase7a9/rc-c-negative-controls.mjs",
+      "bytes": 9155,
+      "sha256": "44e33f366041b1ed08e6c110c0adbf4732fc1def303866075533364e401d945e"
+    },
+    {
+      "path": "scripts/probes/phase7a9/rc-d-recording-lock-probe.mjs",
+      "bytes": 16414,
+      "sha256": "8e585825fcbca0defffcec2f153fcdc386a6938d618f05d975e7738ec7ad44a0"
+    },
+    {
+      "path": "scripts/probes/phase7a9/rc-e-store-package-install.mjs",
+      "bytes": 22123,
+      "sha256": "e0846bb833d2de16bbb282c4afefd6204d095ce1dbff0ddafc1d51a9145373d6"
+    },
+    {
+      "path": "scripts/probes/phase7a9/rc-f-historical-provenance-audit.mjs",
+      "bytes": 26385,
+      "sha256": "ea6aa1e3f3a210ea04d7c20863f245c51e892a624363739d27ba43bc56dcafdb"
+    },
+    {
+      "path": "scripts/probes/phase7a9/rc-package-identity.mjs",
+      "bytes": 15253,
+      "sha256": "1f1d6eca56682e89a71f1404fad27993057e0b43facea81b1c0f28d4a6561492"
+    },
+    {
+      "path": "scripts/probes/release-v0.2.1/release-smoke.d.mts",
+      "bytes": 2038,
+      "sha256": "aa85c230655636eff4df8827ef6f5f3e0e68e028b3e84a4946f712f59bfb9597"
+    },
+    {
+      "path": "scripts/probes/release-v0.2.1/release-smoke.mjs",
+      "bytes": 52596,
+      "sha256": "b6461304ede2341fe80484c17d1f319f08ed5a6041f6a2281102e70a900f1850"
+    },
+    {
+      "path": "scripts/profile-install.mjs",
+      "bytes": 9724,
+      "sha256": "893423bfe91ccb8f1be248dbce7775e40994afbd1d7a97f4aaec0263e50cf09d"
+    },
+    {
+      "path": "scripts/redact.d.mts",
+      "bytes": 819,
+      "sha256": "0bf497b9ad0559bc17c4d039cb62fbaa49defcb25c780b77be3d838526c466d2"
+    },
+    {
+      "path": "scripts/redact.mjs",
+      "bytes": 2197,
+      "sha256": "20aab1330e62c3357dc91066eb301dcc0f66d0c61ca24c2994ef387e1292c6c1"
+    },
+    {
+      "path": "scripts/run-integration-test.mjs",
+      "bytes": 3878,
+      "sha256": "cf2d5b4f060f7bd3a1a28e4d5289fc29c517e563b610813c0758d80ee8bb0597"
+    },
+    {
+      "path": "scripts/scan-credentials.mjs",
+      "bytes": 6820,
+      "sha256": "49fa04493f044cee412eff5ea3d20e01f0e53b21da51139f9a4738a7ac43d935"
+    },
+    {
+      "path": "scripts/smoke-verdict.d.mts",
+      "bytes": 2210,
+      "sha256": "7d34c77bc4570d03106d03e0151a3c27150a7c11da037a38d378a5f4cec51407"
+    },
+    {
+      "path": "scripts/smoke-verdict.mjs",
+      "bytes": 7844,
+      "sha256": "32b6ef59f5b50ed69b94f06839fcc752bc6718695f07354b417bf3162c62b99d"
+    },
+    {
+      "path": "scripts/store-lifecycle-verify.mjs",
+      "bytes": 23833,
+      "sha256": "c627d275cacc8d99c4f08fc613666bf37c3cbbbea0bf964e309038349f364670"
+    },
+    {
+      "path": "scripts/store-worker-audit.d.mts",
+      "bytes": 403,
+      "sha256": "1b9e2ef73ef9da038453e80fb6afcc9f35586a7c26853c75151e4e10044b6373"
+    },
+    {
+      "path": "scripts/store-worker-audit.mjs",
+      "bytes": 6703,
+      "sha256": "41af3252b4099c4c6ffbfdaefe053159e0d84d537fd860e6be40ba99e77dade0"
+    },
+    {
+      "path": "scripts/store1306-final-verify.mjs",
+      "bytes": 33914,
+      "sha256": "05b3442e19170f34e4b0389ba1cef0f12271e3b50194df54e0779fdaa02d4f5f"
+    },
+    {
+      "path": "scripts/test-corpus-runtime.mjs",
+      "bytes": 25335,
+      "sha256": "5673f4cda258283645862430e982d3adb7f084cca65c725b6239cf395325a075"
+    },
+    {
+      "path": "scripts/test-ecdict-download-runtime.mjs",
+      "bytes": 7609,
+      "sha256": "28edf9e5f08c91b7766eece290399df3c130c7dc798cedf0a17f64135b37ddb9"
+    },
+    {
+      "path": "scripts/test-ecdict-import-runtime.mjs",
+      "bytes": 18411,
+      "sha256": "f0a531bee9be0fecc7bb3257bf1c892a8951183cd185e8ac074471d27b436740"
+    },
+    {
+      "path": "scripts/test-phase7a6-management-e2e.mjs",
+      "bytes": 32134,
+      "sha256": "6116115a82e9b3232b986f96d5d7e4bc314bf00640c01dfa8c5e655b93e7a0fb"
+    },
+    {
+      "path": "scripts/test-phase7a8-1b-e2e.mjs",
+      "bytes": 29809,
+      "sha256": "7ea37fbb6d3dec0b0195ea22ff0420e75a2f028e47f3953f0c5b838b373446fb"
+    },
+    {
+      "path": "scripts/test-phase7a8-1br2-e2e.mjs",
+      "bytes": 20791,
+      "sha256": "17cd3ee03b8151c7d5bd77b8ec974827b2863e2ea40567a130da797d04c1a6b5"
+    },
+    {
+      "path": "scripts/test-phase7a8-2-settings-e2e.mjs",
+      "bytes": 43502,
+      "sha256": "0cf92991a57f95fbddb7236f2afb3af2f319b728128b41efbd6c897e93c2ee06"
+    },
+    {
+      "path": "scripts/test-storage-runtime.mjs",
+      "bytes": 14459,
+      "sha256": "01cedc829f56e0a0a74512bf00fc469b6567a4efa244258f0f000d6d2ed7ad97"
+    },
+    {
+      "path": "scripts/verify-production-db.d.mts",
+      "bytes": 644,
+      "sha256": "7fea2212d7c74e7526a6d664ab5677f85989941c74b314c6124623f4c28ec7b5"
+    },
+    {
+      "path": "scripts/verify-production-db.mjs",
+      "bytes": 11870,
+      "sha256": "fbd8c0646fc3599a94dc56f591039152eead9e1f06c6af0d8df526a0919a3389"
+    },
+    {
+      "path": "scripts/verify-source.d.mts",
+      "bytes": 227,
+      "sha256": "313449ee8631a1403bea4d4b5c484edbf3694b734f433fa4095e9b2a4ab8d6ef"
+    },
+    {
+      "path": "scripts/verify-source.mjs",
+      "bytes": 8722,
+      "sha256": "41c5d344be05acacca93bb3fc7f3f329de2c4b3f064569c624e5220af2d54a48"
+    },
+    {
+      "path": "scripts/verify-store-contract.mjs",
+      "bytes": 22209,
+      "sha256": "c0959ca1aff07a3353ebe117c577658cad42949632617aaa485ebe31476c7ec8"
+    },
+    {
+      "path": "scripts/verify.mjs",
+      "bytes": 3124,
+      "sha256": "f4c1076929efc08583352b09815faa2da575a4926c9f7d9d007a95b77d62dbd2"
+    },
+    {
+      "path": "scripts/windows-native-mouse-probe.ps1",
+      "bytes": 31384,
+      "sha256": "64aebc56fc3a348ff3bb7829ab0c8800be59fbea79ed4de5d11e4c6ed3f8256b"
+    },
+    {
+      "path": "src/client/card.tsx",
+      "bytes": 18872,
+      "sha256": "b279192f0e99ce9580655352a05a6cca0167591e111270eb3f2d11094cacfde6"
+    },
+    {
+      "path": "src/client/contracts.ts",
+      "bytes": 2240,
+      "sha256": "cd3f33c06da693390dd3939dd8daf8bed8e69d4be470610e52b3564e0b0bbc11"
+    },
+    {
+      "path": "src/client/gesture.ts",
+      "bytes": 30548,
+      "sha256": "ea94c332c5e403dfbea24869fa8b01eb1299c06b2be0f68a7ecf8aa3cd8e99b2"
+    },
+    {
+      "path": "src/client/index.tsx",
+      "bytes": 34628,
+      "sha256": "494eb298d1d26b53da06dc69769054908e2bf3db7839545929643e5bebd2b5ca"
+    },
+    {
+      "path": "src/client/lifecycle.ts",
+      "bytes": 1747,
+      "sha256": "9a9d6c169dfcfaed210f95b0647ade4cb76907f012ea622dbda3248e7868f67f"
+    },
+    {
+      "path": "src/client/lookup.ts",
+      "bytes": 8324,
+      "sha256": "77d5f298479609316c83b0958523b0157043dec8f960e19183e85e028705a346"
+    },
+    {
+      "path": "src/client/position.ts",
+      "bytes": 4124,
+      "sha256": "7871f9b2ac1bd806178d709f347a13126a6c159120adef4300c48848a76ee793"
+    },
+    {
+      "path": "src/client/selection.ts",
+      "bytes": 13699,
+      "sha256": "33620b51e651275adc18211a17c9917c2ecaccfd2d87decd7861f8ebfbab238c"
+    },
+    {
+      "path": "src/client/settings/dictionary-management-store.ts",
+      "bytes": 14616,
+      "sha256": "831f24423a5e949e06b3a7150c7edc7ea828ccbccc63f29e8b57290d689e0a05"
+    },
+    {
+      "path": "src/client/settings/dictionary-management-transport.ts",
+      "bytes": 8617,
+      "sha256": "bbbf773ed4a777ea051d99594ed6a673e6d2f110424e8c14fc8a32a223ccaf36"
+    },
+    {
+      "path": "src/client/settings/dictionary-settings-components.tsx",
+      "bytes": 44882,
+      "sha256": "efcf08dd98f22896b83c70d4cc269561f4372a9c9f7b71fab35533119d86b63b"
+    },
+    {
+      "path": "src/client/settings/dictionary-settings-section.tsx",
+      "bytes": 60669,
+      "sha256": "701acdfcc7c0e434f229fdacd90dcd4fe2c669312eb091113fe30c60794614da"
+    },
+    {
+      "path": "src/client/settings/snapshot-eligibility.ts",
+      "bytes": 324,
+      "sha256": "a9a1931bcd434587f4c6b49ea15cb83c5009f24d975ec87414b3c713cf1d968a"
+    },
+    {
+      "path": "src/client/store.ts",
+      "bytes": 4043,
+      "sha256": "3fc2e52192dc463b316de74a780d81a2692f8d8a3c100544082bb1a50f37977b"
+    },
+    {
+      "path": "src/client/transport.ts",
+      "bytes": 3870,
+      "sha256": "86684fecf82766533e1413c4056b3327c05ed96a2be27553184fbc783d780846"
+    },
+    {
+      "path": "src/client/trigger.ts",
+      "bytes": 12257,
+      "sha256": "3a8235ec095176dd5453bdecb5f338704515075190a1c617776e42fac49b2af7"
+    },
+    {
+      "path": "src/host/config.ts",
+      "bytes": 5709,
+      "sha256": "c8c9b7b7a7f8f8d2728a1913724c532cf2d08f0f565bd080052e44b3c9370682"
+    },
+    {
+      "path": "src/host/corpus-db.ts",
+      "bytes": 11203,
+      "sha256": "4d2e4ef53de85a1de5cdc8dd4f7371701ed1867ab387934ec4a7c5e9f801859a"
+    },
+    {
+      "path": "src/host/csv-parser.ts",
+      "bytes": 5044,
+      "sha256": "ecb84d41677155c7f5967ae7dab9293e9da0acbbf21e7f8b59af5e0348e785ad"
+    },
+    {
+      "path": "src/host/custom-dictionary-validator.ts",
+      "bytes": 19832,
+      "sha256": "7b61c078d0f6d261041776b3693a0cdcb5f16b14a728e2787bac065a83ce55de"
+    },
+    {
+      "path": "src/host/custom-dictionary-worker.ts",
+      "bytes": 26234,
+      "sha256": "63b3e5479aca1a975da435ed928c2f6b383fd2fcdb2546bae20e57dbd1a89b56"
+    },
+    {
+      "path": "src/host/custom-snapshot-manager.ts",
+      "bytes": 73870,
+      "sha256": "74bfedfaf55a3fd7aab355ca02191a67f92df5b9b1053864cabf28f36b5419ee"
+    },
+    {
+      "path": "src/host/dictionary-activation.ts",
+      "bytes": 65208,
+      "sha256": "d234bad7ffbab11c7817d3fd5cf114038ba1b1a2947857cfd5323d278c37aadc"
+    },
+    {
+      "path": "src/host/dictionary-management-route.ts",
+      "bytes": 26220,
+      "sha256": "3b8e0976bde7c7278c0163788c8e45913962284fd8c1c5c3bbe54423ea08966d"
+    },
+    {
+      "path": "src/host/dictionary-manager.ts",
+      "bytes": 10737,
+      "sha256": "bdeff0b5b014576a97438b68308db4a7a171fe02fd79087591c1e5d9a32a97c6"
+    },
+    {
+      "path": "src/host/dictionary-operations.ts",
+      "bytes": 48961,
+      "sha256": "0923a6703e0de5b75b7148627615e06f0481b483269945f3f6ef35a0330befd9"
+    },
+    {
+      "path": "src/host/dictionary.ts",
+      "bytes": 5764,
+      "sha256": "36d5fe619175f30bcf144c1f63e969939b1b2e3ee26d045cd97a0564e973b155"
+    },
+    {
+      "path": "src/host/ecdict-downloader.ts",
+      "bytes": 29285,
+      "sha256": "f806e4396937aa433fa9fdd541380ce4d016a87c861a5f95f8aa5275083b1c17"
+    },
+    {
+      "path": "src/host/ecdict-importer.ts",
+      "bytes": 52878,
+      "sha256": "e00bc9c8d5296998ad9c56e36c7cb9b74272dbd971d7647a9f1a0cd99e54ed73"
+    },
+    {
+      "path": "src/host/ecdict-integrity-verifier.ts",
+      "bytes": 40116,
+      "sha256": "5088c88452ce19cbab4eba451de5e2d1d23fb0d0d39ae9d6b33653c10acf4ed1"
+    },
+    {
+      "path": "src/host/ecdict-integrity-worker.ts",
+      "bytes": 7265,
+      "sha256": "fd5b41cebd33ae4140a96c7d42de8eaedd24a14bad59e64e5ff6eb2c00245b60"
+    },
+    {
+      "path": "src/host/ecdict-source.ts",
+      "bytes": 9818,
+      "sha256": "f91f4d73b16ec4f29a6859af0432acdec65e713ea26fbf37cfcc8cef4e3c3b67"
+    },
+    {
+      "path": "src/host/exchange-parser.ts",
+      "bytes": 5542,
+      "sha256": "b6413885355a3ae482ef0e6ddd0ca114df679d7261e88d2b3e5b7ef3b94e5627"
+    },
+    {
+      "path": "src/host/fixture-db.ts",
+      "bytes": 4666,
+      "sha256": "591c590b6a017b7882212fb196caa5a45d8731f0d107c1363c5d7b2ec52d40bc"
+    },
+    {
+      "path": "src/host/fixture.ts",
+      "bytes": 22046,
+      "sha256": "7c3ea0d28f7d935b489e7e5c77daed6ddb7d0e7d0da5f0bd6a1f20d4b10ad57b"
+    },
+    {
+      "path": "src/host/lookup.ts",
+      "bytes": 7858,
+      "sha256": "a186114c0ab84562b3a75646e2ede3578c9fc43edc91ed883e89a1a555108484"
+    },
+    {
+      "path": "src/host/managed-storage.ts",
+      "bytes": 48643,
+      "sha256": "6b3945a73e098508ea696f3d30fd2f68e5cc566fe5c1c729228fc967c40759d4"
+    },
+    {
+      "path": "src/host/route.ts",
+      "bytes": 1952,
+      "sha256": "5398427e6649d747ef529f8599a5b51a9ddf06e1c4d9c65cb6bb315266a06b39"
+    },
+    {
+      "path": "src/host/schema-version.ts",
+      "bytes": 550,
+      "sha256": "7206980c7b44481ca85f4418d6339d77b00fc7c5b06a64e00626239c088d85a9"
+    },
+    {
+      "path": "src/host/sqlite-dictionary.ts",
+      "bytes": 15089,
+      "sha256": "fc24a7bd8ed60fe424aa58896006ea7b474bbf2f5ba3438c96f02073b17d8913"
+    },
+    {
+      "path": "src/index.ts",
+      "bytes": 15568,
+      "sha256": "9f3edacac641fc6e3d6561bfd52c88314d3ce0421dabf97ad79b29eedc20cf9c"
+    },
+    {
+      "path": "src/shared/dictionary-management-protocol.ts",
+      "bytes": 15080,
+      "sha256": "ec1a7efb7b9dc3d8e608ef55f097e45ae7145eca4894b7383959a79afeb555d9"
+    },
+    {
+      "path": "src/shared/protocol.ts",
+      "bytes": 5817,
+      "sha256": "a73137ab177c5c443a6ecec71ba00f836eec464b062b6b2ee7ac58c28c744532"
+    },
+    {
+      "path": "src/shared/text.ts",
+      "bytes": 12192,
+      "sha256": "85b76fa56a8a640a6e3e83227df278d5e1d6690fe4b2b0350d75754209e8db3f"
+    },
+    {
+      "path": "tests/bug002-catalog-recovery.spec.ts",
+      "bytes": 19764,
+      "sha256": "4a49c2a5d073b3c8111018b0ba83084a1f9110d64d58e25c76c463d293ec06ea"
+    },
+    {
+      "path": "tests/bug007-cleanup.spec.ts",
+      "bytes": 18424,
+      "sha256": "955d3f81481e697b5aa97153d8f5a7d4dc4390cb008756f0128d662dd5c06142"
+    },
+    {
+      "path": "tests/bundle-check-rules.spec.ts",
+      "bytes": 2303,
+      "sha256": "1fba95c1a0ed8d0165434aa0ce1f32b2f6e0ea3c64df558e8bf4129135d998b2"
+    },
+    {
+      "path": "tests/client-card-interaction.spec.ts",
+      "bytes": 14361,
+      "sha256": "e07037abbdb2a718522aac322f89d58395c711952485099381ff5cd993f3f566"
+    },
+    {
+      "path": "tests/client-card-render.spec.ts",
+      "bytes": 32175,
+      "sha256": "48571bf42d58cf1851db60bae9e17fe17d8fff6115105a308ff35c0e777ac65e"
+    },
+    {
+      "path": "tests/client-dismiss-race.spec.ts",
+      "bytes": 6654,
+      "sha256": "ff3d157eaeb31a9436ae506f6ba9eb45d4af1456527e9ddb48f49baefba20b73"
+    },
+    {
+      "path": "tests/client-gesture-identity.spec.ts",
+      "bytes": 8698,
+      "sha256": "c60cb27e93c80168c87c322a04b6217973af6327b9736e4149171b5a43087a0a"
+    },
+    {
+      "path": "tests/client-gesture.spec.ts",
+      "bytes": 18227,
+      "sha256": "405c5bce89870c4554bfcf0dd82893816ce9bd50a2d3c209fbf01e964069997b"
+    },
+    {
+      "path": "tests/client-io-boundary.spec.ts",
+      "bytes": 11129,
+      "sha256": "c675b8037cc6ae56eff535b293068f89296498b4c2960ae45c9b3d500bb4555f"
+    },
+    {
+      "path": "tests/client-lookup.spec.ts",
+      "bytes": 14497,
+      "sha256": "7061a416a7473800b2469cca2bceb3a5c41289d1a527ce4cebc8734b4f1260a8"
+    },
+    {
+      "path": "tests/client-management-store.spec.ts",
+      "bytes": 15782,
+      "sha256": "f1be8516d8815ea3c109803dbf08ad008426cadb0f724f1a25da61537658c1a7"
+    },
+    {
+      "path": "tests/client-management-transport.spec.ts",
+      "bytes": 12873,
+      "sha256": "90312069c759e53a0ee47b97e38ec4ceaba14dc5960b5504e5baa572d8879524"
+    },
+    {
+      "path": "tests/client-position.spec.ts",
+      "bytes": 4835,
+      "sha256": "c7b92816b5738df0a3a74d27230fac248128860ad756f194697e7c586b4c030d"
+    },
+    {
+      "path": "tests/client-runtime-harness.spec.ts",
+      "bytes": 60915,
+      "sha256": "f048cb2ccbd8cd68dcbf273bf4832ef81326f5a4314db5d55f07c6b904491ec6"
+    },
+    {
+      "path": "tests/client-runtime.spec.ts",
+      "bytes": 6531,
+      "sha256": "0cb399edbcdee581c2a4c107d7eee1c39fa56f455d24fc09b0af20f57d2f1c50"
+    },
+    {
+      "path": "tests/client-selection.spec.ts",
+      "bytes": 14970,
+      "sha256": "2faadf89ef0ccfc8f8946c2523374406ccfaea03daa2fcf565d8236217ba321c"
+    },
+    {
+      "path": "tests/client-settings-registration.spec.ts",
+      "bytes": 5068,
+      "sha256": "725d21dc36c1128567f7a1ba29e35fcb509b94dbc2a5c69a12bddc7d906e2d8d"
+    },
+    {
+      "path": "tests/client-settings-ui.spec.ts",
+      "bytes": 31169,
+      "sha256": "cdf389738a6a5366f119de051357ac1cb485259adf3a63337fb9eac4c70f8888"
+    },
+    {
+      "path": "tests/client-trigger.spec.ts",
+      "bytes": 20347,
+      "sha256": "887101ef45ca7def1fa424783c312b3c823362b3a7fcd2dbe0e81d7bc1daac2c"
+    },
+    {
+      "path": "tests/cordis-lifecycle-management.spec.ts",
+      "bytes": 30288,
+      "sha256": "325b2330fef7b2713360ba9c79cd92823fe4cabbaf7bee2b58d685d0ad06083c"
+    },
+    {
+      "path": "tests/corpus-builder-safety.spec.ts",
+      "bytes": 13240,
+      "sha256": "3049f78e0dce6bc22bc8f7e344167c1c8ac9ec8948ce6ae45306044ad71f4ac1"
+    },
+    {
+      "path": "tests/corpus-production.spec.ts",
+      "bytes": 12476,
+      "sha256": "a1f1ef6783996fbd4a9ba3864f6bf80eb029de38663650e0d12abe8cf36f8631"
+    },
+    {
+      "path": "tests/corpus-verify.spec.ts",
+      "bytes": 9209,
+      "sha256": "937daf48a1c01216ecbb0fac5be1105d62e0ff9827ec48cdabd4ca026a1bfd31"
+    },
+    {
+      "path": "tests/csv-parser.spec.ts",
+      "bytes": 5022,
+      "sha256": "948a0d1ea6bf0ff5dc311a273e5286599af3c4e8144311762f0392e78d3c2d3c"
+    },
+    {
+      "path": "tests/custom-sqlite-snapshot-matrix.spec.ts",
+      "bytes": 45270,
+      "sha256": "6b4b25c5dc6323d94d5b18747811d71af9ab99b657d91bfb401d0a4bdcb92cb5"
+    },
+    {
+      "path": "tests/custom-worker-protocol.spec.ts",
+      "bytes": 6149,
+      "sha256": "9a1ade0520efa321ee464b6ad6e35540ebd14010247d3633d3ead3ee09bfde2c"
+    },
+    {
+      "path": "tests/custom-worker-test-helpers.ts",
+      "bytes": 2273,
+      "sha256": "7d7a01ad64c5410f7929127f9039c62a61d42096f91e81cc8f7e714ebe5d956c"
+    },
+    {
+      "path": "tests/dictionary-activation.spec.ts",
+      "bytes": 40761,
+      "sha256": "c155612c5d8986e82858037cfd0ade481715685c89b96192a17e128f0e543efe"
+    },
+    {
+      "path": "tests/dictionary-management-route.spec.ts",
+      "bytes": 23981,
+      "sha256": "97d80b403ad46cbc6aa1300e10e42d5470b761bd07150eaa8304a3d6b1706432"
+    },
+    {
+      "path": "tests/dictionary-manager.spec.ts",
+      "bytes": 29846,
+      "sha256": "8e46c15ce1e33b53935b4002cdd822e8c5d072bde076e0ccd04c0782aaa05f10"
+    },
+    {
+      "path": "tests/dictionary-operations.spec.ts",
+      "bytes": 70606,
+      "sha256": "3225006a4fe4304d3651a0e07512e1a3b35af8329aed07b96b8a8c821ce41a9b"
+    },
+    {
+      "path": "tests/ecdict-concurrency-quarantine.spec.ts",
+      "bytes": 13679,
+      "sha256": "a40bb177d18c72f7ecf3e485d0cba1d3fe672b324c62402838a778d6469d24a0"
+    },
+    {
+      "path": "tests/ecdict-downloader.spec.ts",
+      "bytes": 50533,
+      "sha256": "28c2270375f47d7931539658dfb2cf91f9a9ff9829af2e8d5d6f2a84020bde75"
+    },
+    {
+      "path": "tests/ecdict-importer.spec.ts",
+      "bytes": 50367,
+      "sha256": "75426625bdb62212dde415a65b3d672b4102fe47426ca70116d0b05d78bf5099"
+    },
+    {
+      "path": "tests/ecdict-integrity-worker.spec.ts",
+      "bytes": 15552,
+      "sha256": "456c8d80d3c05f286112cc75e3eb82a13903f1a35fcb500265af2f5f7e5beae7"
+    },
+    {
+      "path": "tests/ecdict-source.spec.ts",
+      "bytes": 8998,
+      "sha256": "d2e2b5a0db04c2269a8c1ad5e3245a32f1764054b39628e56e0e3c5c0c8769f8"
+    },
+    {
+      "path": "tests/environment-removal.spec.ts",
+      "bytes": 4861,
+      "sha256": "25a73e2b6c522b5178e235d6d0192df90f62f0c2a6fb8125a77927c60f8b9984"
+    },
+    {
+      "path": "tests/exchange-parser.spec.ts",
+      "bytes": 3115,
+      "sha256": "d83d54da91f5ff9f7996d25fd74637f8f171fbc5464e9a2980db15aa500193b8"
+    },
+    {
+      "path": "tests/fault-state-and-supervisor-lifecycle.spec.ts",
+      "bytes": 18535,
+      "sha256": "971725d9016502879835afe803fb02ee5854865ec094e722a8710d3069fb9e10"
+    },
+    {
+      "path": "tests/host-config.spec.ts",
+      "bytes": 7528,
+      "sha256": "94306fcf881ca14fbd35b3dd06286ed97808bef5dba5648c84921a7ac0977d63"
+    },
+    {
+      "path": "tests/host-dictionary.spec.ts",
+      "bytes": 12024,
+      "sha256": "d8b0eef8b1061012edad686a4c2815a9090bf2deaf6df2029d424e6648968526"
+    },
+    {
+      "path": "tests/host-fixture-db.spec.ts",
+      "bytes": 13314,
+      "sha256": "1f29d036ae5573f901cf33eedb19aa81b9fc49a51d479dd3f95346489aafe306"
+    },
+    {
+      "path": "tests/host-lookup.spec.ts",
+      "bytes": 14056,
+      "sha256": "c11a43b086bad6a485d91b5f7469ffeea6a50b8071ea2ca22953e0165b2b8d07"
+    },
+    {
+      "path": "tests/host-route.spec.ts",
+      "bytes": 3474,
+      "sha256": "0300d78d939ce6aea7d81dc780d4f9c7b7e547b00015083d0cc042a194200257"
+    },
+    {
+      "path": "tests/host-sqlite-safety.spec.ts",
+      "bytes": 12218,
+      "sha256": "269d1877499802bdd530c2a7e8aa7e9fa3b8c5b23e85d0f906d66d127f699890"
+    },
+    {
+      "path": "tests/iso-guard.spec.ts",
+      "bytes": 9515,
+      "sha256": "a7fdfbd50a3a2682538c55055bafaa5aa43b1c9a428d58f5e392efe9a3244311"
+    },
+    {
+      "path": "tests/isolated-run-directory.spec.ts",
+      "bytes": 14780,
+      "sha256": "3384afe6ef39ef763f7e30f833dd945bc8a4f27b9c956155eb5afdd3110f6b59"
+    },
+    {
+      "path": "tests/managed-storage.spec.ts",
+      "bytes": 21746,
+      "sha256": "d0acd71ac2891b08cb2b84961cc61ce0a561f757945ba0b557d1b56d107912b3"
+    },
+    {
+      "path": "tests/npm-tarball-worker-verification.spec.ts",
+      "bytes": 5783,
+      "sha256": "ae4ac0ff4c721679376b212e76a4f33a5a4f0434f8610c0923d5a23d1b37caaa"
+    },
+    {
+      "path": "tests/phase421-probe-logic.spec.ts",
+      "bytes": 10917,
+      "sha256": "50f12a28f0a75ecf1808f5ce15897b3378de1667f56eba216c6b73b2f70e6138"
+    },
+    {
+      "path": "tests/phase7a8-1ar-scenarios.spec.ts",
+      "bytes": 36077,
+      "sha256": "60647f220ec8f3f7bbe2a0dfcdc3b5995abb2057549d72fcda7ea50b735c03f1"
+    },
+    {
+      "path": "tests/phase7a8-1ar2-scenarios.spec.ts",
+      "bytes": 28339,
+      "sha256": "58551f6e0f93933a70e3b0c8f60176bec9e0077a5461ec0f8cc4b9cf7499a0f4"
+    },
+    {
+      "path": "tests/phase7a8-1b-activation-matrix.spec.ts",
+      "bytes": 41630,
+      "sha256": "8c25de14e8bb5cfd81aa29dbf2f585b45bb0ea177358d9e70e4013458ad84af2"
+    },
+    {
+      "path": "tests/phase7a8-1br-activation-recovery.spec.ts",
+      "bytes": 39276,
+      "sha256": "b7b38e64057a371334db652e8115068a17988612dfee0ba0148203dc3ea7b309"
+    },
+    {
+      "path": "tests/phase7a8-1br2-scenarios.spec.ts",
+      "bytes": 44173,
+      "sha256": "ce2b5f08a7e235bb5b083f7aa7a5642e6a2f9252a2c1e9b8c603b0f3d4c529e6"
+    },
+    {
+      "path": "tests/phase7a8-2-native-settings.spec.ts",
+      "bytes": 86746,
+      "sha256": "27d041f8cf4bf8f5c2127551ded8ccf4495dc72c32f4c90d1eeffbb0f996a7d1"
+    },
+    {
+      "path": "tests/probes/phase7a8-0/p01-p07-sqlite-safety.spec.ts",
+      "bytes": 3721,
+      "sha256": "a11dfbd9f1014ad16ed30752d582ec1572a723c5f1a5a23f5a49900a88bd274d"
+    },
+    {
+      "path": "tests/probes/phase7a8-0/p08-p09-event-loop-worker.spec.ts",
+      "bytes": 1450,
+      "sha256": "f7e7f378f5137df36ed7436d8ef2c5f583011f37de6b84c37f826a3d70cc3509"
+    },
+    {
+      "path": "tests/probes/phase7a8-0/p10-p13-activation-lifecycle.spec.ts",
+      "bytes": 2848,
+      "sha256": "76a25a71eefc55dac44a01d63482f975ac3f55ecbc9907c254ecc91bcaa56ceb"
+    },
+    {
+      "path": "tests/probes/phase7a8-0/p14-p20-shortcuts.spec.ts",
+      "bytes": 1706,
+      "sha256": "3c659cc93385acc429493ac2c2fe75811f8160fde657f494dc5575c4bb9e4783"
+    },
+    {
+      "path": "tests/quarantine-recovery-proof.spec.ts",
+      "bytes": 26707,
+      "sha256": "aae0799a724e91f8d99be2a49c4bb91dd1ced38e0be9bdbde0a5f475e152bc34"
+    },
+    {
+      "path": "tests/redact.spec.ts",
+      "bytes": 6078,
+      "sha256": "1200a81691c530565a675552231e9311a97fc9ed2dc2d0f584ae20c685971433"
+    },
+    {
+      "path": "tests/risk001-custom-termination.spec.ts",
+      "bytes": 30394,
+      "sha256": "20b74f3a0c30780faa66fb01d5770b65e17e52889a75126f18f7f5317caf7a23"
+    },
+    {
+      "path": "tests/schema-version-test-helpers.ts",
+      "bytes": 2286,
+      "sha256": "b04f54a5ab08a0cd88e90222f931021fae5e5be7ee0ecec5132ff1b764c070dc"
+    },
+    {
+      "path": "tests/schema-version.spec.ts",
+      "bytes": 723,
+      "sha256": "ed94da6bb27b72d93fef23d75818bd5bdf66a2867fd9ac15a5bdd1c650745a98"
+    },
+    {
+      "path": "tests/shared-text.spec.ts",
+      "bytes": 21857,
+      "sha256": "75332e142c8945bbc1b9fa8e6dbdd90a83e496b40a907dbdd871fb86bb11b385"
+    },
+    {
+      "path": "tests/smoke-lifecycle.spec.ts",
+      "bytes": 12669,
+      "sha256": "ed1bd451ca647769a711a304f2ef914fbfd9dac17ea30eb79beead4a227e601b"
+    },
+    {
+      "path": "tests/smoke-verdict.spec.ts",
+      "bytes": 12580,
+      "sha256": "17ea2b3591416b539e66c9ef4c2450a5a5d802fba65b02dd84b7f5658a06dda1"
+    },
+    {
+      "path": "tests/snapshot-eligibility.spec.ts",
+      "bytes": 1016,
+      "sha256": "52dfd296a35f30f8c34b6081dc29c0b2d04a6965fc7a050e7291eedf55ee4c7a"
+    },
+    {
+      "path": "tests/store-worker-audit.spec.ts",
+      "bytes": 7366,
+      "sha256": "b42b8473206cd7a6740f4ab291c3a7de8a443c1aabd41e9de1263f9e3aaf0dad"
+    },
+    {
+      "path": "tests/ux001-modal.spec.ts",
+      "bytes": 2748,
+      "sha256": "d198a2dc44e8e5436448c6901a914f3acb2b00a7a072fd78d7e36053020b40fe"
+    },
+    {
+      "path": "tests/worker-exit-provenance-safety.spec.ts",
+      "bytes": 20728,
+      "sha256": "82e3b5188a076dd74127000084b93159db25fb3cbb3fc9befa578e4ddc260d94"
+    },
+    {
+      "path": "tests/worker-lifecycle-safety.spec.ts",
+      "bytes": 13197,
+      "sha256": "42a9e9470a2f2ddd24d89e6133da4b11de178df32b766b8f86447f16b51a8a1c"
+    },
+    {
+      "path": "tsconfig.build.json",
+      "bytes": 265,
+      "sha256": "bec2797dc51e2945b8055ce7ed42cad193548b026cc808ea185dba4e0ad4fd85"
+    },
+    {
+      "path": "tsconfig.json",
+      "bytes": 664,
+      "sha256": "5f083dc39e9fddd97d6499ae0b3bd71bdef2ea3ee66307a2b78e59a8ccc7eaaf"
+    },
+    {
+      "path": "tsdown.config.ts",
+      "bytes": 3889,
+      "sha256": "d9b1555e4b4d8a756167777d599def508ccc417908ae023728c6deff90ff5477"
+    },
+    {
+      "path": "vitest.config.ts",
+      "bytes": 360,
+      "sha256": "68283f3e5a173e9de8bf09ea3ef5a31b511b6b80bcce7dbe2aab61492d668b29"
+    }
+  ]
+}

@@ -26,8 +26,8 @@
  * @module dsh-word-lookup/host/custom-snapshot-manager
  */
 
-import { randomUUID } from 'node:crypto'
-import { constants, existsSync, lstatSync, statSync } from 'node:fs'
+import { createHash, randomUUID } from 'node:crypto'
+import { constants, existsSync, lstatSync, readFileSync, statSync } from 'node:fs'
 import { copyFile, link, lstat, mkdir, readFile, readdir, unlink, writeFile } from 'node:fs/promises'
 import { basename, isAbsolute, join, resolve } from 'node:path'
 
@@ -44,9 +44,12 @@ import {
 } from './managed-storage.js'
 import {
   CustomDictionaryValidator,
+  customWorkerPathIdentity,
+  CustomWorkerTerminationError,
   SnapshotTamperingError,
   type CustomValidatorTaskOptions,
 } from './custom-dictionary-validator.js'
+import { isTerminationUnconfirmed } from './ecdict-integrity-verifier.js'
 import type { CustomSnapshotValidateSuccessResponse } from './ecdict-integrity-worker.js'
 import type { CustomSnapshotSummary } from '../shared/dictionary-management-protocol.js'
 import { openSqliteDictionary, type SqliteDictionary } from './sqlite-dictionary.js'
@@ -247,10 +250,17 @@ export class CustomSnapshotManager {
   readonly #validator: CustomDictionaryValidator
   readonly #maxSizeBytes: number
   readonly #snapshots = new Map<string, CustomSnapshotRecord>()
-  readonly #ownedStagingFiles = new Set<string>()
+  readonly #ownedStagingFiles = new Map<string, string>()
   readonly #inFlightCleanups = new Map<string, Promise<boolean>>()
+  // Only validated catalog entries may authorize a missing-file retry.
+  readonly #catalogSnapshotIds = new Set<string>()
+  readonly #cleanupFilesRemoved = new Set<string>()
 
   #disposed = false
+  #disposeComplete = false
+  #disposePromise: Promise<void> | null = null
+  // Retained identity authorizes only an explicit retry after the validator observes exit.
+  readonly #retainedStaging = new Map<string, { file: string | null | undefined; owner: string | null | undefined }>()
   #catalogError: string | null = null
   #catalogLock: Promise<void> = Promise.resolve()
 
@@ -276,6 +286,15 @@ export class CustomSnapshotManager {
     this.#validator = options.validator ?? new CustomDictionaryValidator()
     this.#maxSizeBytes = options.maxSizeBytes ?? 2 * 1024 * 1024 * 1024 // 2 GiB
     ACTIVE_MANAGERS.set(this.#managerId, this)
+  }
+
+  #isPathInUse(path: string): boolean {
+    return [...ACTIVE_MANAGERS.values()].some(manager => manager.#validator.isPathInUse(path))
+  }
+
+  #assertPathReleased(path: string): void {
+    if (this.#isPathInUse(path)) throw new CustomWorkerTerminationError(
+      new Error('Managed snapshot path is retained by a Worker'), new Error('Worker exit has not been observed'))
   }
 
   get managerId(): string {
@@ -347,6 +366,7 @@ export class CustomSnapshotManager {
         const activeMeta = await readActiveMetadata(this.#paths)
         if (activeMeta && activeMeta.activeMode === 'custom' && activeMeta.snapshotId) {
           const pubPath = join(this.#paths.customSnapshotDirectory, activeMeta.databaseFile)
+          await validateCustomSnapshotPath(pubPath, this.#paths.customSnapshotDirectory)
           if (existsSync(pubPath)) {
             const st = statSync(pubPath)
             if (st.isFile()) {
@@ -360,12 +380,18 @@ export class CustomSnapshotManager {
                 byteSize: activeMeta.byteSize,
                 createdAt: activeMeta.lastActivatedAt ?? new Date().toISOString(),
               }
-              const newCatalog: CustomSnapshotCatalog = {
-                version: 1,
-                snapshots: Object.freeze([migratedEntry]),
-              }
-              await writeCustomSnapshotCatalogAtomically(this.#paths, newCatalog)
-              catalog = newCatalog
+              // Migration shares the publish lock and re-reads inside it: a
+              // publish may have committed since the initial missing read.
+              catalog = await this.#withCatalogLock(async () => {
+                const current = await readCustomSnapshotCatalog(this.#paths)
+                const entries = [...(current?.snapshots ?? [])]
+                if (!entries.some((entry) => entry.snapshotId === migratedEntry.snapshotId)) {
+                  entries.push(migratedEntry)
+                }
+                const merged: CustomSnapshotCatalog = { version: 1, snapshots: Object.freeze(entries) }
+                await writeCustomSnapshotCatalogAtomically(this.#paths, merged)
+                return merged
+              })
             }
           }
         }
@@ -374,9 +400,9 @@ export class CustomSnapshotManager {
       }
     }
 
-    if (!catalog) return
-
-    for (const entry of catalog.snapshots) {
+    // A first publication can crash before index.json has ever existed.
+    // Missing and empty catalogs both still need the orphan scan below.
+    for (const entry of catalog?.snapshots ?? []) {
       const pubPath = join(this.#paths.customSnapshotDirectory, entry.databaseFile)
       const existing = this.#snapshots.get(entry.snapshotId)
       if (existing && existing.activeLeases > 0) {
@@ -384,12 +410,18 @@ export class CustomSnapshotManager {
         continue
       }
 
-      const fileExists = existsSync(pubPath)
-      let isFileValid = fileExists
+      this.#catalogSnapshotIds.add(entry.snapshotId)
+      let fileExists = true
+      let isFileValid = true
       let errorCode: string | null = null
       let errorMsg: string | null = null
-      if (fileExists) {
-        try {
+      let managedDirectoryVerified = false
+      try {
+          const directory = lstatSync(this.#paths.customSnapshotDirectory)
+          if (!directory.isDirectory() || directory.isSymbolicLink()) {
+            throw new Error('Custom snapshot directory is not a regular managed directory')
+          }
+          managedDirectoryVerified = true
           const lstat = lstatSync(pubPath)
           if (lstat.isSymbolicLink()) {
             isFileValid = false
@@ -413,13 +445,15 @@ export class CustomSnapshotManager {
           }
         } catch (e) {
           isFileValid = false
-          errorCode = 'STAT_FAILED'
-          errorMsg = e instanceof Error ? e.message : String(e)
+          if (managedDirectoryVerified && (e as NodeJS.ErrnoException).code === 'ENOENT') {
+            fileExists = false
+            errorCode = 'FILE_NOT_FOUND'
+            errorMsg = 'Snapshot file is missing on disk'
+          } else {
+            errorCode = 'STAT_FAILED'
+            errorMsg = e instanceof Error ? e.message : String(e)
+          }
         }
-      } else {
-        errorCode = 'FILE_NOT_FOUND'
-        errorMsg = 'Snapshot file is missing on disk'
-      }
 
       const record: CustomSnapshotRecord = {
         id: entry.snapshotId,
@@ -462,11 +496,15 @@ export class CustomSnapshotManager {
     if (!existsSync(this.#paths.customSnapshotDirectory)) return Object.freeze([])
 
     const recoveredIds: string[] = []
+    let persistenceFailed = false
 
     try {
+      // Fail closed on malformed catalogs, including direct reconciliation
+      // calls. Only ENOENT is a legitimate empty recovery starting point.
+      await readCustomSnapshotCatalog(this.#paths)
       const files = await readdir(this.#paths.customSnapshotDirectory)
       for (const file of files) {
-        const match = /^custom-([a-zA-Z0-9._-]{1,64})\.sqlite3$/.exec(file)
+        const match = /^custom-([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\.sqlite3$/.exec(file)
         if (!match) continue
 
         const snapshotId = match[1]!
@@ -480,7 +518,7 @@ export class CustomSnapshotManager {
           continue
         }
 
-        const currentCatalog = await readCustomSnapshotCatalog(this.#paths).catch(() => null)
+        const currentCatalog = await readCustomSnapshotCatalog(this.#paths)
         if (currentCatalog?.snapshots.some((s) => s.snapshotId === snapshotId)) {
           continue
         }
@@ -515,16 +553,25 @@ export class CustomSnapshotManager {
           errorCode: null,
         }
 
-        this.#snapshots.set(snapshotId, record)
         try {
-          await this.#persistSnapshotToCatalog(record)
+          const previous = this.#snapshots.get(snapshotId)
+          if (!await this.#persistSnapshotToCatalog(record, true)) continue
+          // Expose recovery only after the atomic catalog commit succeeded.
+          // Preserve a concurrent adoption, publication or lease change, even
+          // when its replacement record currently has no active leases.
+          const existing = this.#snapshots.get(snapshotId)
+          if (existing === previous && (!existing || existing.activeLeases === 0)) {
+            this.#snapshots.set(snapshotId, record)
+          }
           recoveredIds.push(snapshotId)
-        } catch {
-          // best-effort persistence
+        } catch (err) {
+          persistenceFailed = true
+          this.#catalogError = `CATALOG_PERSISTENCE_FAILED: Cannot register recovered snapshot ${snapshotId}: ${err instanceof Error ? err.message : String(err)}`
         }
       }
-    } catch {
-      // ignore readdir failure
+      if (!persistenceFailed) this.#catalogError = null
+    } catch (err) {
+      this.#catalogError = `Custom snapshot catalog reconciliation failed (catalog may be corrupted): ${err instanceof Error ? err.message : String(err)}`
     }
 
     return Object.freeze(recoveredIds)
@@ -574,7 +621,7 @@ export class CustomSnapshotManager {
   }
 
   isStagingActive(stagingPath: string): boolean {
-    return !this.#disposed && this.#ownedStagingFiles.has(stagingPath)
+    return this.#ownedStagingFiles.has(customWorkerPathIdentity(stagingPath))
   }
 
   get paths(): ManagedStoragePaths {
@@ -785,7 +832,7 @@ export class CustomSnapshotManager {
     await validateCustomSnapshotPath(stagingPath, this.#paths.customSnapshotDirectory)
 
     // Establish staging ownership record
-    this.#ownedStagingFiles.add(stagingPath)
+    this.#ownedStagingFiles.set(customWorkerPathIdentity(stagingPath), stagingPath)
     const ownerPayload: StagingOwnershipPayload = {
       version: 1,
       managerId: this.#managerId,
@@ -802,7 +849,7 @@ export class CustomSnapshotManager {
       }
       await writeFile(ownerPath, JSON.stringify(ownerPayload), { flag: 'wx' })
     } catch (ownerErr: unknown) {
-      this.#ownedStagingFiles.delete(stagingPath)
+      this.#ownedStagingFiles.delete(customWorkerPathIdentity(stagingPath))
       throw new Error(
         `Failed to establish staging ownership record at "${ownerPath}": ${ownerErr instanceof Error ? ownerErr.message : String(ownerErr)}`,
       )
@@ -1030,6 +1077,14 @@ export class CustomSnapshotManager {
       }
       this.#snapshots.set(id, record)
 
+      // Public failure does not authorize deletion while a Worker can still use the path.
+      if (isTerminationUnconfirmed(err) || this.#isPathInUse(stagingPath)) {
+        this.#retainStaging(stagingPath)
+        record = { ...record, state: 'CLEANUP_PENDING', errorCode: 'TERMINATION_UNCONFIRMED' }
+        this.#snapshots.set(id, record)
+        throw err
+      }
+
       // Safe cleanup of temporary staging file (never user source file)
       record = { ...record, state: 'CLEANUP_PENDING' }
       this.#snapshots.set(id, record)
@@ -1108,6 +1163,7 @@ export class CustomSnapshotManager {
     }
 
     const publishedPath = record.publishedPath
+    this.#assertPathReleased(publishedPath)
 
     // 1. Snapshot ID and basename strict binding:
     const expectedBaseName = `custom-${record.id}.sqlite3`
@@ -1383,6 +1439,8 @@ export class CustomSnapshotManager {
       )
     }
 
+    this.#assertPathReleased(record.publishedPath)
+
     // Transactional lease reservation:
     const prevLeases = record.activeLeases
     const prevState = record.state
@@ -1491,9 +1549,21 @@ export class CustomSnapshotManager {
    * Rejects deletion if active dictionary references exist or if the snapshot is in RETIRING state.
    * Handles Windows file locks explicitly.
    */
+  /** Shared capability and execution eligibility; cleanup still revalidates disk identity. */
+  canCleanupSnapshot(snapshotId: string, activeSnapshotId?: string | null): boolean {
+    const record = this.#snapshots.get(snapshotId)
+    if (!record || this.#disposed || snapshotId === activeSnapshotId || record.activeLeases > 0) return false
+    if (record.publishedPath && this.#isPathInUse(record.publishedPath)) return false
+    if (record.state === 'ACTIVE' || record.state === 'RETIRING' || record.state === 'PUBLISHED_LEASED') return false
+    if (record.state === 'REJECTED') {
+      return record.errorCode === 'FILE_NOT_FOUND' && this.#catalogSnapshotIds.has(snapshotId)
+    }
+    return record.state === 'PUBLISHED_INACTIVE' || record.state === 'PUBLISHED' || record.state === 'CLEANUP_PENDING'
+  }
+
   async cleanupSnapshot(snapshotId: string): Promise<boolean> {
     const record = this.#snapshots.get(snapshotId)
-    if (!record || !record.publishedPath) return false
+    if (!record) return false
 
     // Idempotent completion if already deleted
     if (record.state === 'DELETED') {
@@ -1519,10 +1589,7 @@ export class CustomSnapshotManager {
       )
     }
 
-    const isEligible =
-      record.state === 'PUBLISHED_INACTIVE' ||
-      record.state === 'PUBLISHED' ||
-      record.state === 'CLEANUP_PENDING'
+    const isEligible = this.canCleanupSnapshot(snapshotId)
 
     if (!isEligible) {
       throw new Error(
@@ -1530,39 +1597,70 @@ export class CustomSnapshotManager {
       )
     }
 
+    const registryOnly = this.#cleanupFilesRemoved.has(snapshotId) ||
+      (record.state === 'REJECTED' && record.errorCode === 'FILE_NOT_FOUND')
+    if (registryOnly) this.#cleanupFilesRemoved.add(snapshotId)
+
     // SYNCHRONOUS TRANSITION: Claim deletion ownership before ANY await!
     this.#snapshots.set(snapshotId, {
       ...record,
       state: 'CLEANUP_PENDING',
     })
 
-    const cleanupPromise = (async (): Promise<boolean> => {
+    // Schedule execution after registering the promise, including synchronous hook failures.
+    const cleanupPromise = Promise.resolve().then(async (): Promise<boolean> => {
       try {
         if (customSnapshotHooks?.onBeforeValidateCleanup) {
           await customSnapshotHooks.onBeforeValidateCleanup(snapshotId)
         }
 
-        await validateCustomSnapshotPath(record.publishedPath!, this.#paths.customSnapshotDirectory)
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(snapshotId)) {
+          throw new Error('Snapshot cleanup requires a canonical UUID')
+        }
+        const canonicalPath = join(this.#paths.customSnapshotDirectory, `custom-${snapshotId}.sqlite3`)
+        if (!registryOnly && (!record.publishedPath || customWorkerPathIdentity(record.publishedPath) !== customWorkerPathIdentity(canonicalPath))) {
+          throw new Error('Snapshot cleanup path does not match its managed UUID')
+        }
+        if (this.#isPathInUse(canonicalPath)) throw new SnapshotCleanupError('Snapshot is retained by an unconfirmed Worker')
+        await validateCustomSnapshotPath(canonicalPath, this.#paths.customSnapshotDirectory)
+        const directory = await lstat(this.#paths.customSnapshotDirectory)
+        if (!directory.isDirectory() || directory.isSymbolicLink()) throw new Error('Snapshot directory is not a managed directory')
+        const active = await readActiveMetadata(this.#paths)
+        if (active?.activeMode === 'custom' && active.snapshotId === snapshotId) {
+          throw new SnapshotActiveReferenceError('Cannot clean up the currently active snapshot', record.activeLeases)
+        }
 
         if (customSnapshotHooks?.onBeforeUnlinkCleanup) {
           await customSnapshotHooks.onBeforeUnlinkCleanup(snapshotId)
         }
 
-        if (existsSync(record.publishedPath!)) {
-          await unlink(record.publishedPath!)
+        // Only lstat ENOENT proves absence; denial and broken links fail closed.
+        let file: Awaited<ReturnType<typeof lstat>> | undefined
+        try { file = await lstat(canonicalPath) }
+        catch (err) { if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err }
+        if (registryOnly && file) throw new Error('Snapshot cleanup conflict: replacement object exists at missing snapshot path')
+        if (file) {
+          if (!file.isFile() || file.isSymbolicLink()) throw new Error('Snapshot cleanup target is not a regular owned file')
+          this.#assertPathReleased(canonicalPath)
+          await unlink(canonicalPath)
+        } else if (!this.#catalogSnapshotIds.has(snapshotId)) {
+          throw new Error('Missing snapshot is not backed by a known catalog UUID')
         }
-
+        this.#cleanupFilesRemoved.add(snapshotId)
+        await this.#removeSnapshotFromCatalog(snapshotId)
         this.#snapshots.set(snapshotId, {
           ...this.#snapshots.get(snapshotId)!,
           state: 'DELETED',
           error: null,
           errorCode: null,
         })
-        await this.#removeSnapshotFromCatalog(snapshotId)
         return true
       } catch (err: unknown) {
         const errCode = (err as { code?: string })?.code ?? 'CLEANUP_FAILED'
-        const errMsg = err instanceof Error ? err.message : String(err)
+        const detail = err instanceof Error ? err.message : String(err)
+        const errMsg = this.#cleanupFilesRemoved.has(snapshotId) && err instanceof CatalogPersistenceError
+          ? `Snapshot file deleted or absent; catalog cleanup needs retry: ${detail}`
+          : detail
 
         this.#snapshots.set(snapshotId, {
           ...this.#snapshots.get(snapshotId)!,
@@ -1572,26 +1670,26 @@ export class CustomSnapshotManager {
         })
 
         throw new SnapshotCleanupError(
-          `Failed to delete snapshot file "${record.publishedPath}": ${errMsg}`,
+          errMsg,
           errCode,
         )
       } finally {
         this.#inFlightCleanups.delete(snapshotId)
       }
-    })()
+    })
 
     this.#inFlightCleanups.set(snapshotId, cleanupPromise)
     return await cleanupPromise
   }
 
-  async #persistSnapshotToCatalog(record: CustomSnapshotRecord): Promise<void> {
-    if (!record.publishedPath) return
+  async #persistSnapshotToCatalog(record: CustomSnapshotRecord, onlyIfUnregistered = false): Promise<boolean> {
+    if (!record.publishedPath) return false
 
     if (customSnapshotHooks?.onBeforePersistCatalog) {
       await customSnapshotHooks.onBeforePersistCatalog(record)
     }
 
-    await this.#withCatalogLock(async () => {
+    return await this.#withCatalogLock(async () => {
       let catalog: CustomSnapshotCatalog | null = null
       try {
         catalog = await readCustomSnapshotCatalog(this.#paths)
@@ -1606,6 +1704,8 @@ export class CustomSnapshotManager {
 
       const existingList = catalog ? [...catalog.snapshots] : []
       const entryIndex = existingList.findIndex((e) => e.snapshotId === record.id)
+      // Recovery must not overwrite metadata registered while its Worker ran.
+      if (onlyIfUnregistered && entryIndex >= 0) return false
       const newEntry: CustomSnapshotCatalogEntry = {
         snapshotId: record.id,
         identity: record.identity,
@@ -1639,6 +1739,8 @@ export class CustomSnapshotManager {
           { cause: err },
         )
       }
+      this.#catalogSnapshotIds.add(record.id)
+      return true
     })
   }
 
@@ -1646,14 +1748,18 @@ export class CustomSnapshotManager {
     await this.#withCatalogLock(async () => {
       try {
         const catalog = await readCustomSnapshotCatalog(this.#paths)
-        if (!catalog) return
-        const filtered = catalog.snapshots.filter((e) => e.snapshotId !== snapshotId)
-        await writeCustomSnapshotCatalogAtomically(this.#paths, {
-          version: 1,
-          snapshots: Object.freeze(filtered),
-        })
-      } catch {
-        // Non-fatal on cleanup
+        if (catalog?.snapshots.some((entry) => entry.snapshotId === snapshotId)) {
+          const filtered = catalog.snapshots.filter((e) => e.snapshotId !== snapshotId)
+          await writeCustomSnapshotCatalogAtomically(this.#paths, {
+            version: 1,
+            snapshots: Object.freeze(filtered),
+          })
+        }
+        this.#catalogSnapshotIds.delete(snapshotId)
+        this.#catalogError = null
+      } catch (err) {
+        this.#catalogError = 'Custom snapshot catalog cleanup failed; retry required'
+        throw new CatalogPersistenceError('Failed to remove snapshot from custom catalog', { cause: err })
       }
     })
   }
@@ -1662,7 +1768,9 @@ export class CustomSnapshotManager {
    * Helper to clean up staging ownership file and memory tracking.
    */
   async #cleanupStagingOwnership(stagingPath: string): Promise<void> {
-    this.#ownedStagingFiles.delete(stagingPath)
+    if (this.#isPathInUse(stagingPath)) return
+    this.#ownedStagingFiles.delete(customWorkerPathIdentity(stagingPath))
+    this.#retainedStaging.delete(customWorkerPathIdentity(stagingPath))
     const ownerPath = `${stagingPath}.owner`
     try {
       if (existsSync(ownerPath)) {
@@ -1700,7 +1808,7 @@ export class CustomSnapshotManager {
           }
 
           // In-process active manager check: if actively owned by this manager, skip!
-          if (this.#ownedStagingFiles.has(fullPath) && !this.#disposed) {
+          if ([...ACTIVE_MANAGERS.values()].some(manager => manager.isStagingActive(fullPath))) {
             continue
           }
 
@@ -1812,27 +1920,62 @@ export class CustomSnapshotManager {
    * Published snapshots are strictly preserved for future restarts.
    */
   async dispose(): Promise<void> {
-    if (this.#disposed) return
+    if (this.#disposeComplete) return
+    if (this.#disposePromise) return this.#disposePromise
     this.#disposed = true
+    const attempt = this.#finishDispose()
+    this.#disposePromise = attempt
+    try { await attempt }
+    finally { if (this.#disposePromise === attempt) this.#disposePromise = null }
+  }
 
-    ACTIVE_MANAGERS.delete(this.#managerId)
+  #stagingIdentity(path: string): string | null {
+    try {
+      const st = lstatSync(path, { bigint: true })
+      if (!st.isFile() || st.isSymbolicLink()) throw new SnapshotCleanupError('Retained staging object is not a regular file')
+      const ownerDigest = path.endsWith('.owner') ? ':' + createHash('sha256').update(readFileSync(path)).digest('hex') : ''
+      return `${st.dev}:${st.ino}:${st.birthtimeNs}${ownerDigest}`
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
+      throw error
+    }
+  }
 
-    await this.#validator.dispose()
+  #retainStaging(path: string): void {
+    const key = customWorkerPathIdentity(path)
+    if (this.#retainedStaging.has(key)) return
+    const retained = { file: undefined as string | null | undefined, owner: undefined as string | null | undefined }
+    this.#retainedStaging.set(key, retained)
+    // A failed identity observation is retained as unknown and can never authorize unlink.
+    try { retained.file = this.#stagingIdentity(path) } catch {}
+    try { retained.owner = this.#stagingIdentity(`${path}.owner`) } catch {}
+  }
 
-    // Clean up staging files owned by THIS manager instance
-    const owned = [...this.#ownedStagingFiles]
-    for (const stagingPath of owned) {
-      try {
-        if (existsSync(stagingPath)) {
-          await unlink(stagingPath)
-        }
-      } catch {
-        // Ignore
+  async #finishDispose(): Promise<void> {
+    try { await this.#validator.dispose() }
+    catch (error) {
+      for (const path of this.#ownedStagingFiles.values()) this.#retainStaging(path)
+      throw error // ownership and ACTIVE_MANAGERS registration deliberately remain live
+    }
+    for (const stagingPath of [...this.#ownedStagingFiles.values()]) {
+      if (this.#isPathInUse(stagingPath)) {
+        this.#retainStaging(stagingPath)
+        this.#assertPathReleased(stagingPath)
+      }
+      const retained = this.#retainedStaging.get(customWorkerPathIdentity(stagingPath))
+      if (retained && (this.#stagingIdentity(stagingPath) !== retained.file ||
+        this.#stagingIdentity(`${stagingPath}.owner`) !== retained.owner)) {
+        throw new SnapshotCleanupError('Retained staging or owner was replaced; cleanup refused')
+      }
+      try { await unlink(stagingPath) }
+      catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw new SnapshotCleanupError(
+          'Unable to remove owned staging file; ownership retained', (error as NodeJS.ErrnoException).code)
       }
       await this.#cleanupStagingOwnership(stagingPath)
     }
-
-    // Run general orphan staging cleanup (safe for other managers)
+    ACTIVE_MANAGERS.delete(this.#managerId)
+    this.#disposeComplete = true
     await this.cleanupStagingFiles()
   }
 }

@@ -1,0 +1,45 @@
+{
+  "node": "v24.21.0",
+  "electron": "44.7.0",
+  "rows": [
+    {
+      "length": 230,
+      "fsReservation": true,
+      "sqlite": "PASS"
+    },
+    {
+      "length": 248,
+      "fsReservation": true,
+      "sqlite": "PASS"
+    },
+    {
+      "length": 259,
+      "fsReservation": true,
+      "sqlite": "PASS"
+    },
+    {
+      "length": 260,
+      "fsReservation": true,
+      "parentExists": true,
+      "sqlite": "FAIL",
+      "error": "unable to open database file",
+      "code": "ERR_SQLITE_ERROR"
+    },
+    {
+      "length": 270,
+      "fsReservation": true,
+      "parentExists": true,
+      "sqlite": "FAIL",
+      "error": "unable to open database file",
+      "code": "ERR_SQLITE_ERROR"
+    },
+    {
+      "length": 300,
+      "fsReservation": true,
+      "parentExists": true,
+      "sqlite": "FAIL",
+      "error": "unable to open database file",
+      "code": "ERR_SQLITE_ERROR"
+    }
+  ]
+}

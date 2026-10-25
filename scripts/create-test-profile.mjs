@@ -18,8 +18,8 @@
  * | `profiles/<p>/package.json`            | bundles + `link:` dependency         |
  * | `profiles/<p>/node_modules/<package>`  | junction so the Loader resolves it   |
  *
- * Sibling profile files are copied to `<home>/.profile-backup/<stamp>/` before
- * anything is written, so a crashed test can be rebuilt without guessing.
+ * The root and actual home are exclusively created for this run. Existing
+ * directories are refused, and a separate cleanup token is printed for later use.
  *
  * Every mutation happens after `assertIsolatedDshEnvironment()` has accepted the
  * target. If it does not, this script exits non-zero without touching a thing.
@@ -30,18 +30,19 @@
  * @module dsh-word-lookup/scripts/create-test-profile
  */
 
-import { cpSync, existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
+import { randomUUID } from 'node:crypto'
 import { dirname, join, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 import {
   assertIsolatedDshEnvironment,
-  DEFAULT_TEST_ROOT,
   ISOLATION_BANNER,
   IsolationError,
 } from './assert-isolated-env.mjs'
+import { createOwnedTestRoot, createOwnedHome } from './isolated-run-directory.mjs'
 
 /** Repository root, derived from this script's own location. */
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url))
@@ -51,9 +52,6 @@ const PACKAGE_NAME = 'dsh-word-lookup'
 
 /** Bundles every isolated verification profile composes. */
 const BASE_BUNDLES = ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', PACKAGE_NAME]
-
-/** Profile files copied aside before a re-create overwrites them. */
-const BACKED_UP_FILES = ['package.json', 'cordis.yml', 'cordis.patch.yml']
 
 /** Default test port, chosen away from every production port. */
 const DEFAULT_PORT = 50991
@@ -96,7 +94,7 @@ function dshVersion() {
 }
 
 const options = parseArgs(process.argv.slice(2))
-const testRoot = resolve(options['test-root'] ?? DEFAULT_TEST_ROOT)
+const testRoot = resolve(options['test-root'] ?? join(tmpdir(), `dsh-word-lookup-test-${randomUUID()}`))
 const home = resolve(options.home ?? join(testRoot, 'home'))
 const profile = options.profile ?? 'word-lookup-test'
 const port = Number(options.port ?? DEFAULT_PORT)
@@ -107,6 +105,7 @@ const pluginDir = resolve(options.plugin ?? REPO_ROOT)
 let verified
 try {
   verified = assertIsolatedDshEnvironment({ home, profile, port, testRoot })
+  if (dirname(home) !== testRoot) throw new IsolationError(['home must be a direct child of the new test root'])
 } catch (error) {
   if (error instanceof IsolationError) {
     console.error(error.message)
@@ -125,19 +124,13 @@ if (!existsSync(clientBundle) || !existsSync(hostBundle)) {
 }
 
 const profileDir = verified.profileDir
+// No existing directory is adopted, rebuilt, or granted deletion authority.
+const owner = await createOwnedTestRoot({ requestedRoot: testRoot })
+await createOwnedHome(owner, home)
+console.log(`CLEANUP_TOKEN=${owner.cleanupToken}`)
 const linkPath = join(profileDir, 'node_modules', PACKAGE_NAME)
-const backupDir = join(home, '.profile-backup', new Date().toISOString().replace(/[:.]/g, '-'))
-
-/** Files copied aside before this run overwrites the profile. */
+/** Existing test directories are never adopted or overwritten. */
 const backedUp = []
-for (const name of BACKED_UP_FILES) {
-  const source = join(profileDir, name)
-  if (!existsSync(source)) continue
-  mkdirSync(backupDir, { recursive: true })
-  const target = join(backupDir, name)
-  cpSync(source, target)
-  backedUp.push(target)
-}
 
 // --- profile ---------------------------------------------------------------
 mkdirSync(profileDir, { recursive: true })
@@ -194,13 +187,14 @@ if (!existsSync(linkPath)) {
 
 // --- record ----------------------------------------------------------------
 const record = {
-  dshVersion: dshVersion(),
+  dshVersion: options['skip-dsh-version'] === 'true' ? 'not-probed' : dshVersion(),
   nodeVersion: process.version,
   dshHome: verified.home,
   dshProfile: verified.profile,
   profileDir: verified.profileDir,
   port: verified.port,
   testRoot: verified.testRoot,
+  cleanupToken: owner.cleanupToken,
   pluginSourcePath: pluginDir,
   pluginInstalledPath: linkPath,
   linkAction,

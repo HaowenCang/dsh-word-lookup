@@ -1,0 +1,54 @@
+preflight {"home":"C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-preflight-af97f83f7e\\user","tmp":"C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-preflight-af97f83f7e\\tmp","dsh":[]}
+
+node ../runtime022-smoke.mjs ../candidate-rc3/dsh-word-lookup-0.2.2.tgz
+{
+  "status": "FAIL",
+  "baseline": "0.2.1-rc.3",
+  "report": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-preflight-af97f83f7e\\evidence\\runtime022-325bd19b\\runtime-report.json",
+  "observations": [
+    {
+      "id": "actual-version",
+      "status": "PASS"
+    },
+    {
+      "id": "new-profile-created",
+      "status": "PASS"
+    },
+    {
+      "id": "installed-package-isolation",
+      "status": "PASS"
+    },
+    {
+      "id": "installed-payload-exact",
+      "status": "PASS"
+    },
+    {
+      "id": "plugin-loaded",
+      "status": "PASS"
+    },
+    {
+      "id": "fixture-active",
+      "status": "PASS"
+    },
+    {
+      "id": "real-fixture-lookup",
+      "status": "PASS"
+    }
+  ],
+  "error": {
+    "name": "TimeoutError",
+    "message": "page.waitForResponse: Timeout 10000ms exceeded while waiting for event \"response\""
+  },
+  "cleanup": {
+    "status": "PASS",
+    "testRoot": "RETAINED",
+    "portFree": true
+  }
+}
+
+page.waitForResponse: Timeout 10000ms exceeded while waiting for event "response"
+(node:56828) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+EXIT_CODE=1
+

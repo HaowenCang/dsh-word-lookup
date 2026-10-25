@@ -1,0 +1,20 @@
+{
+  "baselineFiles": 577,
+  "backup": "C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-preflight-af97f83f7e\\application-backup-022",
+  "status": "APPLIED_HASH_VERIFIED",
+  "tarball": "E:\\Projects\\DSHarness\\dsh-word-lookup\\build\\rc-v0.2.2\\dsh-word-lookup-0.2.2.tgz",
+  "version": "0.2.2",
+  "tarballSha256": "5311ac80bfa6140d0c843654ce2031641343a43026576bed08f0f85acace1131",
+  "publication": false,
+  "unchangedBaselineFiles": 572,
+  "newFiles": 203,
+  "gitMutation": false,
+  "head": "62e18f8b6ceff318370ef59caa8d66d261f50f23",
+  "existingChanged": [
+    "README.md",
+    "package.json",
+    "package-lock.json",
+    "tests/ecdict-downloader.spec.ts",
+    "docs/superpowers/plans/2026-10-23-v0.2.1-bugfix-plan.md"
+  ]
+}

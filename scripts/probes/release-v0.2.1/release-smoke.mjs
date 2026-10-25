@@ -31,6 +31,8 @@ import { dirname, join, resolve, sep } from 'node:path'
 import { spawn, spawnSync, execSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
+import { createRequire } from 'node:module'
+import { runObservedSmoke, evaluateUninstallProof, ROUTE_MISSING_CONTRACT, formattingObservations, scrollObservation, waitForSmokeStartup, smokeLifecycleFailure } from '../../smoke-verdict.mjs'
 
 import {
   assertIsolatedDshEnvironment,
@@ -41,13 +43,40 @@ import {
   ISOLATION_BANNER,
   IsolationError,
   PRODUCTION_PORTS,
+  isInsideOrEqual,
+  assertDisjointProductionPaths,
 } from '../../assert-isolated-env.mjs'
+import { createOwnedTestRoot, createOwnedHome, cleanupOwnedHome, cleanupOwnedTestRoot } from '../../isolated-run-directory.mjs'
+
+const ownedDshChildren = new Set()
+
+/** Register both directories before any DSH profile or loader writes. */
+export async function createReleaseTestRoot(options = {}) {
+  const owner = await createOwnedTestRoot(options)
+  await createOwnedHome(owner, join(owner.path, 'home'))
+  return owner
+}
+
+/** Called only after evidence is durable outside the deletion range. */
+export async function cleanupReleaseTestRoot(owner, { children, ports, evidencePaths }) {
+  for (const child of children) {
+    const exited = Number.isInteger(child.exitCode) || (typeof child.signalCode === 'string' && child.signalCode.length > 0)
+    if (!exited) throw new Error('cleanup refused: child exit is unconfirmed; directory retained')
+  }
+  for (const port of ports) {
+    if (!await isPortFree(port)) throw new Error(`cleanup refused: port ${port} is still occupied; directory retained`)
+  }
+  for (const evidence of evidencePaths) {
+    if (isInsideOrEqual(evidence, owner.path) || isInsideOrEqual(owner.path, evidence)) throw new Error('cleanup refused: evidence overlaps the scratch directory')
+  }
+  await cleanupOwnedHome(owner, join(owner.path, 'home'))
+  await cleanupOwnedTestRoot(owner)
+}
 
 const REPO_ROOT = fileURLToPath(new URL('../../..', import.meta.url))
 const EXPECTED_PACKAGE_NAME = 'dsh-word-lookup'
 const EXPECTED_VERSION = '0.2.1'
 const OFFICIAL_NPM_REGISTRY = 'https://registry.npmjs.org/'
-const ANSI_REGEX = /\x1B\[[0-?]*[ -/]*[@-~]/g
 
 function sha256Buffer(buf) {
   return createHash('sha256').update(buf).digest('hex')
@@ -96,52 +125,25 @@ function resolveDshInvocation(dshBinOption) {
   return { cmd: dshBinOption, baseArgs: [], isNodeScript: false }
 }
 
-async function bootDsh(verified, port, cwd, dshInvocation, timeoutMs = 90000) {
-  const env = buildIsolatedEnv(verified, process.env, { PORT: String(port) })
+export async function bootReleaseDsh(verified, port, cwd, dshInvocation, timeoutMs = 90000, dependencies = {}) {
+  const env = dependencies.env ?? buildIsolatedEnv(verified, process.env, { PORT: String(port) })
   const args = [...dshInvocation.baseArgs, '--profile', verified.profile, '--no-open', '--port', String(port)]
-  const child = spawn(dshInvocation.cmd, args, {
+  const child = (dependencies.spawnChild ?? spawn)(dshInvocation.cmd, args, {
     cwd,
     env,
     shell: !dshInvocation.isNodeScript && process.platform === 'win32',
     stdio: ['ignore', 'pipe', 'pipe'],
   })
+  ownedDshChildren.add(child)
 
-  let stdout = ''
-  let stderr = ''
-
-  const url = await new Promise((resolveUrl, rejectUrl) => {
-    const timer = setTimeout(async () => {
-      await stopDsh(child, port).catch(() => {})
-      rejectUrl(new Error(`DSH startup timed out after ${timeoutMs}ms.\nSTDOUT:\n${stdout}\nSTDERR:\n${stderr}`))
-    }, timeoutMs)
-
-    const consume = (chunk, isStderr) => {
-      const text = chunk.toString().replace(ANSI_REGEX, '')
-      if (isStderr) stderr += text
-      else stdout += text
-
-      const match = /https?:\/\/[^\s"']*\/\?token=([A-Za-z0-9._~-]+)/.exec(stdout)
-      if (match) {
-        clearTimeout(timer)
-        resolveUrl(match[0])
-      }
-    }
-
-    child.stdout.on('data', (c) => consume(c, false))
-    child.stderr.on('data', (c) => consume(c, true))
-    child.on('exit', (code) => {
-      clearTimeout(timer)
-      rejectUrl(new Error(`DSH exited prematurely with exit code ${code}.\nSTDOUT:\n${stdout}\nSTDERR:\n${stderr}`))
-    })
+  const started = await waitForSmokeStartup(child, {
+    label: 'DSH', timeoutMs,
+    stopChild: (ownedChild) => (dependencies.stopChild ?? stopDsh)(ownedChild, port),
+    setTimer: dependencies.setTimer, clearTimer: dependencies.clearTimer,
+    onChildError: dependencies.onChildError,
   })
-
-  await new Promise((r) => setTimeout(r, 1200))
-  return {
-    child,
-    url,
-    stdoutLog: () => stdout,
-    stderrLog: () => stderr,
-  }
+  await (dependencies.delay ?? ((ms) => new Promise((r) => setTimeout(r, ms))))(1200)
+  return started
 }
 
 async function stopDsh(child, port) {
@@ -162,6 +164,22 @@ async function stopDsh(child, port) {
       await new Promise((r) => setTimeout(r, 2000))
     }
   }
+  if (child.exitCode === null && child.signalCode === null) throw new Error(`DSH child ${child.pid} exit unconfirmed; retaining test root`)
+  if (port && !await isPortFree(port)) throw new Error(`DSH port ${port} remains occupied; retaining test root`)
+}
+
+/** Close runtime resources; same-file seam keeps controlled tests off real processes. */
+export async function cleanupReleaseSmokeResources({ context, dshInstance, downloadedTarballPath, testPort }, dependencies = {}, primaryError) {
+  const cleanupErrors = []
+  try { if (context) await context.close() } catch (error) { cleanupErrors.push(error) }
+  // Browser shutdown failure must never bypass the owned child stop attempt.
+  try { if (dshInstance) await (dependencies.stopChild ?? stopDsh)(dshInstance.child, testPort) } catch (error) { cleanupErrors.push(error) }
+  try {
+    if (!primaryError && cleanupErrors.length === 0 && downloadedTarballPath && (dependencies.exists ?? existsSync)(downloadedTarballPath)) {
+      (dependencies.removeTarball ?? rmSync)(downloadedTarballPath, { force: true })
+    }
+  } catch (error) { cleanupErrors.push(error) }
+  if (primaryError || cleanupErrors.length) throw smokeLifecycleFailure(primaryError, cleanupErrors)
 }
 
 const DISMISS_LABEL = /configure later|not now|skip|later|close|dismiss|got it|continue|ok|稍后配置|跳过/i
@@ -233,10 +251,114 @@ function checkNpmRegistry(packageName, version, registry = OFFICIAL_NPM_REGISTRY
   return { state: 'REGISTRY_ERROR', error: { code: 'UNKNOWN_ERROR', detail: stderr || res.stdout } }
 }
 
-async function main() {
+export const RELEASE_REQUIRED_IDS = Object.freeze([
+  'pluginLoaded', 'settingsNavVisible', 'settingsSectionVisible', 'settingsUpdatedBadgesVerified',
+  'fixtureModeActive', 'lookupSuccessful', 'autoDoubleClickDefaultOff', 'autoSelectionDefaultOff',
+  'literal-escaping', 'line-count', 'vertical-layout', 'pos',
+  'narrowViewportVerified', 'scrollabilityVerified', 'zero-auto-download', 'uninstallationClean',
+])
+
+/** The CLI and controlled collectors share the same report/verdict/exit operation. */
+export async function runReleaseSmoke(options = {}) {
+  const runId = randomUUID()
+  const evidence = {
+    runId, timestamp: new Date().toISOString(), phase: 'RELEASE_V021', observations: [],
+    runtime: { nodeVersion: process.version, dshVersion: 'UNKNOWN / NOT_EXECUTED', execution: 'NOT_EXECUTED' },
+    classification: { formatting: 'CONTROLLED_LOOKUP_RESPONSE', fixtureQuery: 'NOT_EXECUTED', realEcdictQuery: 'NOT_EXECUTED', zeroAutoDownload: 'NOT_VERIFIED', collector: options.execute ? 'SYNTHETIC' : 'RUNTIME' },
+  }
+  const fallbackDir = join(tmpdir(), 'dsh-release-smoke-evidence', 'run-' + runId)
+  return runObservedSmoke({ evidence, requiredIds: RELEASE_REQUIRED_IDS,
+    execute: options.execute ?? (async (report) => {
+      try { await executeReleaseSmoke(report) }
+      catch (error) { console.error(String(error.message).replace(/([?&]token=)[^\s&]+/g, '$1REDACTED')); throw error }
+    }),
+    writeReport: options.writeReport ?? ((report) => {
+      const reportPath = report.reportPath ?? join(fallbackDir, 'smoke-execution-report.json')
+      assertDisjointProductionPaths([reportPath])
+      mkdirSync(dirname(reportPath), { recursive: true })
+      writeFileSync(reportPath, JSON.stringify(report, null, 2), { encoding: 'utf8', flag: 'wx' })
+      console.log('Evidence report written to: ' + reportPath)
+    }), log: options.log,
+  })
+}
+
+// Source: @deepseek-ai/dsh-client-connection/lib/index.js:606-624,832-842.
+// Pin the exact locally inspected rc.2 connection implementation. A custom
+// invocation whose transport cannot be resolved or differs remains unsupported.
+const SUPPORTED_CONNECTION_SHA256 = '3950f524aed44e28240140a254cd928ea40eba8e2d04cc8fd04f92a687f5c91d'
+function resolveRouteContract(invocation) {
+  if (!invocation.isNodeScript || !invocation.baseArgs[0]) return { contract: 'UNKNOWN' }
+  try {
+    const entry = createRequire(resolve(invocation.baseArgs[0])).resolve('@deepseek-ai/dsh-client-connection')
+    const sha256 = sha256File(entry)
+    return { entry, sha256, contract: sha256 === SUPPORTED_CONNECTION_SHA256 ? ROUTE_MISSING_CONTRACT : 'UNKNOWN' }
+  } catch { return { contract: 'UNKNOWN' } }
+}
+
+/** Request the supported inventory Remote and removed plugin route in one page. */
+export async function probeUninstallPage(page, rpcId) {
+  return page.evaluate(async ({ rpcId }) => {
+    const request = async (path, body) => {
+      try {
+        const response = await window.fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), redirect: 'error' })
+        let data
+        if (path.endsWith('pluginInventory/list')) data = await response.json().catch(() => null)
+        return { kind: 'response', status: response.status, origin: new URL(response.url).origin, body: data }
+      } catch { return { kind: 'transport-error', message: 'HTTP request failed' } }
+    }
+    const base = await request('api/pluginInventory/list', { type: 'client-request', rpcId, method: 'pluginInventory/list', payload: { args: {} } })
+    const route = await request('api/dsh-word-lookup', { query: 'derive' })
+    return { base, route, pageOrigin: location.origin, pluginGlobalAbsent: typeof window.__DSH_WORD_LOOKUP__ === 'undefined' }
+  }, { rpcId })
+}
+
+/** Collect discriminated HTTP results and validate inventory before declaring absence. */
+export async function collectUninstallProof({ probe, anonymousProbe, service, routeContract }) {
+  const rpcId = randomUUID()
+  const observed = await probe(rpcId)
+  const anonymous = await anonymousProbe()
+  const base = observed?.base
+  const envelope = base?.body
+  const inventory = envelope?.result?.value
+  const phases = ['pending', 'loading', 'active', 'failed', 'unloading', null]
+  const validEntry = (row) => row && typeof row.entryId === 'string' && typeof row.moduleName === 'string' && typeof row.enabled === 'boolean' && phases.includes(row.fiberPhase)
+  const validPresetRow = (row) => row && (row.entryId === null || typeof row.entryId === 'string') && typeof row.moduleName === 'string' && [true, false, 'conditional'].includes(row.enabled) && phases.includes(row.fiberPhase)
+  const validPresets = inventory?.agentPresets === undefined || (Array.isArray(inventory.agentPresets) && inventory.agentPresets.every((preset) => preset && typeof preset.id === 'string' && typeof preset.isDefault === 'boolean' && preset.broken === undefined && Array.isArray(preset.rows) && preset.rows.every(validPresetRow)))
+  const validInventory = envelope?.type === 'server-response' && envelope.rpcId === rpcId && envelope.result?.ok === true && Array.isArray(inventory?.entries) && inventory.entries.every(validEntry) && validPresets
+  const rows = validInventory ? [...inventory.entries, ...(inventory.agentPresets ?? []).flatMap((preset) => preset.rows)] : []
+  const registration = validInventory ? { kind: 'inventory', absent: !rows.some((row) => row.moduleName === EXPECTED_PACKAGE_NAME || row.moduleName.startsWith(EXPECTED_PACKAGE_NAME + '/')) && observed.pluginGlobalAbsent === true } : { kind: 'unknown' }
+  const originMatches = service?.identified === true && typeof service.origin === 'string' && observed?.pageOrigin === service.origin && base?.origin === service.origin && observed?.route?.origin === service.origin
+  return {
+    route: observed?.route ?? { kind: 'transport-error', message: 'missing route observation' },
+    base: { kind: base?.kind, status: base?.status,
+      authenticated: validInventory && anonymous?.kind === 'response' && [401, 403].includes(anonymous.status),
+      identified: originMatches,
+    }, registration, routeMissingContract: routeContract?.contract ?? 'UNKNOWN',
+  }
+}
+
+async function executeReleaseSmoke(report) {
   const startTime = Date.now()
   const options = parseArgs(process.argv.slice(2))
   const sourceMode = options.source
+  report.mode = sourceMode ?? 'UNKNOWN'
+  report.packageIdentity = { expectedName: EXPECTED_PACKAGE_NAME, expectedVersion: EXPECTED_VERSION, sourceMode: sourceMode ?? 'UNKNOWN', tarballSha256: 'NOT_VERIFIED', installedPath: 'NOT_VERIFIED' }
+  const requestedTestRoot = resolve(options['test-root'] ?? join(tmpdir(), `dsh-release-smoke-v021-${randomUUID()}`))
+  const evidenceDir = resolve(REPO_ROOT, options['evidence-dir'] || join('docs/evidence/release-v0.2.1', `run-${report.runId}`))
+  // Validate write/deletion boundaries before evidence directories or downloads.
+  assertDisjointProductionPaths([requestedTestRoot, evidenceDir])
+  if (isInsideOrEqual(evidenceDir, requestedTestRoot) || isInsideOrEqual(requestedTestRoot, evidenceDir)) {
+    throw new IsolationError(['evidence directory overlaps the test root; choose a separate evidence directory'])
+  }
+  if (options['evidence-name'] && (options['evidence-name'].includes('/') || options['evidence-name'].includes('\\') || options['evidence-name'] === '..')) {
+    throw new IsolationError(['evidence-name must be a filename inside the evidence directory'])
+  }
+  try {
+    lstatSync(requestedTestRoot)
+    throw new IsolationError(['test root already exists; a new run requires an exclusive directory'])
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error
+  }
 
   console.log('======================================================================')
   console.log(' Release v0.2.1: Isolated Smoke Test Execution Probe')
@@ -247,7 +369,7 @@ async function main() {
     console.error('Usage:')
     console.error('  node scripts/probes/release-v0.2.1/release-smoke.mjs --source local-tarball [--tarball <path>]')
     console.error('  node scripts/probes/release-v0.2.1/release-smoke.mjs --source npm [--registry <url>]')
-    process.exit(1)
+    throw new Error('Missing or invalid --source argument')
   }
 
   const dshInvocation = resolveDshInvocation(options['dsh-bin'])
@@ -256,8 +378,11 @@ async function main() {
   console.log(`Target Package:    ${EXPECTED_PACKAGE_NAME}@${EXPECTED_VERSION}`)
   console.log(`DSH Command:       ${dshInvocation.cmd} ${dshInvocation.baseArgs.join(' ')}`)
 
-  const evidenceDir = resolve(REPO_ROOT, options['evidence-dir'] || 'docs/evidence/release-v0.2.1')
-  mkdirSync(evidenceDir, { recursive: true })
+  mkdirSync(dirname(evidenceDir), { recursive: true })
+  mkdirSync(evidenceDir) // independent run evidence must never overwrite a previous run
+  report.reportPath = join(evidenceDir, options['evidence-name'] || 'smoke-execution-report.json')
+  report.runtime.invocation = { cmd: dshInvocation.cmd, baseArgs: [...dshInvocation.baseArgs] }
+  report.runtime.routeContract = resolveRouteContract(dshInvocation)
   const screenshotsDir = join(evidenceDir, 'screenshots')
   mkdirSync(screenshotsDir, { recursive: true })
 
@@ -281,30 +406,20 @@ async function main() {
       console.log('Per release specification, npm smoke test cannot be executed prior to publication.')
       console.log('Execution safely aborted (FAIL-CLOSED, zero simulated success).')
 
-      const preflightReport = {
-        timestamp: new Date().toISOString(),
-        mode: 'npm',
-        verdict: 'NOT_EXECUTED_PRE_PUBLICATION',
-        reason: 'NOT_PUBLISHED (E404 confirmed from official registry)',
-        registry,
-        package: `${EXPECTED_PACKAGE_NAME}@${EXPECTED_VERSION}`,
-        error: registryCheck.error,
-      }
+      report.preflight = { status: 'NOT_EXECUTED_PRE_PUBLICATION', reason: 'NOT_PUBLISHED (E404 confirmed from official registry)' }
+      report.observations.push({ id: 'pluginLoaded', status: 'NOT_EXECUTED' })
+      return
 
-      const reportPath = join(evidenceDir, options['evidence-name'] || 'npm-smoke-preflight-report.json')
-      writeFileSync(reportPath, JSON.stringify(preflightReport, null, 2), 'utf8')
-      console.log(`Report written to: ${reportPath}`)
-      process.exit(0)
     }
 
     if (registryCheck.state === 'NETWORK_ERROR') {
       console.error(`\n[FATAL] npm registry network error: ${JSON.stringify(registryCheck.error)}`)
-      process.exit(2)
+      throw new Error('Smoke preflight failed; see preceding diagnostics')
     }
 
     if (registryCheck.state !== 'PUBLISHED') {
       console.error(`\n[FATAL] Unexpected registry state: ${registryCheck.state}: ${JSON.stringify(registryCheck.error)}`)
-      process.exit(2)
+      throw new Error('Smoke preflight failed; see preceding diagnostics')
     }
 
     registryMetadata = registryCheck.data
@@ -317,13 +432,14 @@ async function main() {
     if (!tarballUrl) throw new Error('Registry metadata missing dist.tarball URL')
 
     const downloadTemp = join(tmpdir(), `npm-download-v021-${Date.now()}-${randomUUID().slice(0, 6)}.tgz`)
+    assertDisjointProductionPaths([downloadTemp])
     console.log(`Downloading published tarball from ${tarballUrl}...`)
     const dlFetch = await fetch(tarballUrl)
     if (!dlFetch.ok) {
       throw new Error(`Failed to download published tarball from ${tarballUrl}: HTTP ${dlFetch.status}`)
     }
     const dlBuf = Buffer.from(await dlFetch.arrayBuffer())
-    writeFileSync(downloadTemp, dlBuf)
+    writeFileSync(downloadTemp, dlBuf, { flag: 'wx' })
     downloadedTarballPath = downloadTemp
     const downloadedHash = sha256File(downloadedTarballPath)
     console.log(`Downloaded tarball SHA-256: ${downloadedHash}`)
@@ -331,6 +447,7 @@ async function main() {
     if (expectedTarballSha256 && downloadedHash !== expectedTarballSha256) {
       throw new Error(`Downloaded npm tarball SHA-256 mismatch! Expected ${expectedTarballSha256}, got ${downloadedHash}`)
     }
+    report.packageIdentity.tarballSha256 = downloadedHash
     expectedTarballSha256 = downloadedHash
     console.log('PASS: Downloaded npm tarball retrieved and verified.')
   }
@@ -360,6 +477,7 @@ async function main() {
     if (expectedTarballSha256 && tgzHash !== expectedTarballSha256) {
       throw new Error(`Candidate tarball SHA-256 mismatch! Expected ${expectedTarballSha256}, got ${tgzHash}`)
     }
+    report.packageIdentity.tarballSha256 = tgzHash
     expectedTarballSha256 = tgzHash
     expectedTarballSize = tgzStat.size
     console.log('PASS: Local candidate tarball verified.')
@@ -369,7 +487,7 @@ async function main() {
   // [Gate 3] Isolated Environment Setup & Assertion
   // ---------------------------------------------------------------------------
   console.log('\n[isolation-setup] Establishing isolated DSH environment...')
-  const testRoot = resolve(options['test-root'] ?? join(tmpdir(), `dsh-release-smoke-v021-${randomUUID().slice(0, 8)}`))
+  const testRoot = requestedTestRoot
   const testHome = join(testRoot, 'home')
   const testProfile = `smoke-v021-${randomUUID().slice(0, 6)}`
   const profileDir = join(testHome, 'profiles', testProfile)
@@ -388,7 +506,7 @@ async function main() {
     if (error instanceof IsolationError) {
       console.error('\n' + error.message)
       console.error('Refusing to execute: target failed isolation contract.')
-      process.exit(2)
+      throw new Error('Smoke preflight failed; see preceding diagnostics')
     }
     throw error
   }
@@ -398,6 +516,8 @@ async function main() {
   console.log(`  Profile:     ${testProfile}`)
   console.log(`  Port:        ${testPort}`)
 
+  report.isolation = { testRoot, dshHome: testHome, profile: testProfile, port: testPort }
+  const ownedRoot = await createReleaseTestRoot({ requestedRoot: testRoot })
   mkdirSync(join(testHome, 'profiles'), { recursive: true })
 
   // ---------------------------------------------------------------------------
@@ -475,6 +595,8 @@ async function main() {
   if (installedPkgJson.name !== EXPECTED_PACKAGE_NAME || installedPkgJson.version !== EXPECTED_VERSION) {
     throw new Error(`Installed manifest mismatch: ${installedPkgJson.name}@${installedPkgJson.version}`)
   }
+  report.packageIdentity = { name: installedPkgJson.name, version: installedPkgJson.version, sourceMode, tarballSha256: expectedTarballSha256, installedPath: installedDir, isSymlink }
+  report.pluginBundleSha256 = { source: 'ISOLATED_INSTALLED_PACKAGE', host: sha256File(join(installedDir, 'lib/index.js')), client: sha256File(join(installedDir, 'lib/client.js')) }
   console.log(`PASS: Installed package confirmed genuine isolated unpack of version ${installedPkgJson.version}.`)
 
   // ---------------------------------------------------------------------------
@@ -485,29 +607,19 @@ async function main() {
   let context = null
   let page = null
 
-  const verificationEvidence = {
-    pluginLoaded: 'NOT_VERIFIED',
-    settingsNavVisible: 'NOT_VERIFIED',
-    settingsSectionVisible: 'NOT_VERIFIED',
-    fixtureModeActive: 'NOT_VERIFIED',
-    lookupSuccessful: 'NOT_VERIFIED',
+  let primaryError
+  const verificationEvidence = report.verificationEvidence = {
     lookupHeadword: null,
     lookupSource: null,
-    autoDoubleClickDefaultOff: 'NOT_VERIFIED',
-    autoSelectionDefaultOff: 'NOT_VERIFIED',
-    ecdictNotDownloaded: 'NOT_VERIFIED',
-    multilineFormattingVerified: 'NOT_VERIFIED',
-    posBadgeDeduplicationVerified: 'NOT_VERIFIED',
-    narrowViewportVerified: 'NOT_VERIFIED',
-    scrollabilityVerified: 'NOT_VERIFIED',
-    settingsUpdatedBadgesVerified: 'NOT_VERIFIED',
-    uninstallationClean: 'NOT_VERIFIED',
     screenshots: {},
   }
 
   try {
-    dshInstance = await bootDsh(verified, testPort, testRoot, dshInvocation)
-    console.log(`DSH running at ${dshInstance.url} (PID: ${dshInstance.child.pid})`)
+    report.runtime.execution = 'ATTEMPTED'
+    report.runtime.invocation.args = [...dshInvocation.baseArgs, '--profile', testProfile, '--no-open', '--port', String(testPort)]
+    dshInstance = await bootReleaseDsh(verified, testPort, testRoot, dshInvocation, 90_000, { onChildError: (error) => report.observations.push({ id: 'runtime-child-error', status: 'FAIL', message: String(error.message).replace(/([?&]token=)[^\s&]+/g, '$1REDACTED') }) })
+    report.runtime.execution = 'EXECUTED'
+    console.log(`DSH running at ${dshInstance.url.replace(/token=.*/, 'token=REDACTED')} (PID: ${dshInstance.child.pid})`)
 
     const browserUserData = join(testRoot, 'chrome-user-data')
     mkdirSync(browserUserData, { recursive: true })
@@ -615,7 +727,7 @@ async function main() {
     if (!diagReady) {
       throw new Error('Plugin failed to load: window.__DSH_WORD_LOOKUP__ diagnostics interface not found')
     }
-    verificationEvidence.pluginLoaded = 'PASS'
+    report.observations.push({ id: 'pluginLoaded', status: 'PASS' })
     console.log('PASS: Plugin loaded cleanly, window.__DSH_WORD_LOOKUP__ exposed.')
 
     // Acceptance 2: Settings entry appears in UI & check updated status badge
@@ -631,13 +743,13 @@ async function main() {
     await page.waitForSelector('nav button', { timeout: 8000 })
     const dictNavButton = page.locator('nav button:has-text("词典"), nav button:has-text("Dictionary")')
     await dictNavButton.waitFor({ state: 'visible', timeout: 5000 })
-    verificationEvidence.settingsNavVisible = 'PASS'
+    report.observations.push({ id: 'settingsNavVisible', status: 'PASS' })
     console.log('PASS: Settings navigation item "词典/Dictionary" visible.')
 
     await dictNavButton.click()
     const settingsSection = page.locator('.dsh-wl-settings')
     await settingsSection.waitFor({ state: 'visible', timeout: 5000 })
-    verificationEvidence.settingsSectionVisible = 'PASS'
+    report.observations.push({ id: 'settingsSectionVisible', status: 'PASS' })
     console.log('PASS: Plugin settings panel (.dsh-wl-settings) successfully rendered.')
 
     // Check Settings badges and description updates
@@ -648,11 +760,11 @@ async function main() {
       const hasPhase7A8 = text.includes('Phase 7A.8 开放') || text.includes('Phase 7A.8')
       const hasSupportedBadge = text.includes('已支持')
       const hasUpdatedDesc = text.includes('请在上方“自定义 SQLite 词典管理”区域配置并挂载使用')
-      return { hasPhase7A8, hasSupportedBadge, hasUpdatedDesc }
+      return { hasPhase7A8, hasSupportedBadge, hasUpdatedDesc, hasCustomRow: text.includes('自定义外部 SQLite 词典') }
     })
 
-    if (!settingsAudit.hasPhase7A8 && settingsAudit.hasSupportedBadge) {
-      verificationEvidence.settingsUpdatedBadgesVerified = 'PASS'
+    if (!settingsAudit.hasPhase7A8 && settingsAudit.hasSupportedBadge && settingsAudit.hasUpdatedDesc && settingsAudit.hasCustomRow) {
+      report.observations.push({ id: 'settingsUpdatedBadgesVerified', status: 'PASS' })
       console.log('PASS: Settings UI accurately shows "已支持" and obsolete "Phase 7A.8 开放" is absent.')
     } else {
       throw new Error(`Settings UI text audit failed: ${JSON.stringify(settingsAudit)}`)
@@ -670,7 +782,7 @@ async function main() {
     })
     console.log('Dictionary Status:', dictStatus)
     if (dictStatus?.activeMode === 'fixture' && dictStatus?.installed === false) {
-      verificationEvidence.fixtureModeActive = 'PASS'
+      report.observations.push({ id: 'fixtureModeActive', status: 'PASS' })
       console.log('PASS: Initial dictionary mode is strictly "fixture" (installed: false).')
     } else {
       throw new Error(`Unexpected dictionary status: ${JSON.stringify(dictStatus)}`)
@@ -692,7 +804,8 @@ async function main() {
       lookupResponse?.headword === 'derive' &&
       lookupResponse?.source === 'sqlite-fixture'
     ) {
-      verificationEvidence.lookupSuccessful = 'PASS'
+      report.observations.push({ id: 'lookupSuccessful', status: 'PASS' })
+      report.classification.fixtureQuery = 'EXECUTED'
       verificationEvidence.lookupHeadword = lookupResponse.headword
       verificationEvidence.lookupSource = lookupResponse.source
       console.log(`PASS: Lookup succeeded for "${lookupResponse.headword}" via ${lookupResponse.source}.`)
@@ -713,13 +826,13 @@ async function main() {
     console.log(`  window.__DSH_WORD_LOOKUP__.gates():     ${JSON.stringify(hostGates)}`)
 
     if (dblChecked === 'false' && hostGates?.autoDoubleClick === false) {
-      verificationEvidence.autoDoubleClickDefaultOff = 'PASS'
+      report.observations.push({ id: 'autoDoubleClickDefaultOff', status: 'PASS' })
     } else {
       throw new Error(`autoDoubleClick not default off: aria-checked=${dblChecked}, gates=${JSON.stringify(hostGates)}`)
     }
 
     if (selChecked === 'false' && hostGates?.autoSelection === false) {
-      verificationEvidence.autoSelectionDefaultOff = 'PASS'
+      report.observations.push({ id: 'autoSelectionDefaultOff', status: 'PASS' })
     } else {
       throw new Error(`autoSelection not default off: aria-checked=${selChecked}, gates=${JSON.stringify(hostGates)}`)
     }
@@ -770,30 +883,7 @@ async function main() {
     console.log(`Definition lines count: ${cardMetrics.defLineCount}`)
     console.log(`Literal \\n in text: ${cardMetrics.hasLiteralEscapeInText}`)
 
-    const noPosDuplication = !cardMetrics.hasDuplicatePos && cardMetrics.firstTransLine.startsWith('n.')
-    const transYOrderValid =
-      cardMetrics.transRects.length === 3 &&
-      cardMetrics.transRects[1].top > cardMetrics.transRects[0].top &&
-      cardMetrics.transRects[2].top > cardMetrics.transRects[1].top
-    const defYOrderValid =
-      cardMetrics.defRects.length === 4 &&
-      cardMetrics.defRects[1].top > cardMetrics.defRects[0].top &&
-      cardMetrics.defRects[2].top > cardMetrics.defRects[1].top &&
-      cardMetrics.defRects[3].top > cardMetrics.defRects[2].top
-
-    if (transYOrderValid && defYOrderValid && !cardMetrics.hasLiteralEscapeInText) {
-      verificationEvidence.multilineFormattingVerified = 'PASS'
-      console.log('PASS: Multiline translations and definitions render cleanly with descending vertical positions.')
-    } else {
-      throw new Error(`Multiline formatting failed: transYOrderValid=${transYOrderValid}, defYOrderValid=${defYOrderValid}`)
-    }
-
-    if (noPosDuplication) {
-      verificationEvidence.posBadgeDeduplicationVerified = 'PASS'
-      console.log('PASS: POS badge duplication successfully suppressed ("v.n." absent, starts with "n.").')
-    } else {
-      throw new Error(`POS badge duplication detected: ${cardMetrics.firstTransLine}`)
-    }
+    report.observations.push(...formattingObservations(cardMetrics))
 
     const cardNormalShot = join(screenshotsDir, '01-card-multiline-normal-360px.png')
     await page.locator('[data-dsh-word-lookup="card"]').screenshot({ path: cardNormalShot })
@@ -808,8 +898,9 @@ async function main() {
       return card.getBoundingClientRect().width
     })
     console.log(`Narrow viewport card width: ${narrowCardWidth}px (<= 320px)`)
-    if (narrowCardWidth <= 320) {
-      verificationEvidence.narrowViewportVerified = 'PASS'
+    const narrowPassed = Number.isFinite(narrowCardWidth) && narrowCardWidth > 0 && narrowCardWidth <= 320
+    report.observations.push({ id: 'narrowViewportVerified', status: narrowPassed ? 'PASS' : 'FAIL', narrowCardWidth })
+    if (narrowPassed) {
       console.log('PASS: Card layout adapts cleanly to narrow 320px viewport without horizontal overflow.')
     } else {
       throw new Error(`Card width ${narrowCardWidth}px exceeds 320px viewport limit`)
@@ -862,8 +953,9 @@ async function main() {
     console.log(`Scrollability: scrollHeight=${scrollInfo.scrollHeight}, clientHeight=${scrollInfo.clientHeight}`)
     console.log(`Scroll action: before=${scrollInfo.beforeScroll}, after=${scrollInfo.afterScroll}`)
 
-    if (scrollInfo.isScrollable && scrollInfo.didScroll && scrollInfo.withinMaxHeightLimit && scrollInfo.noHorizontalOverflow) {
-      verificationEvidence.scrollabilityVerified = 'PASS'
+    const scrollRow = scrollObservation(scrollInfo, 'scrollabilityVerified')
+    report.observations.push(scrollRow)
+    if (scrollRow.status === 'PASS') {
       console.log('PASS: Long entry scrolling strictly verified (scrollHeight > clientHeight, scrollTop moved, maxHeight <= 440px).')
     } else {
       throw new Error(`Scrollability verification failed: ${JSON.stringify(scrollInfo)}`)
@@ -876,14 +968,9 @@ async function main() {
     await page.keyboard.press('Escape')
     await page.waitForTimeout(300)
 
-    // Acceptance 9: ECDICT not downloaded, zero external network requests
-    console.log('\n--- [Acceptance 9] Verifying ECDICT Download Boundary Invariant ---')
-    if (dictStatus.installed === false && dictStatus.canInstall === true) {
-      verificationEvidence.ecdictNotDownloaded = 'PASS'
-      console.log('PASS: ECDICT corpus remains uninstalled; zero automatic downloads triggered.')
-    } else {
-      throw new Error(`ECDICT download boundary violated: ${JSON.stringify(dictStatus)}`)
-    }
+    // Startup dictionary status cannot prove absence of later network activity.
+    report.startupDictionaryStatus = { installed: dictStatus.installed, canInstall: dictStatus.canInstall }
+    report.observations.push({ id: 'zero-auto-download', status: 'NOT_VERIFIED', reason: 'Full observation-window outbound network proof was not collected' })
 
     // Close browser & shutdown DSH for uninstallation test
     await context.close()
@@ -908,7 +995,7 @@ async function main() {
       console.log('PASS: Plugin uninstalled via DSH CLI.')
 
       console.log('Rebooting isolated DSH without plugin to verify clean removal...')
-      dshInstance = await bootDsh(verified, testPort, testRoot, dshInvocation)
+      dshInstance = await bootReleaseDsh(verified, testPort, testRoot, dshInvocation, 90_000, { onChildError: (error) => report.observations.push({ id: 'runtime-child-error', status: 'FAIL', message: String(error.message).replace(/([?&]token=)[^\s&]+/g, '$1REDACTED') }) })
 
       context = await chromium.launchPersistentContext(browserUserData, {
         headless: true,
@@ -918,93 +1005,61 @@ async function main() {
       await page.goto(dshInstance.url, { waitUntil: 'networkidle', timeout: 30000 })
       await page.waitForTimeout(1000)
 
-      const postUninstallLookup = await page.evaluate(async () => {
-        try {
-          const res = await window.fetch('api/dsh-word-lookup', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query: 'derive' }),
-          })
-          return { status: res.status }
-        } catch (e) {
-          return { error: String(e) }
-        }
+      const expectedOrigin = new URL(dshInstance.url).origin
+      const proof = await collectUninstallProof({
+        service: { origin: expectedOrigin, identified: dshInstance.child.exitCode === null && dshInstance.child.signalCode === null && new URL(expectedOrigin).hostname === '127.0.0.1' && Number(new URL(expectedOrigin).port) === testPort },
+        routeContract: report.runtime.routeContract,
+        probe: (rpcId) => probeUninstallPage(page, rpcId),
+        anonymousProbe: async () => {
+          try {
+            const response = await fetch(new URL('/api/pluginInventory/list', expectedOrigin), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}', redirect: 'error' })
+            await response.body?.cancel()
+            return { kind: 'response', status: response.status }
+          } catch { return { kind: 'transport-error', message: 'Anonymous authentication control failed' } }
+        },
       })
-      console.log('Post-uninstall lookup probe:', postUninstallLookup)
-      if (postUninstallLookup.status !== 200) {
-        verificationEvidence.uninstallationClean = 'PASS'
-        console.log(`PASS: Lookup route cleanly disarmed (HTTP status ${postUninstallLookup.status}).`)
-      } else {
-        throw new Error(`Lookup route still responded with HTTP 200 after uninstallation!`)
-      }
+      report.uninstallProof = proof
+      const uninstallStatus = evaluateUninstallProof(proof)
+      report.observations.push({ id: 'uninstallationClean', status: uninstallStatus })
+      console.log('Uninstall observation: ' + uninstallStatus)
 
       await context.close()
       context = null
       await stopDsh(dshInstance.child, testPort)
       dshInstance = null
     } else {
-      verificationEvidence.uninstallationClean = 'SKIPPED'
+      report.observations.push({ id: 'uninstallationClean', status: 'NOT_EXECUTED', reason: '--skip-uninstall was declared' })
     }
+  } catch (error) {
+    primaryError = error
   } finally {
-    if (context) {
-      await context.close().catch(() => {})
-    }
-    if (dshInstance) {
-      await stopDsh(dshInstance.child, testPort).catch(() => {})
-    }
-    if (downloadedTarballPath && existsSync(downloadedTarballPath)) {
-      rmSync(downloadedTarballPath, { force: true })
-    }
+    await cleanupReleaseSmokeResources({ context, dshInstance, downloadedTarballPath, testPort }, {}, primaryError)
   }
 
   // ---------------------------------------------------------------------------
   // [Gate 6] Record Final Smoke Execution Report & Clean Up
   // ---------------------------------------------------------------------------
   const durationMs = Date.now() - startTime
-  const finalReport = {
-    timestamp: new Date().toISOString(),
-    phase: 'RELEASE_V021',
-    mode: sourceMode,
-    verdict: 'PASS',
-    durationMs,
-    packageIdentity: {
-      name: EXPECTED_PACKAGE_NAME,
-      version: EXPECTED_VERSION,
-      sourceMode,
-      tarballSha256: expectedTarballSha256,
-      installedPath: installedDir,
-      isSymlink,
-    },
-    isolation: {
-      testRoot,
-      dshHome: testHome,
-      profile: testProfile,
-      port: testPort,
-    },
-    verificationEvidence,
-  }
-
-  const reportPath = join(evidenceDir, options['evidence-name'] || 'smoke-execution-report.json')
-  writeFileSync(reportPath, JSON.stringify(finalReport, null, 2), 'utf8')
-  console.log(`\nEvidence report written to: ${reportPath}`)
-
+  Object.assign(report, {
+    durationMs, mode: sourceMode,
+    packageIdentity: { name: EXPECTED_PACKAGE_NAME, version: EXPECTED_VERSION, sourceMode, tarballSha256: expectedTarballSha256, installedPath: installedDir, isSymlink },
+    isolation: { testRoot, dshHome: testHome, profile: testProfile, port: testPort },
+  })
+  // Persist observations outside the deletion range before invoking TEST001 cleanup.
+  // Final verdict is still written by the shared finalizer, including cleanup failures.
+  const beforeCleanupPath = join(evidenceDir, 'observations-before-cleanup.json')
+  writeFileSync(beforeCleanupPath, JSON.stringify({ ...report, verdict: 'INCOMPLETE', cleanup: 'PENDING' }, null, 2), { encoding: 'utf8', flag: 'wx' })
   if (options['keep-evidence'] !== 'true') {
-    console.log('Cleaning up isolated scratch directory...')
-    rmSync(testRoot, { recursive: true, force: true })
-    console.log('PASS: Scratch environment cleaned up.')
+    await cleanupReleaseTestRoot(ownedRoot, { children: [...ownedDshChildren], ports: [testPort], evidencePaths: [evidenceDir, screenshotsDir, report.reportPath, beforeCleanupPath] })
+    report.cleanup = { status: 'PASS' }
   } else {
-    console.log(`Scratch directory retained at: ${testRoot}`)
+    report.cleanup = { status: 'RETAINED', reason: '--keep-evidence' }
   }
-
-  console.log('\n======================================================================')
-  console.log(` RELEASE SMOKE TEST VERDICT: PASS (Mode: --source ${sourceMode})`)
-  console.log(` Duration: ${Math.round(durationMs / 1000)}s | Exit Code: 0`)
-  console.log('======================================================================\n')
-  process.exit(0)
 }
 
-main().catch((err) => {
-  console.error('\n[FATAL SMOKE FAILURE]')
-  console.error(err)
-  process.exit(1)
-})
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  runReleaseSmoke().then(({ exitCode }) => { process.exitCode = exitCode }).catch((error) => {
+    console.error('Smoke report could not be saved:', error.message)
+    process.exitCode = 1
+  })
+}

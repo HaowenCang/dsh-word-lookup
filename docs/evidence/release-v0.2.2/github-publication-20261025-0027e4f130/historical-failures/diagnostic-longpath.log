@@ -1,0 +1,74 @@
+preflight {"home":"C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-github-release-0027e4f130\\user","tmp":"C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-github-release-0027e4f130\\tmp","dsh":[]}
+
+node node_modules/vitest/vitest.mjs run tests/ecdict-importer.spec.ts --configLoader runner --no-cache --maxWorkers 1 -t imports valid small synthetic CSV
+
+ RUN  v3.2.4 C:/Users/20659/AppData/Local/Temp/dsh-022-github-release-0027e4f130/repo
+
+ ❯ tests/ecdict-importer.spec.ts (32 tests | 1 failed | 31 skipped) 19ms
+   × ECDICT Runtime Streaming Importer > imports valid small synthetic CSV into a fully valid managed DB 18ms
+     → unable to open database file
+   ↓ ECDICT Runtime Streaming Importer > fails closed with zero DB mutations if cached source is missing
+   ↓ ECDICT Runtime Streaming Importer > fails closed with zero DB mutations if cached source hash/size is invalid
+   ↓ ECDICT Runtime Streaming Importer > fails closed and removes temp DB if CSV header schema is invalid
+   ↓ ECDICT Runtime Streaming Importer > handles UTF-8 BOM in CSV header cleanly
+   ↓ ECDICT Runtime Streaming Importer > fails closed on fatal UTF-8 error during stream parsing without leaving candidate
+   ↓ ECDICT Runtime Streaming Importer > rejects oversized fields and empty headwords according to bounds policy
+   ↓ ECDICT Runtime Streaming Importer > enforces duplicate headword rejection without silent overwrite
+   ↓ ECDICT Runtime Streaming Importer > aborts cleanly before candidate creation when signal is already aborted
+   ↓ ECDICT Runtime Streaming Importer > aborts during entry import chunk loop and cleans up candidate and sidecars
+   ↓ ECDICT Runtime Streaming Importer > aborts during forms phase and cleans up candidate
+   ↓ ECDICT Runtime Streaming Importer > aborts before publication and leaves no final database
+   ↓ ECDICT Runtime Streaming Importer > isolates progress callback exceptions without corrupting the build
+   ↓ ECDICT Runtime Streaming Importer > rejects concurrent same-process imports on identical databaseDirectory
+   ↓ ECDICT Runtime Streaming Importer > releases concurrency lock after failure or abort
+   ↓ ECDICT Runtime Streaming Importer > preserves foreign temporary and final artifacts on error cleanup
+   ↓ ECDICT Runtime Streaming Importer > fails cleanly if final target database file already exists
+   ↓ ECDICT Runtime Streaming Importer > enforces exclusive candidate ownership and preserves foreign pre-existing candidate on collision
+   ↓ ECDICT Runtime Streaming Importer > fails safely on publication-time final collision race and preserves foreign final bytes
+   ↓ ECDICT Runtime Streaming Importer > exposes ambiguousFormCount, rejectedRowCount, and timing breakdown in build result
+   ↓ ECDICT Runtime Streaming Importer > cleans up candidate if PRAGMA integrity_check fails
+   ↓ ECDICT Runtime Streaming Importer > validates canonical probes function correctly
+   ↓ ECDICT Runtime Streaming Importer > preserves cleanup failure when both import and cleanup fail
+   ↓ ECDICT Runtime Streaming Importer > executes full PRAGMA integrity_check statement without table filters or quick_check
+   ↓ ECDICT Runtime Streaming Importer > covers complete logical hashing duration in phase timings across entries, forms, and examples
+   ↓ ECDICT Runtime Streaming Importer > completes normal publication with candidate unlinked and postPublicationCleanup.candidateRemoved = true and sidecarsRemoved = true
+   ↓ ECDICT Runtime Streaming Importer > records sidecar failure with sidecarsRemoved = false and preserves published final when sidecar unlink fails with EPERM
+   ↓ ECDICT Runtime Streaming Importer > records candidate failure with candidateRemoved = false and preserves published final when candidate unlink fails with EPERM
+   ↓ ECDICT Runtime Streaming Importer > retains published final and records cleanup error on post-publication unlink failure (EPERM)
+   ↓ ECDICT Runtime Streaming Importer > preserves foreign final byte-for-byte and cleans own candidate on pre-publication link collision (EEXIST)
+   ↓ ECDICT Runtime Streaming Importer > strictly adheres to Host startup boundary (apply() remains fixture-only)
+   ↓ ECDICT Runtime Streaming Importer > audits package root exports to ensure internal test seams are never exposed
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 31 skipped (32)
+   Start at  07:00:21
+   Duration  1.41s (transform 196ms, setup 0ms, collect 1.11s, tests 19ms, environment 0ms, prepare 142ms)
+
+
+(node:35884) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:39536) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/ecdict-importer.spec.ts > ECDICT Runtime Streaming Importer > imports valid small synthetic CSV into a fully valid managed DB
+Error: unable to open database file
+ ❯ Object.construct ../sqlite-open-trace.cjs:3:83
+ ❯ src/host/ecdict-importer.ts:866:69
+    864| 
+    865|     // 4. Create SQLite candidate database and schemas
+    866|     const sqliteFactory = options?.sqliteFactory ?? ((p: string) => ne…
+       |                                                                     ^
+    867|     db = sqliteFactory(candidatePath)
+    868|     dbOpen = true
+ ❯ buildManagedEcdictDatabaseInternal src/host/ecdict-importer.ts:867:10
+ ❯ tests/ecdict-importer.spec.ts:123:22
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+(node:31932) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+EXIT_CODE=1
+

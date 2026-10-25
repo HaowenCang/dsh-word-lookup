@@ -1,0 +1,100 @@
+preflight {"home":"C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-preflight-af97f83f7e\\user","tmp":"C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-preflight-af97f83f7e\\tmp","dsh":[]}
+
+node node_modules/vitest/vitest.mjs run tests/ecdict-downloader.spec.ts --configLoader runner --no-cache --maxWorkers 1 -t bounds pending cancel
+
+ RUN  v3.2.4 C:/Users/20659/AppData/Local/Temp/dsh-022-preflight-af97f83f7e/repo
+
+ ❯ tests/ecdict-downloader.spec.ts (55 tests | 4 failed | 51 skipped) 52ms
+   ↓ ECDICT secure downloader > BUG-003 response ownership > releases reader and aborts transport on decode failure
+   ↓ ECDICT secure downloader > BUG-003 response ownership > releases reader and aborts transport on write failure
+   ↓ ECDICT secure downloader > BUG-003 response ownership > releases reader and aborts transport on write-cancel-rejection failure
+   ↓ ECDICT secure downloader > BUG-003 response ownership > releases reader and aborts transport on read failure
+   ↓ ECDICT secure downloader > BUG-003 response ownership > releases reader and aborts transport on limit failure
+   ↓ ECDICT secure downloader > BUG-003 response ownership > releases reader and aborts transport on cancel-rejection failure
+   × ECDICT secure downloader > BUG-003 response ownership > bounds pending cancel at 1000ms for decode and preserves the original error 19ms
+     → expected 'operation-settled' to be 'cancel-entered' // Object.is equality
+   × ECDICT secure downloader > BUG-003 response ownership > bounds pending cancel at 1000ms for status and preserves the original error 17ms
+     → expected 'operation-settled' to be 'cancel-entered' // Object.is equality
+   × ECDICT secure downloader > BUG-003 response ownership > bounds pending cancel at 1000ms for length and preserves the original error 4ms
+     → expected 'operation-settled' to be 'cancel-entered' // Object.is equality
+   × ECDICT secure downloader > BUG-003 response ownership > bounds pending cancel at 1000ms for redirect and preserves the original error 11ms
+     → expected 'operation-settled' to be 'cancel-entered' // Object.is equality
+   ↓ ECDICT secure downloader > BUG-003 response ownership > forwards abort while read is pending and removes caller listener
+   ↓ ECDICT secure downloader > BUG-003 response ownership > releases normal EOF without cancel, including hash failure, then succeeds and reuses valid cache
+   ↓ ECDICT secure downloader > BUG-003 response ownership > recovers the same destination after consecutive open-stream failures and a cancelled redirect
+   ↓ ECDICT secure downloader > BUG-003 response ownership > retains its part if closing its handle fails and preserves the original write error
+   ↓ ECDICT secure downloader > BUG-003 actual Host artifact > keeps the packaged pin and private seams while cancelling invalid open UTF-8 through the public root
+   ↓ ECDICT secure downloader > rejects insecure protocol (non-HTTPS)
+   ↓ ECDICT secure downloader > rejects unallowlisted hostname
+   ↓ ECDICT secure downloader > rejects redirect to insecure HTTP protocol
+   ↓ ECDICT secure downloader > rejects redirect to unallowlisted hostname
+   ↓ ECDICT secure downloader > rejects exceeding maximum redirects (> 3)
+   ↓ ECDICT secure downloader > rejects redirect response missing Location header
+   ↓ ECDICT secure downloader > rejects non-200 final HTTP status
+   ↓ ECDICT secure downloader > rejects null response body
+   ↓ ECDICT secure downloader > rejects early when declared Content-Length exceeds sourceByteSize
+   ↓ ECDICT secure downloader > rejects oversized streamed body even with lying small Content-Length
+   ↓ ECDICT secure downloader > rejects truncated streamed body (actual bytes < expected bytes)
+   ↓ ECDICT secure downloader > rejects download when SHA-256 does not match
+   ↓ ECDICT secure downloader > rejects download with invalid UTF-8 bytes mid-stream
+   ↓ ECDICT secure downloader > rejects download with incomplete UTF-8 sequence at EOF
+   ↓ ECDICT secure downloader > successfully downloads and publishes verified synthetic corpus
+   ↓ ECDICT secure downloader > reuses existing valid cache without making network calls
+   ↓ ECDICT secure downloader > leaves existing invalid cache untouched if download fails
+   ↓ ECDICT secure downloader > atomically replaces existing invalid cache when download succeeds
+   ↓ ECDICT secure downloader > cancels immediately if AbortSignal is already aborted
+   ↓ ECDICT secure downloader > cancels mid-stream on AbortSignal and cleans up owned .part file
+   ↓ ECDICT secure downloader > blocks concurrent same-process download attempts for same destination
+   ↓ ECDICT secure downloader > preserves foreign .part files during own cleanup on failure
+   ↓ ECDICT secure downloader > ignores progress callback exceptions and completes download successfully
+   ↓ ECDICT secure downloader > verifies that host apply() makes zero external network calls even with managed-ecdict mode
+   ↓ ECDICT secure downloader > Remediation A: Cancellation linearization & abort-before-publication > aborts cleanly from verifying progress callback without publishing final file and removes .part
+   ↓ ECDICT secure downloader > Remediation A: Cancellation linearization & abort-before-publication > preserves existing invalid final cache byte-for-byte when abort occurs at verifying stage
+   ↓ ECDICT secure downloader > Remediation A: Cancellation linearization & abort-before-publication > releases same-process concurrency guard immediately after abort at verifying stage
+   ↓ ECDICT secure downloader > Remediation B: Production provenance boundary & test seam isolation > ensures root package exports (src/index.ts) do not expose internal testing seams
+   ↓ ECDICT secure downloader > Remediation B: Production provenance boundary & test seam isolation > production downloadPinnedEcdict always resolves packaged manifest pin and ignores foreign descriptor options
+   ↓ ECDICT secure downloader > Remediation C: Independent hard streamed-byte ceiling & strict Content-Length > defines distinct manifest sourceByteSize and MAX_STREAMED_SOURCE_BYTES ceiling
+   ↓ ECDICT secure downloader > Remediation C: Independent hard streamed-byte ceiling & strict Content-Length > rejects pre-network when descriptor expected size exceeds absolute ceiling (80 MiB)
+   ↓ ECDICT secure downloader > Remediation C: Independent hard streamed-byte ceiling & strict Content-Length > rejects early when Content-Length exceeds absolute security ceiling (80 MiB)
+   ↓ ECDICT secure downloader > Remediation C: Independent hard streamed-byte ceiling & strict Content-Length > strictly parses Content-Length and rejects malformed values like "123garbage"
+   ↓ ECDICT secure downloader > Remediation C: Independent hard streamed-byte ceiling & strict Content-Length > cancels response body and cleans up .part when Content-Length is malformed ("123garbage") without touching absent final
+   ↓ ECDICT secure downloader > Remediation C: Independent hard streamed-byte ceiling & strict Content-Length > cancels response body, cleans up .part, and preserves existing invalid final cache byte-for-byte on malformed Content-Length
+   ↓ ECDICT secure downloader > Remediation C: Independent hard streamed-byte ceiling & strict Content-Length > cancels response body and cleans up .part when Content-Length is an unsafe integer
+   ↓ ECDICT secure downloader > Remediation C: Independent hard streamed-byte ceiling & strict Content-Length > rejects in stream loop with explicit security ceiling error when bytes exceed 80 MiB
+   ↓ ECDICT secure downloader > Remediation D: Clean un-obfuscated URL credentials rejection > detects embedded userinfo via hasEmbeddedUserInfo without scanner obfuscation
+   ↓ ECDICT secure downloader > Remediation D: Clean un-obfuscated URL credentials rejection > fails closed for all variations of URL embedded credentials
+   ↓ ECDICT secure downloader > Remediation D: Clean un-obfuscated URL credentials rejection > confirms source code contains zero Store-scanner string-splitting obfuscation
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 51 skipped (55)
+   Start at  05:08:59
+   Duration  1.19s (transform 199ms, setup 0ms, collect 853ms, tests 52ms, environment 0ms, prepare 119ms)
+
+
+(node:55532) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/ecdict-downloader.spec.ts > ECDICT secure downloader > BUG-003 response ownership > bounds pending cancel at 1000ms for decode and preserves the original error
+ FAIL  tests/ecdict-downloader.spec.ts > ECDICT secure downloader > BUG-003 response ownership > bounds pending cancel at 1000ms for status and preserves the original error
+ FAIL  tests/ecdict-downloader.spec.ts > ECDICT secure downloader > BUG-003 response ownership > bounds pending cancel at 1000ms for length and preserves the original error
+ FAIL  tests/ecdict-downloader.spec.ts > ECDICT secure downloader > BUG-003 response ownership > bounds pending cancel at 1000ms for redirect and preserves the original error
+AssertionError: expected 'operation-settled' to be 'cancel-entered' // Object.is equality
+
+Expected: "cancel-entered"
+Received: "operation-settled"
+
+ ❯ tests/ecdict-downloader.spec.ts:159:23
+    157|           operation.then(() => 'operation-settled'),
+    158|         ])
+    159|         expect(first).toBe('cancel-entered')
+       |                       ^
+    160|         expect(cancelCalls).toBe(1)
+    161|         expect(settled).toBe(false)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+
+EXIT_CODE=1
+

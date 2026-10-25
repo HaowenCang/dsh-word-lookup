@@ -1,0 +1,7 @@
+{"runId":"177eb310","pid":15116,"threadId":0,"sequence":1,"time":1792932062814,"kind":"observer-ready","node":"v24.21.0","isMainThread":true,"hooks":["fetch","http","https","socket","tls","undici","worker","child"],"mode":"record-and-block-external"}
+{"runId":"177eb310","pid":15116,"threadId":0,"sequence":2,"time":1792932070074,"kind":"child-created","operation":"execFile","command":"reg.exe","childPid":54528}
+{"runId":"177eb310","pid":15116,"threadId":0,"sequence":3,"time":1792932070158,"kind":"child-created","operation":"execFile","command":"powershell.exe","childPid":13720}
+{"runId":"177eb310","pid":15116,"threadId":0,"sequence":4,"time":1792932070177,"kind":"child-created","operation":"execFile","command":"reg.exe","childPid":47072}
+{"runId":"177eb310","pid":15116,"threadId":0,"sequence":5,"time":1792932070264,"kind":"child-created","operation":"execFile","command":"reg.exe","childPid":54116}
+{"runId":"177eb310","pid":15116,"threadId":0,"sequence":6,"time":1792932070639,"kind":"child-created","operation":"execFile","command":"reg.exe","childPid":26744}
+{"runId":"177eb310","pid":15116,"threadId":0,"sequence":7,"time":1792932072103,"kind":"child-created","operation":"execFile","command":"reg.exe","childPid":50820}

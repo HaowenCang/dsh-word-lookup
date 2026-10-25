@@ -1,0 +1,29 @@
+preflight {"home":"C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-preflight-af97f83f7e\\user","tmp":"C:\\Users\\20659\\AppData\\Local\\Temp\\dsh-022-preflight-af97f83f7e\\tmp","dsh":[]}
+
+node node_modules/tsdown/dist/run.mjs --config-loader native
+ℹ tsdown v0.23.0 powered by rolldown v1.2.14
+ℹ config file: C:\Users\20659\AppData\Local\Temp\dsh-022-preflight-af97f83f7e\repo\tsdown.config.ts 
+ℹ [dsh-word-lookup-host] entry: src/index.ts
+ℹ [dsh-word-lookup-host] target: node22
+ℹ [dsh-word-lookup-host] tsconfig: tsconfig.json
+ℹ [dsh-word-lookup-client] entry: src/client/index.tsx
+ℹ [dsh-word-lookup-client] target: es2022
+ℹ [dsh-word-lookup-client] tsconfig: tsconfig.json
+ℹ [dsh-word-lookup-worker] entry: src/host/ecdict-integrity-worker.ts
+ℹ [dsh-word-lookup-worker] target: node22
+ℹ [dsh-word-lookup-worker] tsconfig: tsconfig.json
+ℹ Build start
+ℹ Cleaning 53 files
+ℹ [dsh-word-lookup-worker] [ESM] lib\ecdict-integrity-worker.js  29.26 kB │ gzip: 7.37 kB
+ℹ [dsh-word-lookup-worker] [ESM] 1 files, total: 29.26 kB
+✔ [dsh-word-lookup-worker] Build complete in 84ms
+ℹ [dsh-word-lookup-host] [ESM] lib\index.js  361.99 kB │ gzip: 81.97 kB
+ℹ [dsh-word-lookup-host] [ESM] 1 files, total: 361.99 kB
+✔ [dsh-word-lookup-host] Build complete in 89ms
+ℹ [dsh-word-lookup-client] [CJS] lib\client.js  198.73 kB │ gzip: 49.42 kB
+ℹ [dsh-word-lookup-client] [CJS] 1 files, total: 198.73 kB
+✔ [dsh-word-lookup-client] Build complete in 130ms
+
+
+EXIT_CODE=0
+

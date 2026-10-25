@@ -177,3 +177,127 @@ export function readEligibleSelection(doc: Document): EligibleSelection | null {
   const range = selection.getRangeAt(0)
   return { text, range, rect: readRangeRect(range) }
 }
+/** Automatic-only target exclusions. Manual shortcut selection rules stay above. */
+export const AUTOMATIC_EXCLUDED_SELECTOR = `${INTERACTIVE_SURFACE_SELECTOR}, [contenteditable]:not([contenteditable="false"]), button, a, [role="button"], [role="link"], [role="dialog"], [aria-modal="true"], [data-dsh-word-lookup="card"], .dsh-wl-card, .dsh-wl-settings, .snapshot-picker-modal`
+
+export interface SelectionEndpoints {
+  readonly anchorNode: Node | null
+  readonly anchorOffset: number
+  readonly focusNode: Node | null
+  readonly focusOffset: number
+}
+
+/** Value snapshot only: never retain a live Selection or Range across events. */
+export function readSelectionEndpoints(doc: Document): SelectionEndpoints | null {
+  const selection = doc.getSelection()
+  return selection === null ? null : {
+    anchorNode: selection.anchorNode,
+    anchorOffset: selection.anchorOffset,
+    focusNode: selection.focusNode,
+    focusOffset: selection.focusOffset,
+  }
+}
+
+export interface AutomaticSurface {
+  readonly target: Element
+  readonly flow: Element
+}
+
+/** Resolve through the composed path, then inspect all DOM ancestors. */
+export function readAutomaticSurface(doc: Document, event: MouseEvent): AutomaticSurface | null {
+  const path = event.composedPath()
+  const elements = path.filter((node): node is Element => (node as Node)?.nodeType === 1)
+  const target = elements[0] ?? elementFor(event.target as Node | null)
+  if (target === null) return null
+  for (const element of new Set([target, ...elements])) {
+    if (element.closest(AUTOMATIC_EXCLUDED_SELECTOR) !== null) return null
+  }
+  // Resolve from the hit text outward: an explicit text/all descendant is
+  // selectable even when its shell is none. Semantic exclusions above still
+  // apply across the whole composed path regardless of this CSS override.
+  let resolved = false
+  for (const element of new Set([target, ...elements])) {
+    for (let ancestor: Element | null = element; ancestor !== null; ancestor = ancestor.parentElement) {
+      const style = doc.defaultView?.getComputedStyle(ancestor)
+      const value = [style?.userSelect, style?.getPropertyValue('-webkit-user-select')]
+        .find(value => value !== undefined && value !== '' && value !== 'auto')
+      if (value === 'none') return null
+      if (value !== undefined) { resolved = true; break }
+    }
+    if (resolved) break
+  }
+  const flow = target.closest(CONVERSATION_FLOW_SELECTOR)
+  return flow === null ? null : { target, flow }
+}
+
+/** Browser-resolved insertion point copied as node/offset values, never a Range. */
+export interface SelectionCaret {
+  readonly node: Node
+  readonly offset: number
+}
+
+export function readPointCaret(doc: Document, x: number, y: number): SelectionCaret | null {
+  const caretDoc = doc as Document & {
+    caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null
+    caretRangeFromPoint?: (x: number, y: number) => Range | null
+  }
+  const position = caretDoc.caretPositionFromPoint?.(x, y)
+  if (position !== undefined && position !== null) return { node: position.offsetNode, offset: position.offset }
+  const range = caretDoc.caretRangeFromPoint?.(x, y)
+  return range === undefined || range === null ? null : { node: range.startContainer, offset: range.startOffset }
+}
+
+export interface AutomaticGestureContext {
+  readonly surface: AutomaticSurface
+  readonly before: SelectionEndpoints | null
+  readonly caret: SelectionCaret | null
+  readonly x: number
+  readonly y: number
+}
+
+/** Caret positions may map to a selected endpoint from trailing line whitespace. */
+function pointTouchesRange(range: Range, caret: SelectionCaret | null, x: number, y: number): boolean {
+  if (caret !== null) {
+    // A copied boundary offset does not track streaming DOM edits like a Range.
+    // Invalid saved evidence is refused, never clamped or sent to geometry.
+    const node = caret.node
+    const length = [3, 4, 7, 8].includes(node.nodeType) ? (node.nodeValue?.length ?? 0) : node.childNodes.length
+    if (node.nodeType === 10 || !Number.isInteger(caret.offset) || caret.offset < 0 || caret.offset > length) return false
+    return caret.node.getRootNode() === range.startContainer.getRootNode() &&
+      range.isPointInRange(caret.node, caret.offset)
+  }
+  // Geometry remains a fallback when the browser cannot resolve a caret.
+  return Array.from(range.getClientRects()).some(rect =>
+    x >= rect.x - 2 && x <= rect.x + rect.width + 2 && y >= rect.y - 2 && y <= rect.y + rect.height + 2,
+  )
+}
+
+/** Associate this gesture's two targets/points with the newly read live Range. */
+export function isSelectionRelatedToGesture(
+  doc: Document,
+  selection: EligibleSelection,
+  context: AutomaticGestureContext | null,
+  event: MouseEvent,
+): boolean {
+  if (context === null) return false
+  const end = readAutomaticSurface(doc, event)
+  const live = readSelectionEndpoints(doc)
+  if (end === null || live === null) return false
+  const anchor = elementFor(live.anchorNode)?.closest(CONVERSATION_FLOW_SELECTOR)
+  const focus = elementFor(live.focusNode)?.closest(CONVERSATION_FLOW_SELECTOR)
+  if (!((context.surface.flow === anchor && end.flow === focus) || (context.surface.flow === focus && end.flow === anchor))) return false
+  const range = selection.range
+  if (!range.intersectsNode(context.surface.target) || !range.intersectsNode(end.target)) return false
+  const startCaret = context.caret ?? readPointCaret(doc, context.x, context.y)
+  const endCaret = readPointCaret(doc, event.clientX, event.clientY)
+  if (!pointTouchesRange(range, startCaret, context.x, context.y) ||
+      !pointTouchesRange(range, endCaret, event.clientX, event.clientY)) return false
+  const before = context.before
+  const changed = before === null || before.anchorNode !== live.anchorNode || before.focusNode !== live.focusNode ||
+    before.anchorOffset !== live.anchorOffset || before.focusOffset !== live.focusOffset
+  // Endpoint change is evidence, never a prerequisite: a second real gesture
+  // over the same text is legitimate when both targets contain its endpoints.
+  return changed ||
+    ((context.surface.target.contains(live.anchorNode) && end.target.contains(live.focusNode)) ||
+     (context.surface.target.contains(live.focusNode) && end.target.contains(live.anchorNode)))
+}
